@@ -1,8 +1,10 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst
-AC_INIT([nbd],[2.7.2],[wouter@debian.org])
-AM_INIT_AUTOMAKE()
+AC_INIT([nbd],[2.7.3],[wouter@debian.org])
+AM_INIT_AUTOMAKE(dist-bzip2 foreign)
+
+AM_MAINTAINER_MODE
 
 AC_ARG_ENABLE(
   lfs, 
@@ -48,7 +50,7 @@ AC_PROG_CC
 AC_MSG_CHECKING(whether warnings should be enabled)
 if test -n "$GCC" ; then
   AC_MSG_RESULT(yes)
-  #CFLAGS="$CFLAGS -Wall -W -Wno-parentheses -Wstrict-prototypes -Wno-unused"
+  CFLAGS="$CFLAGS -Wall -W -Wno-parentheses -Wstrict-prototypes -Wno-unused"
 else
   AC_MSG_RESULT(no)
 fi
