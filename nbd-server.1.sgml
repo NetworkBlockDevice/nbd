@@ -64,6 +64,7 @@ manpage.1: manpage.sgml
       <arg><option>-m</option></arg>
       <arg><option>-c</option></arg>
       <arg><option>-a <replaceable>timeout</replaceable></option></arg>
+      <arg><option>-l <replaceable>host list</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -168,6 +169,23 @@ manpage.1: manpage.sgml
 	  this option is strongly recommended.</para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>host list</option></term>
+	<listitem>
+	  <para>This argument should contain a list of IP-addresses
+	  for hosts that may connect to the server. Wildcards are
+	  <emphasis>not</emphasis> allowed. If the file does not
+	  exist, it is ignored (and any host can connect); If the file
+	  does exist, but is empty, no host can connect. By default,
+	  the name 'nbd_server.allow' is used, and looked for in the
+	  current directory, unless nbd-server is compiled as a
+	  daemon, in which case it is looked for in the
+	  root-directory.
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </refsect1>
     </variablelist>
   </refsect1>
   <refsect1>
@@ -192,22 +210,6 @@ manpage.1: manpage.sgml
     </itemizedlist>
   </refsect1>
   <refsect1>
-    <title>FILES</title>
-    
-    <variablelist>
-      <varlistentry>
-	<term><filename>nbd_server.allow</filename></term>
-	<listitem>
-	  <para>This file, which must be in the directory where
-	  nbd-server is invoked, can contain a list of IP-addresses
-	  for hosts that may connect to the server. Wildcards are
-	  <b>not</b> allowed.
-	</listitem>
-      </varlistentry>
-    </variablelist>
-
-  </refsect1>
-  <refsect1>
     <title>SEE ALSO</title>
 
     <para>nbd-client (8).</para>
@@ -215,8 +217,12 @@ manpage.1: manpage.sgml
   </refsect1>
   <refsect1>
     <title>AUTHOR</title>
-    <para>The NBD kernel module and the NBD tools were written by
-      Pavel Machek (pavel@ucw.cz)</para>
+    <para>The NBD kernel module and the NBD tools were originally
+      written by Pavel Machek (pavel@ucw.cz)</para>
+
+    <para>The kernel module is now maintained by Paul Clements
+      (Paul.Clements@steeleye.com), while the userland tools are
+      maintained by &dhusername; (&dhemail;)</para>
 
     <para>This manual page was written by &dhusername; (&dhemail;) for
       the &debian; system (but may be used by others).  Permission is

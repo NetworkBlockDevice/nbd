@@ -57,14 +57,6 @@
 // #define ISSERVER
 #define MY_NAME "nbd_server"
 
-/* Authorization file should contain lines with IP addresses of 
-   clients authorized to use the server. If it does not exist,
-   access is permitted. 
-   
-   You may want to set this to an absolute path if you're not using
-   -DNODAEMON, since if you don't, nbd-server will look for this file
-   in the root-directory ("/"). */
-#define AUTH_FILE "nbd_server.allow"
 /* how much space for child PIDs we have by default. Dynamically
    allocated, and will be realloc()ed if out of space, so this should
    probably be fair for most situations. */
@@ -73,7 +65,6 @@
 #include "cliserv.h"
 //#undef _IO
 /* Deep magic: ioctl.h defines _IO macro (at least on linux) */
-
 
 /* Debugging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -85,7 +76,6 @@
 #define msg3(a,b,c) do { fprintf(stderr,b,c); fputs("\n",stderr) ; } while(0) 
 #define msg4(a,b,c,d) do { fprintf(stderr,b,c,d); fputs("\n",stderr) ; } while(0)
 #endif
-
 
 #include <sys/ioctl.h>
 #include <sys/mount.h>		/* For BLKGETSIZE */
@@ -108,6 +98,7 @@ void set_peername(int net,char *clientname);
 char difffilename[256];
 unsigned int timeout = 0;
 int autoreadonly = 0;
+char *auth_file="nbd_server.allow";
 
 int authorized_client(char *name)
 /* 0 - authorization refused, 1 - OK 
@@ -118,9 +109,9 @@ int authorized_client(char *name)
    
 	char line[LINELEN] ; 
 
-	if ((f=fopen(AUTH_FILE,"r"))==NULL) {
+	if ((f=fopen(auth_file,"r"))==NULL) {
 		msg4(LOG_INFO,"Can't open authorization file %s (%s).",
-		     AUTH_FILE,strerror(errno)) ;
+		     auth_file,strerror(errno)) ;
 		return 1 ; 
 	}
   
@@ -193,6 +184,7 @@ void cmdline(int argc, char *argv[])
 		       "	-r read only\n"
 		       "	-m multiple file\n"
 		       "	-c copy on write\n"
+		       "        -l file with list of hosts that are allowed to connect.\n"
 		       "        -a maximum idle seconds, terminates when idle time exceeded\n"
 		       "	if port is set to 0, stdin is used (for running from inetd)\n"
 		       "	if file_to_export contains '%%s', it is substituted with IP\n"
@@ -212,6 +204,14 @@ void cmdline(int argc, char *argv[])
 				break;
 			case 'c': flags |=F_COPYONWRITE;
 			        break;
+			case 'l':
+				free(auth_file);
+				if (i+1<argc) {
+					auth_file=argv[++i];
+				} else {
+					fprintf(stderr, "host list file requires an argument");
+				}
+				break;
 			case 'a': 
 				if (i+1<argc) {
 					timeout = atoi(argv[i+1]);
