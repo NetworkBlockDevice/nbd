@@ -741,11 +741,15 @@ int mainloop(int net)
  **/
 int splitexport(void) {
 	off_t i ;
-	
+
 	for (i=0; i<exportsize; i+=hunksize) {
 		char exportname3[1024];
-		
-		snprintf(exportname3, 1024, "%s.%d", exportname2, (int)(i/hunksize));
+
+		if(flags & F_MULTIFILE) {
+			snprintf(exportname3, 1024, "%s.%d", exportname2, (int)(i/hunksize));
+		} else {
+			strncpy(exportname3, exportname2, 1024);
+		}
 		exportname3[1023]='\0';
 		printf( "Opening %s\n", exportname3 );
 		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
