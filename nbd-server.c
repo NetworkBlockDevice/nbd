@@ -96,9 +96,9 @@
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
-#define msg2(a,b) syslog(a,"%s", b)
-#define msg3(a,b,c) syslog(a,"%s %s", b,c)
-#define msg4(a,b,c,d) syslog(a,"%s %s %s", b,c,d)
+#define msg2(a,b) syslog(a,b)
+#define msg3(a,b,c) syslog(a,b,c)
+#define msg4(a,b,c,d) syslog(a,b,c,d)
 #else
 #define msg2(a,b) g_message(b)
 #define msg3(a,b,c) g_message(b,c)
@@ -391,15 +391,11 @@ void sigchld_handler(int s)
 
 	while((pid=wait(status)) > 0) {
 		if(WIFEXITED(status)) {
-			memset(buf,'\0', 80);
-			snprintf(buf, 79, "%d", WEXITSTATUS(status));
-			msg3(LOG_INFO, "Child exited with ", buf);
+			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 		}
 		for(i=0;children[i]!=pid&&i<child_arraysize;i++);
 		if(i>=child_arraysize) {
-			memset(buf, '\0', 80);
-			snprintf(buf, 79, "%ld", (long)pid);
-			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID ", buf);
+			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
 		} else {
 			children[i]=(pid_t)0;
 			DEBUG2("Removing %d from the list of children", pid);
@@ -845,9 +841,7 @@ void serveconnection(CLIENT *client) {
 		err("Size of exported file is too big\n");
 	}
 	else {
-		memset(buf, '\0', 80);
-		snprintf(buf, 79, "%Lu", (unsigned long long)client->exportsize);
-		msg3(LOG_INFO, "size of exported file/device is %s", buf);
+		msg3(LOG_INFO, "size of exported file/device is %Lu", (unsigned long long)client->exportsize);
 	}
 
 	setmysockopt(client->net);
