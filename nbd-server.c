@@ -212,9 +212,19 @@ void connectme(int port)
 	struct sockaddr_in addrin;
 	int addrinlen = sizeof(addrin);
 	int net, sock, newpid;
+#ifndef sun
+	int yes=1;
+#else
+	char yes='1';
+#endif
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
+
+	/* lose the pesky "Address already in use" error message */
+	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
+	        err("setsockopt");
+	}
 
 	DEBUG("Waiting for connections... bind, ");
 	addrin.sin_family = AF_INET;
