@@ -196,6 +196,8 @@ manpage.1: manpage.sgml
   </refsect1>
   <refsect1>
     <title>AUTHOR</title>
+    <para>The NBD kernel module and the NBD tools were written by
+      Pavel Machek (pavel@ucw.cz)</para>
 
     <para>This manual page was written by &dhusername; (&dhemail;) for
       the &debian; system (but may be used by others).  Permission is
