@@ -308,7 +308,6 @@ void cmdline(int argc, char *argv[])
 			case 'c': flags |=F_COPYONWRITE;
 			        break;
 			case 'l':
-				free(auth_file);
 				if (i+1<argc) {
 					auth_file=argv[++i];
 				} else {
