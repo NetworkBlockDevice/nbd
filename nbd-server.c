@@ -18,11 +18,17 @@
  * 	clean on 32 bit machines. Anton Altaparmakov <aia21@cam.ac.uk>
  * Version 2.0 - Version synchronised with client
  * Version 2.1 - Reap zombie client processes when they exit. Removed
- * 	(uncommented) the _IO magic, it's no longer necessary.
+ * 	(uncommented) the _IO magic, it's no longer necessary. Wouter
+ * 	Verhelst <wouter@debian.org>
  * Version 2.2 - Auto switch to read-only mode (usefull for floppies).
+ * Version 2.3 - Fixed code so that Large File Support works. This
+ *	removes the FS_32BIT compile-time directive; define
+ *	_FILE_OFFSET_BITS=64 and _LARGEFILE_SOURCE if you used to be
+ *	using FS_32BIT. This will allow you to use files >2GB instead of
+ *	having to use the -m option. Wouter Verhelst <wouter@debian.org>
  */
 
-#define VERSION "2.2"
+#define VERSION "2.3"
 #define GIGA (1*1024*1024*1024)
 
 #include <sys/types.h>
@@ -71,15 +77,6 @@
 #include <sys/ioctl.h>
 #include <sys/mount.h>		/* For BLKGETSIZE */
 
-#ifdef	FS_32BIT
-typedef u32		fsoffset_t;
-#define htonll		htonl
-#define ntohll		ntohl
-#else
-typedef u64		fsoffset_t;
-#endif
-
-
 //#define DODBG
 #ifdef DODBG
 #define DEBUG( a ) printf( a )
@@ -89,11 +86,6 @@ typedef u64		fsoffset_t;
 #define DEBUG( a )
 #define DEBUG2( a,b ) 
 #define DEBUG3( a,b,c ) 
-#endif
-
-#if	defined(HAVE_LLSEEK) && !defined(sun)
-/* Solaris already has llseek defined in unistd.h */
-extern long long llseek(unsigned int, long long, unsigned int);
 #endif
 
 void serveconnection(int net);
@@ -150,10 +142,11 @@ inline void writeit(int f, void *buf, int len)
 	}
 }
 
+#define OFFT_MAX (((off_t)1)<<(sizeof(off_t)*8))-1
 int port;			/* Port I'm listening at */
 char *exportname;		/* File I'm exporting */
-fsoffset_t exportsize = (fsoffset_t)-1;	/* ...and its length */
-fsoffset_t hunksize = (fsoffset_t)-1;
+off_t exportsize = OFFT_MAX;	/* ...and its length */
+off_t hunksize = OFFT_MAX;
 int flags = 0;
 int export[1024];
 int difffile=-1 ;
@@ -207,13 +200,13 @@ void cmdline(int argc, char *argv[])
 				}
 			}
 		} else {
-			fsoffset_t es;
+			off_t es;
 			int last = strlen(argv[i])-1;
 			char suffix = argv[i][last];
 			if (suffix == 'k' || suffix == 'K' ||
 			    suffix == 'm' || suffix == 'M')
 				argv[i][last] = '\0';
-			es = (fsoffset_t)atol(argv[i]);
+			es = (off_t)atol(argv[i]);
 			switch (suffix) {
 				case 'm':
 				case 'M':  es <<= 10;
@@ -296,47 +289,39 @@ void connectme(int port)
 #define SEND writeit( net, &reply, sizeof( reply ));
 #define ERROR { reply.error = htonl(-1); SEND; reply.error = 0; lastpoint = -1; }
 
-fsoffset_t lastpoint = (fsoffset_t)-1;
+off_t lastpoint = (off_t)-1;
 
-void maybeseek(int handle, fsoffset_t a)
+void maybeseek(int handle, off_t a)
 {
-	if (a > exportsize)
-		err("Can not happen\n");
-	if (lastpoint != a) {
-#if	defined(HAVE_LLSEEK) && !defined(FS_32BIT)
-		if (llseek(handle, a, SEEK_SET) < 0)
-#else
-		if (lseek(handle, (long)a, SEEK_SET) < 0)
-#endif
-			err("Can not seek locally!\n");
-		lastpoint = a;
-	} else {
-		DEBUG("@");
-	}
+if (a > exportsize)
+	err("Can not happen\n");
+if (lastpoint != a) {
+	if (lseek(handle, a, SEEK_SET) < 0)
+		err("Can not seek locally!\n");
+	lastpoint = a;
+} else {
+	DEBUG("@");
+}
 }
 
-void myseek(int handle,fsoffset_t a)
+void myseek(int handle,off_t a)
 {
-#if HAVE_LLSEEK && !defined(FS_32BIT)
-	if (llseek(handle, a, SEEK_SET) < 0)
-#else
-	if (lseek(handle, (long)a, SEEK_SET) < 0)
-#endif 
+	if (lseek(handle, a, SEEK_SET) < 0)
 		err("Can not seek locally!\n");
 }
 
 char pagebuf[DIFFPAGESIZE];
 
-int rawexpread(fsoffset_t a, char *buf, int len)
+int rawexpread(off_t a, char *buf, int len)
 {
   maybeseek(export[a/hunksize], a%hunksize);
   return (read(export[a/hunksize], buf, len) != len);
 }
 
-int expread(fsoffset_t a, char *buf, int len)
+int expread(off_t a, char *buf, int len)
 {
 	int rdlen, offset;
-	fsoffset_t mapcnt, mapl, maph, pagestart;
+	off_t mapcnt, mapl, maph, pagestart;
  
 	if (!(flags & F_COPYONWRITE))
 		return rawexpread(a, buf, len);
@@ -363,17 +348,17 @@ int expread(fsoffset_t a, char *buf, int len)
 	return 0;
 }
 
-int rawexpwrite(fsoffset_t a, char *buf, int len)
+int rawexpwrite(off_t a, char *buf, int len)
 {
 	maybeseek(export[a/hunksize], a%hunksize);
 	return (write(export[a/hunksize], buf, len) != len);
 }
 
 
-int expwrite(fsoffset_t a, char *buf, int len)
+int expwrite(off_t a, char *buf, int len)
 {
 	u32 mapcnt,mapl,maph ; int wrlen,rdlen ; 
-	fsoffset_t pagestart ; int offset ;
+	off_t pagestart ; int offset ;
 
 	if (!(flags & F_COPYONWRITE))
 		return(rawexpwrite(a,buf,len)); 
@@ -415,22 +400,16 @@ int mainloop(int net)
 	struct nbd_reply reply;
 	char zeros[300];
 	int i = 0;
-	fsoffset_t size_host;
+	off_t size_host;
 
 	memset(zeros, 0, 290);
 	if (write(net, INIT_PASSWD, 8) < 0)
 		err("Negotiation failed: %m");
-#ifndef	FS_32BIT
 	cliserv_magic = htonll(cliserv_magic);
-#endif
 	if (write(net, &cliserv_magic, sizeof(cliserv_magic)) < 0)
 		err("Negotiation failed: %m");
 	size_host = htonll(exportsize);
-#ifdef	FS_32BIT
-        if (write(net, zeros, 4) < 0 || write(net, &size_host, 4) < 0)
-#else
 	if (write(net, &size_host, 8) < 0)
-#endif
 		err("Negotiation failed: %m");
 	if (write(net, zeros, 128) < 0)
 		err("Negotiation failed: %m");
@@ -473,7 +452,12 @@ int mainloop(int net)
 				(unsigned long long)request.from / 512, len);
 #endif
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
-		if (((request.from + len) > exportsize) ||
+		if ((request.from + len) > (OFFT_MAX)) {
+		  DEBUG("[Number too large!]");
+		  ERROR;
+		  continue;
+		}
+		if ((((off_t)request.from + len) > exportsize) ||
 		    ((flags & F_READONLY) && request.type)) {
 			DEBUG("[RANGE!]");
 			ERROR;
@@ -527,39 +511,39 @@ void set_peername(int net,char *clientname)
 	strncpy(clientname,peername,255) ;
 }
 
-fsoffset_t size_autodetect(int export)
+off_t size_autodetect(int export)
 {
-	fsoffset_t es;
+	off_t es;
 	u32 es32;
 	struct stat stat_buf;
 	int error;
 
 	DEBUG("looking for export size with lseek SEEK_END\n");
-	es = (fsoffset_t)lseek(export, 0, SEEK_END);
-	if ((signed long long)es > 0LL)
+	es = lseek(export, (off_t)0, SEEK_END);
+	if (es > ((off_t)0))
 		return es;
 
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
 	error = fstat(export, &stat_buf);
 	if (!error && stat_buf.st_size > 0)
-		return (fsoffset_t)stat_buf.st_size;
+		return (off_t)stat_buf.st_size;
 
 #ifdef BLKGETSIZE
 	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
 	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
-		es = (fsoffset_t)es32 * (fsoffset_t)512;
+		es = (off_t)es32 * (off_t)512;
 		return es;
 	}
 #endif
 	err("Could not find size of exported block device: %m");
-	return (fsoffset_t)-1;
+	return (off_t)-1;
 }
 
 int main(int argc, char *argv[])
 {
 	int net;
-	fsoffset_t i;
+	off_t i;
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
@@ -576,7 +560,7 @@ int main(int argc, char *argv[])
 
 void serveconnection(int net) 
 {   
-  u64 i ;
+  off_t i ;
 
   for (i=0; i<exportsize; i+=hunksize) {
     char exportname3[1024];
@@ -591,23 +575,13 @@ void serveconnection(int net)
 			err("Could not open exported file: %m");
 	}
     }
-	
-    if (exportsize == (fsoffset_t)-1) {
+
+    if (exportsize == (off_t)OFFT_MAX) {
 	exportsize = size_autodetect(export[0]);
     }
-    if (exportsize > ((fsoffset_t)-1 >> 1)) {
-#ifdef HAVE_LLSEEK
-	if ((exportsize >> 10) > ((fsoffset_t)-1 >> 1))
-		msg3(LOG_INFO, "size of exported file/device is %LuMB",
-				(unsigned long long)(exportsize >> 20));
-	else
-		msg3(LOG_INFO, "size of exported file/device is %LuKB",
-				(unsigned long long)(exportsize >> 10));
-    }
-#else
+    if (exportsize > (off_t)OFFT_MAX) {
 	err("Size of exported file is too big\n");
     }
-#endif
     else
 	msg3(LOG_INFO, "size of exported file/device is %Lu",
 			(unsigned long long)exportsize);

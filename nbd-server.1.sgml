@@ -57,13 +57,13 @@ manpage.1: manpage.sgml
     <cmdsynopsis>
       <command>&dhpackage;</command>
 
-      <arg><option>-c <replaceable>this</replaceable></option></arg>
       <arg choice=plain><replaceable>port</replaceable</arg>
       <arg choice=plain><replaceable>filename</replaceable></arg>
       <arg><replaceable>size</replaceable></arg>
       <arg><option>-r</option></arg>
       <arg><option>-m</option></arg>
       <arg><option>-c</option></arg>
+      <arg><option>-a <replaceable>timeout</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -81,7 +81,7 @@ manpage.1: manpage.sgml
     then be used for whatever purpose a normal block device (harddisk,
     CD-ROM, ...) can be used for.</para>
 
-    <para>NBD can be usefull for diskless clients that need swapspace,
+    <para>NBD can be useful for diskless clients that need swapspace,
     but you can also create a filesystem on it and use it as though it
     were a local filesystem.</para>
 
@@ -157,6 +157,15 @@ manpage.1: manpage.sgml
 	  with lots of writes), and that after disconnecting and
 	  reconnecting the client or the server, all changes are
 	  lost.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+      	<term><option>timeout</option></term>
+	<listitem>
+	  <para>Maximum number of idle seconds. If a connection is
+	  inactive for this amount of time, it is terminated; this is to
+	  avoid stale nbd-server processes staying in memory. Use of
+	  this option is strongly recommended.</para>
 	</listitem>
       </varlistentry>
     </variablelist>

@@ -24,7 +24,6 @@ typedef unsigned long u32;
 #error I need at least some 32-bit type
 #endif
 
-#ifndef	FS_32BIT
 #if SIZEOF_UNSIGNED_INT==8
 typedef unsigned int u64;
 #elif SIZEOF_UNSIGNED_LONG_INT==8
@@ -34,15 +33,10 @@ typedef unsigned long long u64;
 #else
 #error I need at least some 64-bit type
 #endif
-#endif	/* FS_32BIT */
 
 #include <linux/nbd.h>
 
-#ifdef	FS_32BIT
-struct { unsigned char m[8]; } cliserv_magic = { { 0x00, 0x00, 0x42, 0x02, 0x81, 0x86, 0x12, 0x53 } };
-#else
 u64 cliserv_magic = 0x00420281861253LL;
-#endif
 #define INIT_PASSWD "NBDMAGIC"
 
 #define INFO(a) do { } while(0)
@@ -105,7 +99,6 @@ void logging(void)
 	setvbuf(stderr, NULL, _IONBF, 0);
 }
 
-#ifndef	FS_32BIT
 #ifdef WORDS_BIGENDIAN
 u64 ntohll(u64 a)
 {
@@ -122,4 +115,3 @@ u64 ntohll(u64 a)
 }
 #endif
 #define htonll ntohll
-#endif	/* FS_32BIT */
