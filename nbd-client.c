@@ -14,6 +14,7 @@
  */
 
 #include "config.h"
+#include "lfs.h"
 
 #include <asm/page.h>
 #include <sys/ioctl.h>
@@ -28,12 +29,12 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-#define MY_NAME "nbd_client"
 #ifndef __GNUC__
 #error I need GCC to work
 #endif
 
 #include <linux/ioctl.h>
+#define MY_NAME "nbd_client"
 #include "cliserv.h"
 
 int opennet(char *name, int port)

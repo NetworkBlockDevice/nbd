@@ -54,6 +54,7 @@
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
 #include "config.h"
+#include "lfs.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
