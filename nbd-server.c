@@ -87,11 +87,12 @@ typedef u64		fsoffset_t;
 extern long long llseek(unsigned int, long long, unsigned int);
 #endif
 
-void serveconnection(int net)  ;
-void set_peername(int net,char *clientname) ;
+void serveconnection(int net);
+void set_peername(int net,char *clientname);
 
 #define LINELEN 256 
-char difffilename[256] ;
+char difffilename[256];
+unsigned int timeout = 0;
 
 int authorized_client(char *name)
 /* 0 - authorization refused, 1 - OK 
@@ -162,10 +163,11 @@ void cmdline(int argc, char *argv[])
 
 	if (argc < 3) {
 		printf("This is nbd-server version " VERSION "\n");	
-		printf("Usage: port file_to_export [size][kKmM] [-r] [-m] [-c]\n"
+		printf("Usage: port file_to_export [size][kKmM] [-r] [-m] [-c] [-a timeout_sec]\n"
 		       "	-r read only\n"
 		       "	-m multiple file\n"
 		       "	-c copy on write\n"
+		       "        -a maximum idle seconds, terminates when idle time exceeded\n"
 		       "	if port is set to 0, stdin is used (for running from inetd)\n"
 		       "	if file_to_export contains '%%s', it is substituted with IP\n"
 		       "		address of machine trying to connect\n" );
@@ -182,8 +184,16 @@ void cmdline(int argc, char *argv[])
 				flags |= F_MULTIFILE;
 				hunksize = 1*GIGA;
 				break;
-			case 'c': flags |=F_COPYONWRITE ;
-			        break ;
+			case 'c': flags |=F_COPYONWRITE;
+			        break;
+			case 'a': 
+				if (i+1<argc) {
+					timeout = atoi(argv[i+1]);
+					i++;
+				} else {
+					fprintf(stderr, "timeout requires argument\n");
+					exit(1);
+				}
 			}
 		} else {
 			fsoffset_t es;
@@ -413,6 +423,8 @@ int mainloop(int net)
 		printf("%d: ", i);
 #endif
 
+		if (timeout) 
+			alarm(timeout);
 		readit(net, &request, sizeof(request));
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
