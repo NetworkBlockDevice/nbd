@@ -53,6 +53,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>		/* wait */
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <sys/mount.h>		/* For BLKGETSIZE */
 #include <signal.h>		/* sigaction */
 #include <netinet/tcp.h>
