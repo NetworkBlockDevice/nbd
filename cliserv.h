@@ -47,7 +47,7 @@ typedef unsigned long long u64;
 
 #if NBD_LFS==1
 #define _LARGEFILE_SOURCE
-#define _FILE_OFFSET_BITS=64
+#define _FILE_OFFSET_BITS 64
 #endif
 
 u64 cliserv_magic = 0x00420281861253LL;
