@@ -752,7 +752,7 @@ int splitexport(void) {
 			strncpy(exportname3, exportname2, 1024);
 		}
 		exportname3[1023]='\0';
-		printf( "Opening %s\n", exportname3 );
+		DEBUG2( "Opening %s\n", exportname3 );
 		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
 			/* Read WRITE ACCESS was requested by media is only read only */
 			autoreadonly = 1;
@@ -963,7 +963,20 @@ int main(int argc, char *argv[])
 	logging();
 	cmdline(argc, argv);
 	
-	if (!port) return 1 ;
+	if (!port) {
+#ifndef ISSERVER
+          /* You really should define ISSERVER if you're going to use inetd
+           * mode, but if you don't, closing stdout and stderr (which inetd
+           * had connected to the client socket) will let it work. */
+          close(1);
+          close(2);
+          open("/dev/null", O_WRONLY);
+          open("/dev/null", O_WRONLY);
+#endif
+          set_peername(0,clientname);
+          serveconnection(0);
+          return 0;
+        }
 	connectme(port); /* serve infinitely */
 	return 0 ;
 }
