@@ -318,15 +318,14 @@ void maybeseek(int handle, fsoffset_t a)
 void myseek(int handle,fsoffset_t a)
 {
 #if HAVE_LLSEEK && !defined(FS_32BIT)
-  if (llseek(handle, a, SEEK_SET) < 0)
+	if (llseek(handle, a, SEEK_SET) < 0)
 #else
-  if (lseek(handle, (long)a, SEEK_SET) < 0)
+	if (lseek(handle, (long)a, SEEK_SET) < 0)
 #endif 
-    err("Can not seek locally!\n");
+		err("Can not seek locally!\n");
 }
 
-char pagebuf[DIFFPAGESIZE] ;
-
+char pagebuf[DIFFPAGESIZE];
 
 int rawexpread(fsoffset_t a, char *buf, int len)
 {
@@ -339,29 +338,29 @@ int expread(fsoffset_t a, char *buf, int len)
 	int rdlen, offset;
 	fsoffset_t mapcnt, mapl, maph, pagestart;
  
-  if (flags & F_COPYONWRITE) {
-    DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
+	if (!(flags & F_COPYONWRITE))
+		return rawexpread(a, buf, len);
+	DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
 
-    mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
+	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
-    for (mapcnt=mapl;mapcnt<=maph;mapcnt++) {
-      pagestart=mapcnt*DIFFPAGESIZE ;
-      offset=a-pagestart ;
-      rdlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset ;
-      if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-	DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
-			(unsigned long)difmap[mapcnt]);
-	myseek(difffile,difmap[mapcnt]*DIFFPAGESIZE+offset) ;
-	if (read(difffile, buf, rdlen) != rdlen) return -1 ;
-      } else { /* the block is not there */
-	DEBUG2("Page %Lu is not here, we read the original one\n",
-			(unsigned long long)mapcnt) ;
-	if (rawexpread(a,buf,rdlen)) return -1 ;
-      }
-      len-=rdlen ; a+=rdlen ; buf+=rdlen ;
-    }
-  } else return rawexpread(a,buf,len) ;
-  return 0 ;
+	for (mapcnt=mapl;mapcnt<=maph;mapcnt++) {
+		pagestart=mapcnt*DIFFPAGESIZE;
+		offset=a-pagestart;
+		rdlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset;
+		if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
+			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
+			       (unsigned long)difmap[mapcnt]);
+			myseek(difffile, difmap[mapcnt]*DIFFPAGESIZE+offset);
+			if (read(difffile, buf, rdlen) != rdlen) return -1;
+		} else { /* the block is not there */
+			DEBUG2("Page %Lu is not here, we read the original one\n",
+			       (unsigned long long)mapcnt);
+			return rawexpread(a, buf, rdlen);
+		}
+		len-=rdlen; a+=rdlen; buf+=rdlen;
+	}
+	return 0;
 }
 
 int rawexpwrite(fsoffset_t a, char *buf, int len)
@@ -372,41 +371,42 @@ int rawexpwrite(fsoffset_t a, char *buf, int len)
 
 
 int expwrite(fsoffset_t a, char *buf, int len)
-{  u32 mapcnt,mapl,maph ; int wrlen,rdlen ; 
-   fsoffset_t pagestart ; int offset ;
+{
+	u32 mapcnt,mapl,maph ; int wrlen,rdlen ; 
+	fsoffset_t pagestart ; int offset ;
 
-  if (flags & F_COPYONWRITE) {
-    DEBUG3("Asked to write %d bytes at %Lu.\n", len, (unsigned long long)a);
+	if (!(flags & F_COPYONWRITE))
+		return(rawexpwrite(a,buf,len)); 
+	DEBUG3("Asked to write %d bytes at %Lu.\n", len, (unsigned long long)a);
 
-    mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
+	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
-    for (mapcnt=mapl;mapcnt<=maph;mapcnt++) {
-      pagestart=mapcnt*DIFFPAGESIZE ;
-      offset=a-pagestart ;
-      wrlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset ;
+	for (mapcnt=mapl;mapcnt<=maph;mapcnt++) {
+		pagestart=mapcnt*DIFFPAGESIZE ;
+		offset=a-pagestart ;
+		wrlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset ;
 
-      if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-	DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
-			(unsigned long)difmap[mapcnt]) ;
-	myseek(difffile,difmap[mapcnt]*DIFFPAGESIZE+offset) ;
-	if (write(difffile, buf, wrlen) != wrlen) return -1 ;
-      } else { /* the block is not there */
-	myseek(difffile,difffilelen*DIFFPAGESIZE) ;
-	difmap[mapcnt]=difffilelen++ ;
-	DEBUG3("Page %Lu is not here, we put it at %lu\n",
-			(unsigned long long)mapcnt,
-			(unsigned long)difmap[mapcnt]);
-	rdlen=DIFFPAGESIZE ;
-	if (rdlen+pagestart%hunksize>hunksize) 
-	  rdlen=hunksize-(pagestart%hunksize) ;
-	if (rawexpread(pagestart,pagebuf,rdlen)) return -1 ;
-	memcpy(pagebuf+offset,buf,wrlen) ;
-	if (write(difffile,pagebuf,DIFFPAGESIZE)!=DIFFPAGESIZE) return -1 ;
-      }						    
-      len-=wrlen ; a+=wrlen ; buf+=wrlen ;
-    }
-  } else return(rawexpwrite(a,buf,len)); 
-  return 0 ;
+		if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
+			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
+			       (unsigned long)difmap[mapcnt]) ;
+			myseek(difffile,difmap[mapcnt]*DIFFPAGESIZE+offset) ;
+			if (write(difffile, buf, wrlen) != wrlen) return -1 ;
+		} else { /* the block is not there */
+			myseek(difffile,difffilelen*DIFFPAGESIZE) ;
+			difmap[mapcnt]=difffilelen++ ;
+			DEBUG3("Page %Lu is not here, we put it at %lu\n",
+			       (unsigned long long)mapcnt,
+			       (unsigned long)difmap[mapcnt]);
+			rdlen=DIFFPAGESIZE ;
+			if (rdlen+pagestart%hunksize>hunksize) 
+				rdlen=hunksize-(pagestart%hunksize) ;
+			if (rawexpread(pagestart,pagebuf,rdlen)) return -1 ;
+			memcpy(pagebuf+offset,buf,wrlen) ;
+			if (write(difffile,pagebuf,DIFFPAGESIZE)!=DIFFPAGESIZE) return -1 ;
+		}						    
+		len-=wrlen ; a+=wrlen ; buf+=wrlen ;
+	}
+	return 0;
 }
 
 int mainloop(int net)
