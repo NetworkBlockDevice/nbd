@@ -686,7 +686,7 @@ int mainloop(CLIENT *client)
 		request.type = ntohl(request.type);
 
 		if (request.type==NBD_CMD_DISC) { /* Disconnect request */
-		  if (client->difmap) free(client->difmap) ;
+		  if (client->difmap) g_free(client->difmap) ;
                   if (client->difffile>=0) { 
                      close(client->difffile) ; unlink(client->difffilename) ; }
 		  err("Disconnect request received.") ;
@@ -760,15 +760,14 @@ int splitexport(CLIENT* client) {
 	off_t i;
 
 	for (i=0; i<client->exportsize; i+=client->server->hunksize) {
-		char tmpname[1024];
+		gchar *tmpname;
 
 		if(client->server->flags & F_MULTIFILE) {
-			snprintf(tmpname, 1024, "%s.%d", client->exportname,
+			tmpname=g_strdup_printf("%s.%d", client->exportname,
 					(int)(i/client->server->hunksize));
 		} else {
-			strncpy(tmpname, client->exportname, 1024);
+			tmpname=g_strdup(client->exportname);
 		}
-		tmpname[1023]='\0';
 		DEBUG2( "Opening %s\n", tmpname );
 		if ((client->export[ i/ client->server->hunksize ] =
 					open(tmpname, (client->server->flags &
@@ -781,6 +780,7 @@ int splitexport(CLIENT* client) {
 						open(tmpname, O_RDONLY)) == -1) 
 				err("Could not open exported file: %m");
 		}
+		g_free(tmpname);
 	}
 
 	if (client->server->flags & F_COPYONWRITE) {
@@ -850,7 +850,7 @@ void set_peername(int net, CLIENT *client) {
 
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
-	strncpy(client->clientname,peername,255) ;
+	client->clientname=g_strdup(peername);
 }
 
 /**
