@@ -3,6 +3,7 @@ dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],[2.7.99pre2.8],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
+AM_MAINTAINER_MODE
 
 AC_ARG_ENABLE(
   lfs,
