@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.8.0-rc1],[wouter@debian.org])
+AC_INIT([nbd],[2.8.0-rc2],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -74,18 +74,16 @@ dnl We need to check for NBD_CMD_DISC, but that's part of an enum, it is not
 dnl #define'd. Therefore, we check for something which is differently #define'd
 dnl in the old or new versions, even if we don't really care about that.
 dnl This might break at some time, but it should work for now, so...
-AC_TRY_COMPILE([#include <stdio.h>
-#define MY_NAME "conftest"
-#define NBD_H_LOCAL
-#include "cliserv.h"
+AC_TRY_COMPILE([#define u32 int
+#define u64 int
+#include "nbd.h"
 ],
 [int foo=NBD_CMD_DISC], 
   [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (2.6) nbd.h can be found in the current directory)
     NBD_H='"nbd.h"'],
-  AC_TRY_COMPILE([#include <stdio.h>
-#define MY_NAME "conftest"
-#define NBD_H_LINUX
-#include "cliserv.h"
+  AC_TRY_COMPILE([#define u32 int
+#define u64 int
+#include <linux/nbd.h>
   ],
 [int foo=NBD_CMD_DISC],
     [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path) NBD_H='<linux/nbd.h>'],
