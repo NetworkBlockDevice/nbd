@@ -53,7 +53,6 @@
 
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
-#include "config.h"
 #include "lfs.h"
 
 #include <sys/types.h>
@@ -140,38 +139,7 @@
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using copyonwrite */
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
-//char difffilename[1024]; /**< filename of the copy-on-write file. Doesn't belong here! */
-//unsigned int timeout = 0; /**< disconnect timeout */
-//int autoreadonly = 0; /**< 1 = switch to readonly if opening readwrite isn't
-//			possible */
-//char *auth_file="nbd_server.allow"; /**< authorization file */
-//char exportname2[1024]; /**< File I'm exporting, with virtualhost resolved */
-//off_t lastpoint = (off_t)-1;	/**< keep track of where we are in the file, to
-//				  avoid an lseek if possible */
-//char pagebuf[DIFFPAGESIZE];	/**< when doing copyonwrite, this is
-//				  used as a temporary buffer to store
-//				  the exported block in. @todo this is
-//				  a great example of namespace
-//				  pollution. Throw it out. */
-//unsigned int port;		/**< Port I'm listening at */
-//char *exportname;		/**< File I'm exporting */
-//off_t exportsize = OFFT_MAX;	/**< length of file I'm exporting */
-//off_t hunksize = OFFT_MAX;      /**< size of each exported file in case of -m */
-//int flags = 0;			/**< flags associated with this exported file */
-//int export[1024];/**< array of filedescriptors of exported files; only first is
-//		   used unless -m option is activated */ 
-//int difffile=-1; /**< filedescriptor for copyonwrite file */
-//u32 difffilelen=0 ; /**< number of pages in difffile */
-//u32 *difmap=NULL ; /**< Determine whether a block is in the original file
-//		     (difmap[block]==-1) or in the copyonwrite file (in which
-//		     case it contains the offset where it is to be found in the
-//		     copyonwrite file). @todo the kernel knows about sparse
-//		     files, we should use those instead. Should also be off_t
-//		     instead of u32; copyonwrite is probably broken wrt LFS */
-char clientname[256] ;
-int child_arraysize=DEFAULT_CHILD_ARRAY; /**< number of available slots for
-					   child array */
-pid_t *children; /**< child array */
+GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 
 /**
@@ -385,7 +353,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 void sigchld_handler(int s)
 {
         int* status=NULL;
-	int i;
+	int* i;
 	char buf[80];
 	pid_t pid;
 
@@ -393,14 +361,30 @@ void sigchld_handler(int s)
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 		}
-		for(i=0;children[i]!=pid&&i<child_arraysize;i++);
-		if(i>=child_arraysize) {
+		i=g_hash_table_lookup(children, &pid);
+		if(!i) {
 			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
 		} else {
-			children[i]=(pid_t)0;
 			DEBUG2("Removing %d from the list of children", pid);
+			g_hash_table_remove(children, &pid);
 		}
 	}
+}
+
+/**
+ * Kill a child. Called from sigterm_handler::g_hash_table_foreach.
+ *
+ * @param key the key
+ * @param value the value corresponding to the above key
+ * @param user_data a pointer which we always set to 1, so that we know what
+ * will happen next.
+ **/
+void killchild(gpointer key, gpointer value, gpointer user_data) {
+	pid_t *pid=value;
+	int *parent=user_data;
+
+	kill(*pid, SIGTERM);
+	*parent=1;
 }
 
 /**
@@ -412,12 +396,7 @@ void sigterm_handler(int s) {
 	int i;
 	int parent=0;
 
-	for(i=0;i<child_arraysize;i++) {
-		if(children[i]) {
-			kill(children[i], s);
-			parent=1;
-		}
-	}
+	g_hash_table_foreach(children, killchild, &parent);
 
 	if(parent) {
 		unlink(pidfname);
@@ -871,7 +850,15 @@ void set_peername(int net, CLIENT *client) {
 
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
-	strncpy(clientname,peername,255) ;
+	strncpy(client->clientname,peername,255) ;
+}
+
+/**
+ * Destroy a pid_t*
+ * @param data a pointer to pid_t which should be freed
+ **/
+void destroy_pid_t(gpointer data) {
+	g_free(data);
 }
 
 /**
@@ -947,10 +934,11 @@ void connectme(SERVER* serve) {
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
 		err("sigaction: %m");
-	children=g_malloc(sizeof(pid_t)*child_arraysize);
-	memset(children, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
+	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 	for(;;) { /* infinite loop */
 		CLIENT *client;
+		pid_t *pid;
+
 		if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 			err("accept: %m");
 
@@ -965,33 +953,20 @@ void connectme(SERVER* serve) {
 			continue ;
 		}
 		msg2(LOG_INFO,"Authorized client") ;
-		for(i=0;children[i]&&i<child_arraysize;i++);
-		if(i>=child_arraysize) {
-			pid_t*ptr;
-
-			ptr=realloc(children, sizeof(pid_t)*child_arraysize);
-			if(ptr) {
-				children=ptr;
-				memset(children+child_arraysize, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
-				i=child_arraysize+1;
-				child_arraysize+=DEFAULT_CHILD_ARRAY;
-			} else {
-				msg2(LOG_INFO,"Not enough memory to store child PID");
-				close(net);
-				continue;
-			}
-		}
+		pid=g_malloc(sizeof(pid_t));
 #ifndef NOFORK
-		if ((children[i]=fork())<0) {
+		if ((*pid=fork())<0) {
 			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
 			close(net) ;
 			continue ;
 		}
-		if (children[i]>0) { /* parent */
-			close(net) ; continue ; }
+		if (*pid>0) { /* parent */
+			close(net);
+			g_hash_table_insert(children, pid, pid);
+			continue;
+		}
 		/* child */
-		realloc(children,0);
-		child_arraysize=0;
+		g_hash_table_destroy(children);
 		close(sock) ;
 #endif // NOFORK
 		msg2(LOG_INFO,"Starting to serve") ;
