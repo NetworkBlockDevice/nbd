@@ -3,6 +3,7 @@
  *
  * Copyright 1996-1998 Pavel Machek, distribute under GPL
  *  <pavel@atrey.karlin.mff.cuni.cz>
+ * Copyright 2002 Anton Altaparmakov <aia21@cam.ac.uk>
  *
  * Version 1.0 - hopefully 64-bit-clean
  * Version 1.1 - merging enhancements from Josh Parsons, <josh@coombs.anu.edu.au>
@@ -13,9 +14,11 @@
  *	with make FSCHOICE=-DFS_32BIT nbd-server. (I don't have the
  *	original autoconf input file, or I would make it a configure
  *	option.) Ken Yap <ken@nlc.net.au>.
+ * Version 1.6 - fix autodetection of block device size and really make 64 bit
+ * 	clean on 32 bit machines. Anton Altaparmakov <aia21@cam.ac.uk>
  */
 
-#define VERSION "1.5"
+#define VERSION "1.6"
 #define GIGA (1*1024*1024*1024)
 
 #include <sys/types.h>
@@ -142,7 +145,8 @@ inline void writeit(int f, void *buf, int len)
 
 int port;			/* Port I'm listening at */
 char *exportname;		/* File I'm exporting */
-fsoffset_t exportsize = ~0, hunksize = ~0;	/* ...and its length */
+fsoffset_t exportsize = (fsoffset_t)-1;	/* ...and its length */
+fsoffset_t hunksize = (fsoffset_t)-1;
 int flags = 0;
 int export[1024];
 int difffile=-1 ;
@@ -274,7 +278,7 @@ void connectme(int port)
 #define SEND writeit( net, &reply, sizeof( reply ));
 #define ERROR { reply.error = htonl(-1); SEND; reply.error = 0; lastpoint = -1; }
 
-fsoffset_t lastpoint = -1;
+fsoffset_t lastpoint = (fsoffset_t)-1;
 
 void maybeseek(int handle, fsoffset_t a)
 {
@@ -313,11 +317,12 @@ int rawexpread(fsoffset_t a, char *buf, int len)
 }
 
 int expread(fsoffset_t a, char *buf, int len)
-{ int rdlen ; fsoffset_t mapcnt,mapl,maph ;
-  fsoffset_t pagestart; int offset ;
+{
+	int rdlen, offset;
+	fsoffset_t mapcnt, mapl, maph, pagestart;
  
   if (flags & F_COPYONWRITE) {
-    DEBUG3("Asked to read %d bytes at %lu.\n",len,(unsigned long)a) ;
+    DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
 
     mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -326,12 +331,13 @@ int expread(fsoffset_t a, char *buf, int len)
       offset=a-pagestart ;
       rdlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset ;
       if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-	DEBUG3("Page %d is at %ld\n",(int)mapcnt,(long int)difmap[mapcnt]) ;
+	DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
+			(unsigned long)difmap[mapcnt]);
 	myseek(difffile,difmap[mapcnt]*DIFFPAGESIZE+offset) ;
 	if (read(difffile, buf, rdlen) != rdlen) return -1 ;
       } else { /* the block is not there */
-	DEBUG2("Page %d is not here, we read the original one\n",
-	      (int)mapcnt) ;
+	DEBUG2("Page %Lu is not here, we read the original one\n",
+			(unsigned long long)mapcnt) ;
 	if (rawexpread(a,buf,rdlen)) return -1 ;
       }
       len-=rdlen ; a+=rdlen ; buf+=rdlen ;
@@ -352,7 +358,7 @@ int expwrite(fsoffset_t a, char *buf, int len)
    fsoffset_t pagestart ; int offset ;
 
   if (flags & F_COPYONWRITE) {
-    DEBUG3("Asked to write %d bytes at %lu.\n",len,(unsigned long)a) ;
+    DEBUG3("Asked to write %d bytes at %Lu.\n", len, (unsigned long long)a);
 
     mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -362,15 +368,16 @@ int expwrite(fsoffset_t a, char *buf, int len)
       wrlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset ;
 
       if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-	DEBUG3("Page %d is at %ld\n",mapcnt,(long)difmap[mapcnt]) ;
+	DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
+			(unsigned long)difmap[mapcnt]) ;
 	myseek(difffile,difmap[mapcnt]*DIFFPAGESIZE+offset) ;
 	if (write(difffile, buf, wrlen) != wrlen) return -1 ;
       } else { /* the block is not there */
 	myseek(difffile,difffilelen*DIFFPAGESIZE) ;
 	difmap[mapcnt]=difffilelen++ ;
-	DEBUG3("Page %d is not here, we put it at %ld\n",
-	      mapcnt,(long)difmap[mapcnt]) ;
-
+	DEBUG3("Page %Lu is not here, we put it at %lu\n",
+			(unsigned long long)mapcnt,
+			(unsigned long)difmap[mapcnt]);
 	rdlen=DIFFPAGESIZE ;
 	if (rdlen+pagestart%hunksize>hunksize) 
 	  rdlen=hunksize-(pagestart%hunksize) ;
@@ -443,8 +450,9 @@ int mainloop(int net)
 		if (len > BUFSIZE)
 			err("Request too big!");
 #ifdef DODBG
-		printf("%s from %d (%d) len %d, ", (request.type ? "WRITE" : "READ"),
-		       (int) request.from, (int) request.from / 512, len);
+		printf("%s from %Lu (%Lu) len %d, ", request.type ? "WRITE" :
+				"READ", (unsigned long long)request.from,
+				(unsigned long long)request.from / 512, len);
 #endif
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 		if (((request.from + len) > exportsize) ||
@@ -504,28 +512,30 @@ void set_peername(int net,char *clientname)
 fsoffset_t size_autodetect(int export)
 {
 	fsoffset_t es;
+	u32 es32;
+	struct stat stat_buf;
+	int error;
+
 	DEBUG("looking for export size with lseek SEEK_END\n");
-	if ((int)(es = lseek(export, 0, SEEK_END)) == -1 || es == 0) {
-	  	struct stat stat_buf;
-		int error;
-		DEBUG("looking for export size with fstat\n");
-		stat_buf.st_size = 0;
-		if ((error = fstat(export, &stat_buf)) == -1 || stat_buf.st_size == 0 ) {
-			DEBUG("looking for export size with ioctl BLKGETSIZE\n");
+	es = (fsoffset_t)lseek(export, 0, SEEK_END);
+	if ((signed long long)es > 0LL)
+		return es;
+
+	DEBUG("looking for export size with fstat\n");
+	stat_buf.st_size = 0;
+	error = fstat(export, &stat_buf);
+	if (!error && stat_buf.st_size > 0)
+		return (fsoffset_t)stat_buf.st_size;
+
 #ifdef BLKGETSIZE
-			if(ioctl(export, BLKGETSIZE, &es) || es == 0) {
-#else
-			if(1){
-#endif
-				err("Could not find size of exported block device: %m");
-			} else {
-				es *= 512; /* assume blocksize 512 */
-			}
-		} else {
-			es = stat_buf.st_size;
-		}
+	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
+	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
+		es = (fsoffset_t)es32 * (fsoffset_t)512;
+		return es;
 	}
-	return es;
+#endif
+	err("Could not find size of exported block device: %m");
+	return (fsoffset_t)-1;
 }
 
 int main(int argc, char *argv[])
@@ -559,23 +569,25 @@ void serveconnection(int net)
       err("Could not open exported file: %m");
     }
 	
-    if (exportsize == (u64)~0) {
-      exportsize = size_autodetect(export[0]);
+    if (exportsize == (fsoffset_t)-1) {
+	exportsize = size_autodetect(export[0]);
     }
-    if (exportsize > (~0UL >> 1))
+    if (exportsize > ((fsoffset_t)-1 >> 1)) {
 #ifdef HAVE_LLSEEK
-    if ((exportsize >> 10) > (~0UL >> 1))
-      msg3(LOG_INFO, "size of exported file/device is %luMB",
-	       (unsigned long)(exportsize >> 20));
-    else
-      msg3(LOG_INFO, "size of exported file/device is %luKB",
-	   (unsigned long)(exportsize >> 10));
+	if ((exportsize >> 10) > ((fsoffset_t)-1 >> 1))
+		msg3(LOG_INFO, "size of exported file/device is %LuMB",
+				(unsigned long long)(exportsize >> 20));
+	else
+		msg3(LOG_INFO, "size of exported file/device is %LuKB",
+				(unsigned long long)(exportsize >> 10));
+    }
 #else
-    err("Size of exported file is too big\n");
+	err("Size of exported file is too big\n");
+    }
 #endif
     else
-      msg3(LOG_INFO, "size of exported file/device is %lu",
-		       (unsigned long)exportsize);
+	msg3(LOG_INFO, "size of exported file/device is %Lu",
+			(unsigned long long)exportsize);
 
     if (flags & F_COPYONWRITE) {
       sprintf(difffilename,"%s-%s-%d.diff",exportname2,clientname,
