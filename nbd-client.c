@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
 
 	if (argc < 3) {
 	errmsg:
+		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 		fprintf(stderr, "Usage: nbd-client [bs=blocksize] host port nbd_device [-swap]\n");
 		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
