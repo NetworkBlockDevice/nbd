@@ -51,6 +51,12 @@
  * 	<wouter@debian.org>
  */
 
+/* used in cliserv.h, so must come first */
+#define MY_NAME "nbd_server"
+/* Includes LFS defines, which defines behaviours of some of the following
+ * headers, so must come before those */
+#include "cliserv.h"
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -71,10 +77,6 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
-
-/* used in cliserv.h, so must come first */
-#define MY_NAME "nbd_server"
-#include "cliserv.h"
 
 /** how much space for child PIDs we have by default. Dynamically
    allocated, and will be realloc()ed if out of space, so this should
