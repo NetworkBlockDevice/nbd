@@ -1,0 +1,10 @@
+nbd server for windows 2000
+
+This is a runnable version of nbd server for windows 2000.
+The client used for test is nbd-2.0.
+
+usage example:
+if Partition if defined
+mynbdserverwin 3456 \\.\A:
+if not
+mynbdserverwin 3456 c:\testfile 
