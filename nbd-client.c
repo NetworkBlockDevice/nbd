@@ -34,6 +34,12 @@
 #include <linux/ioctl.h>
 #include "cliserv.h"
 
+/**
+ * Open a connection to a given host on a given port.
+ * @param name The host to connect to
+ * @param port The port to connect to
+ * @return A connected socket to the given host on the given port
+ **/
 int opennet(char *name, int port)
 {
 	int sock;
@@ -58,6 +64,11 @@ int opennet(char *name, int port)
 	return sock;
 }
 
+/**
+ * Do everything
+ * @todo cut this thing into little tiny manageable pieces, preferably with a
+ * chainsaw.
+ **/
 int main(int argc, char *argv[])
 {
 	int port, sock, nbd, one = 1;
