@@ -184,8 +184,18 @@ manpage.1: manpage.sgml
   </refsect1>
   <refsect1>
     <title>FILES</title>
-
-    <para><filename>nbd_server.allow</filename></para>
+    
+    <variablelist>
+      <varlistentry>
+	<term><filename>nbd_server.allow</filename></term>
+	<listitem>
+	  <para>This file, which must be in the directory where
+	  nbd-server is invoked, can contain a list of IP-addresses
+	  for hosts that may connect to the server. Wildcards are
+	  <b>not</b> allowed.
+	</listitem>
+      </varlistentry>
+    </variablelist>
 
   </refsect1>
   <refsect1>
