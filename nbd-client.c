@@ -13,6 +13,8 @@
  * 	open the exported file.
  */
 
+#include "config.h"
+
 #include <asm/page.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>

@@ -51,19 +51,21 @@
  * 	<wouter@debian.org>
  */
 
-/* used in cliserv.h, so must come first */
-#define MY_NAME "nbd_server"
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
-#include "cliserv.h"
+#include "config.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>		/* wait */
+#ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
+#endif
 #include <sys/param.h>
+#ifdef HAVE_SYS_MOUNT_H
 #include <sys/mount.h>		/* For BLKGETSIZE */
+#endif
 #include <signal.h>		/* sigaction */
 #include <netinet/tcp.h>
 #include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
@@ -77,6 +79,10 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
+
+/* used in cliserv.h, so must come first */
+#define MY_NAME "nbd_server"
+#include "cliserv.h"
 
 /** how much space for child PIDs we have by default. Dynamically
    allocated, and will be realloc()ed if out of space, so this should
@@ -401,13 +407,15 @@ off_t size_autodetect(int export)
 	struct stat stat_buf;
 	int error;
 
-	DEBUG("looking for export size with lseek SEEK_END\n");
-	es = lseek(export, (off_t)0, SEEK_END);
-	if (es > ((off_t)0)) {
+#ifdef HAVE_SYS_MOUNT_H
+#ifdef HAVE_SYS_IOCTL_H
+	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
+	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
+		es = (off_t)es32 * (off_t)512;
 		return es;
-        } else {
-                DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
-        }
+	}
+#endif
+#endif
 
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
@@ -417,14 +425,15 @@ off_t size_autodetect(int export)
         } else {
                 err("fstat failed: %m");
         }
-	
-#ifdef BLKGETSIZE
-	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
-	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
-		es = (off_t)es32 * (off_t)512;
+
+	DEBUG("looking for export size with lseek SEEK_END\n");
+	es = lseek(export, (off_t)0, SEEK_END);
+	if (es > ((off_t)0)) {
 		return es;
-	}
-#endif
+        } else {
+                DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
+        }
+
 	err("Could not find size of exported block device: %m");
 	return OFFT_MAX;
 }

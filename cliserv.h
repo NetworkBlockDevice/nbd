@@ -9,7 +9,6 @@
    Send 128 bytes of zeros (reserved for future use)
  */
 
-#include "config.h"
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
