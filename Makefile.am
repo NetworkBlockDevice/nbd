@@ -1,7 +1,7 @@
 bin_PROGRAMS = nbd-server
 EXTRA_PROGRAMS = nbd-client
 nbd_client_SOURCES = nbd-client.c cliserv.h
-nbd_server_SOURCES = nbd-server.c cliserv.h
+nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h
 man1_MANS = nbd-server.1
 man8_MANS = nbd-client.8
 EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd
