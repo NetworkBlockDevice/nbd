@@ -394,7 +394,8 @@ int mainloop(int net)
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
 	while (1) {
-		char buf[20480];
+#define BUFSIZE (1024*1024)
+		char buf[BUFSIZE];
 		int len;
 
 #ifdef DODBG
@@ -417,7 +418,7 @@ int mainloop(int net)
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > 10240)
+		if (len > BUFSIZE)
 			err("Request too big!");
 #ifdef DODBG
 		printf("%s from %d (%d) len %d, ", (request.type ? "WRITE" : "READ"),
@@ -483,9 +484,10 @@ fsoffset_t size_autodetect(int export)
 	fsoffset_t es;
 	DEBUG("looking for export size with lseek SEEK_END\n");
 	if ((int)(es = lseek(export, 0, SEEK_END)) == -1 || es == 0) {
-		struct stat stat_buf = { 0, } ;
+	  	struct stat stat_buf;
 		int error;
 		DEBUG("looking for export size with fstat\n");
+		stat_buf.st_size = 0;
 		if ((error = fstat(export, &stat_buf)) == -1 || stat_buf.st_size == 0 ) {
 			DEBUG("looking for export size with ioctl BLKGETSIZE\n");
 #ifdef BLKGETSIZE
