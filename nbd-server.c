@@ -670,7 +670,11 @@ int mainloop(int net)
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
 
-		if (request.type==NBD_CMD_DISC) { /* Disconnect request */
+		/* Disconnect request. 2.6 nbd.h defines NBD_CMD_DISC, which we
+		 * will use (again) at some point in the future, but many
+		 * people are still using 2.4-based systems, and they need to
+		 * be able to compile as well.*/
+		if (request.type==2) {
 		  if (difmap) free(difmap) ;
                   if (difffile>=0) { 
                      close(difffile) ; unlink(difffilename) ; }
