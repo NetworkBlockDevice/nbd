@@ -958,7 +958,7 @@ int serveloop(SERVER* serve) {
 		}
 		/* child */
 		g_hash_table_destroy(children);
-		close(sock) ;
+		close(serve->socket) ;
 #endif // NOFORK
 		msg2(LOG_INFO,"Starting to serve") ;
 		serveconnection(client);
