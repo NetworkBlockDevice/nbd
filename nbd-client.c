@@ -5,9 +5,9 @@
  *  <pavel@atrey.karlin.mff.cuni.cz>
  *
  * Version 1.0 - 64bit issues should be fixed, now
+ * Version 1.1 - added bs (blocksize) option (Alexey Guzeev, aga@permonline.ru)
+ * Version 1.2 - I added new option '-d' to send the disconnect request
  */
-
-/* I added new option '-d' to send the disconnect request */
 
 #include <asm/page.h>
 #include <sys/ioctl.h>
@@ -60,19 +60,27 @@ int main(int argc, char *argv[])
 	u64 magic, size64;
 	unsigned long size;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
-	int swap = (argc > 4);
+	int blocksize=1024;
+	char *hostname;
+	int swap=0;
 
 	logging();
 
-	if (argc < 2) {
+	if (argc < 3) {
 	errmsg:
-		fprintf(stderr, "Usage: host port nbd_device -swap\n");
-		fprintf(stderr, "or     -d nbd_device \n");
+		fprintf(stderr, "Usage: nbd-client [bs=blocksize] host port nbd_device [-swap]\n");
+		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
+		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
+		fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
+		fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
+		fprintf(stderr, "blocksizes other than 1024 without patches\n");
 		return 1;
 	}
 
-	if (strcmp(argv[1],"-d")==0) {
-	  nbd = open(argv[2], O_RDWR);
+	++argv; --argc; /* skip programname */
+	
+	if (strcmp(argv[0], "-d")==0) {
+	  nbd = open(argv[1], O_RDWR);
 	  if (nbd < 0)
 		err("Can not open NBD: %m");
 	  printf("Disconnecting: que, ");
@@ -84,20 +92,38 @@ int main(int argc, char *argv[])
 		err("Ioctl failed: %m\n");
 	  printf("sock, ");
 #else
-	  die("Can't disconnect: I was not compiled with disconnect support!\n" );
+	  fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
+	  exit(1);
 #endif
 	  if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
 		err("Ioctl failed: %m\n");
 	  printf("done\n");
 	  return 0;
 	}
-	
-	if (argc<4) goto errmsg;
-	port = atoi(argv[2]);
-	sock = opennet(argv[1], port);
-	nbd = open(argv[3], O_RDWR);
+
+	if (strncmp(argv[0], "bs=", 3)==0) {
+	  blocksize=atoi(argv[0]+3);
+	  ++argv; --argc; /* skip blocksize */
+	}
+
+	if (argc==0) goto errmsg;
+	hostname=argv[0];
+	++argv; --argc; /* skip hostname */
+
+	if (argc==0) goto errmsg;
+	port = atoi(argv[0]);
+	++argv; --argc; /* skip port */
+
+	if (argc==0) goto errmsg;
+	sock = opennet(hostname, port);
+	nbd = open(argv[0], O_RDWR);
 	if (nbd < 0)
 	  err("Can not open NBD: %m");
+	++argv; --argc; /* skip device */
+
+	if (argc>1) goto errmsg;
+	if (argc!=0) swap=1;
+	argv=NULL; argc=0; /* don't use it later suddenly */
 
 	printf("Negotiation: ");
 	if (read(sock, buf, 8) < 0)
@@ -115,50 +141,47 @@ int main(int argc, char *argv[])
 	if (read(sock, &size64, sizeof(size64)) < 0)
 		err("Failed/3: %m\n");
 	size64 = ntohll(size64);
-	if (size64 > (~0UL >> 1)) {
+
 #ifdef NBD_SET_SIZE_BLOCKS
-		if ((size64 >> 10) > (~0UL >> 1)) {
-			printf("size = %luMB", (unsigned long)(size64>>20));
-			err("Exported device is too big for me. Get 64-bit machine :-(\n");
-		} else
-			printf("size = %luKB", (unsigned long)(size64>>10));
+	if ((size64>>10) > (~0UL >> 1)) {
+		printf("size = %luMB", (unsigned long)(size64>>20));
+		err("Exported device is too big for me. Get 64-bit machine :-(\n");
+	} else
+		printf("size = %luKB", (unsigned long)(size64>>10));
 #else
+	if (size64 > (~0UL >> 1)) {
 		printf("size = %luKB", (unsigned long)(size64>>10));
 		err("Exported device is too big. Get 64-bit machine or newer kernel :-(\n");
-#endif
 	} else
 		printf("size = %lu", (unsigned long)(size64));
+#endif
 
 	if (read(sock, &buf, 128) < 0)
 		err("Failed/4: %m\n");
 	printf("\n");
 
-	if (size64 > (~0UL >> 1)) {
 #ifdef NBD_SET_SIZE_BLOCKS
-		if ((size64 >> 10) > (~0UL >> 1))
-		/*
-		 * If you really need NBDs larger than 2TB on 32-bit
-		 * machines you can use blocksizes larger than 1kB
-		 * - FIXME
-		 */
-			err("Device too large.\n");
-		else {
-			int er;
-
-			if (ioctl(nbd, NBD_SET_BLKSIZE, 1UL << 10) < 0)
-				err("Ioctl/1.1a failed: %m\n");
-			size = (unsigned long)(size64 >> 10);
-			if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
-				err("Ioctl/1.1b failed: %m\n");
-		}
-#else
+	if (size64/blocksize > (~0UL >> 1))
 		err("Device too large.\n");
-#endif
+	else {
+		int er;
+		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+			err("Ioctl/1.1a failed: %m\n");
+		size = (unsigned long)(size64/blocksize);
+		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
+			err("Ioctl/1.1b failed: %m\n");
+fprintf(stderr, "bs=%d, sz=%lu\n", blocksize, size);
+	}
+#else
+	if (size64 > (~0UL >> 1)) {
+		err("Device too large.\n");
 	} else {
 		size = (unsigned long)size64;
 		if (ioctl(nbd, NBD_SET_SIZE, size) < 0)
 			err("Ioctl/1 failed: %m\n");
 	}
+#endif
+
 	ioctl(nbd, NBD_CLEAR_SOCK);
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl/2 failed: %m\n");
