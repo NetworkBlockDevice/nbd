@@ -87,7 +87,10 @@ AC_TRY_CPP([#include "nbd.h"
   )
 )
 AC_MSG_RESULT($NBD_H)
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/mount.h sys/socket.h syslog.h])
+AC_CHECK_HEADERS([sys/mount.h],,,
+[[#include <sys/param.h>
+]])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h])
 AM_PATH_GLIB_2_0(2.2.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
