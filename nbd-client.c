@@ -87,36 +87,36 @@ int main(int argc, char *argv[])
 	++argv; --argc; /* skip programname */
 	
 	if (strcmp(argv[0], "-d")==0) {
-	  nbd = open(argv[1], O_RDWR);
-	  if (nbd < 0)
-		err("Can not open NBD: %m");
-	  printf("Disconnecting: que, ");
-	  if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
-		err("Ioctl failed: %m\n");
-	  printf("disconnect, ");
+		nbd = open(argv[1], O_RDWR);
+		if (nbd < 0)
+			err("Can not open NBD: %m");
+		printf("Disconnecting: que, ");
+		if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
+			err("Ioctl failed: %m\n");
+		printf("disconnect, ");
 #ifdef NBD_DISCONNECT
-	  if (ioctl(nbd, NBD_DISCONNECT)<0)
-		err("Ioctl failed: %m\n");
-	  printf("sock, ");
+		if (ioctl(nbd, NBD_DISCONNECT)<0)
+			err("Ioctl failed: %m\n");
+		printf("sock, ");
 #else
-	  fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
-	  exit(1);
+		fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
+		exit(1);
 #endif
-	  if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
-		err("Ioctl failed: %m\n");
-	  printf("done\n");
-	  return 0;
+		if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
+			err("Ioctl failed: %m\n");
+		printf("done\n");
+		return 0;
 	}
-
+	
 	if (strncmp(argv[0], "bs=", 3)==0) {
-	  blocksize=atoi(argv[0]+3);
-	  ++argv; --argc; /* skip blocksize */
+		blocksize=atoi(argv[0]+3);
+		++argv; --argc; /* skip blocksize */
 	}
-
+	
 	if (argc==0) goto errmsg;
 	hostname=argv[0];
 	++argv; --argc; /* skip hostname */
-
+	
 	if (argc==0) goto errmsg;
 	port = atoi(argv[0]);
 	++argv; --argc; /* skip port */
@@ -201,15 +201,15 @@ fprintf(stderr, "bs=%d, sz=%lu\n", blocksize, size);
 #else
 	if (swap)
 		if (setsockopt(sock, SOL_SOCKET, SO_SWAPPING, &one, sizeof(int)) < 0)
-			 err("Could not enable swapping: %m");
+			err("Could not enable swapping: %m");
 #endif
-
+	
 	/* Go daemon */
-
+	
 	chdir("/");
 	if (fork())
 		exit(0);
-
+	
 	if (ioctl(nbd, NBD_DO_IT) < 0)
 		fprintf(stderr, "Kernel call returned: %m");
 	else
