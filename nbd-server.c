@@ -40,6 +40,9 @@
  * 	817385); close the PID file after writing to it, so that the
  * 	daemon can actually be found. Wouter Verhelst
  * 	<wouter@debian.org>
+ * 10/10/2003 - Size of the data "size_host" was wrong and so was not
+ *  	correctly put in network endianness. Many types were corrected
+ *  	(size_t and off_t instead of int).  <vspaceg@sourceforge.net>
  */
 
 #define VERSION PACKAGE_VERSION
@@ -49,6 +52,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>		/* wait */
+#include <sys/ioctl.h>
+#include <sys/mount.h>		/* For BLKGETSIZE */
 #include <signal.h>		/* sigaction */
 #include <netinet/tcp.h>
 #include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
@@ -62,18 +67,14 @@
 #include <arpa/inet.h>
 #include <strings.h>
 
-//#define _IO(a,b)
-// #define ISSERVER
+/* used in cliserv.h, so must be first */
 #define MY_NAME "nbd_server"
+#include "cliserv.h"
 
 /* how much space for child PIDs we have by default. Dynamically
    allocated, and will be realloc()ed if out of space, so this should
    probably be fair for most situations. */
 #define DEFAULT_CHILD_ARRAY 256
-
-#include "cliserv.h"
-//#undef _IO
-/* Deep magic: ioctl.h defines _IO macro (at least on linux) */
 
 /* Debugging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -86,9 +87,6 @@
 #define msg4(a,b,c,d) do { fprintf(stderr,b,c,d); fputs("\n",stderr) ; } while(0)
 #endif
 
-#include <sys/ioctl.h>
-#include <sys/mount.h>		/* For BLKGETSIZE */
-
 //#define DODBG
 #ifdef DODBG
 #define DEBUG( a ) printf( a )
@@ -99,6 +97,16 @@
 #define DEBUG2( a,b ) 
 #define DEBUG3( a,b,c ) 
 #endif
+
+#ifndef PACKAGE_VERSION
+#define PACKAGE_VERSION ""
+#endif
+
+/* This is starting to get ugly. If someone knows a better way to find
+ * the maximum value of a signed type *without* relying on overflow
+ * (doing so breaks on 64bit architectures), that would be nice.
+ */
+#define OFFT_MAX (((((off_t)1)<<((sizeof(off_t)-1)*8))-1)<<7)+127
 
 void serveconnection(int net);
 void set_peername(int net,char *clientname);
@@ -134,9 +142,9 @@ int authorized_client(char *name)
 	return 0 ;
 }
 
-inline void readit(int f, void *buf, int len)
+inline void readit(int f, void *buf, size_t len)
 {
-	int res;
+	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
 		if ((res = read(f, buf, len)) <= 0)
@@ -146,9 +154,9 @@ inline void readit(int f, void *buf, int len)
 	}
 }
 
-inline void writeit(int f, void *buf, int len)
+inline void writeit(int f, void *buf, size_t len)
 {
-	int res;
+	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");
 		if ((res = send(f, buf, len, 0)) <= 0)
@@ -158,12 +166,7 @@ inline void writeit(int f, void *buf, int len)
 	}
 }
 
-/* This is starting to get ugly. If someone knows a better way to find
- * the maximum value of a signed type *without* relying on overflow
- * (doing so breaks on 64bit architectures), that would be nice.
- */
-#define OFFT_MAX (((((off_t)1)<<((sizeof(off_t)-1)*8))-1)<<7)+127
-int port;			/* Port I'm listening at */
+unsigned int port;			/* Port I'm listening at */
 char *exportname;		/* File I'm exporting */
 off_t exportsize = OFFT_MAX;	/* ...and its length */
 off_t hunksize = OFFT_MAX;
@@ -232,7 +235,7 @@ void cmdline(int argc, char *argv[])
 			}
 		} else {
 			off_t es;
-			int last = strlen(argv[i])-1;
+			size_t last = strlen(argv[i])-1;
 			char suffix = argv[i][last];
 			if (suffix == 'k' || suffix == 'K' ||
 			    suffix == 'm' || suffix == 'M')
@@ -291,7 +294,7 @@ void sigterm_handler(int s) {
 	exit(0);
 }
 
-void connectme(int port)
+void connectme(unsigned int port)
 {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
@@ -369,10 +372,19 @@ void connectme(int port)
 		msg2(LOG_INFO,"Authorized client") ;
 		for(i=0;children[i]&&i<child_arraysize;i++);
 		if(i>=child_arraysize) {
-			realloc(children, sizeof(pid_t)*child_arraysize);
-			memset(children+child_arraysize, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
-			i=child_arraysize+1;
-			child_arraysize+=DEFAULT_CHILD_ARRAY;
+			pid_t*ptr;
+
+			ptr=realloc(children, sizeof(pid_t)*child_arraysize);
+			if(ptr) {
+				children=ptr;
+				memset(children+child_arraysize, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
+				i=child_arraysize+1;
+				child_arraysize+=DEFAULT_CHILD_ARRAY;
+			} else {
+				msg2(LOG_INFO,"Not enough memory to store child PID");
+				close(net);
+				continue;
+			}
 		}
 #ifndef NOFORK
 		if ((children[i]=fork())<0) {
@@ -399,7 +411,7 @@ off_t lastpoint = (off_t)-1;
 
 void maybeseek(int handle, off_t a)
 {
-if (a > exportsize)
+if (a < 0 || a > exportsize)
 	err("Can not happen\n");
 if (lastpoint != a) {
 	if (lseek(handle, a, SEEK_SET) < 0)
@@ -418,15 +430,18 @@ void myseek(int handle,off_t a)
 
 char pagebuf[DIFFPAGESIZE];
 
-int rawexpread(off_t a, char *buf, int len)
+int rawexpread(off_t a, char *buf, size_t len)
 {
+	ssize_t res;
+
 	maybeseek(export[a/hunksize], a%hunksize);
-	return (read(export[a/hunksize], buf, len) != len);
+	res = read(export[a/hunksize], buf, len);
+	return (res < 0 || (size_t)res != len);
 }
 
-int expread(off_t a, char *buf, int len)
+int expread(off_t a, char *buf, size_t len)
 {
-	int rdlen, offset;
+	off_t rdlen, offset;
 	off_t mapcnt, mapl, maph, pagestart;
  
 	if (!(flags & F_COPYONWRITE))
@@ -438,7 +453,8 @@ int expread(off_t a, char *buf, int len)
 	for (mapcnt=mapl;mapcnt<=maph;mapcnt++) {
 		pagestart=mapcnt*DIFFPAGESIZE;
 		offset=a-pagestart;
-		rdlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset;
+		rdlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
+			len : (size_t)DIFFPAGESIZE-offset;
 		if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)difmap[mapcnt]);
@@ -454,17 +470,22 @@ int expread(off_t a, char *buf, int len)
 	return 0;
 }
 
-int rawexpwrite(off_t a, char *buf, int len)
+int rawexpwrite(off_t a, char *buf, size_t len)
 {
+	ssize_t res;
+
 	maybeseek(export[a/hunksize], a%hunksize);
-	return (write(export[a/hunksize], buf, len) != len);
+	res = write(export[a/hunksize], buf, len);
+	return (res < 0 || (size_t)res != len);
 }
 
 
-int expwrite(off_t a, char *buf, int len)
+int expwrite(off_t a, char *buf, size_t len)
 {
-	u32 mapcnt,mapl,maph ; int wrlen,rdlen ; 
-	off_t pagestart ; int offset ;
+	off_t mapcnt,mapl,maph ;
+	off_t wrlen,rdlen ; 
+	off_t pagestart ;
+	off_t offset ;
 
 	if (!(flags & F_COPYONWRITE))
 		return(rawexpwrite(a,buf,len)); 
@@ -475,7 +496,8 @@ int expwrite(off_t a, char *buf, int len)
 	for (mapcnt=mapl;mapcnt<=maph;mapcnt++) {
 		pagestart=mapcnt*DIFFPAGESIZE ;
 		offset=a-pagestart ;
-		wrlen=(len<DIFFPAGESIZE-offset) ? len : DIFFPAGESIZE-offset ;
+		wrlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
+			len : (size_t)DIFFPAGESIZE-offset;
 
 		if (difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
@@ -526,7 +548,7 @@ int mainloop(int net)
 	while (1) {
 #define BUFSIZE (1024*1024)
 		char buf[BUFSIZE];
-		int len;
+		size_t len;
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
@@ -562,7 +584,7 @@ int mainloop(int net)
 		  ERROR;
 		  continue;
 		}
-		if ((((off_t)request.from + len) > exportsize) ||
+		if (((size_t)((off_t)request.from + len) > exportsize) ||
 		    ((flags & F_READONLY) && request.type)) {
 			DEBUG("[RANGE!]");
 			ERROR;
@@ -654,9 +676,6 @@ off_t size_autodetect(int export)
 
 int main(int argc, char *argv[])
 {
-	int net;
-	off_t i;
-
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
 		exit(-1) ;
@@ -688,10 +707,10 @@ void serveconnection(int net)
 		}
 	}
 	
-	if (exportsize == (off_t)OFFT_MAX) {
+	if (exportsize == OFFT_MAX) {
 		exportsize = size_autodetect(export[0]);
 	}
-	if (exportsize > (off_t)OFFT_MAX) {
+	if (exportsize > OFFT_MAX) {
 		err("Size of exported file is too big\n");
 	}
 	else

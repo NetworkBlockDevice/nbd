@@ -28,8 +28,6 @@ AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr])
 AC_FUNC_FORK
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 case "`uname`" in
