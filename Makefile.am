@@ -9,8 +9,10 @@ man8_MANS = nbd-client.8
 EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h
 CLEANFILES = nbd-client.8 nbd-server.1
 nbd-server.1: nbd-server.1.sgml
-	docbook-to-man nbd-server.1.sgml > nbd-server.1
+	docbook2man nbd-server.1.sgml
+	mv NBD-SERVER.1 nbd-server.1
 nbd-client.8: nbd-client.8.sgml
-	docbook-to-man nbd-client.8.sgml > nbd-client.8
+	docbook2man nbd-client.8.sgml
+	mv NBD-CLIENT.8 nbd-client.8
 dist-hook:
 	rm -Rf `find $(distdir) -name 'CVS' -type d -print`
