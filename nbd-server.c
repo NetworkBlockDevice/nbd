@@ -31,6 +31,15 @@
  * 	so that processes don't think they have to wait for us, which is
  * 	interesting for initscripts as well. Wouter Verhelst
  * 	<wouter@debian.org>
+ * Version 2.5 - Bugfix release: forgot to reset child_arraysize to
+ *      zero after fork()ing, resulting in nbd-server going berserk
+ *      when it receives a signal with at least one child open. Wouter
+ *      Verhelst <wouter@debian.org>
+ * 10/10/2003 - Added socket option SO_KEEPALIVE (sf.net bug 819235);
+ * 	rectified type of mainloop::size_host (sf.net bugs 814435 and
+ * 	817385); close the PID file after writing to it, so that the
+ * 	daemon can actually be found. Wouter Verhelst
+ * 	<wouter@debian.org>
  */
 
 #define VERSION PACKAGE_VERSION
@@ -305,6 +314,7 @@ void connectme(int port)
 		pidf=fopen(pidfname, "w");
 		if(pidf) {
 			fprintf(pidf,"%d", (int)getpid());
+			fclose(pidf);
 		} else {
 			perror("fopen");
 			fprintf(stderr, "Not fatal; continuing");
@@ -318,7 +328,10 @@ void connectme(int port)
 
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-	        err("setsockopt");
+	        err("setsockopt SO_REUSEADDR");
+	}
+	if (setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
+		err("setsockopt SO_KEEPALIVE");
 	}
 
 	DEBUG("Waiting for connections... bind, ");
@@ -493,7 +506,7 @@ int mainloop(int net)
 	struct nbd_reply reply;
 	char zeros[300];
 	int i = 0;
-	off_t size_host;
+	u64 size_host;
 
 	memset(zeros, 0, 290);
 	if (write(net, INIT_PASSWD, 8) < 0)
@@ -501,7 +514,7 @@ int mainloop(int net)
 	cliserv_magic = htonll(cliserv_magic);
 	if (write(net, &cliserv_magic, sizeof(cliserv_magic)) < 0)
 		err("Negotiation failed: %m");
-	size_host = htonll(exportsize);
+	size_host = htonll((u64)exportsize);
 	if (write(net, &size_host, 8) < 0)
 		err("Negotiation failed: %m");
 	if (write(net, zeros, 128) < 0)

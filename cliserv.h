@@ -13,6 +13,8 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
+#include <stdlib.h>
 
 #if SIZEOF_UNSIGNED_SHORT_INT==4
 typedef unsigned short u32;
@@ -41,6 +43,11 @@ typedef unsigned long long u64;
  * Required for people trying to compile nbd-server on a non-linux
  * system. */
 #include "nbd.h"
+#endif
+
+#if NBD_LFS==1
+#define _LARGEFILE_SOURCE
+#define _FILE_OFFSET_BITS=64
 #endif
 
 u64 cliserv_magic = 0x00420281861253LL;
