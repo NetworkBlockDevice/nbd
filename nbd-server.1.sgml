@@ -50,7 +50,8 @@ manpage.1: manpage.sgml
     <refname>&dhpackage;</refname>
 
     <refpurpose>serve a file as a block device to other computers
-    running the Linux(tm) Operating System</refpurpose>
+    running the &gnu;/Linux(tm) or &gnu;/Hurd Operating
+    System</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
