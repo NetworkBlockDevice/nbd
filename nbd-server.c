@@ -739,7 +739,7 @@ int splitexport(void) {
 	for (i=0; i<exportsize; i+=hunksize) {
 		char exportname3[1024];
 		
-		sprintf(exportname3, exportname2, (int)i/hunksize);
+		snprintf(exportname3, 1024, "%s.%d", exportname2, (int)i/hunksize);
 		printf( "Opening %s\n", exportname3 );
 		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
 			/* Read WRITE ACCESS was requested by media is only read only */
@@ -751,7 +751,7 @@ int splitexport(void) {
 	}
 
 	if (flags & F_COPYONWRITE) {
-		sprintf(difffilename,"%s-%s-%d.diff",exportname2,clientname,
+		snprintf(difffilename, 256, "%s-%s-%d.diff",exportname2,clientname,
 			(int)getpid()) ;
 		msg3(LOG_INFO,"About to create map and diff file %s",difffilename) ;
 		difffile=open(difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
@@ -789,7 +789,7 @@ void serveconnection(int net) {
 }
 
 /**
- * Find the name of the file we have to serve. This will use sprintf()
+ * Find the name of the file we have to serve. This will use snprintf()
  * to put the IP address of the client inside a filename containing
  * "%s". That name is then written to exportname2
  *
@@ -806,7 +806,7 @@ void set_peername(int net,char *clientname)
 	if (getpeername( net, (struct sockaddr *) &addrin, &addrinlen ) < 0)
 		err("getsockname failed: %m");
 	peername = inet_ntoa(addrin.sin_addr);
-	sprintf(exportname2, exportname, peername);
+	snprintf(exportname2, 1024, exportname, peername);
 
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, exportname2);
