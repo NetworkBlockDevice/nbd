@@ -920,6 +920,8 @@ void setup_serve(SERVER* serve) {
 /**
  * Loop through the available servers, and serve them.
  *
+ * Actually, right now we only handle one server. Will change that for
+ * 2.9.
  **/
 int serveloop(SERVER* serve) {
 	struct sockaddr_in addrin;
