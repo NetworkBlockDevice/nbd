@@ -1,10 +1,21 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst
-AC_INIT([nbd],[2.7.1],[wouter@debian.org])
+AC_INIT([nbd],[2.7.2],[wouter@debian.org])
 AM_INIT_AUTOMAKE()
 
-AC_ARG_ENABLE(lfs, AC_HELP_STRING([--enable-lfs],[Enable Large File Support]), [NBD_LFS=1], [NBD_LFS=0])
+AC_ARG_ENABLE(
+  lfs, 
+  AC_HELP_STRING([--enable-lfs],[Enable Large File Support]),
+  [
+     if test "x$enableval" = "xyes" ; then
+        NBD_LFS=1
+     else
+        NBD_LFS=0
+     fi
+  ],
+  [NBD_LFS=0]
+)
 AC_MSG_CHECKING([whether Large File Support should be enabled])
 if test $NBD_LFS -eq 1; then
   AC_DEFINE(NBD_LFS,1, [Define to 1 if Large File Support should be enabled])
@@ -14,7 +25,18 @@ else
   AC_MSG_RESULT([no])
 fi
 
-AC_ARG_ENABLE(syslog, AC_HELP_STRING([--enable-syslog],[Enable Syslog logging]), [ISSERVER=1], [ISSERVER=0])
+AC_ARG_ENABLE(
+   syslog,
+   AC_HELP_STRING([--enable-syslog],[Enable Syslog logging]),
+   [
+      if test "x$enableval" = "xyes" ; then
+         ISSERVER=1
+      else
+         ISSERVER=0
+      fi
+   ],
+   [ISSERVER=0]
+)
 AC_MSG_CHECKING([whether syslog logging is requested])
 if test $ISSERVER -eq 1; then
   AC_DEFINE(ISSERVER,1, [Define to 1 if you want nbd-server to log through syslog])
