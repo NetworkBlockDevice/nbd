@@ -103,10 +103,6 @@
 #define DEBUG2( a,b ) 
 #define DEBUG3( a,b,c ) 
 #endif
-/** sending macro... not really required */
-#define SEND writeit( net, &reply, sizeof( reply ));
-/** error macro... not sure whether we really need this */
-#define ERROR { reply.error = htonl(-1); SEND; reply.error = 0; lastpoint = -1; }
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION ""
 #endif
@@ -164,7 +160,7 @@ char pidfname[256]; /**< name of our PID file */
 /**
  * Variables associated with a copyonwrite server. Not yet used.
  **/
-typedef struct __cow_opts {
+typedef struct {
 	char* difffilename;  /**< filename of the copy-on-write file */
 	int difffile;	     /**< filedescriptor of copyonwrite file. @todo
 			       shouldn't this be an array too? (cfr
@@ -175,9 +171,10 @@ typedef struct __cow_opts {
 } cow_opts;
 
 /**
- * Variables associated with a server. Not yet used.
+ * Variables associated with a server. Not yet used. @todo modify the code to
+ * use an instance of this struct instead of the heap of global variables.
  **/
-typedef struct __nbd_server_opts {
+typedef struct {
 	char* exportname;    /**< filename of the file we're exporting */
 	unsigned int port;            /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
@@ -190,13 +187,14 @@ typedef struct __nbd_server_opts {
 	int export[1024];    /**< array of filedescriptors of exported files;
 			       only the first is actually used unless we're
 			       doing the multiple file option */
-	cow_opts* cow;	     /**< only used if (flags | F_COPYONWRITE) */
+	cow_opts* cow;	     /**< only used if (flags | F_COPYONWRITE) (NULL
+			       otherwise) */
 } nbd_server_opts;
 
 /**
- * Check whether a client is allowed to connect. Works with an
- * authorization file which contains one line per machine, no
- * wildcards.
+ * Check whether a client is allowed to connect. Works with an authorization
+ * file which contains one line per machine, no wildcards.
+ *
  * @param name IP address of client trying to connect (in human-readable form)
  * @return 0 - authorization refused, 1 - OK
  **/
@@ -264,7 +262,8 @@ inline void writeit(int f, void *buf, size_t len)
  * Parse the command line.
  *
  * @todo getopt() is a great thing, and easy to use. Also, we want to
- * create a configuration file which nbd-server will read.
+ * create a configuration file which nbd-server will read. Maybe do (as in,
+ * parse) that here.
  *
  * @param argc the argc argument to main()
  * @param argv the argv argument to main()
@@ -382,7 +381,7 @@ void sigterm_handler(int s) {
 	if(parent) {
 		unlink(pidfname);
 	}
-		
+
 	exit(0);
 }
 
@@ -399,7 +398,7 @@ off_t size_autodetect(int export)
 	u32 es32;
 	struct stat stat_buf;
 	int error;
-	
+
 	DEBUG("looking for export size with lseek SEEK_END\n");
 	es = lseek(export, (off_t)0, SEEK_END);
 	if (es > ((off_t)0)) {
@@ -407,7 +406,7 @@ off_t size_autodetect(int export)
         } else {
                 DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
-	
+
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
 	error = fstat(export, &stat_buf);
@@ -468,9 +467,12 @@ int rawexpwrite(off_t a, char *buf, size_t len)
 /**
  * seek to a position in a file, no matter what. Used when using maybeseek is a
  * bad idea (for instance, because we're reading the copyonwrite file instead
- * of the exported file)
+ * of the exported file).
  * @param handle a filedescriptor
  * @param a position to seek to
+ * @todo get rid of this; lastpoint is a global variable right now, but it
+ * shouldn't be. If we pass it on as a parameter, that makes things a *lot*
+ * easier.
  **/
 void myseek(int handle,off_t a) {
 	if (lseek(handle, a, SEEK_SET) < 0) {
@@ -611,6 +613,12 @@ void negotiate(int net) {
 		err("Negotiation failed: %m");
 }
 
+/** sending macro; not really required. Uses variables in the local
+ * scope of mainloop(). Get rid of it. */
+#define SEND writeit( net, &reply, sizeof( reply ));
+/** error macro; not sure whether we really need this. Uses variables
+ * in the local scope of mainloop(). Get rid of this beast. */
+#define ERROR { reply.error = htonl(-1); SEND; reply.error = 0; lastpoint = -1; }
 /**
  * Serve a file to a single client.
  *
