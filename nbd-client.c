@@ -7,6 +7,7 @@
  * Version 1.0 - 64bit issues should be fixed, now
  * Version 1.1 - added bs (blocksize) option (Alexey Guzeev, aga@permonline.ru)
  * Version 1.2 - I added new option '-d' to send the disconnect request
+ * Version 2.0 - Version synchronised with server
  */
 
 #include <asm/page.h>

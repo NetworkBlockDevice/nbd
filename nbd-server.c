@@ -16,9 +16,10 @@
  *	option.) Ken Yap <ken@nlc.net.au>.
  * Version 1.6 - fix autodetection of block device size and really make 64 bit
  * 	clean on 32 bit machines. Anton Altaparmakov <aia21@cam.ac.uk>
+ * Version 2.0 - Version synchronised with client
  */
 
-#define VERSION "1.6"
+#define VERSION "2.0"
 #define GIGA (1*1024*1024*1024)
 
 #include <sys/types.h>
