@@ -127,17 +127,21 @@
  *
  * Actually, do we need this at all? Can't we just say '0 is autodetect', and
  * live with it? Or better yet, use an extra flag, or so?
+ * Answer: yes, we need it, as the hunksize is defined to this when the
+ * multiple file thingy isn't used.
  */
 #define OFFT_MAX (((((off_t)1)<<((sizeof(off_t)-1)*8))-1)<<7)+127
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			    authorization file (yuck) */
 #define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
 #define GIGA (1*1024*1024*1024) /**< 1 Gigabyte. Used as hunksize when doing
-				  the multiple file thingy */
+				  the multiple file thingy. @todo: make this a
+				  configuration option. */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
-#define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using copyonwrite */
+#define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
+			    copyonwrite */
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
@@ -155,6 +159,7 @@ typedef struct {
 	int flags;           /**< flags associated with this exported file */
 	unsigned int timeout;/**< how long a connection may be idle
 			       (0=forever) */
+	int socket;	     /**< The socket of this server. */
 } SERVER;
 
 /**
@@ -167,16 +172,12 @@ typedef struct {
 	int export[1024];    /**< array of filedescriptors of exported files;
 			       only the first is actually used unless we're
 			       doing the multiple file option */
-	int lastpoint;	     /**< For keeping track of where we are in a file.
-			       This code is BUGGY currently, at least in
-			       combination with the multiple file option. */
 	int net;	     /**< The actual client socket */
 	SERVER *server;	     /**< The server this client is getting data from */
 	char* difffilename;  /**< filename of the copy-on-write file, if any */
 	int difffile;	     /**< filedescriptor of copyonwrite file. @todo
-			       shouldn't this be an array too? (cfr
-			       nbd_server_opts::export) Or make -m and -c
-			       mutually exclusive */
+			       shouldn't this be an array too? (cfr export) Or
+			       make -m and -c mutually exclusive */
 	u32 difffilelen;     /**< number of pages in difffile */
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
 } CLIENT;
@@ -216,8 +217,7 @@ int authorized_client(CLIENT *opts) {
  * @param buf a buffer
  * @param len the number of bytes to be read
  **/
-inline void readit(int f, void *buf, size_t len)
-{
+inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
@@ -235,8 +235,7 @@ inline void readit(int f, void *buf, size_t len)
  * @param buf a buffer containing data
  * @param len the number of bytes to be written
  **/
-inline void writeit(int f, void *buf, size_t len)
-{
+inline void writeit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");
@@ -252,16 +251,16 @@ inline void writeit(int f, void *buf, size_t len)
  * function so that we can call it from multiple places
  */
 void usage() {
-	printf("This is nbd-server version " VERSION "\n");	
-	printf("Usage: port file_to_export [size][kKmM] [-r] [-m] [-c] [-a timeout_sec]\n"
-	       "	-r read only\n"
-	       "	-m multiple file\n"
-	       "	-c copy on write\n"
-	       "        -l file with list of hosts that are allowed to connect.\n"
-	       "        -a maximum idle seconds, terminates when idle time exceeded\n"
-	       "	if port is set to 0, stdin is used (for running from inetd)\n"
-	       "	if file_to_export contains '%%s', it is substituted with IP\n"
-	       "		address of machine trying to connect\n" );
+	printf("This is nbd-server version " VERSION "\n");
+	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec]\n"
+	       "\t-r|--read-only\t\tread only\n"
+	       "\t-m|--multi-file\t\tmultiple file\n"
+	       "\t-c|--copy-on-write\tcopy on write\n"
+	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
+	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n\n"
+	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
+	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
+	       "\t\taddress of the machine trying to connect\n" );
 }
 
 /**
@@ -350,8 +349,7 @@ SERVER* cmdline(int argc, char *argv[]) {
  * @param s the signal we're handling (must be SIGCHLD, or something
  * is severely wrong)
  **/
-void sigchld_handler(int s)
-{
+void sigchld_handler(int s) {
         int* status=NULL;
 	int* i;
 	char buf[80];
@@ -412,8 +410,7 @@ void sigterm_handler(int s) {
  * @return the size of the file, or OFFT_MAX if detection was
  * impossible.
  **/
-off_t size_autodetect(int export)
-{
+off_t size_autodetect(int export) {
 	off_t es;
 	u32 es32;
 	struct stat stat_buf;
@@ -454,48 +451,7 @@ off_t size_autodetect(int export)
 }
 
 /**
- * Seek to a position in a file, unless we're already there.
- * @param handle a filedescriptor
- * @param a position to seek to
- * @param client the client we're working for
- **/
-void maybeseek(int handle, off_t a, CLIENT* client) {
-	if (a < 0 || a > client->exportsize) {
-		err("Can not happen\n");
-	}
-	if (client->lastpoint != a) {
-		if (lseek(handle, a, SEEK_SET) < 0) {
-			err("Can not seek locally!\n");
-		}
-		client->lastpoint = a;
-	} else {
-		DEBUG("S");
-	}
-}
-
-/**
- * Write an amount of bytes at a given offset to the right file. This
- * abstracts the write-side of the multiple file option.
- *
- * @param a The offset where the write should start
- * @param buf The buffer to write from
- * @param len The length of buf
- * @return The number of bytes actually written, or -1 in case of an error
- **/
-int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client)
-{
-	ssize_t res;
-
-	maybeseek(client->export[a/client->server->hunksize],
-			a%client->server->hunksize, client);
-	res = write(client->export[a/client->server->hunksize], buf, len);
-	return (res < 0 || (size_t)res != len);
-}
-
-/**
- * seek to a position in a file, no matter what. Used when using maybeseek is a
- * bad idea (for instance, because we're reading the copyonwrite file instead
- * of the exported file).
+ * seek to a position in a file, with error handling.
  * @param handle a filedescriptor
  * @param a position to seek to
  * @todo get rid of this; lastpoint is a global variable right now, but it
@@ -509,6 +465,24 @@ void myseek(int handle,off_t a) {
 }
 
 /**
+ * Write an amount of bytes at a given offset to the right file. This
+ * abstracts the write-side of the multiple file option.
+ *
+ * @param a The offset where the write should start
+ * @param buf The buffer to write from
+ * @param len The length of buf
+ * @return The number of bytes actually written, or -1 in case of an error
+ **/
+int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
+	ssize_t res;
+
+	myseek(client->export[(int)a/client->server->hunksize],
+			a%client->server->hunksize);
+	res = write(client->export[(int)((off_t)a/(off_t)(client->server->hunksize))], buf, len);
+	return (res < 0 || (size_t)res != len);
+}
+
+/**
  * Read an amount of bytes at a given offset from the right file. This
  * abstracts the read-side of the multiple files option.
  *
@@ -518,13 +492,12 @@ void myseek(int handle,off_t a) {
  * @return The number of bytes actually read, or -1 in case of an
  * error.
  **/
-int rawexpread(off_t a, char *buf, size_t len, CLIENT *client)
-{
+int rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	ssize_t res;
 
-	maybeseek(client->export[a/client->server->hunksize],
-			a%client->server->hunksize, client);
-	res = read(client->export[a/client->server->hunksize], buf, len);
+	myseek(client->export[(int)a/client->server->hunksize],
+			a%client->server->hunksize);
+	res = read(client->export[(int)a/client->server->hunksize], buf, len);
 	return (res < 0 || (size_t)res != len);
 }
 
@@ -537,11 +510,10 @@ int rawexpread(off_t a, char *buf, size_t len, CLIENT *client)
  * @param len The size of buf
  * @return The number of bytes actually read, or -1 in case of an error
  **/
-int expread(off_t a, char *buf, size_t len, CLIENT *client)
-{
+int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t rdlen, offset;
 	off_t mapcnt, mapl, maph, pagestart;
- 
+
 	if (!(client->server->flags & F_COPYONWRITE))
 		return rawexpread(a, buf, len, client);
 	DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
@@ -651,7 +623,7 @@ void negotiate(CLIENT *client) {
 /** sending macro. */
 #define SEND(net,reply) writeit( net, &reply, sizeof( reply ));
 /** error macro. */
-#define ERROR(client,reply) { reply.error = htonl(-1); SEND(client->net,reply); reply.error = 0; client->lastpoint = -1; }
+#define ERROR(client,reply) { reply.error = htonl(-1); SEND(client->net,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -661,10 +633,10 @@ void negotiate(CLIENT *client) {
  * @param net A network socket, connected to an nbd client
  * @return never
  **/
-int mainloop(CLIENT *client)
-{
+int mainloop(CLIENT *client) {
 	struct nbd_request request;
 	struct nbd_reply reply;
+	gboolean go_on=TRUE;
 #ifdef DODBG
 	int i = 0;
 #endif
@@ -672,7 +644,7 @@ int mainloop(CLIENT *client)
 	DEBUG("Entering request loop!\n");
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
-	while (1) {
+	while (go_on) {
 		char buf[BUFSIZE];
 		size_t len;
 #ifdef DODBG
@@ -685,11 +657,15 @@ int mainloop(CLIENT *client)
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
 
-		if (request.type==NBD_CMD_DISC) { /* Disconnect request */
-		  if (client->difmap) g_free(client->difmap) ;
-                  if (client->difffile>=0) { 
-                     close(client->difffile) ; unlink(client->difffilename) ; }
-		  err("Disconnect request received.") ;
+		if (request.type==NBD_CMD_DISC) {
+			msg2(LOG_INFO, "Disconnect request received.");
+			if (client->difmap) g_free(client->difmap) ;
+                	if (client->difffile>=0) { 
+                		close(client->difffile);
+				unlink(client->difffilename);
+			}
+			go_on=FALSE;
+			continue;
 		}
 
 		len = ntohl(request.len);
@@ -705,9 +681,9 @@ int mainloop(CLIENT *client)
 #endif
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 		if ((request.from + len) > (OFFT_MAX)) {
-		  DEBUG("[Number too large!]");
-		  ERROR(client, reply);
-		  continue;
+			DEBUG("[Number too large!]");
+			ERROR(client, reply);
+			continue;
 		}
 
 		if (((ssize_t)((off_t)request.from + len) > client->exportsize) ||
@@ -717,7 +693,7 @@ int mainloop(CLIENT *client)
 			continue;
 		}
 
-		if (request.type==1) {	/* WRITE */
+		if (request.type==NBD_CMD_WRITE) {
 			DEBUG("wr: net->buf, ");
 			readit(client->net, buf, len);
 			DEBUG("buf->exp, ");
@@ -728,7 +704,6 @@ int mainloop(CLIENT *client)
 				ERROR(client, reply);
 				continue;
 			}
-			client->lastpoint += len;
 			SEND(client->net, reply);
 			DEBUG("OK!\n");
 			continue;
@@ -737,12 +712,10 @@ int mainloop(CLIENT *client)
 
 		DEBUG("exp->buf, ");
 		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
-		 	client->lastpoint = -1;
 			DEBUG("Read failed: %m");
 			ERROR(client, reply);
 			continue;
 		}
-		client->lastpoint += len;
 
 		DEBUG("buf->net, ");
 		memcpy(buf, &reply, sizeof(struct nbd_reply));
@@ -801,13 +774,15 @@ int splitexport(CLIENT* client) {
 /**
  * Serve a connection. 
  *
- * @todo allow for multithreading, perhaps use libevent.
+ * @todo allow for multithreading, perhaps use libevent. Not just yet, though;
+ * follow the road map.
  *
  * @param net A network socket connected to an nbd client
  **/
 void serveconnection(CLIENT *client) {
 	char buf[80];
 	splitexport(client);
+
 	if (!client->server->expected_size) {
 		client->exportsize = size_autodetect(client->export[0]);
 	} else {
@@ -829,9 +804,9 @@ void serveconnection(CLIENT *client) {
 }
 
 /**
- * Find the name of the file we have to serve. This will use snprintf()
+ * Find the name of the file we have to serve. This will use g_strdup_printf
  * to put the IP address of the client inside a filename containing
- * "%s". That name is then written to exportname2
+ * "%s". That name is then written to client->exportname.
  *
  * @param net A socket connected to an nbd client
  * @param client information about the client. The IP address in human-readable
@@ -862,28 +837,12 @@ void destroy_pid_t(gpointer data) {
 }
 
 /**
- * Connect the socket, and start to serve. This function will fork()
- * if a connection from an authorized client is received, and will
- * start mainloop().
- *
- * @todo modularize this giant beast. Preferably with a chainsaw. Also,
- * it has no business starting mainloop(); it should connect, and be
- * done with it.
- *
- * @param port the port where we will listen
+ * Go daemon (unless we specified at compile time that we didn't want this)
+ * @param serve the first server of our configuration. If its port is zero,
+ * 	then do not daemonize, because we're doing inetd then.
  **/
-void connectme(SERVER* serve) {
-	struct sockaddr_in addrin;
-	struct sigaction sa;
-	int addrinlen = sizeof(addrin);
-	int net, sock, newpid, i;
-#ifndef sun
-	int yes=1;
-#else
-	char yes='1';
-#endif /* sun */
-#ifndef NODAEMON
-#ifndef NOFORK
+#if !defined(NODAEMON) && !defined(NOFORK)
+void daemonize(SERVER* serve) {
 	FILE*pidf;
 
 	if((serve->port)) {
@@ -900,17 +859,39 @@ void connectme(SERVER* serve) {
 			fprintf(stderr, "Not fatal; continuing");
 		}
 	}
-#endif /* NOFORK */
-#endif /* NODAEMON */
+}
+#else
+#define daemonize(serve)
+#endif /* !defined(NODAEMON) && !defined(NOFORK) */
 
-	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+/**
+ * Connect a server's socket.
+ *
+ * @todo modularize this giant beast. Preferably with a chainsaw. Also,
+ * it has no business starting mainloop(), through serveconnection(); it
+ * should connect, and be done with it.
+ *
+ * @param serve the server we want to connect.
+ **/
+void setup_serve(SERVER* serve) {
+	struct sockaddr_in addrin;
+	struct sigaction sa;
+	int addrinlen = sizeof(addrin);
+	int newpid, i;
+#ifndef sun
+	int yes=1;
+#else
+	char yes='1';
+#endif /* sun */
+
+	if ((serve->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
 
 	/* lose the pesky "Address already in use" error message */
-	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
+	if (setsockopt(serve->socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
 	        err("setsockopt SO_REUSEADDR");
 	}
-	if (setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
+	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
 		err("setsockopt SO_KEEPALIVE");
 	}
 
@@ -918,12 +899,11 @@ void connectme(SERVER* serve) {
 	addrin.sin_family = AF_INET;
 	addrin.sin_port = htons(serve->port);
 	addrin.sin_addr.s_addr = 0;
-	if (bind(sock, (struct sockaddr *) &addrin, addrinlen) < 0)
+	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
 		err("bind: %m");
 	DEBUG("listen, ");
-	if (listen(sock, 1) < 0)
+	if (listen(serve->socket, 1) < 0)
 		err("listen: %m");
-	DEBUG("accept, ");
 	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;
@@ -935,11 +915,22 @@ void connectme(SERVER* serve) {
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
 		err("sigaction: %m");
 	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
-	for(;;) { /* infinite loop */
+}
+
+/**
+ * Loop through the available servers, and serve them.
+ *
+ **/
+int serveloop(SERVER* serve) {
+	struct sockaddr_in addrin;
+	int addrinlen=sizeof(addrin);
+	for(;;) {
 		CLIENT *client;
+		int net;
 		pid_t *pid;
 
-		if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
+		DEBUG("accept, ");
+		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 			err("accept: %m");
 
 		client = g_malloc(sizeof(CLIENT));
@@ -979,19 +970,24 @@ void connectme(SERVER* serve) {
  **/
 int main(int argc, char *argv[]) {
 	SERVER* serve;
+	GArray* servers;
+
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
 		exit(-1) ;
 	}
+
 	logging();
 	serve=cmdline(argc, argv);
-	
+	servers=g_array_new(TRUE, FALSE, sizeof(SERVER*));
+
 	if (!(serve->port)) {
 	  	CLIENT *client;
 #ifndef ISSERVER
-          	/* You really should define ISSERVER if you're going to use inetd
-          	 * mode, but if you don't, closing stdout and stderr (which inetd
-          	 * had connected to the client socket) will let it work. */
+		/* You really should define ISSERVER if you're going to use
+		 * inetd mode, but if you don't, closing stdout and stderr
+		 * (which inetd had connected to the client socket) will let it
+		 * work. */
           	close(1);
           	close(2);
           	open("/dev/null", O_WRONLY);
@@ -1002,10 +998,11 @@ int main(int argc, char *argv[]) {
 		client->net=0;
 		client->exportsize=OFFT_MAX;
           	set_peername(0,client);
-          	serveconnection(0);
+          	serveconnection(client);
           	return 0;
         }
-	connectme(serve); /* serve infinitely */
+	daemonize(serve);
+	setup_serve(serve);
+	serveloop(serve);
 	return 0 ;
 }
-
