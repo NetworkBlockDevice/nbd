@@ -19,9 +19,10 @@
  * Version 2.0 - Version synchronised with client
  * Version 2.1 - Reap zombie client processes when they exit. Removed
  * 	(uncommented) the _IO magic, it's no longer necessary.
+ * Version 2.2 - Auto switch to read-only mode (usefull for floppies).
  */
 
-#define VERSION "2.1"
+#define VERSION "2.2"
 #define GIGA (1*1024*1024*1024)
 
 #include <sys/types.h>
@@ -101,6 +102,7 @@ void set_peername(int net,char *clientname);
 #define LINELEN 256 
 char difffilename[256];
 unsigned int timeout = 0;
+int autoreadonly = 0;
 
 int authorized_client(char *name)
 /* 0 - authorization refused, 1 - OK 
@@ -481,7 +483,7 @@ int mainloop(int net)
 			DEBUG("wr: net->buf, ");
 			readit(net, buf, len);
 			DEBUG("buf->exp, ");
-			if (expwrite(request.from, buf, len)) {
+			if ((autoreadonly == 1) || expwrite(request.from, buf, len)) {
 				DEBUG("Write failed: %m" );
 				ERROR;
 				continue;
@@ -581,8 +583,13 @@ void serveconnection(int net)
     
     sprintf(exportname3, exportname2, i/hunksize);
     printf( "Opening %s\n", exportname3 );
-    if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1)
-      err("Could not open exported file: %m");
+    if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
+	    	/* Read WRITE ACCESS was requested by media is only read only */
+	    	autoreadonly = 1;
+		flags |= F_READONLY;
+    		if ((export[i/hunksize] = open(exportname3, O_RDONLY)) == -1) 
+			err("Could not open exported file: %m");
+	}
     }
 	
     if (exportsize == (fsoffset_t)-1) {
