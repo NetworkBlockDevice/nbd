@@ -43,7 +43,14 @@ case "`uname`" in
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;
-     esac
+esac
+AC_MSG_CHECKING(whether there is a local nbd.h)
+if test -f nbd.h; then
+  AC_DEFINE(HAVE_LOCAL_NBD_H,1, [Define to 1 if you want to use a local nbd.h (not provided, must be supplied by you])
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
 AC_CHECK_HEADERS([linux/nbd.h arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/mount.h sys/socket.h syslog.h])
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
