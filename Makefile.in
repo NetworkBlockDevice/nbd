@@ -15,11 +15,11 @@ all: $(CMDS)
 
 nbd-client: nbd-client.o
 
-nbd-client.o: nbd-client.c cliserv.h nbd.h config.h
+nbd-client.o: nbd-client.c cliserv.h config.h
 
 nbd-server: nbd-server.o
 
-nbd-server.o: nbd-server.c cliserv.h nbd.h config.h
+nbd-server.o: nbd-server.c cliserv.h config.h
 	$(CC) $(CFLAGS) $(FSCHOICE) -c nbd-server.c
 
 install: $(CMDS)

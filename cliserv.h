@@ -36,7 +36,7 @@ typedef unsigned long long u64;
 #endif
 #endif	/* FS_32BIT */
 
-#include "nbd.h"
+#include <linux/nbd.h>
 
 #ifdef	FS_32BIT
 struct { unsigned char m[8]; } cliserv_magic = { { 0x00, 0x00, 0x42, 0x02, 0x81, 0x86, 0x12, 0x53 } };
