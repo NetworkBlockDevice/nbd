@@ -72,9 +72,6 @@ manpage.1: manpage.sgml
     <para>This manual page documents briefly the
       <command>&dhpackage;</command> command.</para>
 
-    <para>This manual page was written for the &debian; distribution
-      because the original program does not have a manual page.</para>
-
     <para>With <command>&dhpackage;</command>, you can connect to a
     server running <command>nbd-server</command>, thus using raw
     diskspace from that server as a blockdevice on the local
@@ -168,9 +165,12 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>AUTHOR</title>
     <para>The NBD kernel module and the NBD tools have been written by
-    Pavel Macheck (pavel@ucw.cz).</para>
+    Pavel Macheck (pavel@ucw.cz). Maintenance of the kernel module was taken
+    over by Paul Clements <email>Paul.Clements@steeleye.com></email>, while
+    &dhusername; &dhemail; took over maintenance of the NBD userland
+    tools.</para>
 
-    <para>This manual page was written by &dhusername; (&dhemail;) for
+    <para>This manual page was written by &dhusername; &dhemail; for
     the &debian; system (but may be used by others).  Permission is
     granted to copy, distribute and/or modify this document under the
     terms of the <acronym>GNU</acronym> General Public License,
