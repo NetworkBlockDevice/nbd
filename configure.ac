@@ -1,8 +1,8 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst
-AC_INIT([nbd],[2.7],[wouter@debian.org])
-AM_INIT_AUTOMAKE(nbd, 2.7)
+AC_INIT([nbd],[2.7.1],[wouter@debian.org])
+AM_INIT_AUTOMAKE()
 
 AC_ARG_ENABLE(lfs, AC_HELP_STRING([--enable-lfs],[Enable Large File Support]), [NBD_LFS=1], [NBD_LFS=0])
 AC_MSG_CHECKING([whether Large File Support should be enabled])
