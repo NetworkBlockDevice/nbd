@@ -135,8 +135,8 @@ inline void writeit(int f, void *buf, int len)
 	int res;
 	while (len > 0) {
 		DEBUG("+");
-		if ((res = write(f, buf, len)) <= 0)
-			err("Write failed: %m");
+		if ((res = send(f, buf, len, 0)) <= 0)
+			err("Send failed: %m");
 		len -= res;
 		buf += res;
 	}
@@ -474,6 +474,7 @@ int mainloop(int net)
 			}
 			lastpoint += len;
 			SEND;
+			DEBUG("OK!\n");
 			continue;
 		}
 		/* READ */
