@@ -1,0 +1,32 @@
+dnl Configure script for NBD system
+dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>
+AC_INIT(nbd-server.c)
+
+
+AC_PROG_CC
+AC_MSG_CHECKING(whether warnings should be enabled)
+if test -n "$GCC" ; then
+  AC_MSG_RESULT(yes)
+  CFLAGS="$CFLAGS -Wall -W -Wno-parentheses -Wstrict-prototypes -Wno-unused"
+else
+  AC_MSG_RESULT(no)
+fi
+#AC_PROG_INSTALL
+AC_C_BIGENDIAN
+AC_C_INLINE
+AC_CHECK_SIZEOF(unsigned short int)
+AC_CHECK_SIZEOF(unsigned int)
+AC_CHECK_SIZEOF(unsigned long int)
+AC_CHECK_SIZEOF(unsigned long long int)
+AC_CHECK_FUNCS(llseek)
+AC_MSG_CHECKING(whether client should be built)
+case "`uname`" in
+     *Linux*) BUILD_CLIENT=nbd-client
+	      AC_MSG_RESULT(yes)
+              ;;
+     *) AC_MSG_RESULT(no) ;;
+     esac
+AC_SUBST(BUILD_CLIENT)
+AC_CONFIG_HEADER(config.h)
+AC_OUTPUT(Makefile)
+
