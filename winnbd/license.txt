@@ -1,0 +1,2 @@
+The license of this program can be obtained from: http://www.vanheusden.com/license.txt
+It is actually the GNU Public License.
