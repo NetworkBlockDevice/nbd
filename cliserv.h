@@ -35,7 +35,12 @@ typedef unsigned long long u64;
 #error I need at least some 64-bit type
 #endif
 
-#include NBD_H
+#ifdef NBD_H_LOCAL
+#include "nbd.h"
+#endif
+#ifdef NBD_H_LINUX
+#include <linux/nbd.h>
+#endif
 
 #if NBD_LFS==1
 #define _LARGEFILE_SOURCE

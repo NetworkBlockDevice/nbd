@@ -2,7 +2,7 @@ dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],[2.7.99pre2.8],[wouter@debian.org])
-AM_INIT_AUTOMAKE()
+AM_INIT_AUTOMAKE(foreign dist-bzip2)
 
 AC_ARG_ENABLE(
   lfs,
@@ -75,14 +75,14 @@ AC_TRY_CPP([#include "nbd.h"
 #error not here
 #endif
 ], 
-  [AC_DEFINE(NBD_H, "nbd.h", Set to where a (recent enough) nbd.h can be found)
+  [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (recent enough) nbd.h can be found in the current directory)
     NBD_H='"nbd.h"'],
   AC_TRY_CPP([#include <linux/nbd.h>
 #ifdef LOCAL_END_REQUEST
 #error not here
 #endif
 ],
-    [AC_DEFINE(NBD_H, <linux/nbd.h>) NBD_H='<linux/nbd.h>'],
+    [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (recent enough) nbd.h can be found in the linux directory in the search path) NBD_H='<linux/nbd.h>'],
     AC_MSG_ERROR(Could not find a (recent enough) nbd.h)
   )
 )
