@@ -26,9 +26,14 @@
  *	_FILE_OFFSET_BITS=64 and _LARGEFILE_SOURCE if you used to be
  *	using FS_32BIT. This will allow you to use files >2GB instead of
  *	having to use the -m option. Wouter Verhelst <wouter@debian.org>
+ * Version 2.4 - Added code to keep track of children, so that we can
+ * 	properly kill them from initscripts. Add a call to daemon(),
+ * 	so that processes don't think they have to wait for us, which is
+ * 	interesting for initscripts as well. Wouter Verhelst
+ * 	<wouter@debian.org>
  */
 
-#define VERSION "2.3"
+#define VERSION PACKAGE_VERSION
 #define GIGA (1*1024*1024*1024)
 
 #include <sys/types.h>
@@ -56,6 +61,10 @@
    clients authorized to use the server. If it does not exist,
    access is permitted. */
 #define AUTH_FILE "nbd_server.allow"
+/* how much space for child PIDs we have by default. Dynamically
+   allocated, and will be realloc()ed if out of space, so this should
+   probably be fair for most situations. */
+#define DEFAULT_CHILD_ARRAY 256
 
 #include "cliserv.h"
 //#undef _IO
@@ -117,7 +126,6 @@ int authorized_client(char *name)
   return 0 ;
 }
 
-
 inline void readit(int f, void *buf, int len)
 {
 	int res;
@@ -157,7 +165,8 @@ int difffile=-1 ;
 u32 difffilelen=0 ; /* number of pages in difffile */
 u32 *difmap=NULL ;
 char clientname[256] ;
-
+int child_arraysize=DEFAULT_CHILD_ARRAY;
+pid_t *children;
 
 #define DIFFPAGESIZE 4096 /* diff file uses those chunks */
 
@@ -227,7 +236,35 @@ void cmdline(int argc, char *argv[])
 
 void sigchld_handler(int s)
 {
-	while(wait(NULL) > 0);
+        int* status=NULL;
+	int i;
+	pid_t pid;
+
+	while((pid=wait(status)) > 0) {
+		if(WIFEXITED(status)) {
+			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+		}
+		for(i=0;children[i]!=pid&&i<child_arraysize;i++);
+		if(i>=child_arraysize) {
+			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld",(long) pid);
+		} else {
+			children[i]=(pid_t)0;
+			DEBUG2("Removing %d from the list of children", pid);
+		}
+	}
+}
+
+/* If we are terminated, make sure our children are, too. */
+void sigterm_handler(int s) {
+	int i;
+
+	for(i=0;i<child_arraysize;i++) {
+		if(children[i]) {
+			kill(children[i], s);
+		}
+	}
+
+	exit(0);
 }
 
 void connectme(int port)
@@ -235,7 +272,7 @@ void connectme(int port)
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
-	int net, sock, newpid;
+	int net, sock, newpid, i;
 #ifndef sun
 	int yes=1;
 #else
@@ -265,30 +302,52 @@ void connectme(int port)
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGCHLD, &sa, NULL) == -1)
 		err("sigaction: %m");
-	for(;;) { /* infinite loop */
-	  if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-	    err("accept: %m");
-
-	  set_peername(net,clientname) ;
-	  if (!authorized_client(clientname)) {
-	    msg2(LOG_INFO,"Unauthorized client") ;
-	    close(net) ;
-	    continue ;
-	  }
-	  msg2(LOG_INFO,"Authorized client") ;
+	sa.sa_handler = sigterm_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGTERM, &sa, NULL) == -1)
+		err("sigaction: %m");
+	children=malloc(sizeof(pid_t)*child_arraysize);
+	memset(children, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
+#ifndef NODAEMON
 #ifndef NOFORK
-	  if ((newpid=fork())<0) {
-	    msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-	    close(net) ;
-	    continue ;
-	  }
-	  if (newpid>0) { /* parent */
-	    close(net) ; continue ; }
-	  /* child */
-	  close(sock) ;
+	if(daemon(1,0)<0) {
+		err("daemon");
+	}
+#endif /* NOFORK */
+#endif /* NODAEMON */
+	for(;;) { /* infinite loop */
+		if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
+			err("accept: %m");
+		
+		set_peername(net,clientname) ;
+		if (!authorized_client(clientname)) {
+			msg2(LOG_INFO,"Unauthorized client") ;
+			close(net) ;
+			continue ;
+		}
+		msg2(LOG_INFO,"Authorized client") ;
+		for(i=0;children[i]&&i<child_arraysize;i++);
+		if(i>=child_arraysize) {
+			realloc(children, sizeof(pid_t)*child_arraysize);
+			memset(children+child_arraysize, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
+			i=child_arraysize+1;
+			child_arraysize+=DEFAULT_CHILD_ARRAY;
+		}
+#ifndef NOFORK
+		if ((children[i]=fork())<0) {
+			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+			close(net) ;
+			continue ;
+		}
+		if (children[i]>0) { /* parent */
+			close(net) ; continue ; }
+		/* child */
+		realloc(children,0);
+		close(sock) ;
 #endif // NOFORK
-	  msg2(LOG_INFO,"Starting to serve") ;
-	  serveconnection(net) ;        
+		msg2(LOG_INFO,"Starting to serve") ;
+		serveconnection(net) ;        
 	}
 }
 
@@ -427,7 +486,6 @@ int mainloop(int net)
 #define BUFSIZE (1024*1024)
 		char buf[BUFSIZE];
 		int len;
-
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
