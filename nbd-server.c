@@ -100,9 +100,9 @@
 #define msg3(a,b,c) syslog(a,"%s %s", b,c)
 #define msg4(a,b,c,d) syslog(a,"%s %s %s", b,c,d)
 #else
-#define msg2(a,b) g_message(a,b)
-#define msg3(a,b,c) g_message(a,b,c)
-#define msg4(a,b,c,d) g_message(a,b,c,d)
+#define msg2(a,b) g_message(b)
+#define msg3(a,b,c) g_message(b,c)
+#define msg4(a,b,c,d) g_message(b,c,d)
 #endif
 
 /* Debugging macros */
@@ -307,7 +307,7 @@ void usage() {
  * @param argv the argv argument to main()
  **/
 SERVER* cmdline(int argc, char *argv[]) {
-	int i;
+	int i=0;
 	int c;
 	struct option long_options[] = {
 		{"read-only", no_argument, NULL, 'r'},
@@ -320,6 +320,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	SERVER *serve;
 
 	serve=g_malloc(sizeof(SERVER));
+	serve->hunksize=OFFT_MAX;
 	while((c=getopt_long(argc, argv, "a:cl:mr", long_options, &i))>=0) {
 		switch (c) {
 		case 'r':
@@ -346,17 +347,17 @@ SERVER* cmdline(int argc, char *argv[]) {
 	}
 	/* What's left: the port to export, the name of the to be exported
 	 * file, and, optionally, the size of the file, in that order. */
-	if(++i>argc) {
+	if(++i>=argc) {
 		usage();
 		exit(0);
 	} 
 	serve->port=strtol(argv[i], NULL, 0);
-	if(++i>argc) {
+	if(++i>=argc) {
 		usage();
 		exit(0);
 	}
 	serve->exportname = argv[i];
-	if(++i<=argc) {
+	if(++i<argc) {
 		off_t es;
 		size_t last = strlen(argv[i])-1;
 		char suffix = argv[i][last];
@@ -458,8 +459,9 @@ off_t size_autodetect(int export)
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
 	error = fstat(export, &stat_buf);
-	if (!error && stat_buf.st_size > 0) {
-		return (off_t)stat_buf.st_size;
+	if (!error) {
+		if(stat_buf.st_size > 0)
+			return (off_t)stat_buf.st_size;
         } else {
                 err("fstat failed: %m");
         }
@@ -578,7 +580,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client)
 			len : (size_t)DIFFPAGESIZE-offset;
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
-			       (unsigned long)difmap[mapcnt]);
+			       (unsigned long)(client->difmap[mapcnt]));
 			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
 			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
 		} else { /* the block is not there */
@@ -622,7 +624,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
-			       (unsigned long)difmap[mapcnt]) ;
+			       (unsigned long)(client->difmap[mapcnt])) ;
 			myseek(client->difffile,
 					client->difmap[mapcnt]*DIFFPAGESIZE+offset);
 			if (write(client->difffile, buf, wrlen) != wrlen) return -1 ;
@@ -631,7 +633,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 			client->difmap[mapcnt]=client->difffilelen++ ;
 			DEBUG3("Page %Lu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
-			       (unsigned long)difmap[mapcnt]);
+			       (unsigned long)(client->difmap[mapcnt]));
 			rdlen=DIFFPAGESIZE ;
 			if (rdlen+pagestart%(client->server->hunksize) >
 					(client->server->hunksize)) 
@@ -789,7 +791,7 @@ int splitexport(CLIENT* client) {
 			snprintf(tmpname, 1024, "%s.%d", client->exportname,
 					(int)(i/client->server->hunksize));
 		} else {
-			strncpy(client->exportname, client->server->exportname, 1024);
+			strncpy(tmpname, client->exportname, 1024);
 		}
 		tmpname[1023]='\0';
 		DEBUG2( "Opening %s\n", tmpname );
@@ -845,7 +847,7 @@ void serveconnection(CLIENT *client) {
 	else {
 		memset(buf, '\0', 80);
 		snprintf(buf, 79, "%Lu", (unsigned long long)client->exportsize);
-		msg3(LOG_INFO, "size of exported file/device is ", buf);
+		msg3(LOG_INFO, "size of exported file/device is %s", buf);
 	}
 
 	setmysockopt(client->net);
@@ -868,12 +870,10 @@ void set_peername(int net, CLIENT *client) {
 	int addrinlen = sizeof( addrin );
 	char *peername ;
 
-	client->clientname=g_malloc(256);
 	if (getpeername(net, (struct sockaddr *) &addrin, (socklen_t *)&addrinlen) < 0)
 		err("getsockname failed: %m");
 	peername = inet_ntoa(addrin.sin_addr);
-	snprintf(client->exportname, 1024, client->server->exportname, peername);
-	client->exportname[1023]='\0';
+	client->exportname=g_strdup_printf(client->server->exportname, peername);
 
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
@@ -962,6 +962,7 @@ void connectme(SERVER* serve) {
 
 		client = g_malloc(sizeof(CLIENT));
 		client->server=serve;
+		client->exportsize=OFFT_MAX;
 		client->net=net;
 		set_peername(net, client);
 		if (!authorized_client(client)) {
@@ -1030,6 +1031,7 @@ int main(int argc, char *argv[]) {
 		client=g_malloc(sizeof(CLIENT));
 		client->server=serve;
 		client->net=0;
+		client->exportsize=OFFT_MAX;
           	set_peername(0,client);
           	serveconnection(0);
           	return 0;
