@@ -371,6 +371,7 @@ void connectme(int port)
 			close(net) ; continue ; }
 		/* child */
 		realloc(children,0);
+		child_arraysize=0;
 		close(sock) ;
 #endif // NOFORK
 		msg2(LOG_INFO,"Starting to serve") ;

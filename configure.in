@@ -1,6 +1,6 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>
-AC_INIT(nbd, 2.4, wouter@debian.org)
+AC_INIT(nbd, 2.5, wouter@debian.org)
 
 AC_PROG_CC
 AC_MSG_CHECKING(whether warnings should be enabled)
