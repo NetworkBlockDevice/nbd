@@ -91,13 +91,13 @@
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
-#define msg2(a,b) syslog(a,b)
-#define msg3(a,b,c) syslog(a,b,c)
-#define msg4(a,b,c,d) syslog(a,b,c,d)
+#define msg2(a,b) syslog(a,"%s", b)
+#define msg3(a,b,c) syslog(a,"%s %s", b,c)
+#define msg4(a,b,c,d) syslog(a,"%s %s %s", b,c,d)
 #else
-#define msg2(a,b) do { fprintf(stderr,b) ; fputs("\n",stderr) ; } while(0) 
-#define msg3(a,b,c) do { fprintf(stderr,b,c); fputs("\n",stderr) ; } while(0) 
-#define msg4(a,b,c,d) do { fprintf(stderr,b,c,d); fputs("\n",stderr) ; } while(0)
+#define msg2(a,b) do { fprintf(stderr,"%s\n", b) ; } while(0) 
+#define msg3(a,b,c) do { fprintf(stderr,"%s %s\n", b,c); } while(0) 
+#define msg4(a,b,c,d) do { fprintf(stderr,"%s %s %s\n", b,c,d); } while(0)
 #endif
 
 /* Debugging macros */
@@ -354,15 +354,20 @@ void sigchld_handler(int s)
 {
         int* status=NULL;
 	int i;
+	char buf[80];
 	pid_t pid;
 
 	while((pid=wait(status)) > 0) {
 		if(WIFEXITED(status)) {
-			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+			memset(buf,'\0', 80);
+			snprintf(buf, 79, "%d", WEXITSTATUS(status));
+			msg3(LOG_INFO, "Child exited with ", buf);
 		}
 		for(i=0;children[i]!=pid&&i<child_arraysize;i++);
 		if(i>=child_arraysize) {
-			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld",(long) pid);
+			memset(buf, '\0', 80);
+			snprintf(buf, 79, "%ld", (long)pid);
+			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID ", buf);
 		} else {
 			children[i]=(pid_t)0;
 			DEBUG2("Removing %d from the list of children", pid);
@@ -739,7 +744,7 @@ int splitexport(void) {
 	for (i=0; i<exportsize; i+=hunksize) {
 		char exportname3[1024];
 		
-		snprintf(exportname3, 1024, "%s.%d", exportname2, (int)i/hunksize);
+		snprintf(exportname3, 1024, "%s.%d", exportname2, (int)(i/hunksize));
 		exportname3[1023]='\0';
 		printf( "Opening %s\n", exportname3 );
 		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
@@ -773,7 +778,8 @@ int splitexport(void) {
  *
  * @param net A network socket connected to an nbd client
  **/
-void serveconnection(int net) {   
+void serveconnection(int net) {
+	char buf[80];
 	splitexport();
 	if (exportsize == OFFT_MAX) {
 		exportsize = size_autodetect(export[0]);
@@ -781,9 +787,11 @@ void serveconnection(int net) {
 	if (exportsize > OFFT_MAX) {
 		err("Size of exported file is too big\n");
 	}
-	else
-		msg3(LOG_INFO, "size of exported file/device is %Lu",
-		     (unsigned long long)exportsize);
+	else {
+		memset(buf, '\0', 80);
+		snprintf(buf, 79, "%Lu", (unsigned long long)exportsize);
+		msg3(LOG_INFO, "size of exported file/device is ", buf);
+	}
 
 	setmysockopt(net);
 
