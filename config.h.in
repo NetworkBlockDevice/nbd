@@ -96,6 +96,9 @@
 /* Define to 1 if `vfork' works. */
 #undef HAVE_WORKING_VFORK
 
+/* Define to 1 if you want nbd-server to log through syslog */
+#undef ISSERVER
+
 /* Define to 1 if Large File Support should be enabled */
 #undef NBD_LFS
 
