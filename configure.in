@@ -53,7 +53,9 @@ if test -f nbd.h; then
 else
   AC_MSG_RESULT(no)
 fi
-AC_CHECK_HEADERS([linux/nbd.h arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/mount.h sys/socket.h syslog.h])
+AC_CHECK_HEADERS([linux/nbd.h arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/mount.h sys/socket.h syslog.h],,,[[typedef unsigned short u32;
+typedef unsigned int u64;
+]])
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
