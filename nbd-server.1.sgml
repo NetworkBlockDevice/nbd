@@ -145,6 +145,15 @@ manpage.1: manpage.sgml
 	    Linux 2.2 and below), you can use this option to store the
 	    data in multiple files and export a larger filesystem, if
 	    needed.</para>
+	  <para>
+	    To use this option, you must make sure that the exported
+	    name contains the string "%d", which will be exchanged by
+	    the number of the exported file, starting by one; that the
+	    individual files are 1G in size; and that the total size
+	    of all files together is specified.</para>
+	  <para>
+	    Allowing more flexibility for this option is planned for
+	    future versions.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

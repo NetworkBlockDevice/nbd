@@ -739,7 +739,7 @@ int splitexport(void) {
 	for (i=0; i<exportsize; i+=hunksize) {
 		char exportname3[1024];
 		
-		sprintf(exportname3, exportname2, i/hunksize);
+		sprintf(exportname3, exportname2, (int)i/hunksize);
 		printf( "Opening %s\n", exportname3 );
 		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
 			/* Read WRITE ACCESS was requested by media is only read only */
