@@ -142,7 +142,11 @@ inline void writeit(int f, void *buf, int len)
 	}
 }
 
-#define OFFT_MAX (((off_t)1)<<(sizeof(off_t)*8))-1
+/* This is starting to get ugly. If someone knows a better way to find
+ * the maximum value of a signed type *without* relying on overflow
+ * (doing so breaks on 64bit architectures), that would be nice.
+ */
+#define OFFT_MAX (((((off_t)1)<<((sizeof(off_t)-1)*8))-1)<<7)+127
 int port;			/* Port I'm listening at */
 char *exportname;		/* File I'm exporting */
 off_t exportsize = OFFT_MAX;	/* ...and its length */
@@ -272,6 +276,7 @@ void connectme(int port)
 	    continue ;
 	  }
 	  msg2(LOG_INFO,"Authorized client") ;
+#ifndef NOFORK
 	  if ((newpid=fork())<0) {
 	    msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
 	    close(net) ;
@@ -281,6 +286,7 @@ void connectme(int port)
 	    close(net) ; continue ; }
 	  /* child */
 	  close(sock) ;
+#endif // NOFORK
 	  msg2(LOG_INFO,"Starting to serve") ;
 	  serveconnection(net) ;        
 	}
@@ -521,14 +527,20 @@ off_t size_autodetect(int export)
 
 	DEBUG("looking for export size with lseek SEEK_END\n");
 	es = lseek(export, (off_t)0, SEEK_END);
-	if (es > ((off_t)0))
+	if (es > ((off_t)0)) {
 		return es;
+        } else {
+                DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
+        }
 
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
 	error = fstat(export, &stat_buf);
-	if (!error && stat_buf.st_size > 0)
+	if (!error && stat_buf.st_size > 0) {
 		return (off_t)stat_buf.st_size;
+        } else {
+                err("fstat failed: %m");
+        }
 
 #ifdef BLKGETSIZE
 	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
