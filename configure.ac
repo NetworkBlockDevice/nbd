@@ -5,18 +5,21 @@ AC_INIT([nbd],[2.7.99pre2.8],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
-AC_ARG_ENABLE(
-  lfs,
-  AC_HELP_STRING(--enable-lfs,Enable Large File Support),
-  [
-    if test "x$enableval" = "xyes" ; then
-      NBD_LFS=1
-    else
-      NBD_LFS=0
-    fi
-  ],
-  [NBD_LFS=0]
-)
+dnl Assume we want LFS. If there's some weird operating system out there that
+dnl doesn't support it, we can always add a check.
+dnl AC_ARG_ENABLE(
+dnl   lfs,
+dnl   AC_HELP_STRING(--enable-lfs,Enable Large File Support),
+dnl   [
+dnl     if test "x$enableval" = "xyes" ; then
+dnl       NBD_LFS=1
+dnl     else
+dnl       NBD_LFS=0
+dnl     fi
+dnl   ],
+dnl   [NBD_LFS=0]
+dnl )
+NBD_LFS=1
 AC_MSG_CHECKING([whether Large File Support should be enabled])
 if test $NBD_LFS -eq 1; then
   AC_DEFINE(NBD_LFS,1, [Define to 1 if Large File Support should be enabled])
