@@ -180,7 +180,7 @@ manpage.1: manpage.sgml
 	  the name 'nbd_server.allow' is used, and looked for in the
 	  current directory, unless nbd-server is compiled as a
 	  daemon, in which case it is looked for in the
-	  root-directory.
+	  root-directory.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
