@@ -55,7 +55,7 @@ manpage.1: manpage.sgml
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>&dhpackage;</command>
+      <command>&dhpackage; </command>
 
       <arg choice=plain><replaceable>port</replaceable</arg>
       <arg choice=plain><replaceable>filename</replaceable></arg>
@@ -87,7 +87,7 @@ manpage.1: manpage.sgml
     were a local filesystem.</para>
 
     <para><command>&dhpackage;</command> implements some security
-    through a file called "nbd_server.allow" in the current directory.
+    through a file called "nbd_server.allow" in the current directory (by default; a different file can be chosen with the '-l' option).
     This file must list the IP-addresses of clients that are allowed
     to connect. If it does not exist, all clients are able to connect.
     If the file is empty, no clients can connect.</para>
@@ -185,8 +185,6 @@ manpage.1: manpage.sgml
       </varlistentry>
     </variablelist>
 
-  </refsect1>
-    </variablelist>
   </refsect1>
   <refsect1>
     <title>EXAMPLES</title>
