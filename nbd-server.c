@@ -131,7 +131,7 @@
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using copyonwrite */
-char difffilename[256]; /**< filename of the copy-on-write file. Doesn't belong here! */
+char difffilename[1024]; /**< filename of the copy-on-write file. Doesn't belong here! */
 unsigned int timeout = 0; /**< disconnect timeout */
 int autoreadonly = 0; /**< 1 = switch to readonly if opening readwrite isn't
 			possible */
@@ -740,6 +740,7 @@ int splitexport(void) {
 		char exportname3[1024];
 		
 		snprintf(exportname3, 1024, "%s.%d", exportname2, (int)i/hunksize);
+		exportname3[1023]='\0';
 		printf( "Opening %s\n", exportname3 );
 		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
 			/* Read WRITE ACCESS was requested by media is only read only */
@@ -751,8 +752,9 @@ int splitexport(void) {
 	}
 
 	if (flags & F_COPYONWRITE) {
-		snprintf(difffilename, 256, "%s-%s-%d.diff",exportname2,clientname,
+		snprintf(difffilename, 1024, "%s-%s-%d.diff",exportname2,clientname,
 			(int)getpid()) ;
+		difffilename[1023]='\0';
 		msg3(LOG_INFO,"About to create map and diff file %s",difffilename) ;
 		difffile=open(difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 		if (difffile<0) err("Could not create diff file (%m)") ;
@@ -807,6 +809,7 @@ void set_peername(int net,char *clientname)
 		err("getsockname failed: %m");
 	peername = inet_ntoa(addrin.sin_addr);
 	snprintf(exportname2, 1024, exportname, peername);
+	exportname2[1023]='\0';
 
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, exportname2);
