@@ -409,13 +409,15 @@ off_t size_autodetect(int export)
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
+#ifdef BLKGETSIZE
 	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
 	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
 		es = (off_t)es32 * (off_t)512;
 		return es;
 	}
-#endif
-#endif
+#endif /* BLKGETSIZE */
+#endif /* HAVE_SYS_IOCTL_H */
+#endif /* HAVE_SYS_MOUNT_H */
 
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
