@@ -343,6 +343,10 @@ void cmdline(int argc, char *argv[])
 	}
 
 	exportname = argv[2];
+	if(exportname[0] != '/') {
+		fprintf(stderr, "%s requires an absolute path name to the exported file\n", argv[0]);
+		exit(EXIT_FAILURE);
+	}
 }
 
 /**
