@@ -3,6 +3,7 @@ dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst
 AC_INIT([nbd],[2.7],[wouter@debian.org])
 AM_INIT_AUTOMAKE(nbd, 2.7)
+
 AC_ARG_ENABLE(lfs, AC_HELP_STRING([--enable-lfs],[Enable Large File Support]), [NBD_LFS=1], [NBD_LFS=0])
 AC_MSG_CHECKING([whether Large File Support should be enabled])
 if test $NBD_LFS -eq 1; then
@@ -12,6 +13,7 @@ else
   AC_DEFINE(NBD_LFS,0)
   AC_MSG_RESULT([no])
 fi
+
 AC_ARG_ENABLE(syslog, AC_HELP_STRING([--enable-syslog],[Enable Syslog logging]), [ISSERVER=1], [ISSERVER=0])
 AC_MSG_CHECKING([whether syslog logging is requested])
 if test $ISSERVER -eq 1; then
@@ -24,7 +26,7 @@ AC_PROG_CC
 AC_MSG_CHECKING(whether warnings should be enabled)
 if test -n "$GCC" ; then
   AC_MSG_RESULT(yes)
-  CFLAGS="$CFLAGS -Wall -W -Wno-parentheses -Wstrict-prototypes -Wno-unused"
+  #CFLAGS="$CFLAGS -Wall -W -Wno-parentheses -Wstrict-prototypes -Wno-unused"
 else
   AC_MSG_RESULT(no)
 fi
@@ -48,7 +50,7 @@ case "`uname`" in
 esac
 AC_MSG_CHECKING(whether there is a local nbd.h)
 if test -f nbd.h; then
-  AC_DEFINE(HAVE_LOCAL_NBD_H,1, [Define to 1 if you want to use a local nbd.h (not provided, must be supplied by you])
+  AC_DEFINE(HAVE_LOCAL_NBD_H,1, [Define to 1 if you want to use a local nbd.h (not provided, must be supplied by you)])
   AC_MSG_RESULT(yes)
 else
   AC_MSG_RESULT(no)
