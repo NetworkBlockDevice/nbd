@@ -8,6 +8,9 @@
  * Version 1.1 - added bs (blocksize) option (Alexey Guzeev, aga@permonline.ru)
  * Version 1.2 - I added new option '-d' to send the disconnect request
  * Version 2.0 - Version synchronised with server
+ * Version 2.1 - Check for disconnection before INIT_PASSWD is received
+ * 	to make errormsg a bit more helpful in case the server can't
+ * 	open the exported file.
  */
 
 #include <asm/page.h>
@@ -129,6 +132,8 @@ int main(int argc, char *argv[])
 	printf("Negotiation: ");
 	if (read(sock, buf, 8) < 0)
 		err("Failed/1: %m");
+	if (strlen(buf)==0)
+		err("Server closed connection");
 	if (strcmp(buf, INIT_PASSWD))
 		err("INIT_PASSWD bad");
 	printf(".");

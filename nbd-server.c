@@ -17,14 +17,18 @@
  * Version 1.6 - fix autodetection of block device size and really make 64 bit
  * 	clean on 32 bit machines. Anton Altaparmakov <aia21@cam.ac.uk>
  * Version 2.0 - Version synchronised with client
+ * Version 2.1 - Reap zombie client processes when they exit. Removed
+ * 	(uncommented) the _IO magic, it's no longer necessary.
  */
 
-#define VERSION "2.0"
+#define VERSION "2.1"
 #define GIGA (1*1024*1024*1024)
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/wait.h>		/* wait */
+#include <signal.h>		/* sigaction */
 #include <netinet/tcp.h>
 #include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
 #include <netdb.h>		/* hostent, gethostby*, getservby* */
@@ -37,7 +41,7 @@
 #include <arpa/inet.h>
 #include <strings.h>
 
-#define _IO(a,b)
+//#define _IO(a,b)
 // #define ISSERVER
 #define MY_NAME "nbd_server"
 
@@ -47,7 +51,7 @@
 #define AUTH_FILE "nbd_server.allow"
 
 #include "cliserv.h"
-#undef _IO
+//#undef _IO
 /* Deep magic: ioctl.h defines _IO macro (at least on linux) */
 
 
@@ -222,9 +226,15 @@ void cmdline(int argc, char *argv[])
 	exportname = argv[2];
 }
 
+void sigchld_handler(int s)
+{
+	while(wait(NULL) > 0);
+}
+
 void connectme(int port)
 {
 	struct sockaddr_in addrin;
+	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
 	int net, sock, newpid;
 #ifndef sun
@@ -251,6 +261,11 @@ void connectme(int port)
 	if (listen(sock, 1) < 0)
 		err("listen: %m");
 	DEBUG("accept, ");
+	sa.sa_handler = sigchld_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGCHLD, &sa, NULL) == -1)
+		err("sigaction: %m");
 	for(;;) { /* infinite loop */
 	  if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 	    err("accept: %m");
