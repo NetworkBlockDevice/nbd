@@ -81,6 +81,8 @@
 #include <strings.h>
 #include <dirent.h>
 
+#include <glib.h>
+
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"

@@ -35,15 +35,7 @@ typedef unsigned long long u64;
 #error I need at least some 64-bit type
 #endif
 
-#ifdef HAVE_LOCAL_NBD_H
-#include "nbd.h"
-#else
-#ifdef HAVE_LINUX_NBD_H
-#include <linux/nbd.h>
-#else
-#error I need an nbd.h somewhere. Either install it in <linux/nbd.h> or put it in the current directory.
-#endif
-#endif
+#include NBD_H
 
 #if NBD_LFS==1
 #define _LARGEFILE_SOURCE
