@@ -34,7 +34,14 @@ typedef unsigned long long u64;
 #error I need at least some 64-bit type
 #endif
 
+#ifdef HAVE_LINUX_NBD_H
 #include <linux/nbd.h>
+#else
+/* get it from a kernel source somewhere, and dump it in this directory.
+ * Required for people trying to compile nbd-server on a non-linux
+ * system. */
+#include "nbd.h"
+#endif
 
 u64 cliserv_magic = 0x00420281861253LL;
 #define INIT_PASSWD "NBDMAGIC"

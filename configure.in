@@ -1,7 +1,6 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>
-AC_INIT(nbd-server.c)
-
+AC_INIT(nbd, 2.4, wouter@debian.org)
 
 AC_PROG_CC
 AC_MSG_CHECKING(whether warnings should be enabled)
@@ -26,6 +25,7 @@ case "`uname`" in
               ;;
      *) AC_MSG_RESULT(no) ;;
      esac
+AC_CHECK_HEADERS([linux/nbd.h])
 AC_SUBST(BUILD_CLIENT)
 AC_CONFIG_HEADER(config.h)
 AC_OUTPUT(Makefile)

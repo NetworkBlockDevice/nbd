@@ -59,7 +59,11 @@
 
 /* Authorization file should contain lines with IP addresses of 
    clients authorized to use the server. If it does not exist,
-   access is permitted. */
+   access is permitted. 
+   
+   You may want to set this to an absolute path if you're not using
+   -DNODAEMON, since if you don't, nbd-server will look for this file
+   in the root-directory ("/"). */
 #define AUTH_FILE "nbd_server.allow"
 /* how much space for child PIDs we have by default. Dynamically
    allocated, and will be realloc()ed if out of space, so this should
@@ -109,21 +113,25 @@ int authorized_client(char *name)
 /* 0 - authorization refused, 1 - OK 
   authorization file contains one line per machine, no wildcards
 */
-{ FILE *f ;
+{
+	FILE *f ;
    
-  char line[LINELEN] ; 
+	char line[LINELEN] ; 
 
-  if ((f=fopen(AUTH_FILE,"r"))==NULL)
-    { msg4(LOG_INFO,"Can't open authorization file %s (%s).",
-	   AUTH_FILE,strerror(errno)) ;
-      return 1 ; 
-    }
+	if ((f=fopen(AUTH_FILE,"r"))==NULL) {
+		msg4(LOG_INFO,"Can't open authorization file %s (%s).",
+		     AUTH_FILE,strerror(errno)) ;
+		return 1 ; 
+	}
   
-  while (fgets(line,LINELEN,f)!=NULL) {
-    if (strncmp(line,name,strlen(name))==0) { fclose(f)  ; return 1 ; }
-  }
-  fclose(f) ;
-  return 0 ;
+	while (fgets(line,LINELEN,f)!=NULL) {
+		if (strncmp(line,name,strlen(name))==0) {
+			fclose(f);
+			return 1;
+		}
+	}
+	fclose(f) ;
+	return 0 ;
 }
 
 inline void readit(int f, void *buf, int len)
@@ -167,6 +175,7 @@ u32 *difmap=NULL ;
 char clientname[256] ;
 int child_arraysize=DEFAULT_CHILD_ARRAY;
 pid_t *children;
+char pidfname[256];
 
 #define DIFFPAGESIZE 4096 /* diff file uses those chunks */
 
@@ -257,13 +266,19 @@ void sigchld_handler(int s)
 /* If we are terminated, make sure our children are, too. */
 void sigterm_handler(int s) {
 	int i;
+	int parent=0;
 
 	for(i=0;i<child_arraysize;i++) {
 		if(children[i]) {
 			kill(children[i], s);
+			parent=1;
 		}
 	}
 
+	if(parent) {
+		unlink(pidfname);
+	}
+		
 	exit(0);
 }
 
@@ -277,7 +292,26 @@ void connectme(int port)
 	int yes=1;
 #else
 	char yes='1';
-#endif
+#endif /* sun */
+#ifndef NODAEMON
+#ifndef NOFORK
+	FILE*pidf;
+
+	if(port) {
+		if(daemon(0,0)<0) {
+			err("daemon");
+		}
+		snprintf(pidfname, sizeof(char)*255, "/var/run/nbd-server.%d.pid", port);
+		pidf=fopen(pidfname, "w");
+		if(pidf) {
+			fprintf(pidf,"%d", (int)getpid());
+		} else {
+			perror("fopen");
+			fprintf(stderr, "Not fatal; continuing");
+		}
+	}
+#endif /* NOFORK */
+#endif /* NODAEMON */
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
@@ -309,13 +343,6 @@ void connectme(int port)
 		err("sigaction: %m");
 	children=malloc(sizeof(pid_t)*child_arraysize);
 	memset(children, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
-#ifndef NODAEMON
-#ifndef NOFORK
-	if(daemon(1,0)<0) {
-		err("daemon");
-	}
-#endif /* NOFORK */
-#endif /* NODAEMON */
 	for(;;) { /* infinite loop */
 		if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 			err("accept: %m");
@@ -379,8 +406,8 @@ char pagebuf[DIFFPAGESIZE];
 
 int rawexpread(off_t a, char *buf, int len)
 {
-  maybeseek(export[a/hunksize], a%hunksize);
-  return (read(export[a/hunksize], buf, len) != len);
+	maybeseek(export[a/hunksize], a%hunksize);
+	return (read(export[a/hunksize], buf, len) != len);
 }
 
 int expread(off_t a, char *buf, int len)
@@ -582,7 +609,7 @@ off_t size_autodetect(int export)
 	u32 es32;
 	struct stat stat_buf;
 	int error;
-
+	
 	DEBUG("looking for export size with lseek SEEK_END\n");
 	es = lseek(export, (off_t)0, SEEK_END);
 	if (es > ((off_t)0)) {
@@ -590,7 +617,7 @@ off_t size_autodetect(int export)
         } else {
                 DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
-
+	
 	DEBUG("looking for export size with fstat\n");
 	stat_buf.st_size = 0;
 	error = fstat(export, &stat_buf);
@@ -599,7 +626,7 @@ off_t size_autodetect(int export)
         } else {
                 err("fstat failed: %m");
         }
-
+	
 #ifdef BLKGETSIZE
 	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
 	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
@@ -608,7 +635,7 @@ off_t size_autodetect(int export)
 	}
 #endif
 	err("Could not find size of exported block device: %m");
-	return (off_t)-1;
+	return OFFT_MAX;
 }
 
 int main(int argc, char *argv[])
@@ -631,44 +658,44 @@ int main(int argc, char *argv[])
 
 void serveconnection(int net) 
 {   
-  off_t i ;
-
-  for (i=0; i<exportsize; i+=hunksize) {
-    char exportname3[1024];
-    
-    sprintf(exportname3, exportname2, i/hunksize);
-    printf( "Opening %s\n", exportname3 );
-    if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
-	    	/* Read WRITE ACCESS was requested by media is only read only */
-	    	autoreadonly = 1;
-		flags |= F_READONLY;
-    		if ((export[i/hunksize] = open(exportname3, O_RDONLY)) == -1) 
-			err("Could not open exported file: %m");
+	off_t i ;
+	
+	for (i=0; i<exportsize; i+=hunksize) {
+		char exportname3[1024];
+		
+		sprintf(exportname3, exportname2, i/hunksize);
+		printf( "Opening %s\n", exportname3 );
+		if ((export[i/hunksize] = open(exportname3, (flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
+			/* Read WRITE ACCESS was requested by media is only read only */
+			autoreadonly = 1;
+			flags |= F_READONLY;
+			if ((export[i/hunksize] = open(exportname3, O_RDONLY)) == -1) 
+				err("Could not open exported file: %m");
+		}
 	}
-    }
-
-    if (exportsize == (off_t)OFFT_MAX) {
-	exportsize = size_autodetect(export[0]);
-    }
-    if (exportsize > (off_t)OFFT_MAX) {
-	err("Size of exported file is too big\n");
-    }
-    else
-	msg3(LOG_INFO, "size of exported file/device is %Lu",
-			(unsigned long long)exportsize);
-
-    if (flags & F_COPYONWRITE) {
-      sprintf(difffilename,"%s-%s-%d.diff",exportname2,clientname,
-	      (int)getpid()) ;
-      msg3(LOG_INFO,"About to create map and diff file %s",difffilename) ;
-      difffile=open(difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
-      if (difffile<0) err("Could not create diff file (%m)") ;
-      if ((difmap=calloc(exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
-	  err("Could not allocate memory") ;
-      for (i=0;i<exportsize/DIFFPAGESIZE;i++) difmap[i]=(u32)-1 ;	  
-    }
-    
-    setmysockopt(net);
-      
-    mainloop(net);
+	
+	if (exportsize == (off_t)OFFT_MAX) {
+		exportsize = size_autodetect(export[0]);
+	}
+	if (exportsize > (off_t)OFFT_MAX) {
+		err("Size of exported file is too big\n");
+	}
+	else
+		msg3(LOG_INFO, "size of exported file/device is %Lu",
+		     (unsigned long long)exportsize);
+	
+	if (flags & F_COPYONWRITE) {
+		sprintf(difffilename,"%s-%s-%d.diff",exportname2,clientname,
+			(int)getpid()) ;
+		msg3(LOG_INFO,"About to create map and diff file %s",difffilename) ;
+		difffile=open(difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
+		if (difffile<0) err("Could not create diff file (%m)") ;
+		if ((difmap=calloc(exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
+			err("Could not allocate memory") ;
+		for (i=0;i<exportsize/DIFFPAGESIZE;i++) difmap[i]=(u32)-1 ;	  
+	}
+	
+	setmysockopt(net);
+	
+	mainloop(net);
 }
