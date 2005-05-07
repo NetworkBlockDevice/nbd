@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst
-AC_INIT([nbd],[2.7.3],[wouter@debian.org])
+AC_INIT([nbd],[CVS],[wouter@debian.org])
 AM_INIT_AUTOMAKE(dist-bzip2 foreign)
 
 AM_MAINTAINER_MODE
