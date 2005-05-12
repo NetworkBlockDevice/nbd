@@ -53,7 +53,6 @@ void print_help(void) {
  *
  * NOTES:
  *   This function accomplishes everything needed to become a daemon.
- *   Including closing standard in/out/err and forking.
  *   It returns nothing, on failure the program must abort.
  *
  */
@@ -99,6 +98,8 @@ int opennet(const char *name, int port) {
 	xaddrin.sin_addr.s_addr = *((int *) hostn->h_addr);
 	if ((connect(sock, (struct sockaddr *) &xaddrin, xaddrinlen) < 0)) {
 		err_noexit("Connect: %m");
+		close(sock);
+		return(-1);
 	}
 
 	setmysockopt(sock);
@@ -367,6 +368,11 @@ int main(int argc, char **argv) {
 	if (strcmp(argv[1], "-d") == 0) {
 		nbddev = argv[2];
 		return(nbd_disable(nbddev));
+	}
+
+	if (argc < 4) {
+		print_help();
+		return(EXIT_FAILURE);
 	}
 
 	host = argv[1];
