@@ -822,7 +822,7 @@ void serveconnection(int net) {
 void set_peername(int net,char *clientname)
 {
 	struct sockaddr_in addrin;
-	int addrinlen = sizeof( addrin );
+	size_t addrinlen = sizeof( addrin );
 	char *peername ;
 
 	if (getpeername( net, (struct sockaddr *) &addrin, &addrinlen ) < 0)
@@ -851,7 +851,7 @@ void connectme(unsigned int port)
 {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
-	int addrinlen = sizeof(addrin);
+	size_t addrinlen = sizeof(addrin);
 	int net, sock, newpid, i;
 #ifndef sun
 	int yes=1;
