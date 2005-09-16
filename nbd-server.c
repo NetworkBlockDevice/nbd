@@ -145,6 +145,7 @@
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
+char default_authname[] = "/etc/nbd_server.allow"; /**< default name of allow file */
 
 /**
  * Variables associated with a server.
@@ -296,6 +297,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'm':
 			serve->flags |= F_MULTIFILE;
 			serve->hunksize = 1*GIGA;
+			serve->authname = default_authname;
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
