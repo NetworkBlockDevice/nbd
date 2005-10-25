@@ -75,17 +75,16 @@ void err(const char *s)
 {
 	const int maxlen = 150;
 	char s1[maxlen], *s2;
-	int n = 0;
 
 	strncpy(s1, s, maxlen);
-	if (s2 = strstr(s, "%m")) {
+	if ((s2 = strstr(s, "%m"))) {
 		strcpy(s1 + (s2 - s), strerror(errno));
 		s2 += 2;
 		strcpy(s1 + strlen(s1), s2);
 	}
 #ifndef	sun
 	/* Solaris doesn't have %h in syslog */
-	else if (s2 = strstr(s, "%h")) {
+	else if ((s2 = strstr(s, "%h"))) {
 		strcpy(s1 + (s2 - s), hstrerror(h_errno));
 		s2 += 2;
 		strcpy(s1 + strlen(s1), s2);

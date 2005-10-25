@@ -63,7 +63,7 @@ int opennet(char *name, int port)
 
 int main(int argc, char *argv[])
 {
-	int port, sock, nbd, one = 1;
+	int port, sock, nbd;
 	u64 magic, size64;
 	unsigned long size;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";

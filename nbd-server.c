@@ -354,7 +354,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 void sigchld_handler(int s) {
         int* status=NULL;
 	int* i;
-	char buf[80];
 	pid_t pid;
 
 	while((pid=wait(status)) > 0) {
@@ -393,7 +392,6 @@ void killchild(gpointer key, gpointer value, gpointer user_data) {
  * is severely wrong).
  **/
 void sigterm_handler(int s) {
-	int i;
 	int parent=0;
 
 	g_hash_table_foreach(children, killchild, &parent);
@@ -724,6 +722,7 @@ int mainloop(CLIENT *client) {
 		writeit(client->net, buf, len + sizeof(struct nbd_reply));
 		DEBUG("OK!\n");
 	}
+	return 0;
 }
 
 /**
@@ -782,7 +781,6 @@ int splitexport(CLIENT* client) {
  * @param net A network socket connected to an nbd client
  **/
 void serveconnection(CLIENT *client) {
-	char buf[80];
 	splitexport(client);
 
 	if (!client->server->expected_size) {
@@ -879,7 +877,6 @@ void setup_serve(SERVER* serve) {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
-	int newpid, i;
 #ifndef sun
 	int yes=1;
 #else
@@ -927,7 +924,7 @@ void setup_serve(SERVER* serve) {
  **/
 int serveloop(SERVER* serve) {
 	struct sockaddr_in addrin;
-	int addrinlen=sizeof(addrin);
+	socklen_t addrinlen=sizeof(addrin);
 	for(;;) {
 		CLIENT *client;
 		int net;
