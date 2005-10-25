@@ -170,6 +170,10 @@ manpage.1: manpage.sgml
     <para>The NBD kernel module and the NBD tools have been written by
     Pavel Macheck (pavel@ucw.cz).</para>
 
+    <para>The kernel module is now maintained by Paul Clements
+    (Paul.Clements@steeleye.com), while the userland tools are maintained by
+    Wouter Verhelst (wouter@debian.org)</para>
+
     <para>This manual page was written by &dhusername; (&dhemail;) for
     the &debian; system (but may be used by others).  Permission is
     granted to copy, distribute and/or modify this document under the
