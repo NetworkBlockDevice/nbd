@@ -326,6 +326,10 @@ SERVER* cmdline(int argc, char *argv[]) {
 		exit(0);
 	}
 	serve->exportname = argv[i];
+	if(serve->exportname[0] != '/') {
+		fprintf(stderr, "E: The to be exported file needs to be an absolute filename!\n");
+		exit(EXIT_FAILURE);
+	}
 	if(++i<argc) {
 		off_t es;
 		size_t last = strlen(argv[i])-1;
