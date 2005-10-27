@@ -170,7 +170,7 @@ typedef struct {
 	off_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer */
 	char *exportname;    /**< (processed) filename of the file we're exporting */
-	int export[1024];    /**< array of filedescriptors of exported files;
+	GArray *export;    /**< array of filedescriptors of exported files;
 			       only the first is actually used unless we're
 			       doing the multiple file option */
 	int net;	     /**< The actual client socket */
@@ -326,6 +326,10 @@ SERVER* cmdline(int argc, char *argv[]) {
 		exit(0);
 	}
 	serve->exportname = argv[i];
+	if(serve->exportname[0] != '/') {
+		fprintf(stderr, "E: The to be exported file needs to be an absolute filename!\n");
+		exit(EXIT_FAILURE);
+	}
 	if(++i<argc) {
 		off_t es;
 		size_t last = strlen(argv[i])-1;
@@ -476,9 +480,9 @@ void myseek(int handle,off_t a) {
 int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	ssize_t res;
 
-	myseek(client->export[(int)a/client->server->hunksize],
-			a%client->server->hunksize);
-	res = write(client->export[(int)((off_t)a/(off_t)(client->server->hunksize))], buf, len);
+	myseek(g_array_index(client->export, int, (int)(a/client->server->hunksize)), a%client->server->hunksize);
+	;
+	res = write(g_array_index(client->export, int, (int)((off_t)a/(off_t)(client->server->hunksize))), buf, len);
 	return (res < 0 || (size_t)res != len);
 }
 
@@ -495,9 +499,9 @@ int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 int rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	ssize_t res;
 
-	myseek(client->export[(int)a/client->server->hunksize],
+	myseek(g_array_index(client->export,int,(int)a/client->server->hunksize),
 			a%client->server->hunksize);
-	res = read(client->export[(int)a/client->server->hunksize], buf, len);
+	res = read(g_array_index(client->export,int,(int)a/client->server->hunksize), buf, len);
 	return (res < 0 || (size_t)res != len);
 }
 
@@ -733,7 +737,9 @@ int mainloop(CLIENT *client) {
  **/
 int splitexport(CLIENT* client) {
 	off_t i;
+	int fhandle;
 
+	client->export = g_array_new(TRUE, TRUE, sizeof(int));
 	for (i=0; i<client->exportsize; i+=client->server->hunksize) {
 		gchar *tmpname;
 
@@ -744,17 +750,14 @@ int splitexport(CLIENT* client) {
 			tmpname=g_strdup(client->exportname);
 		}
 		DEBUG2( "Opening %s\n", tmpname );
-		if ((client->export[ i/ client->server->hunksize ] =
-					open(tmpname, (client->server->flags &
-							F_READONLY) ? O_RDONLY
-						: O_RDWR)) == -1) {
+		if((fhandle = open(tmpname, (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
 			/* Read WRITE ACCESS was requested by media is only read only */
 			client->server->flags |= F_AUTOREADONLY;
 			client->server->flags |= F_READONLY;
-			if ((client->export[i/client->server->hunksize] =
-						open(tmpname, O_RDONLY)) == -1) 
+			if((fhandle = open(tmpname, O_RDONLY)) == -1)
 				err("Could not open exported file: %m");
 		}
+		g_array_insert_val(client->export,i/client->server->hunksize,fhandle);
 		g_free(tmpname);
 	}
 	return 0;
@@ -789,7 +792,7 @@ void serveconnection(CLIENT *client) {
 	splitexport(client);
 
 	if (!client->server->expected_size) {
-		client->exportsize = size_autodetect(client->export[0]);
+		client->exportsize = size_autodetect(g_array_index(client->export,int,0));
 	} else {
 		/* Perhaps we should check first. Not now. */
 		client->exportsize = client->server->expected_size;
