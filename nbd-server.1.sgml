@@ -13,7 +13,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
   <!ENTITY dhsurname   "<surname>Verhelst</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>september 19, 2001</date>">
+  <!ENTITY dhdate      "<date>$Date$</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
