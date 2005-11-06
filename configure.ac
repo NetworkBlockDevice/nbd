@@ -1,24 +1,24 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.8.1],[wouter@debian.org])
+AC_INIT([nbd],[2.8.1cvs],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
 dnl Assume we want LFS. If there's some weird operating system out there that
 dnl doesn't support it, we can always add a check.
-dnl AC_ARG_ENABLE(
-dnl   lfs,
-dnl   AC_HELP_STRING(--enable-lfs,Enable Large File Support),
-dnl   [
-dnl     if test "x$enableval" = "xyes" ; then
-dnl       NBD_LFS=1
-dnl     else
-dnl       NBD_LFS=0
-dnl     fi
-dnl   ],
-dnl   [NBD_LFS=0]
-dnl )
+AC_ARG_ENABLE(
+  lfs,
+  AC_HELP_STRING([--disable-lfs],[Disable Large File Support (enabled by default)]),
+  [
+    if test "x$enableval" = "xyes" ; then
+      NBD_LFS=1
+    else
+      NBD_LFS=0
+    fi
+  ],
+  [NBD_LFS=1]
+)
 NBD_LFS=1
 AC_MSG_CHECKING([whether Large File Support should be enabled])
 if test $NBD_LFS -eq 1; then
@@ -31,7 +31,7 @@ fi
 
 AC_ARG_ENABLE(
   syslog,
-  AC_HELP_STRING(--enable-syslog,Enable Syslog logging),
+  AC_HELP_STRING([--disable-syslog],[Disable Syslog logging (enabled by default)]),
   [
     if test "x$enableval" = "xyes" ; then
       ISSERVER=1
@@ -39,7 +39,7 @@ AC_ARG_ENABLE(
       ISSERVER=0
     fi
   ],
-  [ISSERVER=0]
+  [ISSERVER=1]
 )
 AC_MSG_CHECKING([whether syslog logging is requested])
 if test $ISSERVER -eq 1; then
@@ -65,6 +65,7 @@ AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 case "`uname`" in
      *Linux*) sbin_PROGRAMS=nbd-client
+              man_MANS='nbd-client.8 nbd-server.1'
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;
@@ -106,7 +107,7 @@ AM_PATH_GLIB_2_0(2.2.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-AC_SUBST(sbin_PROGRAMS)
+AC_SUBST(sbin_PROGRAMS man_MANS)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile Doxyfile])
 AC_OUTPUT
