@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.8.1cvs],[wouter@debian.org])
+AC_INIT([nbd],[2.8.2cvs],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -107,7 +107,8 @@ AM_PATH_GLIB_2_0(2.2.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-AC_SUBST(sbin_PROGRAMS man_MANS)
+AC_SUBST(sbin_PROGRAMS)
+AC_SUBST(man_MANS)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile Doxyfile])
 AC_OUTPUT
