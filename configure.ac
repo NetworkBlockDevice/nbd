@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.8.2cvs],[wouter@debian.org])
+AC_INIT([nbd],[2.8.2],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -80,15 +80,15 @@ AC_TRY_COMPILE([#define u32 int
 #include "nbd.h"
 ],
 [int foo=NBD_CMD_DISC], 
-  [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (2.6) nbd.h can be found in the current directory)
+  [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (kernel 2.6) nbd.h can be found in the current directory)
     NBD_H='"nbd.h"'],
   AC_TRY_COMPILE([#define u32 int
 #define u64 int
 #include <linux/nbd.h>
   ],
 [int foo=NBD_CMD_DISC],
-    [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path) NBD_H='<linux/nbd.h>'],
-    AC_MSG_ERROR(Could not find an nbd.h from 2.6 or above.)
+    [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (kernel 2.6) nbd.h can be found in the linux directory in the search path) NBD_H='<linux/nbd.h>'],
+    AC_MSG_ERROR(Could not find an nbd.h from kernel 2.6 or above.)
   )
 )
 if test -f nbd.h
