@@ -37,10 +37,11 @@ typedef unsigned long long u64;
 
 #ifdef NBD_H_LOCAL
 #include "nbd.h"
-#endif
+#else
 #ifdef NBD_H_LINUX
 #include <linux/nbd.h>
-#endif
+#endif // NBD_H_LINUX
+#endif // NBD_H_LOCAL
 
 #if NBD_LFS==1
 #define _LARGEFILE_SOURCE
