@@ -366,10 +366,13 @@ void sigchld_handler(int s) {
         int* status=NULL;
 	int* i;
 	pid_t pid;
+	int done=0;
 
-	while((pid=wait(status)) > 0) {
+	while(!done && (pid=wait(status)) > 0) {
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+			msg3(LOG_INFO, "pid is %d", pid);
+			done=1;
 		}
 		i=g_hash_table_lookup(children, &pid);
 		if(!i) {
@@ -950,8 +953,10 @@ int serveloop(SERVER* serve) {
 		pid_t *pid;
 
 		DEBUG("accept, ");
-		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-			err("accept: %m");
+		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+			msg2(LOG_ERR,"accept: %m");
+			continue;
+		}
 
 		client = g_malloc(sizeof(CLIENT));
 		client->server=serve;
