@@ -1,13 +1,15 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[CVS],[wouter@debian.org])
+AC_INIT([nbd],[2.8.3],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
+dnl Assume we want LFS. If there's some weird operating system out there that
+dnl doesn't support it, we can always add a check.
 AC_ARG_ENABLE(
   lfs,
-  AC_HELP_STRING(--disable-lfs,Disable Large File Support (default on)),
+  AC_HELP_STRING([--disable-lfs],[Disable Large File Support (enabled by default)]),
   [
     if test "x$enableval" = "xyes" ; then
       NBD_LFS=1
@@ -17,6 +19,7 @@ AC_ARG_ENABLE(
   ],
   [NBD_LFS=1]
 )
+NBD_LFS=1
 AC_MSG_CHECKING([whether Large File Support should be enabled])
 if test $NBD_LFS -eq 1; then
   AC_DEFINE(NBD_LFS,1, [Define to 1 if Large File Support should be enabled])
@@ -28,7 +31,7 @@ fi
 
 AC_ARG_ENABLE(
   syslog,
-  AC_HELP_STRING(--enable-syslog,Enable Syslog logging),
+  AC_HELP_STRING([--disable-syslog],[Disable Syslog logging (enabled by default)]),
   [
     if test "x$enableval" = "xyes" ; then
       ISSERVER=1
@@ -36,7 +39,7 @@ AC_ARG_ENABLE(
       ISSERVER=0
     fi
   ],
-  [ISSERVER=0]
+  [ISSERVER=1]
 )
 AC_MSG_CHECKING([whether syslog logging is requested])
 if test $ISSERVER -eq 1; then
@@ -62,6 +65,7 @@ AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 case "`uname`" in
      *Linux*) sbin_PROGRAMS=nbd-client
+              man8_MANS=nbd-client.8
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;
@@ -76,16 +80,15 @@ AC_TRY_COMPILE([#define u32 int
 #include "nbd.h"
 ],
 [int foo=NBD_CMD_DISC], 
-  [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (2.6) nbd.h can be found in the current directory)
+  [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (kernel 2.6) nbd.h can be found in the current directory)
     NBD_H='"nbd.h"'],
   AC_TRY_COMPILE([#define u32 int
 #define u64 int
 #include <linux/nbd.h>
   ],
 [int foo=NBD_CMD_DISC],
-    [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
-      NBD_H='<linux/nbd.h>'],
-    AC_MSG_ERROR(Could not find an nbd.h from 2.6 or above.)
+    [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (kernel 2.6) nbd.h can be found in the linux directory in the search path) NBD_H='<linux/nbd.h>'],
+    AC_MSG_ERROR(Could not find an nbd.h from kernel 2.6 or above.)
   )
 )
 if test -f nbd.h
@@ -100,13 +103,12 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h])
-AM_PATH_GLIB_2_0(2.6.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+AM_PATH_GLIB_2_0(2.2.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_SUBST(sbin_PROGRAMS)
-nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
-AC_SUBST(nbd_server_CPPFLAGS)
+AC_SUBST(man8_MANS)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile Doxyfile])
 AC_OUTPUT

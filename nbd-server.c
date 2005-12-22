@@ -276,6 +276,7 @@ void usage() {
  **/
 SERVER* cmdline(int argc, char *argv[]) {
 	int i=0;
+	int nonspecial=0;
 	int c;
 	struct option long_options[] = {
 		{"read-only", no_argument, NULL, 'r'},
@@ -286,11 +287,44 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{0,0,0,0}
 	};
 	SERVER *serve;
+	off_t es;
+	size_t last;
+	char suffix;
 
 	serve=g_malloc(sizeof(SERVER));
 	serve->hunksize=OFFT_MAX;
-	while((c=getopt_long(argc, argv, "a:cl:mr", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-a:cl:mr", long_options, &i))>=0) {
 		switch (c) {
+		case 1:
+			switch(nonspecial++) {
+			case 0:
+				serve->port=strtol(optarg, NULL, 0);
+				break;
+			case 1:
+				serve->exportname = g_strdup(optarg);
+				if(serve->exportname[0] != '/') {
+					fprintf(stderr, "E: The to be exported file needs to be an absolute filename!\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			case 2:
+				last=strlen(optarg)-1;
+				suffix=optarg[last];
+				if (suffix == 'k' || suffix == 'K' ||
+				    suffix == 'm' || suffix == 'M')
+					optarg[last] = '\0';
+				es = (off_t)atol(optarg);
+				switch (suffix) {
+					case 'm':
+					case 'M':  es <<= 10;
+					case 'k':
+					case 'K':  es <<= 10;
+					default :  break;
+				}
+				serve->expected_size = es;
+				break;
+			}
+			break;
 		case 'r':
 			serve->flags |= F_READONLY;
 			break;
@@ -316,36 +350,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 	}
 	/* What's left: the port to export, the name of the to be exported
 	 * file, and, optionally, the size of the file, in that order. */
-	if(++i>=argc) {
+	if(nonspecial<2) {
 		usage();
-		exit(0);
-	} 
-	serve->port=strtol(argv[i], NULL, 0);
-	if(++i>=argc) {
-		usage();
-		exit(0);
-	}
-	serve->exportname = argv[i];
-	if(serve->exportname[0] != '/') {
-		fprintf(stderr, "E: The to be exported file needs to be an absolute filename!\n");
 		exit(EXIT_FAILURE);
-	}
-	if(++i<argc) {
-		off_t es;
-		size_t last = strlen(argv[i])-1;
-		char suffix = argv[i][last];
-		if (suffix == 'k' || suffix == 'K' ||
-		    suffix == 'm' || suffix == 'M')
-			argv[i][last] = '\0';
-		es = (off_t)atol(argv[i]);
-		switch (suffix) {
-			case 'm':
-			case 'M':  es <<= 10;
-			case 'k':
-			case 'K':  es <<= 10;
-			default :  break;
-		}
-		serve->expected_size = es;
 	}
 	return serve;
 }
@@ -359,10 +366,13 @@ void sigchld_handler(int s) {
         int* status=NULL;
 	int* i;
 	pid_t pid;
+	int done=0;
 
-	while((pid=wait(status)) > 0) {
+	while(!done && (pid=wait(status)) > 0) {
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+			msg3(LOG_INFO, "pid is %d", pid);
+			done=1;
 		}
 		i=g_hash_table_lookup(children, &pid);
 		if(!i) {
@@ -416,7 +426,7 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int export) {
 	off_t es;
-	u32 es32;
+	unsigned long sectors;
 	struct stat stat_buf;
 	int error;
 
@@ -424,8 +434,8 @@ off_t size_autodetect(int export) {
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE
 	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
-	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
-		es = (off_t)es32 * (off_t)512;
+	if (!ioctl(export, BLKGETSIZE, &sectors) && sectors) {
+		es = (off_t)sectors * (off_t)512;
 		return es;
 	}
 #endif /* BLKGETSIZE */
@@ -677,7 +687,7 @@ int mainloop(CLIENT *client) {
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE)
+		if (len > BUFSIZE-sizeof(struct nbd_reply))
 			err("Request too big!");
 #ifdef DODBG
 		printf("%s from %Lu (%Lu) len %d, ", request.type ? "WRITE" :
@@ -943,8 +953,10 @@ int serveloop(SERVER* serve) {
 		pid_t *pid;
 
 		DEBUG("accept, ");
-		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-			err("accept: %m");
+		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+			msg2(LOG_ERR,"accept: %m");
+			continue;
+		}
 
 		client = g_malloc(sizeof(CLIENT));
 		client->server=serve;
