@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.8.3],[wouter@debian.org])
+AC_INIT([nbd],[CVS],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -93,7 +93,7 @@ AC_TRY_COMPILE([#define u32 int
 )
 if test -f nbd.h
 then
-  if test $NBD_H='<linux/nbd.h>'
+  if test $NBD_H = '<linux/nbd.h>'
   then
     AC_MSG_WARN([there is a local nbd.h, but it is from the 2.4-series of kernels. Using the system-provided, working, nbd.h])
   fi
