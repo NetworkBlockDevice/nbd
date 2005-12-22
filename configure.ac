@@ -65,7 +65,7 @@ AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 case "`uname`" in
      *Linux*) sbin_PROGRAMS=nbd-client
-              man_MANS='nbd-client.8 nbd-server.1'
+              man8_MANS=nbd-client.8
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;
@@ -108,7 +108,7 @@ AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_SUBST(sbin_PROGRAMS)
-AC_SUBST(man_MANS)
+AC_SUBST(man8_MANS)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile Doxyfile])
 AC_OUTPUT
