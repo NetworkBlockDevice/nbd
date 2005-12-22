@@ -13,7 +13,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
   <!ENTITY dhsurname   "<surname>Verhelst</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>$Date$</date>">
+  <!ENTITY dhdate      "<date>september 19, 2001</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
@@ -72,9 +72,6 @@ manpage.1: manpage.sgml
 
     <para>This manual page documents the
       <command>&dhpackage;</command> command.</para>
-
-    <para>This manual page was written for the &debian; distribution
-      because the original program does not have a manual page.</para>
 
     <para><command>&dhpackage;</command> is the server for the Linux
     Network Block Device (NBD). With NBD, a client can use a file,
@@ -184,14 +181,13 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term><option>host list</option></term>
 	<listitem>
-	  <para>This argument should contain a list of IP-addresses
-	  for hosts that may connect to the server. Wildcards are
-	  <emphasis>not</emphasis> allowed. If the file does not
-	  exist, it is ignored (and any host can connect); If the file
-	  does exist, but is empty, no host can connect. By default,
-	  the name 'nbd_server.allow' is used, and looked for in the
-	  current directory, unless nbd-server is compiled as a
-	  daemon, in which case it is looked for in the
+	  <para>This argument should be the name of a file containing a list of
+	  IP-addresses for hosts that may connect to the server. Wildcards are
+	  <emphasis>not</emphasis> allowed. If the file does not exist, it is
+	  ignored (and any host can connect); If the file does exist, but is
+	  empty, no host can connect. By default, the name 'nbd_server.allow'
+	  is used, and looked for in the current directory, unless nbd-server
+	  is compiled as a daemon, in which case it is looked for in the
 	  root-directory.</para>
 	</listitem>
       </varlistentry>
@@ -228,13 +224,13 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>AUTHOR</title>
     <para>The NBD kernel module and the NBD tools were originally
-      written by Pavel Machek (pavel@ucw.cz)</para>
+      written by Pavel Machek <email>pavel@ucw.cz</email></para>
 
     <para>The kernel module is now maintained by Paul Clements
-      (Paul.Clements@steeleye.com), while the userland tools are
-      maintained by &dhusername; (&dhemail;)</para>
+    <email>Paul.Clements@steeleye.com</email>, while the userland tools are
+    maintained by &dhusername; &dhemail;</para>
 
-    <para>This manual page was written by &dhusername; (&dhemail;) for
+    <para>This manual page was written by &dhusername; &dhemail; for
       the &debian; system (but may be used by others).  Permission is
       granted to copy, distribute and/or modify this document under
       the terms of the <acronym>GNU</acronym> General Public License,
