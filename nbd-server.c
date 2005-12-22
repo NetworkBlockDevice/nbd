@@ -689,7 +689,7 @@ int mainloop(int net)
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE)
+		if (len > BUFSIZE-sizeof(struct nbd_reply))
 			err("Request too big!");
 #ifdef DODBG
 		printf("%s from %Lu (%Lu) len %d, ", request.type ? "WRITE" :
