@@ -987,6 +987,7 @@ int serveloop(SERVER* serve) {
 #endif // NOFORK
 		msg2(LOG_INFO,"Starting to serve") ;
 		serveconnection(client);
+		return 0;
 	}
 }
 
