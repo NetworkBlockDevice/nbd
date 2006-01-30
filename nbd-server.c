@@ -88,15 +88,6 @@
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
 
-/** Default position of the config file */
-#ifndef SYSCONFDIR
-#define SYSCONFDIR "/etc"
-#endif
-#define CFILE SYSCONFDIR "/nbd-server/config"
-
-/** Where our config file actually is */
-gchar* config_file_pos;
-
 /** how much space for child PIDs we have by default. Dynamically
    allocated, and will be realloc()ed if out of space, so this should
    probably be fair for most situations. */
@@ -160,7 +151,7 @@ char default_authname[] = "/etc/nbd_server.allow"; /**< default name of allow fi
  * Variables associated with a server.
  **/
 typedef struct {
-	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
+	char* exportname;    /**< (unprocessed) filename of the file we're exporting */
 	off_t hunksize;      /**< size of a hunk of an exported file */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
@@ -193,35 +184,10 @@ typedef struct {
 } CLIENT;
 
 /**
- * Type of configuration file values
- **/
-typedef enum {
-	PARAM_INT,		/**< This parameter is an integer */
-	PARAM_STRING,		/**< This parameter is a string */
-	PARAM_BOOL,		/**< This parameter is a boolean */
-} PARAM_TYPE;
-/**
- * Configuration file values
- **/
-typedef struct {
-	gchar *paramname;	/**< Name of the parameter, as it appears in
-				  the config file */
-	gboolean required;	/**< Whether this is a required (as opposed to
-				  optional) parameter */
-	PARAM_TYPE ptype;	/**< Type of the parameter. */
-	gpointer target;	/**< Pointer to where the data of this
-				  parameter should be written. If ptype is
-				  PARAM_BOOL, the data is or'ed rather than
-				  overwritten. */
-	gint flagval;		/**< Flag mask for this parameter in case ptype
-				  is PARAM_BOOL. */
-} PARAM;
-
-/**
  * Check whether a client is allowed to connect. Works with an authorization
  * file which contains one line per machine, no wildcards.
  *
- * @param opts The client who's trying to connect.
+ * @param name IP address of client trying to connect (in human-readable form)
  * @return 0 - authorization refused, 1 - OK
  **/
 int authorized_client(CLIENT *opts) {
@@ -296,11 +262,14 @@ void usage() {
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" );
-	printf("Using configuration file %s\n", CFILE);
 }
 
 /**
  * Parse the command line.
+ *
+ * @todo getopt() is a great thing, and easy to use. Also, we want to
+ * create a configuration file which nbd-server will read. Maybe do (as in,
+ * parse) that here.
  *
  * @param argc the argc argument to main()
  * @param argv the argv argument to main()
@@ -315,7 +284,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"copy-on-write", no_argument, NULL, 'c'},
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"idle-time", required_argument, NULL, 'a'},
-		{"config-file", required_argument, NULL, 'C'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -323,16 +291,11 @@ SERVER* cmdline(int argc, char *argv[]) {
 	size_t last;
 	char suffix;
 
-	if(argc==1) {
-		return NULL;
-	}
-	serve=g_new0(SERVER, 1);
+	serve=g_malloc(sizeof(SERVER));
 	serve->hunksize=OFFT_MAX;
-	serve->authname = g_strdup(default_authname);
-	while((c=getopt_long(argc, argv, "-a:C:cl:mr", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-a:cl:mr", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
-			/* non-option argument */
 			switch(nonspecial++) {
 			case 0:
 				serve->port=strtol(optarg, NULL, 0);
@@ -368,24 +331,20 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'm':
 			serve->flags |= F_MULTIFILE;
 			serve->hunksize = 1*GIGA;
+			serve->authname = default_authname;
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
 		        break;
-		case 'C':
-			g_free(config_file_pos);
-			config_file_pos=g_strdup(optarg);
-			break;
 		case 'l':
-			g_free(serve->authname);
-			serve->authname=g_strdup(optarg);
+			serve->authname=optarg;
 			break;
 		case 'a': 
 			serve->timeout=strtol(optarg, NULL, 0);
 			break;
 		default:
 			usage();
-			exit(EXIT_FAILURE);
+			exit(0);
 			break;
 		}
 	}
@@ -399,128 +358,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 }
 
 /**
- * Error codes for config file parsing
- **/
-typedef enum {
-	CFILE_NOTFOUND,		/**< The configuration file is not found */
-	CFILE_MISSING_GENERIC,	/**< The (required) group "generic" is missing */
-	CFILE_KEY_MISSING,	/**< A (required) key is missing */
-	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
-	CFILE_PROGERR		/**< Programmer error */
-} CFILE_ERRORS;
-
-/**
- * Remove a SERVER from memory. Used from the hash table
- **/
-void remove_server(gpointer s) {
-	SERVER *server;
-
-	server=(SERVER*)s;
-	g_free(server->exportname);
-	if(server->authname)
-		g_free(server->authname);
-	g_free(server);
-}
-
-/**
- * Parse the config file.
- *
- * @param f the name of the config file
- * @param e a GError. @see CFILE_ERRORS for what error values this function can
- * 	return.
- * @return a GHashTable of SERVER* pointers, with the port number as the hash
- *	key. If the config file is empty or does not exist, returns an empty
- *	GHashTable; if the config file contains an error, returns NULL, and
- *	e is set appropriately
- **/
-GHashTable* parse_cfile(gchar* f, GError** e) {
-	SERVER *s;
-	PARAM p[] = {
-		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
-		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
-		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "timeout",	FALSE,	PARAM_INT,	NULL, 0 },
-		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
-		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
-		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
-		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
-	};
-	GKeyFile *cfile;
-	GError *err = NULL;
-	GQuark errdomain;
-	GHashTable *retval;
-	gchar **groups;
-	gboolean value;
-	gint i,j;
-
-	errdomain = g_quark_from_string("parse_cfile");
-	cfile = g_key_file_new();
-	retval = g_hash_table_new_full(g_int_hash, g_int_equal, NULL, remove_server);
-	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
-			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file.");
-		g_key_file_free(cfile);
-		return retval;
-	}
-	if(strcmp(g_key_file_get_start_group(cfile), "generic")) {
-		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
-		g_key_file_free(cfile);
-		return NULL;
-	}
-	groups = g_key_file_get_groups(cfile, NULL);
-	for(i=0;groups[i];i++) {
-		s=g_new0(SERVER, 1);
-		p[0].target=&(s->exportname);
-		p[1].target=&(s->port);
-		p[2].target=&(s->authname);
-		p[3].target=&(s->timeout);
-		p[4].target=&(s->expected_size);
-		p[5].target=p[6].target=p[7].target=p[8].target=&(s->flags);
-		for(j=0;j<9;j++) {
-			g_assert(p[j].target != NULL);
-			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
-			switch(p[j].ptype) {
-				case PARAM_INT:
-					*((gint*)p[j].target) = g_key_file_get_integer(cfile, groups[i], p[j].paramname, &err);
-					break;
-				case PARAM_STRING:
-					*((gchar**)p[j].target) = g_key_file_get_string(cfile, groups[i], p[j].paramname, &err);
-					break;
-				case PARAM_BOOL:
-					value = g_key_file_get_boolean(cfile, groups[i], p[j].paramname, &err);
-					if(!err) {
-						*((gint*)p[j].target) |= value;
-					}
-					break;
-			}
-			if(err) {
-				if(err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
-					if(p[j].required) {
-						g_set_error(e, errdomain, CFILE_KEY_MISSING, "Could not find required value %s in group %s: %s", p[j].paramname, groups[i], err->message);
-						g_hash_table_destroy(retval);
-						g_error_free(err);
-						g_key_file_free(cfile);
-						g_free(s);
-						return NULL;
-					} else {
-						g_error_free(err);
-						continue;
-					}
-					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Could not parse %s in group %s: %s", p[j].paramname, groups[i], err->message);
-					g_hash_table_destroy(retval);
-					g_error_free(err);
-					g_key_file_free(cfile);
-					g_free(s);
-					return NULL;
-				}
-			}
-		}
-		g_hash_table_insert(retval, &(s->port), s);
-	}
-	return retval;
-}
-
-/**
  * Signal handler for SIGCHLD
  * @param s the signal we're handling (must be SIGCHLD, or something
  * is severely wrong)
@@ -529,10 +366,13 @@ void sigchld_handler(int s) {
         int* status=NULL;
 	int* i;
 	pid_t pid;
+	int done=0;
 
-	while((pid=wait(status)) > 0) {
+	while(!done && (pid=wait(status)) > 0) {
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+			msg3(LOG_INFO, "pid is %d", pid);
+			done=1;
 		}
 		i=g_hash_table_lookup(children, &pid);
 		if(!i) {
@@ -586,7 +426,7 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int export) {
 	off_t es;
-	u32 es32;
+	unsigned long sectors;
 	struct stat stat_buf;
 	int error;
 
@@ -594,8 +434,8 @@ off_t size_autodetect(int export) {
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE
 	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
-	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
-		es = (off_t)es32 * (off_t)512;
+	if (!ioctl(export, BLKGETSIZE, &sectors) && sectors) {
+		es = (off_t)sectors * (off_t)512;
 		return es;
 	}
 #endif /* BLKGETSIZE */
@@ -645,7 +485,6 @@ void myseek(int handle,off_t a) {
  * @param a The offset where the write should start
  * @param buf The buffer to write from
  * @param len The length of buf
- * @param client The client we're serving for
  * @return The number of bytes actually written, or -1 in case of an error
  **/
 int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
@@ -664,7 +503,6 @@ int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param a The offset where the read should start
  * @param buf A buffer to read into
  * @param len The size of buf
- * @param client The client we're serving for
  * @return The number of bytes actually read, or -1 in case of an
  * error.
  **/
@@ -684,7 +522,6 @@ int rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param a The offset where the read should start
  * @param buf A buffer to read into
  * @param len The size of buf
- * @param client The client we're going to read for
  * @return The number of bytes actually read, or -1 in case of an error
  **/
 int expread(off_t a, char *buf, size_t len, CLIENT *client) {
@@ -725,7 +562,6 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param a The offset where the write should start
  * @param buf The buffer to write from
  * @param len The length of buf
- * @param client The client we're going to write for.
  * @return The number of bytes actually written, or -1 in case of an error
  **/
 int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
@@ -779,7 +615,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 /**
  * Do the initial negotiation.
  *
- * @param client The client we're negotiating with.
+ * @param net A socket to do the negotiation over
  **/
 void negotiate(CLIENT *client) {
 	char zeros[300];
@@ -808,7 +644,7 @@ void negotiate(CLIENT *client) {
  * @todo This beast needs to be split up in many tiny little manageable
  * pieces. Preferably with a chainsaw.
  *
- * @param client The client we're going to serve to.
+ * @param net A network socket, connected to an nbd client
  * @return never
  **/
 int mainloop(CLIENT *client) {
@@ -851,7 +687,7 @@ int mainloop(CLIENT *client) {
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE + sizeof(struct nbd_reply))
+		if (len > BUFSIZE-sizeof(struct nbd_reply))
 			err("Request too big!");
 #ifdef DODBG
 		printf("%s from %Lu (%Lu) len %d, ", request.type ? "WRITE" :
@@ -960,7 +796,7 @@ int copyonwrite_prepare(CLIENT* client)
  * @todo allow for multithreading, perhaps use libevent. Not just yet, though;
  * follow the road map.
  *
- * @param client a connected client
+ * @param net A network socket connected to an nbd client
  **/
 void serveconnection(CLIENT *client) {
 	splitexport(client);
@@ -1025,29 +861,25 @@ void destroy_pid_t(gpointer data) {
 /**
  * Go daemon (unless we specified at compile time that we didn't want this)
  * @param serve the first server of our configuration. If its port is zero,
- * 	then do not daemonize, because we're doing inetd then. This parameter
- * 	is only used to create a PID file of the form
- * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
+ * 	then do not daemonize, because we're doing inetd then.
  **/
 #if !defined(NODAEMON) && !defined(NOFORK)
 void daemonize(SERVER* serve) {
 	FILE*pidf;
 
-	if(daemon(0,0)<0) {
-		err("daemon");
-	}
-	if(serve) {
+	if((serve->port)) {
+		if(daemon(0,0)<0) {
+			err("daemon");
+		}
 		snprintf(pidfname, sizeof(char)*255, "/var/run/nbd-server.%d.pid", serve->port);
-	} else {
-		strncpy(pidfname, "/var/run/nbd-server.pid", sizeof(char)*255);
-	}
-	pidf=fopen(pidfname, "w");
-	if(pidf) {
-		fprintf(pidf,"%d\n", (int)getpid());
-		fclose(pidf);
-	} else {
-		perror("fopen");
-		fprintf(stderr, "Not fatal; continuing");
+		pidf=fopen(pidfname, "w");
+		if(pidf) {
+			fprintf(pidf,"%d", (int)getpid());
+			fclose(pidf);
+		} else {
+			perror("fopen");
+			fprintf(stderr, "Not fatal; continuing");
+		}
 	}
 }
 #else
@@ -1057,14 +889,13 @@ void daemonize(SERVER* serve) {
 /**
  * Connect a server's socket.
  *
- * @todo modularize this giant beast.
+ * @todo modularize this giant beast. Preferably with a chainsaw. Also,
+ * it has no business starting mainloop(), through serveconnection(); it
+ * should connect, and be done with it.
  *
- * @param port the port we're connecting to (we don't need it, but
- * g_hash_table_foreach requires it)
  * @param serve the server we want to connect.
- * @param data (unused) user data.
  **/
-void setup_serve(gpointer port, gpointer s, gpointer data) {
+void setup_serve(SERVER* serve) {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
@@ -1073,9 +904,7 @@ void setup_serve(gpointer port, gpointer s, gpointer data) {
 #else
 	char yes='1';
 #endif /* sun */
-	SERVER *serve=(SERVER*)s;
 
-	g_assert(data==NULL);
 	if ((serve->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
 
@@ -1110,13 +939,6 @@ void setup_serve(gpointer port, gpointer s, gpointer data) {
 }
 
 /**
- * Connect our servers.
- **/
-void setup_servers(GHashTable* servers) {
-	g_hash_table_foreach(servers, setup_serve, NULL);
-}
-
-/**
  * Loop through the available servers, and serve them.
  *
  * Actually, right now we only handle one server. Will change that for
@@ -1131,8 +953,10 @@ int serveloop(SERVER* serve) {
 		pid_t *pid;
 
 		DEBUG("accept, ");
-		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-			err("accept: %m");
+		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+			msg2(LOG_ERR,"accept: %m");
+			continue;
+		}
 
 		client = g_malloc(sizeof(CLIENT));
 		client->server=serve;
@@ -1163,6 +987,7 @@ int serveloop(SERVER* serve) {
 #endif // NOFORK
 		msg2(LOG_INFO,"Starting to serve") ;
 		serveconnection(client);
+		return 0;
 	}
 }
 
@@ -1170,9 +995,8 @@ int serveloop(SERVER* serve) {
  * Main entry point...
  **/
 int main(int argc, char *argv[]) {
-	SERVER *serve;
-	GHashTable *servers;
-	GError *err=NULL;
+	SERVER* serve;
+	GArray* servers;
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
@@ -1180,18 +1004,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	logging();
-	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
-	servers = parse_cfile(config_file_pos, &err);
-	if(!servers) {
-		g_critical("Could not parse command file: %s", err->message);
-	}
-	if(serve) {
-		g_hash_table_insert(servers, &serve->port, serve);
-	}
+	servers=g_array_new(TRUE, FALSE, sizeof(SERVER*));
 
-/* We don't support this at this time */
-#if 0
 	if (!(serve->port)) {
 	  	CLIENT *client;
 #ifndef ISSERVER
@@ -1212,13 +1027,8 @@ int main(int argc, char *argv[]) {
           	serveconnection(client);
           	return 0;
         }
-#endif
-	if((!serve) && (!servers)) {
-		g_message("Nothing to do! Bye!");
-		exit(EXIT_FAILURE);
-	}
 	daemonize(serve);
-	setup_servers(servers);
-	serveloop(servers);
+	setup_serve(serve);
+	serveloop(serve);
 	return 0 ;
 }
