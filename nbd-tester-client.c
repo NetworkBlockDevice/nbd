@@ -52,6 +52,8 @@ typedef enum {
 
 inline int read_all(int f, void *buf, size_t len) {
 	ssize_t res;
+	int retval=0;
+
 	while(len>0) {
 		if((res=read(f, buf, len)) <=0) {
 			snprintf(errstr, errstr_len, "Read failed: %s", strerror(errno));
@@ -59,7 +61,9 @@ inline int read_all(int f, void *buf, size_t len) {
 		}
 		len-=res;
 		buf+=res;
+		retval+=res;
 	}
+	return retval;
 }
 
 int setup_connection(gchar *hostname, int port, CONNECTION_TYPE ctype) {
@@ -216,12 +220,12 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 		snprintf(errstr, errstr_len, "Could not read from socket: %s", strerror(errno));
 		goto err_open;
 	}
-	read_all(sock,&buf,128);
 	if(tmp==0) {
 		retval=-1;
 		snprintf(errstr, errstr_len, "Server closed connection unexpectedly when trying to read size of device in throughput test");
 		goto err;
 	}
+	read_all(sock,&buf,128);
 	size=ntohll(size);
 	req.magic=htonl(NBD_REQUEST_MAGIC);
 	req.type=htonl(NBD_CMD_READ);
@@ -229,7 +233,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 	for(i=0;i+1024<=size;i+=1024) {
 		if(do_write) {
 			*((u64*)req.handle)=i;
-			req.from=htonl(i);
+			req.from=htonll(i);
 			write(sock, &req, sizeof(req));
 			printf("Requests(+): %d\n", ++requests);
 		}
@@ -242,7 +246,10 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 			if(FD_ISSET(sock, &set)) {
 				/* Okay, there's something ready for
 				 * reading here */
-				read_packet_check_header(sock, 1024, i);
+				if(read_packet_check_header(sock, 1024, i)<0) {
+					retval=-1;
+					goto err_open;
+				}
 				printf("Requests(-): %d\n", --requests);
 			}
 		} while FD_ISSET(sock, &set);
