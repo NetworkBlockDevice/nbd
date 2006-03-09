@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include "config.h"
 #include "lfs.h"
 #define MY_NAME "nbd-tester-client"
@@ -52,7 +53,7 @@ typedef enum {
 
 inline int read_all(int f, void *buf, size_t len) {
 	ssize_t res;
-	int retval=0;
+	size_t retval=0;
 
 	while(len>0) {
 		if((res=read(f, buf, len)) <=0) {
