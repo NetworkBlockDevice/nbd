@@ -433,8 +433,8 @@ void remove_server(gpointer s) {
  *	GHashTable; if the config file contains an error, returns NULL, and
  *	e is set appropriately
  **/
-GHashTable* parse_cfile(gchar* f, GError** e) {
-	SERVER *s;
+GArray* parse_cfile(gchar* f, GError** e) {
+	SERVER s;
 	PARAM p[] = {
 		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
 		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
@@ -448,14 +448,14 @@ GHashTable* parse_cfile(gchar* f, GError** e) {
 	GKeyFile *cfile;
 	GError *err = NULL;
 	GQuark errdomain;
-	GHashTable *retval;
+	GArray *retval;
 	gchar **groups;
 	gboolean value;
 	gint i,j;
 
 	errdomain = g_quark_from_string("parse_cfile");
 	cfile = g_key_file_new();
-	retval = g_hash_table_new_full(g_int_hash, g_int_equal, NULL, remove_server);
+	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
 		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file.");
@@ -469,13 +469,12 @@ GHashTable* parse_cfile(gchar* f, GError** e) {
 	}
 	groups = g_key_file_get_groups(cfile, NULL);
 	for(i=0;groups[i];i++) {
-		s=g_new0(SERVER, 1);
-		p[0].target=&(s->exportname);
-		p[1].target=&(s->port);
-		p[2].target=&(s->authname);
-		p[3].target=&(s->timeout);
-		p[4].target=&(s->expected_size);
-		p[5].target=p[6].target=p[7].target=p[8].target=&(s->flags);
+		p[0].target=&(s.exportname);
+		p[1].target=&(s.port);
+		p[2].target=&(s.authname);
+		p[3].target=&(s.timeout);
+		p[4].target=&(s.expected_size);
+		p[5].target=p[6].target=p[7].target=p[8].target=&(s.flags);
 		for(j=0;j<9;j++) {
 			g_assert(p[j].target != NULL);
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
@@ -497,25 +496,23 @@ GHashTable* parse_cfile(gchar* f, GError** e) {
 				if(err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
 					if(p[j].required) {
 						g_set_error(e, errdomain, CFILE_KEY_MISSING, "Could not find required value %s in group %s: %s", p[j].paramname, groups[i], err->message);
-						g_hash_table_destroy(retval);
+						g_array_free(retval, TRUE);
 						g_error_free(err);
 						g_key_file_free(cfile);
-						g_free(s);
 						return NULL;
 					} else {
 						g_error_free(err);
 						continue;
 					}
 					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Could not parse %s in group %s: %s", p[j].paramname, groups[i], err->message);
-					g_hash_table_destroy(retval);
+					g_array_free(retval, TRUE);
 					g_error_free(err);
 					g_key_file_free(cfile);
-					g_free(s);
 					return NULL;
 				}
 			}
 		}
-		g_hash_table_insert(retval, &(s->port), s);
+		g_array_append_val(retval, s);
 	}
 	return retval;
 }
@@ -1057,14 +1054,9 @@ void daemonize(SERVER* serve) {
 /**
  * Connect a server's socket.
  *
- * @todo modularize this giant beast.
- *
- * @param port the port we're connecting to (we don't need it, but
- * g_hash_table_foreach requires it)
  * @param serve the server we want to connect.
- * @param data (unused) user data.
  **/
-void setup_serve(gpointer port, gpointer s, gpointer data) {
+void setup_serve(SERVER *serve) {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
@@ -1073,9 +1065,6 @@ void setup_serve(gpointer port, gpointer s, gpointer data) {
 #else
 	char yes='1';
 #endif /* sun */
-	SERVER *serve=(SERVER*)s;
-
-	g_assert(data==NULL);
 	if ((serve->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
 
@@ -1112,57 +1101,96 @@ void setup_serve(gpointer port, gpointer s, gpointer data) {
 /**
  * Connect our servers.
  **/
-void setup_servers(GHashTable* servers) {
-	g_hash_table_foreach(servers, setup_serve, NULL);
+void setup_servers(GArray* servers) {
+	int i;
+
+	for(i=0;i<servers->len;i++) {
+		setup_serve(&(g_array_index(servers, SERVER, i)));
+	}
 }
 
 /**
  * Loop through the available servers, and serve them.
- *
- * Actually, right now we only handle one server. Will change that for
- * 2.9.
  **/
-int serveloop(SERVER* serve) {
+int serveloop(GArray* servers) {
 	struct sockaddr_in addrin;
 	socklen_t addrinlen=sizeof(addrin);
+	SERVER *serve;
+	int i, max, sock;
+	fd_set mset, rset;
+	struct timeval tv;
+
+	/* 
+	 * Set up the master fd_set. The set of descriptors we need
+	 * to select() for never changes anyway and it buys us a *lot*
+	 * of time to only build this once. However, if we ever choose
+	 * to not fork() for clients anymore, we may have to revisit
+	 * this.
+	 */
+	max=0;
+	FD_ZERO(&mset);
+	for(i=0;i<servers->len;i++) {
+		sock=(g_array_index(servers, SERVER, i)).socket;
+		FD_SET(sock, &mset);
+		max=sock>max?sock:max;
+	}
 	for(;;) {
 		CLIENT *client;
 		int net;
 		pid_t *pid;
 
-		DEBUG("accept, ");
-		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-			err("accept: %m");
+		memcpy(&rset, &mset, sizeof(fd_set));
+		tv.tv_sec=0;
+		tv.tv_usec=500;
+		if(select(max+1, &rset, NULL, NULL, &tv)>0) {
+			DEBUG("accept, ");
+			for(i=0;i<servers->len;i++) {
+				serve=&(g_array_index(servers, SERVER, i));
+				if(FD_ISSET(serve->socket, &rset)) {
+					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
+						err("accept: %m");
 
-		client = g_malloc(sizeof(CLIENT));
-		client->server=serve;
-		client->exportsize=OFFT_MAX;
-		client->net=net;
-		set_peername(net, client);
-		if (!authorized_client(client)) {
-			msg2(LOG_INFO,"Unauthorized client") ;
-			close(net) ;
-			continue ;
-		}
-		msg2(LOG_INFO,"Authorized client") ;
-		pid=g_malloc(sizeof(pid_t));
+					client = g_malloc(sizeof(CLIENT));
+					client->server=serve;
+					client->exportsize=OFFT_MAX;
+					client->net=net;
+					set_peername(net, client);
+					if (!authorized_client(client)) {
+						msg2(LOG_INFO,"Unauthorized client") ;
+						close(net);
+						continue;
+					}
+					msg2(LOG_INFO,"Authorized client") ;
+					pid=g_malloc(sizeof(pid_t));
 #ifndef NOFORK
-		if ((*pid=fork())<0) {
-			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-			close(net) ;
-			continue ;
-		}
-		if (*pid>0) { /* parent */
-			close(net);
-			g_hash_table_insert(children, pid, pid);
-			continue;
-		}
-		/* child */
-		g_hash_table_destroy(children);
-		close(serve->socket) ;
+					if ((*pid=fork())<0) {
+						msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+						close(net);
+						continue;
+					}
+					if (*pid>0) { /* parent */
+						close(net);
+						g_hash_table_insert(children, pid, pid);
+						continue;
+					}
+					/* child */
+					g_hash_table_destroy(children);
+					for(i=0;i<servers->len,serve=&(g_array_index(servers, SERVER, i)),i++) {
+						close(serve->socket);
+					}
+					/* FALSE does not free the
+					actual data. This is required,
+					because the client has a
+					direct reference into that
+					data, and otherwise we get a
+					segfault... */
+					g_array_free(servers, FALSE);
 #endif // NOFORK
-		msg2(LOG_INFO,"Starting to serve") ;
-		serveconnection(client);
+					msg2(LOG_INFO,"Starting to serve");
+					serveconnection(client);
+				}
+			}
+		}
 	}
 }
 
@@ -1171,7 +1199,7 @@ int serveloop(SERVER* serve) {
  **/
 int main(int argc, char *argv[]) {
 	SERVER *serve;
-	GHashTable *servers;
+	GArray *servers;
 	GError *err=NULL;
 
 	if (sizeof( struct nbd_request )!=28) {
@@ -1187,7 +1215,8 @@ int main(int argc, char *argv[]) {
 		g_critical("Could not parse command file: %s", err->message);
 	}
 	if(serve) {
-		g_hash_table_insert(servers, &serve->port, serve);
+		g_array_append_val(servers, *serve);
+		g_free(serve);
 	}
 
 /* We don't support this at this time */
