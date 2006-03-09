@@ -230,9 +230,14 @@ manpage.1: manpage.sgml
     <para>The NBD kernel module and the NBD tools were originally
       written by Pavel Machek (pavel@ucw.cz)</para>
 
-    <para>The kernel module is now maintained by Paul Clements
+    <para>The Linux kernel module is now maintained by Paul Clements
       (Paul.Clements@steeleye.com), while the userland tools are
       maintained by &dhusername; (&dhemail;)</para>
+
+    <para>On The Hurd there is a regular translator available to perform the
+      client side of the protocol, and the use of
+      <command>nbd-client</command> is not required. Please see the
+      relevant documentation for more information.</para>
 
     <para>This manual page was written by &dhusername; (&dhemail;) for
       the &debian; system (but may be used by others).  Permission is
