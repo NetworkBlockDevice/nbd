@@ -1175,7 +1175,7 @@ int serveloop(GArray* servers) {
 					}
 					/* child */
 					g_hash_table_destroy(children);
-					for(i=0;i<servers->len,serve=&(g_array_index(servers, SERVER, i)),i++) {
+					for(i=0;i<servers->len,serve=&(g_array_index(servers, SERVER, i));i++) {
 						close(serve->socket);
 					}
 					/* FALSE does not free the
