@@ -149,7 +149,7 @@ void finish_sock(int sock, int nbd, int swap) {
 int main(int argc, char *argv[]) {
 	int port, sock, nbd;
 	int blocksize=1024;
-	char *hostname;
+	char *hostname, *nbddev;
 	int swap=0;
 	int cont=0;
 	u64 size64;
@@ -207,7 +207,8 @@ int main(int argc, char *argv[]) {
 
 	if (argc==0) goto errmsg;
 	sock = opennet(hostname, port);
-	nbd = open(argv[0], O_RDWR);
+	nbddev = argv[0];
+	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Can not open NBD: %m");
 	++argv; --argc; /* skip device */
@@ -234,8 +235,10 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 	chdir("/");
+#ifndef NOFORK
 	if (fork())
 		exit(0);
+#endif
 
 	do {
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
@@ -249,7 +252,7 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, " Reconnecting\n");
 					close(sock); close(nbd);
 					sock = opennet(hostname, port);
-					nbd = open(argv[0], O_RDWR);
+					nbd = open(nbddev, O_RDWR);
 					if(size64!=negotiate(sock,blocksize)) {
 						err("Size of the device changed. Bye");
 					}
