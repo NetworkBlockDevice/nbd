@@ -704,6 +704,7 @@ int mainloop(CLIENT *client) {
 		if (((ssize_t)((off_t)request.from + len) > client->exportsize) ||
 		    ((client->server->flags & F_READONLY) && request.type)) {
 			DEBUG("[RANGE!]");
+			readit(client->net, buf, len);
 			ERROR(client, reply);
 			continue;
 		}
