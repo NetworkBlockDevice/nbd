@@ -46,10 +46,43 @@ do make sure that /var/run is writeable by the server that nbd-server
 runs as; otherwise, you won't get a PID file, though the server will
 keep running).
 
+Starting with NBD 2.9, there is also support for a configuration file.
+This configuration file is expected to be found at
+<sysconfdir>/nbd-server/config, and should look something like this:
+
+# This is a comment
+[generic]
+	# The [generic] section is required, but can not currently
+	# contain any options. This section name is reserved for future
+	# use.
+[export1]
+	exportname = /export/nbd/export1-file
+	port = 12345
+	authfile = /export/nbd/export1-authfile
+	timeout = 30
+	filesize = 10000000
+	readonly = no
+	multifile = false
+	copyonwrite = no
+[otherexport]
+	exportname = /export/nbd/experiment
+	port = 12346
+	# The other options are all optional.
+
+The configuration file is parsed with GLib's GKeyFile, which parses key
+files as they are specified in the Freedesktop.org Desktop Entry
+Specification, as can be found at
+<http://freedesktop.org/Standards/desktop-entry-spec>. While this format
+was not intended to be used for configuration files, the glib API is
+flexible enough for it to be used as such.
+
+The old command-line syntax is still supported, however.
+
 There are packages (or similar) available for the following operating
 systems:
 
-Debian: "nbd-client" and "nbd-server", since woody.
+Debian (and derivatives, like Ubuntu): "nbd-client" and "nbd-server",
+	since Debian woody.
 Gentoo: the "nbd" ebuild in the "sys-block" category, available in
 	Portage since 2002.
 FreeBSD: "net/nbd-server", available in the ports tree since 2003.
@@ -75,5 +108,5 @@ then you'll have only one kblockd, meaning, the kernel can't write to
 more than one block device at the same time.
 
 If, while your kblockd is emptying the NBD buffer cache, the kernel
-decides that the cache your nbd-server is writing to needs to be
-emptied, then you've got a deadlock.
+decides that the cache of the block device your nbd-server is writing to
+needs to be emptied, then you've got a deadlock.
