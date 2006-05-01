@@ -1,5 +1,4 @@
 bin_PROGRAMS = nbd-server
-noinst_PROGRAMS = nbd-tester-client
 EXTRA_PROGRAMS = nbd-client
 noinst_PROGRAMS = nbd-tester-client
 nbd_client_SOURCES = nbd-client.c cliserv.h
