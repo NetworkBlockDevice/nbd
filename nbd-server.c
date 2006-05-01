@@ -448,7 +448,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	GKeyFile *cfile;
 	GError *err = NULL;
 	GQuark errdomain;
-	GArray *retval;
+	GArray *retval=NULL;
 	gchar **groups;
 	gboolean value;
 	gint i,j;
@@ -1175,7 +1175,7 @@ int serveloop(GArray* servers) {
 					}
 					/* child */
 					g_hash_table_destroy(children);
-					for(i=0;i<servers->len,serve=&(g_array_index(servers, SERVER, i));i++) {
+					for(i=0;i<servers->len,serve=(g_array_index(servers, SERVER*, i));i++) {
 						close(serve->socket);
 					}
 					/* FALSE does not free the
@@ -1211,12 +1211,11 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
-	if(!servers) {
-		g_critical("Could not parse command file: %s", err->message);
+	if(!servers->len) {
+		g_warning("Could not parse config file: %s", err->message);
 	}
 	if(serve) {
 		g_array_append_val(servers, *serve);
-		g_free(serve);
 	}
 
 /* We don't support this at this time */
@@ -1242,7 +1241,7 @@ int main(int argc, char *argv[]) {
           	return 0;
         }
 #endif
-	if((!serve) && (!servers)) {
+	if((!serve) && (!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);
 	}
