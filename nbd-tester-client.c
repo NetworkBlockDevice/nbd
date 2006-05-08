@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <syslog.h>
 #include <unistd.h>
 #include "config.h"
 #include "lfs.h"
