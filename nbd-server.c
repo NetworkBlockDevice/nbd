@@ -287,10 +287,11 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec]\n"
+	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
+	       "\t-C|--config-file\tspecify an alternat configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
@@ -392,8 +393,8 @@ SERVER* cmdline(int argc, char *argv[]) {
 	/* What's left: the port to export, the name of the to be exported
 	 * file, and, optionally, the size of the file, in that order. */
 	if(nonspecial<2) {
-		usage();
-		exit(EXIT_FAILURE);
+		g_free(serve);
+		serve=NULL;
 	}
 	return serve;
 }
@@ -445,6 +446,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
 	};
+	const int p_size=8;
 	GKeyFile *cfile;
 	GError *err = NULL;
 	GQuark errdomain;
@@ -453,6 +455,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	gboolean value;
 	gint i,j;
 
+	memset(&s, '\0', sizeof(SERVER));
 	errdomain = g_quark_from_string("parse_cfile");
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
@@ -468,25 +471,35 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		return NULL;
 	}
 	groups = g_key_file_get_groups(cfile, NULL);
-	for(i=0;groups[i];i++) {
+	for(i=1;groups[i];i++) {
 		p[0].target=&(s.exportname);
 		p[1].target=&(s.port);
 		p[2].target=&(s.authname);
 		p[3].target=&(s.timeout);
 		p[4].target=&(s.expected_size);
 		p[5].target=p[6].target=p[7].target=p[8].target=&(s.flags);
-		for(j=0;j<9;j++) {
+		for(j=0;j<p_size;j++) {
 			g_assert(p[j].target != NULL);
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
 			switch(p[j].ptype) {
 				case PARAM_INT:
-					*((gint*)p[j].target) = g_key_file_get_integer(cfile, groups[i], p[j].paramname, &err);
+					*((gint*)p[j].target) =
+						g_key_file_get_integer(cfile,
+								groups[i],
+								p[j].paramname,
+								&err);
 					break;
 				case PARAM_STRING:
-					*((gchar**)p[j].target) = g_key_file_get_string(cfile, groups[i], p[j].paramname, &err);
+					*((gchar**)p[j].target) =
+						g_key_file_get_string(cfile,
+								groups[i],
+								p[j].paramname,
+								&err);
 					break;
 				case PARAM_BOOL:
-					value = g_key_file_get_boolean(cfile, groups[i], p[j].paramname, &err);
+					value = g_key_file_get_boolean(cfile,
+							groups[i],
+							p[j].paramname, &err);
 					if(!err) {
 						*((gint*)p[j].target) |= value;
 					}
@@ -501,7 +514,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 						g_key_file_free(cfile);
 						return NULL;
 					} else {
-						g_error_free(err);
+						g_clear_error(&err);
 						continue;
 					}
 					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Could not parse %s in group %s: %s", p[j].paramname, groups[i], err->message);
@@ -1211,7 +1224,7 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
-	if(!servers->len) {
+	if(!servers || !servers->len) {
 		g_warning("Could not parse config file: %s", err->message);
 	}
 	if(serve) {
@@ -1241,7 +1254,7 @@ int main(int argc, char *argv[]) {
           	return 0;
         }
 #endif
-	if((!serve) && (!servers->len)) {
+	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);
 	}
