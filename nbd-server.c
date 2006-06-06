@@ -946,8 +946,8 @@ int splitexport(CLIENT* client) {
 	}
 	return 0;
 }
-int copyonwrite_prepare(CLIENT* client)
-{
+
+int copyonwrite_prepare(CLIENT* client) {
 	off_t i;
 	if ((client->difffilename = malloc(1024))==NULL)
 		err("Failed to allocate string for diff file name");

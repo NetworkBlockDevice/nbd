@@ -67,10 +67,6 @@ case "`uname`" in
      *) AC_MSG_RESULT(no) ;;
 esac
 AC_MSG_CHECKING(where to find a working nbd.h)
-dnl We need to check for NBD_CMD_DISC, but that's part of an enum, it is not
-dnl #define'd. Therefore, we check for something which is differently #define'd
-dnl in the old or new versions, even if we don't really care about that.
-dnl This might break at some time, but it should work for now, so...
 AC_TRY_COMPILE([#define u32 int
 #define u64 int
 #include "nbd.h"
