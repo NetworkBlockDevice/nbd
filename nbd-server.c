@@ -363,12 +363,12 @@ SERVER* cmdline(int argc, char *argv[]) {
  * is severely wrong)
  **/
 void sigchld_handler(int s) {
-        int* status=NULL;
+        int status;
 	int* i;
 	pid_t pid;
 	int done=0;
 
-	while(!done && (pid=wait(status)) > 0) {
+	while(!done && (pid=wait(&status)) > 0) {
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 			msg3(LOG_INFO, "pid is %d", pid);
