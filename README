@@ -64,9 +64,6 @@ Thanks, and have fun,
 
 Wouter Verhelst
 
-
-
-
 [1] When you write something to a block device, the kernel will not
 immediately write that to the physical block device; instead, your
 changes are written to a cache, which is periodically flushed by a
@@ -77,3 +74,24 @@ more than one block device at the same time.
 If, while your kblockd is emptying the NBD buffer cache, the kernel
 decides that the cache your nbd-server is writing to needs to be
 emptied, then you've got a deadlock.
+
+COMMON COMPILE PROBLEMS
+=======================
+
+if ./configure fails for you with a message like
+
+checking where to find a working nbd.h... configure: error: Could not find an nbd.h from kernel 2.6 or above.
+
+then check whether /usr/include/linux/nbd.h
+* exists
+* contains the following enum:
+	enum {
+        	NBD_CMD_READ = 0,
+	        NBD_CMD_WRITE = 1,
+	        NBD_CMD_DISC = 2
+	};
+
+if it doesn't, then fetch the kernel sources from a kernel.org mirror,
+fish the nbd.h from those sources (you'll find it in the include/linux
+directory), and put it in the nbd userland directory. If you now re-run
+configure, it will work.
