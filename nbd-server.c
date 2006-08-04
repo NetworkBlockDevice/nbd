@@ -536,12 +536,12 @@ GArray* parse_cfile(gchar* f, GError** e) {
  * is severely wrong)
  **/
 void sigchld_handler(int s) {
-        int* status=NULL;
+        int status;
 	int* i;
 	pid_t pid;
 
-	while((pid=wait(status)) > 0) {
-		if(WIFEXITED(status)) {
+	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
+		if(WIFEXITED(&status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 		}
 		i=g_hash_table_lookup(children, &pid);
