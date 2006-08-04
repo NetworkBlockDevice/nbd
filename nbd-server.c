@@ -368,7 +368,7 @@ void sigchld_handler(int s) {
 	pid_t pid;
 	int done=0;
 
-	while(!done && (pid=wait(&status)) > 0) {
+	while(!done && (pid=waitpid(-1 &status, WNOHANG)) > 0) {
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 			msg3(LOG_INFO, "pid is %d", pid);
