@@ -855,6 +855,8 @@ void connectme(unsigned int port) {
 	int sock;
 	int newpid;
 	int i;
+	int sock_flags;
+	fd_set read_fds;
 #ifndef sun
 	int yes=1;
 #else
@@ -924,7 +926,7 @@ void connectme(unsigned int port) {
 	memset(children, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
 	for(;;) { /* infinite loop */
 		DEBUG("select, ");
-		if(select(max_fd+1, &read_fds, NULL, NULL, NULL) <= 0) {
+		if(select(sock+1, &read_fds, NULL, NULL, NULL) <= 0) {
 			if(errno == EINTR) {
 				continue;
 			}
@@ -932,7 +934,7 @@ void connectme(unsigned int port) {
 			continue;
 		}
 		if (FD_ISSET(sock, &read_fds)) {
-			if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
+			if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 				if(errno != EAGAIN) {
 					err("accept: %m");
 				}
