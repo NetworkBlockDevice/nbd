@@ -975,8 +975,8 @@ int serveloop(SERVER* serve) {
 	struct sockaddr_in addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	int max_fd = serve->socket;
-
 	fd_set read_fds;
+
 	FD_ZERO(&read_fds);
 	FD_SET(serve->socket, &read_fds);
 
