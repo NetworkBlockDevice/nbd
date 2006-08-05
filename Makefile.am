@@ -10,7 +10,7 @@ nbd_tester_client_LDADD = @GLIB_LIBS@
 nbd_server_LDADD = @GLIB_LIBS@
 nbd_tester_client_LDADD = @GLIB_LIBS@
 man_MANS = nbd-server.1 nbd-client.8
-EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h nbd-client.8 nbd-server.1
+EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h nbd-client.8 nbd-server.1 CodingStyle
 MAINTAINERCLEANFILES = nbd-client.8 nbd-server.1
 nbd-server.1: nbd-server.1.sgml
 	docbook2man nbd-server.1.sgml
