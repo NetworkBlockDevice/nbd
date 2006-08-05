@@ -58,6 +58,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/select.h>		/* select */
 #include <sys/wait.h>		/* wait */
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
@@ -96,11 +97,6 @@
 
 /** Where our config file actually is */
 gchar* config_file_pos;
-
-/** how much space for child PIDs we have by default. Dynamically
-   allocated, and will be realloc()ed if out of space, so this should
-   probably be fair for most situations. */
-#define DEFAULT_CHILD_ARRAY 256
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -1073,6 +1069,7 @@ void setup_serve(SERVER *serve) {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
+	int sock_flags;
 #ifndef sun
 	int yes=1;
 #else
@@ -1087,6 +1084,14 @@ void setup_serve(SERVER *serve) {
 	}
 	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
 		err("setsockopt SO_KEEPALIVE");
+	}
+
+	/* make the listening socket non-blocking */
+	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+		err("fcntl F_SETFL O_NONBLOCK");
 	}
 
 	DEBUG("Waiting for connections... bind, ");
@@ -1129,8 +1134,11 @@ int serveloop(GArray* servers) {
 	struct sockaddr_in addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	SERVER *serve;
-	int i, max, sock;
-	fd_set mset, rset;
+	int i;
+	int max;
+	int sock;
+	fd_set mset;
+	int rset;
 	struct timeval tv;
 
 	/* 
