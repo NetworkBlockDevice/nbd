@@ -124,18 +124,10 @@ gchar* config_file_pos;
 #define PACKAGE_VERSION ""
 #endif
 /**
- * The highest value a variable of type off_t can reach.
+ * The highest value a variable of type off_t can reach. This is a signed
+ * integer, so set all bits except for the leftmost one.
  **/
-/* This is starting to get ugly. If someone knows a better way to find
- * the maximum value of a signed type *without* relying on overflow
- * (doing so breaks on 64bit architectures), that would be nice.
- *
- * Actually, do we need this at all? Can't we just say '0 is autodetect', and
- * live with it? Or better yet, use an extra flag, or so?
- * Answer: yes, we need it, as the hunksize is defined to this when the
- * multiple file thingy isn't used.
- */
-#define OFFT_MAX (((((off_t)1)<<((sizeof(off_t)-1)*8))-1)<<7)+127
+#define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			    authorization file (yuck) */
 #define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
