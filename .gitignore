@@ -14,3 +14,14 @@ nbd-client.8
 nbd-server.1
 stamp-h.in
 stamp-h1
+Doxyfile
+compile
+depcomp
+install-sh
+manpage.refs
+manpage.links
+missing
+mkinstalldirs
+nbd-tester-client
+nbd-client
+nbd-server
