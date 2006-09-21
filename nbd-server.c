@@ -1130,7 +1130,7 @@ int serveloop(GArray* servers) {
 	int max;
 	int sock;
 	fd_set mset;
-	int rset;
+	fd_set rset;
 	struct timeval tv;
 
 	/* 
