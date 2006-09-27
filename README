@@ -33,7 +33,7 @@ Note that the filename must be an absolute path; i.e., something like
 /path/to/file, not ../file. See the nbd-server manpage for details on
 any available options.
 
-Finally, you'll be able to star the client:
+Finally, you'll be able to start the client:
 
 nbd-client <hostname> <port> <nbd device>
 
@@ -61,9 +61,9 @@ This configuration file is expected to be found at
 	authfile = /export/nbd/export1-authfile
 	timeout = 30
 	filesize = 10000000
-	readonly = no
+	readonly = false
 	multifile = false
-	copyonwrite = no
+	copyonwrite = false
 [otherexport]
 	exportname = /export/nbd/experiment
 	port = 12346
