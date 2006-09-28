@@ -423,6 +423,8 @@ void remove_server(gpointer s) {
  *	e is set appropriately
  **/
 GArray* parse_cfile(gchar* f, GError** e) {
+	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
+	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	SERVER s;
 	PARAM p[] = {
 		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
@@ -437,6 +439,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	const int p_size=8;
 	GKeyFile *cfile;
 	GError *err = NULL;
+	const char *err_msg=NULL;
 	GQuark errdomain;
 	GArray *retval=NULL;
 	gchar **groups;
@@ -495,22 +498,21 @@ GArray* parse_cfile(gchar* f, GError** e) {
 			}
 			if(err) {
 				if(err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
-					if(p[j].required) {
-						g_set_error(e, errdomain, CFILE_KEY_MISSING, "Could not find required value %s in group %s: %s", p[j].paramname, groups[i], err->message);
-						g_array_free(retval, TRUE);
-						g_error_free(err);
-						g_key_file_free(cfile);
-						return NULL;
-					} else {
+					if(!p[j].required) {
+						/* Ignore not-found error for optional values */
 						g_clear_error(&err);
 						continue;
+					} else {
+						err_msg = MISSING_REQUIRED_ERROR;
 					}
-					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Could not parse %s in group %s: %s", p[j].paramname, groups[i], err->message);
-					g_array_free(retval, TRUE);
-					g_error_free(err);
-					g_key_file_free(cfile);
-					return NULL;
+				} else {
+					err_msg = DEFAULT_ERROR;
 				}
+				g_set_error(e, errdomain, CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
+				g_array_free(retval, TRUE);
+				g_error_free(err);
+				g_key_file_free(cfile);
+				return NULL;
 			}
 		}
 		g_array_append_val(retval, s);
