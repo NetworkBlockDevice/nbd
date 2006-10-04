@@ -468,7 +468,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		p[2].target=&(s.authname);
 		p[3].target=&(s.timeout);
 		p[4].target=&(s.expected_size);
-		p[5].target=p[6].target=p[7].target=p[8].target=&(s.flags);
+		p[5].target=p[6].target=p[7].target=&(s.flags);
 		for(j=0;j<p_size;j++) {
 			g_assert(p[j].target != NULL);
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
@@ -491,8 +491,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 					value = g_key_file_get_boolean(cfile,
 							groups[i],
 							p[j].paramname, &err);
-					if(!err) {
-						*((gint*)p[j].target) |= value;
+					if(!err && value) {
+						*((gint*)p[j].target) |= p[j].flagval;
 					}
 					break;
 			}
@@ -515,6 +515,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				return NULL;
 			}
 		}
+		if(s.flags & F_MULTIFILE)
+			s.hunksize = 1*GIGA;
+		else
+			s.hunksize = OFFT_MAX;
 		g_array_append_val(retval, s);
 	}
 	return retval;
@@ -905,34 +909,50 @@ int mainloop(CLIENT *client) {
 }
 
 /**
- * Split a single exportfile into multiple ones, if that was asked.
+ * Set up client export array, which is an array of file handles.
+ * Also, split a single exportfile into multiple ones, if that was asked.
  * @return 0 on success, -1 on failure
  * @param client information on the client which we want to split
  **/
-int splitexport(CLIENT* client) {
-	off_t i;
-	int fhandle;
+int setupexport(CLIENT* client) {
+	int i;
+	int multifile = (client->server->flags & F_MULTIFILE);
 
 	client->export = g_array_new(TRUE, TRUE, sizeof(int));
-	for (i=0; i<client->exportsize; i+=client->server->hunksize) {
-		gchar *tmpname;
 
-		if(client->server->flags & F_MULTIFILE) {
-			tmpname=g_strdup_printf("%s.%d", client->exportname,
-					(int)(i/client->server->hunksize));
+	/* If multifile, open as many files as we can.
+	 * For non-multifile, open exactly one file.
+	 * (Either way, we must be able to open at least one file.) */
+	for(i=0; ; i++) {
+		int fhandle;
+		gchar *tmpname;
+		mode_t mode = (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR;
+
+		if(multifile) {
+			tmpname=g_strdup_printf("%s.%d", client->exportname, i);
 		} else {
 			tmpname=g_strdup(client->exportname);
 		}
 		DEBUG2( "Opening %s\n", tmpname );
-		if((fhandle = open(tmpname, (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
-			/* Read WRITE ACCESS was requested by media is only read only */
-			client->server->flags |= F_AUTOREADONLY;
-			client->server->flags |= F_READONLY;
-			if((fhandle = open(tmpname, O_RDONLY)) == -1)
-				err("Could not open exported file: %m");
+		fhandle = open(tmpname, mode);
+		if(fhandle == -1 && mode == O_RDWR) {
+			/* Try again because maybe media was read-only */
+			fhandle = open(tmpname, O_RDONLY);
+			if(fhandle != -1) {
+				client->server->flags |= F_AUTOREADONLY;
+				client->server->flags |= F_READONLY;
+			}
 		}
-		g_array_insert_val(client->export,i/client->server->hunksize,fhandle);
+		if(fhandle == -1) {
+			if(multifile && i*(client->server->hunksize) >= client->exportsize)
+				break;
+			err("Could not open exported file: %m");
+		}
+		g_array_insert_val(client->export, i, fhandle);
 		g_free(tmpname);
+
+		if(!multifile)
+			break;
 	}
 	return 0;
 }
@@ -963,7 +983,11 @@ int copyonwrite_prepare(CLIENT* client) {
  * @param client a connected client
  **/
 void serveconnection(CLIENT *client) {
-	splitexport(client);
+	setupexport(client);
+
+	/* Sanity check. There must be at least one file. */
+	if(client->export->len == 0)
+		err("No file(s) to export\n");
 
 	if (!client->server->expected_size) {
 		client->exportsize = size_autodetect(g_array_index(client->export,int,0));
