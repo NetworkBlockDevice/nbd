@@ -115,10 +115,12 @@ gchar* config_file_pos;
 #define DEBUG( a ) printf( a )
 #define DEBUG2( a,b ) printf( a,b )
 #define DEBUG3( a,b,c ) printf( a,b,c )
+#define DEBUG4( a,b,c,d ) printf( a,b,c,d )
 #else
 #define DEBUG( a )
 #define DEBUG2( a,b ) 
 #define DEBUG3( a,b,c ) 
+#define DEBUG4( a,b,c,d ) 
 #endif
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION ""
@@ -131,9 +133,6 @@ gchar* config_file_pos;
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			    authorization file (yuck) */
 #define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
-#define GIGA (1*1024*1024*1024) /**< 1 Gigabyte. Used as hunksize when doing
-				  the multiple file thingy. @todo: make this a
-				  configuration option. */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
@@ -149,7 +148,6 @@ char default_authname[] = "/etc/nbd_server.allow"; /**< default name of allow fi
  **/
 typedef struct {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
-	off_t hunksize;      /**< size of a hunk of an exported file */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
 	unsigned int port;   /**< port we're exporting this file at */
@@ -164,11 +162,16 @@ typedef struct {
  * Variables associated with a client socket.
  **/
 typedef struct {
+	int fhandle;      /**< file descriptor */
+	off_t startoff;   /**< starting offset of this file */
+} FILE_INFO;
+
+typedef struct {
 	off_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer */
 	char *exportname;    /**< (processed) filename of the file we're exporting */
-	GArray *export;    /**< array of filedescriptors of exported files;
-			       only the first is actually used unless we're
+	GArray *export;    /**< array of FILE_INFO of exported files;
+			       array size is always 1 unless we're
 			       doing the multiple file option */
 	int net;	     /**< The actual client socket */
 	SERVER *server;	     /**< The server this client is getting data from */
@@ -316,7 +319,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 		return NULL;
 	}
 	serve=g_new0(SERVER, 1);
-	serve->hunksize=OFFT_MAX;
 	serve->authname = g_strdup(default_authname);
 	while((c=getopt_long(argc, argv, "-a:C:cl:mr", long_options, &i))>=0) {
 		switch (c) {
@@ -356,7 +358,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'm':
 			serve->flags |= F_MULTIFILE;
-			serve->hunksize = 1*GIGA;
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
@@ -515,10 +516,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				return NULL;
 			}
 		}
-		if(s.flags & F_MULTIFILE)
-			s.hunksize = 1*GIGA;
-		else
-			s.hunksize = OFFT_MAX;
 		g_array_append_val(retval, s);
 	}
 	return retval;
@@ -584,11 +581,11 @@ void sigterm_handler(int s) {
 /**
  * Detect the size of a file.
  *
- * @param export An open filedescriptor
+ * @param fhandle An open filedescriptor
  * @return the size of the file, or OFFT_MAX if detection was
  * impossible.
  **/
-off_t size_autodetect(int export) {
+off_t size_autodetect(int fhandle) {
 	off_t es;
 	u32 es32;
 	struct stat stat_buf;
@@ -597,8 +594,8 @@ off_t size_autodetect(int export) {
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE
-	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
-	if (!ioctl(export, BLKGETSIZE, &es32) && es32) {
+	DEBUG("looking for fhandle size with ioctl BLKGETSIZE\n");
+	if (!ioctl(fhandle, BLKGETSIZE, &es32) && es32) {
 		es = (off_t)es32 * (off_t)512;
 		return es;
 	}
@@ -606,9 +603,9 @@ off_t size_autodetect(int export) {
 #endif /* HAVE_SYS_IOCTL_H */
 #endif /* HAVE_SYS_MOUNT_H */
 
-	DEBUG("looking for export size with fstat\n");
+	DEBUG("looking for fhandle size with fstat\n");
 	stat_buf.st_size = 0;
-	error = fstat(export, &stat_buf);
+	error = fstat(fhandle, &stat_buf);
 	if (!error) {
 		if(stat_buf.st_size > 0)
 			return (off_t)stat_buf.st_size;
@@ -616,8 +613,8 @@ off_t size_autodetect(int export) {
                 err("fstat failed: %m");
         }
 
-	DEBUG("looking for export size with lseek SEEK_END\n");
-	es = lseek(export, (off_t)0, SEEK_END);
+	DEBUG("looking for fhandle size with lseek SEEK_END\n");
+	es = lseek(fhandle, (off_t)0, SEEK_END);
 	if (es > ((off_t)0)) {
 		return es;
         } else {
@@ -626,6 +623,54 @@ off_t size_autodetect(int export) {
 
 	err("Could not find size of exported block device: %m");
 	return OFFT_MAX;
+}
+
+/**
+ * Get the file handle and offset, given an export offset.
+ *
+ * @param export An array of export files
+ * @param a The offset to get corresponding file/offset for
+ * @param fhandle [out] File descriptor
+ * @param foffset [out] Offset into fhandle
+ * @param maxbytes [out] Tells how many bytes can be read/written
+ * from fhandle starting at foffset (0 if there is no limit)
+ * @return 0 on success, -1 on failure
+ **/
+int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+	/* Negative offset not allowed */
+	if(a < 0)
+		return -1;
+
+	/* Binary search for last file with starting offset <= a */
+	FILE_INFO fi;
+	int start = 0;
+	int end = export->len - 1;
+	while( start <= end ) {
+		int mid = (start + end) / 2;
+		fi = g_array_index(export, FILE_INFO, mid);
+		if( fi.startoff < a ) {
+			start = mid + 1;
+		} else if( fi.startoff > a ) {
+			end = mid - 1;
+		} else {
+			start = end = mid;
+			break;
+		}
+	}
+
+	/* end should never go negative, since first startoff is 0 and a >= 0 */
+	g_assert(end >= 0);
+
+	fi = g_array_index(export, FILE_INFO, end);
+	*fhandle = fi.fhandle;
+	*foffset = a - fi.startoff;
+	*maxbytes = 0;
+	if( end+1 < export->len ) {
+		FILE_INFO fi_next = g_array_index(export, FILE_INFO, end+1);
+		*maxbytes = fi_next.startoff - a;
+	}
+
+	return 0;
 }
 
 /**
@@ -652,13 +697,35 @@ void myseek(int handle,off_t a) {
  * @param client The client we're serving for
  * @return The number of bytes actually written, or -1 in case of an error
  **/
-int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
-	ssize_t res;
+ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
+	int fhandle;
+	off_t foffset;
+	size_t maxbytes;
 
-	myseek(g_array_index(client->export, int, (int)(a/client->server->hunksize)), a%client->server->hunksize);
-	;
-	res = write(g_array_index(client->export, int, (int)((off_t)a/(off_t)(client->server->hunksize))), buf, len);
-	return (res < 0 || (size_t)res != len);
+	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+		return -1;
+	if(maxbytes && len > maxbytes)
+		len = maxbytes;
+
+	DEBUG4("\tWRITE %u bytes to fd %d, offset %Lu.\n", len, fhandle, foffset);
+
+	myseek(fhandle, foffset);
+	return write(fhandle, buf, len);
+}
+
+/**
+ * Call rawexpwrite repeatedly until all data has been written.
+ * @return 0 on success, nonzero on failure
+ **/
+int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
+	ssize_t ret;
+
+	while(len > 0 && (ret=rawexpwrite(a, buf, len, client)) > 0 ) {
+		a += ret;
+		buf += ret;
+		len -= ret;
+	}
+	return (ret < 0 || len != 0);
 }
 
 /**
@@ -672,13 +739,35 @@ int rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * @return The number of bytes actually read, or -1 in case of an
  * error.
  **/
-int rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
-	ssize_t res;
+ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
+	int fhandle;
+	off_t foffset;
+	size_t maxbytes;
 
-	myseek(g_array_index(client->export,int,(int)a/client->server->hunksize),
-			a%client->server->hunksize);
-	res = read(g_array_index(client->export,int,(int)a/client->server->hunksize), buf, len);
-	return (res < 0 || (size_t)res != len);
+	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+		return -1;
+	if(maxbytes && len > maxbytes)
+		len = maxbytes;
+
+	DEBUG4("\tREAD %u bytes from fd %d, offset %Lu.\n", len, fhandle, foffset);
+
+	myseek(fhandle, foffset);
+	return read(fhandle, buf, len);
+}
+
+/**
+ * Call rawexpread repeatedly until all data has been read.
+ * @return 0 on success, nonzero on failure
+ **/
+int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
+	ssize_t ret;
+
+	while(len > 0 && (ret=rawexpread(a, buf, len, client)) > 0 ) {
+		a += ret;
+		buf += ret;
+		len -= ret;
+	}
+	return (ret < 0 || len != 0);
 }
 
 /**
@@ -689,14 +778,14 @@ int rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param buf A buffer to read into
  * @param len The size of buf
  * @param client The client we're going to read for
- * @return The number of bytes actually read, or -1 in case of an error
+ * @return 0 on success, nonzero on failure
  **/
 int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t rdlen, offset;
 	off_t mapcnt, mapl, maph, pagestart;
 
 	if (!(client->server->flags & F_COPYONWRITE))
-		return rawexpread(a, buf, len, client);
+		return(rawexpread_fully(a, buf, len, client));
 	DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
@@ -714,7 +803,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		} else { /* the block is not there */
 			DEBUG2("Page %Lu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
-			if(rawexpread(a, buf, rdlen, client)) return -1;
+			if(rawexpread_fully(a, buf, rdlen, client)) return -1;
 		}
 		len-=rdlen; a+=rdlen; buf+=rdlen;
 	}
@@ -730,7 +819,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param buf The buffer to write from
  * @param len The length of buf
  * @param client The client we're going to write for.
- * @return The number of bytes actually written, or -1 in case of an error
+ * @return 0 on success, nonzero on failure
  **/
 int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	char pagebuf[DIFFPAGESIZE];
@@ -740,7 +829,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t offset;
 
 	if (!(client->server->flags & F_COPYONWRITE))
-		return(rawexpwrite(a,buf,len, client)); 
+		return(rawexpwrite_fully(a, buf, len, client)); 
 	DEBUG3("Asked to write %d bytes at %Lu.\n", len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
@@ -764,11 +853,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			rdlen=DIFFPAGESIZE ;
-			if (rdlen+pagestart%(client->server->hunksize) >
-					(client->server->hunksize)) 
-				rdlen=client->server->hunksize -
-					(pagestart%client->server->hunksize);
-			if (rawexpread(pagestart, pagebuf, rdlen, client))
+			if (rawexpread_fully(pagestart, pagebuf, rdlen, client))
 				return -1;
 			memcpy(pagebuf+offset,buf,wrlen) ;
 			if (write(client->difffile, pagebuf, DIFFPAGESIZE) !=
@@ -869,8 +954,7 @@ int mainloop(CLIENT *client) {
 			continue;
 		}
 
-		if (((ssize_t)((off_t)request.from + len) > client->exportsize) ||
-		    ((client->server->flags & F_READONLY) && request.type)) {
+		if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
 			DEBUG("[RANGE!]");
 			ERROR(client, reply);
 			continue;
@@ -880,9 +964,13 @@ int mainloop(CLIENT *client) {
 			DEBUG("wr: net->buf, ");
 			readit(client->net, buf, len);
 			DEBUG("buf->exp, ");
-			if ((client->server->flags & F_AUTOREADONLY) ||
-					expwrite(request.from, buf, len,
-						client)) {
+			if ((client->server->flags & F_READONLY) ||
+			    (client->server->flags & F_AUTOREADONLY)) {
+				DEBUG("[WRITE to READONLY!]");
+				ERROR(client, reply);
+				continue;
+			}
+			if (expwrite(request.from, buf, len, client)) {
 				DEBUG("Write failed: %m" );
 				ERROR(client, reply);
 				continue;
@@ -909,22 +997,22 @@ int mainloop(CLIENT *client) {
 }
 
 /**
- * Set up client export array, which is an array of file handles.
+ * Set up client export array, which is an array of FILE_INFO.
  * Also, split a single exportfile into multiple ones, if that was asked.
- * @return 0 on success, -1 on failure
- * @param client information on the client which we want to split
+ * @param client information on the client which we want to setup export for
  **/
-int setupexport(CLIENT* client) {
+void setupexport(CLIENT* client) {
 	int i;
+	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
 
-	client->export = g_array_new(TRUE, TRUE, sizeof(int));
+	client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
-	/* If multifile, open as many files as we can.
-	 * For non-multifile, open exactly one file.
-	 * (Either way, we must be able to open at least one file.) */
+	/* If multi-file, open as many files as we can.
+	 * If not, open exactly one file.
+	 * Calculate file sizes as we go to get total size. */
 	for(i=0; ; i++) {
-		int fhandle;
+		FILE_INFO fi;
 		gchar *tmpname;
 		mode_t mode = (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR;
 
@@ -934,27 +1022,50 @@ int setupexport(CLIENT* client) {
 			tmpname=g_strdup(client->exportname);
 		}
 		DEBUG2( "Opening %s\n", tmpname );
-		fhandle = open(tmpname, mode);
-		if(fhandle == -1 && mode == O_RDWR) {
+		fi.fhandle = open(tmpname, mode);
+		if(fi.fhandle == -1 && mode == O_RDWR) {
 			/* Try again because maybe media was read-only */
-			fhandle = open(tmpname, O_RDONLY);
-			if(fhandle != -1) {
+			fi.fhandle = open(tmpname, O_RDONLY);
+			if(fi.fhandle != -1) {
 				client->server->flags |= F_AUTOREADONLY;
 				client->server->flags |= F_READONLY;
 			}
 		}
-		if(fhandle == -1) {
-			if(multifile && i*(client->server->hunksize) >= client->exportsize)
+		if(fi.fhandle == -1) {
+			if(multifile && i>0)
 				break;
 			err("Could not open exported file: %m");
 		}
-		g_array_insert_val(client->export, i, fhandle);
+		fi.startoff = laststartoff + lastsize;
+		g_array_append_val(client->export, fi);
 		g_free(tmpname);
+
+		/* Starting offset and size of this file will be used to
+		 * calculate starting offset of next file */
+		laststartoff = fi.startoff;
+		lastsize = size_autodetect(fi.fhandle);
 
 		if(!multifile)
 			break;
 	}
-	return 0;
+
+	/* Set export size to total calculated size */
+	client->exportsize = laststartoff + lastsize;
+
+	/* Export size may be overridden */
+	if(client->server->expected_size) {
+		/* desired size must be <= total calculated size */
+		if(client->server->expected_size > client->exportsize) {
+			err("Size of exported file is too big\n");
+		}
+
+		client->exportsize = client->server->expected_size;
+	}
+
+	msg3(LOG_INFO, "Size of exported file/device is %Lu", (unsigned long long)client->exportsize);
+	if(multifile) {
+		msg3(LOG_INFO, "Total number of files: %d", i);
+	}
 }
 
 int copyonwrite_prepare(CLIENT* client) {
@@ -984,25 +1095,6 @@ int copyonwrite_prepare(CLIENT* client) {
  **/
 void serveconnection(CLIENT *client) {
 	setupexport(client);
-
-	/* Sanity check. There must be at least one file. */
-	if(client->export->len == 0)
-		err("No file(s) to export\n");
-
-	if (!client->server->expected_size) {
-		client->exportsize = size_autodetect(g_array_index(client->export,int,0));
-	} else {
-		/* Perhaps we should check first. Not now. */
-		client->exportsize = client->server->expected_size;
-	}
-	if (client->exportsize > OFFT_MAX) {
-		/* uhm, well... In a parallel universe, this *might* be
-		 * possible... */
-		err("Size of exported file is too big\n");
-	}
-	else {
-		msg3(LOG_INFO, "size of exported file/device is %Lu", (unsigned long long)client->exportsize);
-	}
 
 	if (client->server->flags & F_COPYONWRITE) {
 		copyonwrite_prepare(client);
