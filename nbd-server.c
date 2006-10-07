@@ -707,7 +707,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("\tWRITE %u bytes to fd %d, offset %Lu.\n", len, fhandle, foffset);
+	DEBUG4("(WRITE to fd %d offset %Lu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
 	return write(fhandle, buf, len);
@@ -749,7 +749,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("\tREAD %u bytes from fd %d, offset %Lu.\n", len, fhandle, foffset);
+	DEBUG4("(READ from fd %d offset %Lu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
 	return read(fhandle, buf, len);
