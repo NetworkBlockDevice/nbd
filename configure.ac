@@ -69,6 +69,8 @@ esac
 AC_MSG_CHECKING(where to find a working nbd.h)
 AC_TRY_COMPILE([#define u32 int
 #define u64 int
+#define __be32 int
+#define __be64 int
 #include "nbd.h"
 ],
 [int foo=NBD_CMD_DISC], 
@@ -76,6 +78,8 @@ AC_TRY_COMPILE([#define u32 int
     NBD_H='"nbd.h"'],
   AC_TRY_COMPILE([#define u32 int
 #define u64 int
+#define __be32 int
+#define __be64 int
 #include <linux/nbd.h>
   ],
 [int foo=NBD_CMD_DISC],
