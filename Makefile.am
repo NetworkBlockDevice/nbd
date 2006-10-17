@@ -6,7 +6,7 @@ nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@
 man1_MANS = nbd-server.1
 EXTRA_MANS = nbd-client.8
-EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h nbd-client.8 nbd-server.1
+EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd/gznbd.c gznbd/Makefile winnbd/license.txt winnbd/nbdsrvr.dsp winnbd/NBDSvrWin2000.zip winnbd/readme.txt winnbd/nbdsrvr.cpp winnbd/nbdsrvr.dsw winnbd/README lfs.h nbd-client.8 nbd-server.1
 MAINTAINERCLEANFILES = nbd-client.8 nbd-server.1
 nbd-server.1: nbd-server.1.sgml
 	docbook2man nbd-server.1.sgml
