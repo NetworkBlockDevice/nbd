@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst
-AC_INIT([nbd],[CVS],[wouter@debian.org])
+AC_INIT([nbd],[SVN],[wouter@debian.org])
 AM_INIT_AUTOMAKE(dist-bzip2 foreign)
 
 AM_MAINTAINER_MODE
@@ -82,6 +82,8 @@ fi
 AC_CHECK_HEADERS([linux/nbd.h],,,
 [[#define u32 unsigned int
 #define u64 unsigned long int
+#define __be32 unsigned int
+#define __be64 unsigned long int
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/mount.h sys/socket.h syslog.h])
 AC_HEADER_SYS_WAIT
