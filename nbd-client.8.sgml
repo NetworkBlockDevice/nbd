@@ -69,12 +69,6 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>DESCRIPTION</title>
 
-    <para>This manual page documents briefly the
-      <command>&dhpackage;</command> command.</para>
-
-    <para>This manual page was written for the &debian; distribution
-      because the original program does not have a manual page.</para>
-
     <para>With <command>&dhpackage;</command>, you can connect to a
     server running <command>nbd-server</command>, thus using raw
     diskspace from that server as a blockdevice on the local

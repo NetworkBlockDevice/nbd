@@ -70,12 +70,6 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>DESCRIPTION</title>
 
-    <para>This manual page documents the
-      <command>&dhpackage;</command> command.</para>
-
-    <para>This manual page was written for the &debian; distribution
-      because the original program does not have a manual page.</para>
-
     <para><command>&dhpackage;</command> is the server for the Linux
     Network Block Device (NBD). With NBD, a client can use a file,
     exported over the network from a server, as a block device. It can
