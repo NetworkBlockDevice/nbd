@@ -8,14 +8,17 @@ nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@
 nbd_tester_client_LDADD = @GLIB_LIBS@
-man_MANS = nbd-server.1 nbd-client.8
-EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h nbd-client.8 nbd-server.1 CodingStyle
+man_MANS = nbd-server.1 nbd-server.5 nbd-client.8
+EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml nbd-server.5.sgml gznbd winnbd lfs.h nbd-client.8 CodingStyle
 MAINTAINERCLEANFILES = nbd-client.8 nbd-server.1
-nbd-server.1: nbd-server.1.sgml
+nbd-server.1.in: nbd-server.1.sgml
 	docbook2man nbd-server.1.sgml
-	mv NBD-SERVER.1 nbd-server.1
+	mv NBD-SERVER.1 nbd-server.1.in
 nbd-client.8: nbd-client.8.sgml
 	docbook2man nbd-client.8.sgml
 	mv NBD-CLIENT.8 nbd-client.8
+nbd-server.5.in: nbd-server.5.sgml
+	docbook2man nbd-server.5.sgml
+	mv NBD-SERVER.5 nbd-server.5.in
 dist-hook:
 	rm -Rf `find $(distdir) -name 'CVS' -type d -print`

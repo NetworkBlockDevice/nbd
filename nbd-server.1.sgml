@@ -157,40 +157,54 @@ manpage.1: manpage.sgml
 	<term><option>-c</option></term>
 	<listitem>
 	  <para>Copy on write. When this option is provided,
-	  write-operations are not done to the exported file, but to a
-	  separate file. This separate file is removed when the
-	  connection is closed, which means that serving this way will
-	  make nbd-server slow down (especially on large block devices
-	  with lots of writes), and that after disconnecting and
-	  reconnecting the client or the server, all changes are
-	  lost.</para>
+	    write-operations are not done to the exported file, but to a
+	    separate file. This separate file is removed when the
+	    connection is closed, which means that serving this way will
+	    make nbd-server slow down (especially on large block devices
+	    with lots of writes), and that after disconnecting and
+	    reconnecting the client or the server, all changes are
+	    lost.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-C</option></term>
+	<listitem>
+	  <para>Specify configuration file. The default configuration
+	    file, if this parameter is not specified, is
+	    <filename>@sysconfdir@/nbd-server/config</filename>.</para>
+	  <para>Note that the configuration file is always parsed and
+	    the entries in the file used, even if an extra server is
+	    specified on the command line. To disable the configuration
+	    file entirely, either move it away or use the -C option to
+	    point <command>nbd-server</command>(1) to a non-existing or
+	    empty configuration file.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
       	<term><option>timeout</option></term>
 	<listitem>
 	  <para>Maximum number of idle seconds. If a connection is
-	  inactive for this amount of time, it is terminated; this is to
-	  avoid stale nbd-server processes staying in memory. Use of
-	  this option is strongly recommended.</para>
+	    inactive for this amount of time, it is terminated; this is to
+	    avoid stale nbd-server processes staying in memory. Use of
+	    this option is strongly recommended.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>host list</option></term>
 	<listitem>
 	  <para>This argument should contain a list of IP-addresses
-	  for hosts that may connect to the server. Wildcards are
-	  <emphasis>not</emphasis> allowed. If the file does not
-	  exist, it is ignored (and any host can connect); If the file
-	  does exist, but is empty, no host can connect. By default,
-	  the name 'nbd_server.allow' is used, and looked for in the
-	  current directory, unless nbd-server is compiled as a
-	  daemon, in which case it is looked for in the
-	  root-directory.</para>
+	    for hosts that may connect to the server. Wildcards are
+	    <emphasis>not</emphasis> allowed. If the file does not
+	    exist, it is ignored (and any host can connect); If the file
+	    does exist, but is empty, no host can connect. By default,
+	    the name 'nbd_server.allow' is used, and looked for in the
+	    current directory, unless nbd-server is compiled as a
+	    daemon, in which case it is looked for in the
+	    root-directory.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
-
+    
   </refsect1>
   <refsect1>
     <title>EXAMPLES</title>
@@ -209,21 +223,21 @@ manpage.1: manpage.sgml
 	  changes are lost after restarting the client or the
 	  server:</para>
 	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev
-	  -c</command></para>
+	    -c</command></para>
       </listitem>
     </itemizedlist>
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
-
-    <para>nbd-client (8), http://nbd.sourceforge.net/roadmap.html</para>
-
+    
+    <para>nbd-client (8), nbd-server (5), http://nbd.sourceforge.net/roadmap.html</para>
+    
   </refsect1>
   <refsect1>
     <title>AUTHOR</title>
     <para>The NBD kernel module and the NBD tools were originally
       written by Pavel Machek (pavel@ucw.cz)</para>
-
+    
     <para>The Linux kernel module is now maintained by Paul Clements
       (Paul.Clements@steeleye.com), while the userland tools are
       maintained by &dhusername; (&dhemail;)</para>

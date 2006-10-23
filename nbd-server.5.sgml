@@ -1,0 +1,488 @@
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+
+<!-- Process this file with docbook-to-man to generate an nroff manual
+     page: `docbook-to-man manpage.sgml > manpage.1'.  You may view
+     the manual page with: `docbook-to-man manpage.sgml | nroff -man |
+     less'.  A typical entry in a Makefile or Makefile.am is:
+
+manpage.1: manpage.sgml
+	docbook-to-man $< > $@
+  -->
+
+  <!-- Fill in your name for FIRSTNAME and SURNAME. -->
+  <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
+  <!ENTITY dhsurname   "<surname>Verhelst</surname>">
+  <!-- Please adjust the date whenever revising the manpage. -->
+  <!ENTITY dhdate      "<date>$Date: 2006-10-18 15:01:57 +0200 (wo, 18 okt 2006) $</date>">
+  <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
+       allowed: see man(7), man(1). -->
+  <!ENTITY dhsection   "<manvolnum>5</manvolnum>">
+  <!ENTITY dhemail     "<email>wouter@debian.org</email>">
+  <!ENTITY dhusername  "Wouter Verhelst">
+  <!ENTITY dhucpackage "<refentrytitle>NBD-SERVER</refentrytitle>">
+  <!ENTITY dhpackage   "/etc/nbd-server/config">
+
+  <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
+  <!ENTITY gnu         "<acronym>GNU</acronym>">
+]>
+
+<refentry>
+  <refentryinfo>
+    <address>
+      &dhemail;
+    </address>
+    <author>
+      &dhfirstname;
+      &dhsurname;
+    </author>
+    <copyright>
+      <year>2006</year>
+      <holder>&dhusername;</holder>
+    </copyright>
+    &dhdate;
+  </refentryinfo>
+  <refmeta>
+    &dhucpackage;
+
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>&dhpackage;</refname>
+
+    <refpurpose>configuration file for nbd-server</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&dhpackage; </command>
+
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para><command>&dhpackage;</command> allows to configure the
+    nbd-server.</para>
+
+    <para>The default configuration file is
+      <filename>@SCD@/nbd-server/config</filename>, but this
+      can be varied with the <option>-C</option> option to
+      <command>nbd-server</command>(1).
+    </para>
+    <para>
+      The configuration file consists of section header lines, comment
+      lines, and option lines.
+    </para>
+    <para>
+      A section header is a unique name that
+      is enclosed in square brackets ("[" and "]"). A section header
+      denotes the beginning of a section; a section continues until
+      the next section or the end of the file, whichever is first. The
+      first section in the configuration file must be called
+      <option>generic</option>, and is used for global options that
+      apply to more than one export. This section must always be
+      present, even if it holds no options. Every other section
+      defines one export; the names of these sections are not
+      important, except that you should take care to make sure that
+      each section name is unique (future versions of
+      <command>nbd-server</command> may use the section name to refer
+      to an export)
+    </para>
+    <para>
+      A comment line is a line that starts with optional whitespace,
+      followed by a pound sign ("#"), and continues until the end of
+      the line. Comments may <emphasis>not</emphasis> be used on
+      option lines or section header lines.
+    </para>
+    <para>
+      An option line is a line that starts with an option name,
+      followed by an equals sign ("="), followed by the option
+      value. An option can be of type string, of type integer, or of
+      type boolean. The value of a boolean option can be denoted with
+      either true or false (so not yes, no, on, off, 1, or 0); all
+      booleans default to false unless specified otherwise; no value
+      may be quoted (always enter it directly); for a string option,
+      leading whitespace is stripped (but trailing whitespace is not).
+    </para>
+
+  </refsect1>
+  <refsect1>
+    <title>OPTIONS FOR SECTION [generic]</title>
+
+    <!-- These are in alphabetical order, please keep it that way -->    
+    <variablelist>
+      <varlistentry>
+	<term><option>group</option></term>
+	<listitem>
+	  <para>
+	    Optional; string.
+	  </para>
+	  <para>
+	    The name of the group this server must run as. If this
+	    parameter is not specified, then nbd-server will not
+	    attempt to change its GID (so the GID it runs as will be
+	    the primary group of the user who starts nbd-server). If
+	    it is specified, then nbd-server will change its GID after
+	    opening ports, but before accepting connections or opening
+	    files.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>user</option></term>
+        <listitem>
+          <para>
+	    Optional; string.
+	  </para>
+	  <para>
+	    The name of the user this server must run as. If this
+	    parameter is not specified, then nbd-server will not
+	    attempt to change its UID (so the UID it runs as will be
+	    the user who starts nbd-server). If it is specified, then
+	    nbd-server will change its UID after opening ports, but
+	    before accepting connections or opening files.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  <refsect1>
+    <title>OPTIONS FOR EXPORT SECTIONS</title>
+
+    <!-- These are in alphabetical order, please keep it that way -->
+    <variablelist>
+      <varlistentry>
+	<term><option>authfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string; default
+	    <filename>@SCD@/nbd-server/allow</filename>.
+	  </para>
+	  <para>
+	    The name of the authorization file for this export. This
+	    file should contain one line per IP-address, and must not
+	    contain wildcards of any kind or empty lines. If the file
+	    does not exist, everyone is allowed to connect. If the
+	    file exists but is empty, nobody is allowed to
+	    connect. Otherwise, <command>nbd-server</command> will
+	    only allow clients to connect whose IP-adres is listed in
+	    this file.
+	  </para>
+	  <para>Corresponds to the <option>-l</option> option on the
+	  command line</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>autoreadonly</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    If this option is set to true, then
+	    <command>nbd-server</command> will automatically switch to
+	    readonly if it cannot write to the file.
+	  </para>
+	  <para>Does not have a corresponding command-line
+	    argument</para>
+	  <para>TODO: verify whether this option actually works as
+	    documented. I have a feeling I've been terribly
+	    stupid.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>copyonwrite</option></term>
+	<listitem>
+	  <para>
+	    Optional; boolean.
+	  </para>
+	  <para>
+	    Whether this is a copy-on-write export. If it is, then any
+	    writes to this export will not be written to the master
+	    file, but to a separate file which will be removed upon
+	    disconnect. The result of using this option is that
+	    nbd-server will be slower, and that any writes will be
+	    lost upon disconnect.
+	  </para>
+	  <para>Corresponds to the <option>-c</option> option on the
+	    command line</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>exportname</option></term>
+	<listitem>
+	  <para>Required; string.</para>
+	  <para>
+	    The name of the file that will be exported. This must be a
+	    fully-qualified path and filename; relative paths are not
+	    allowed.
+	  </para>
+	  <para>
+	    Note that <command>nbd-server</command> will only try to
+	    find and open the exported file when a client actually
+	    connects; as a result, <command>nbd-server</command> must
+	    be able to open and read this file
+	    <emphasis>after</emphasis> changing to the user and group
+	    that have been specified by use of the
+	    <option>user</option> and <option>group</option> options;
+	    also, <command>nbd-server</command> will only detect
+	    errors in this option upon connection of a client.
+	  </para>
+	  <para>When specified on the command line, this should be the
+	    second argument.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>filesize</option></term>
+	<listitem>
+	  <para>Optional; integer; default autodetected.</para>
+	  <para>
+	    Disable autodetection of file or block device size, and
+	    forcibly specify a size. Sizes must be specified in
+	    bytes. If the <option>multifile</option> option is in
+	    effect, this option specifies the size of the
+	    <emphasis>entire</emphasis> export, not of individual
+	    files.
+	  </para>
+	  <para>When specified on the command line, this should be the
+	    third argument.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>multifile</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    If this option is set to true, then
+	    <command>nbd-server</command> will search for files of the
+	    form
+	    <replaceable>exportname</replaceable>.<replaceable>integer</replaceable>,
+	    with <replaceable>exportname</replaceable> being the
+	    filename that would otherwise have been used (after
+	    name transformation for virtualization, if any, has been
+	    performed) and <replaceable>integer</replaceable> an
+	    integer number, starting with 0 and ending when no more
+	    files can be found.
+	  </para>
+	  <para>
+	    The size of the individual files will be autodetected,
+	    <emphasis>even</emphasis> if the <option>filesize</option>
+	    option has been specified. See the documentation for the
+	    <option>multifile</option> for details.
+	  </para>
+	  <para>
+	    Corresponds to the <option>-m</option> option on the
+	    command line.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>port</option></term>
+	<listitem>
+	  <para>Required; integer.</para>
+	  <para>
+	    The port on which this export is to be served. Currently
+	    it is not possible to export multiple block devices on the
+	    same port unless virtualization is used; future versions
+	    of <command>nbd-server</command> may add this
+	    functionality.
+	  </para>
+	  <para>
+	    When specified on the command line, this should be the
+	    first argument.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>readonly</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    Disallow writes to the device. If this option is
+	    specified, <command>nbd-server</command> will issue an
+	    error to any client that tries to write to the device.
+	  </para>
+	  <para>
+	    Use of this option in conjunction with
+	    <option>copyonwrite</option> is possible, but silly.
+	  </para>
+	  <para>Corresponds to the <option>-r</option> option on the
+	  command line.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>sparse_cow</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    When this option is enabled, <command>nbd-server</command>
+	    will use sparse files to implement the copy-on-write
+	    option; such files take up less space then they appear to,
+	    which allows <command>nbd-server</command> to handle the
+	    file as if it was just as large as the block device it's for.
+	  </para>
+	  <para>
+	    If this option is disabled, <command>nbd-server</command>
+	    will map every newly written block to the end of the
+	    copy-on-write file, which means that
+	    <command>nbd-server</command> will have to lseek(2) to the
+	    right position after every 4096-byte block.
+	  </para>
+	  <para>
+	    Using this option may be faster when much is being written
+	    during a connection.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>timeout</option></term>
+	<listitem>
+	  <para>Optional; integer; default 0</para>
+	  <para>
+	    How many seconds a connection may be idle for this
+	    export. When a connection is idle for a longer time,
+	    <command>nbd-server</command> will forcibly disconnect the
+	    connection. If you specify 0 (the default), then a
+	    connection may be idle forever.
+	  </para>
+	  <para>
+	    Corresponds to the <option>-a</option> option on the
+	    command line
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>virtstyle</option></term>
+	<listitem>
+	  <para>Optional; string; default "ipliteral"</para>
+	  <para>
+	    Defines the style of virtualization. Virtualization allows
+	    one to create one export that will serve a different file
+	    depending on the IP address that is connecting. When
+	    virtualization is There are three types of virtualization
+	    that <command>nbd-server</command> supports:
+	  </para>
+	  <variablelist>
+	    <varlistentry>
+	      <term><option>ipliteral</option></term>
+	      <listitem>
+		<para>
+		  <command>nbd-server</command> will look for the
+		  literal string '%s' in the
+		  <option>exportname</option>, and replace it by the
+		  IP address of the connecting host in dotted-quad
+		  notation. The string that results from this
+		  transformation will be used as an absolute pathname
+		  that <command>nbd-server</command> will attempt to
+		  open. As an example, if a client connects from
+		  192.168.1.100 and <option>exportname</option> is
+		  specified as <filename>/export/%s</filename>, then
+		  nbd-server will attempt to serve
+		  <filename>/export/192.168.1.100</filename>
+		</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><option>iphash</option></term>
+	      <listitem>
+		<para>
+		  Same as above, except that
+		  <command>nbd-server</command> will replace the dots
+		  in the IP address by forward slashes ('/'); in the
+		  same example, <command>nbd-server</command> would
+		  open <filename>/export/192/168/1/100</filename>
+		  instead.
+		</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><option>cidrhash</option></term>
+	      <listitem>
+		<para>
+		  This option requires one to add a space and a number
+		  after it. <command>nbd-server</command> will use the
+		  number as a network mask in CIDR style, and use that
+		  as a hash cutoff point. In the above example, if
+		  <option>virtstyle</option> has been specified
+		  as <constant>cidrhash 16</constant>, then
+		  <command>nbd-server</command> will try to open
+		  <filename>/export/192.168.0.0/192.168.1.100</filename>; if
+		  <option>virtstyle</option> were specified as
+		  <constant>cidrhash 26</constant>, then
+		  <command>nbd-server</command> will try to open
+		  <filename>/export/192.168.1.64/192.168.1.100</filename>.
+		</para>
+	      </listitem>
+	    </varlistentry>
+	  </variablelist>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </refsect1>
+  <refsect1>
+    <title>EXAMPLES</title>
+    <para>Some examples of nbd-server usage:</para>
+    <itemizedlist mark="none">
+      <listitem>
+	<para>To export a file /export/nbd/exp-bl-dev on port 2000:</para>
+	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev</command></para>
+      </listitem>
+      <listitem>
+	<para>To export a the same file read-only:</para>
+	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev -r</command></para>
+      </listitem>
+      <listitem>
+	<para>To export the same file read-write, but make sure
+	  changes are lost after restarting the client or the
+	  server:</para>
+	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev
+	  -c</command></para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para>nbd-server (1), nbd-client (8),
+      http://nbd.sourceforge.net/roadmap.html</para>
+
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>The NBD kernel module and the NBD tools were originally
+      written by Pavel Machek (pavel@ucw.cz)</para>
+
+    <para>The Linux kernel module is now maintained by Paul Clements
+      (Paul.Clements@steeleye.com), while the userland tools are
+      maintained by &dhusername; (&dhemail;)</para>
+
+    <para>On The Hurd there is a regular translator available to perform the
+      client side of the protocol, and the use of
+      <command>nbd-client</command> is not required. Please see the
+      relevant documentation for more information.</para>
+
+    <para>This manual page was written by &dhusername; (&dhemail;) for
+      the &debian; system (but may be used by others).  Permission is
+      granted to copy, distribute and/or modify this document under
+      the terms of the <acronym>GNU</acronym> General Public License,
+      version 2, as published by the Free Software Foundation.</para>
+
+  </refsect1>
+</refentry>
+
+<!-- Keep this comment at the end of the file
+Local variables:
+mode: sgml
+sgml-omittag:t
+sgml-shorttag:t
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:2
+sgml-indent-data:t
+sgml-parent-document:nil
+sgml-default-dtd-file:nil
+sgml-exposed-tags:nil
+sgml-local-catalogs:nil
+sgml-local-ecat-files:nil
+End:
+-->
