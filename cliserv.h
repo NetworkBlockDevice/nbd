@@ -55,8 +55,7 @@ u64 cliserv_magic = 0x00420281861253LL;
 
 #define INFO(a) do { } while(0)
 
-void setmysockopt(int sock)
-{
+void setmysockopt(int sock) {
 	int size = 1;
 #if 0
 	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(int)) < 0)
@@ -74,8 +73,7 @@ void setmysockopt(int sock)
 #endif
 }
 
-void err(const char *s)
-{
+void err(const char *s) {
 	const int maxlen = 150;
 	char s1[maxlen], *s2;
 
@@ -103,8 +101,7 @@ void err(const char *s)
 	exit(1);
 }
 
-void logging(void)
-{
+void logging(void) {
 #ifdef ISSERVER
 	openlog(MY_NAME, LOG_PID, LOG_DAEMON);
 #endif
@@ -113,13 +110,11 @@ void logging(void)
 }
 
 #ifdef WORDS_BIGENDIAN
-u64 ntohll(u64 a)
-{
+u64 ntohll(u64 a) {
 	return a;
 }
 #else
-u64 ntohll(u64 a)
-{
+u64 ntohll(u64 a) {
 	u32 lo = a & 0xffffffff;
 	u32 hi = a >> 32U;
 	lo = ntohl(lo);
