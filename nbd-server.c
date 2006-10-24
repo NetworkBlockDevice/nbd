@@ -82,6 +82,8 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <glib.h>
 
@@ -97,6 +99,11 @@
 
 /** Where our config file actually is */
 gchar* config_file_pos;
+
+/** What user we're running as */
+gchar* runuser=NULL;
+/** What group we're running as */
+gchar* rungroup=NULL;
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -139,9 +146,21 @@ gchar* config_file_pos;
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
 			    copyonwrite */
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
+#define F_SPARSE 16
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
-char default_authname[] = "/etc/nbd_server.allow"; /**< default name of allow file */
+char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
+
+/**
+ * Types of virtuatlization
+ **/
+typedef enum {
+	VIRT_NONE=0,	/**< No virtualization */
+	VIRT_IPLIT,	/**< Literal IP address as part of the filename */
+	VIRT_IPHASH,	/**< Replacing all dots in an ip address by a / before
+			     doing the same as in IPLIT */
+	VIRT_CIDR,	/**< Every subnet in its own directory */
+} VIRT_STYLE;
 
 /**
  * Variables associated with a server.
@@ -156,6 +175,9 @@ typedef struct {
 	unsigned int timeout;/**< how long a connection may be idle
 			       (0=forever) */
 	int socket;	     /**< The socket of this server. */
+	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
+	uint8_t cidrlen;     /**< The length of the mask when we use
+				  CIDR-style virtualization */
 } SERVER;
 
 /**
@@ -191,6 +213,7 @@ typedef enum {
 	PARAM_STRING,		/**< This parameter is a string */
 	PARAM_BOOL,		/**< This parameter is a boolean */
 } PARAM_TYPE;
+
 /**
  * Configuration file values
  **/
@@ -418,26 +441,35 @@ void remove_server(gpointer s) {
  * @param f the name of the config file
  * @param e a GError. @see CFILE_ERRORS for what error values this function can
  * 	return.
- * @return a GHashTable of SERVER* pointers, with the port number as the hash
- *	key. If the config file is empty or does not exist, returns an empty
- *	GHashTable; if the config file contains an error, returns NULL, and
- *	e is set appropriately
+ * @return a Array of SERVER* pointers, If the config file is empty or does not
+ *	exist, returns an empty GHashTable; if the config file contains an
+ *	error, returns NULL, and e is set appropriately
  **/
 GArray* parse_cfile(gchar* f, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	SERVER s;
-	PARAM p[] = {
+	gchar *virtstyle=NULL;
+	PARAM lp[] = {
 		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
 		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
 		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
 		{ "timeout",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
+		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
+		{ "autoreadonly", FALSE, PARAM_BOOL,	NULL, F_AUTOREADONLY },
+		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 	};
-	const int p_size=8;
+	const int lp_size=11;
+	PARAM gp[] = {
+		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
+		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
+	};
+	PARAM* p=gp;
+	int p_size=2;
 	GKeyFile *cfile;
 	GError *err = NULL;
 	const char *err_msg=NULL;
@@ -447,7 +479,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	gboolean value;
 	gint i,j;
 
-	memset(&s, '\0', sizeof(SERVER));
 	errdomain = g_quark_from_string("parse_cfile");
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
@@ -463,13 +494,21 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		return NULL;
 	}
 	groups = g_key_file_get_groups(cfile, NULL);
-	for(i=1;groups[i];i++) {
-		p[0].target=&(s.exportname);
-		p[1].target=&(s.port);
-		p[2].target=&(s.authname);
-		p[3].target=&(s.timeout);
-		p[4].target=&(s.expected_size);
-		p[5].target=p[6].target=p[7].target=&(s.flags);
+	for(i=0;groups[i];i++) {
+		memset(&s, '\0', sizeof(SERVER));
+		lp[0].target=&(s.exportname);
+		lp[1].target=&(s.port);
+		lp[2].target=&(s.authname);
+		lp[3].target=&(s.timeout);
+		lp[4].target=&(s.expected_size);
+		lp[5].target=&(virtstyle);
+		lp[6].target=lp[7].target=lp[8].target=
+				lp[9].target=lp[10].target=&(s.flags);
+		/* After the [generic] group, start parsing exports */
+		if(i==1) {
+			p=lp;
+			p_size=lp_size;
+		} 
 		for(j=0;j<p_size;j++) {
 			g_assert(p[j].target != NULL);
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
@@ -492,8 +531,12 @@ GArray* parse_cfile(gchar* f, GError** e) {
 					value = g_key_file_get_boolean(cfile,
 							groups[i],
 							p[j].paramname, &err);
-					if(!err && value) {
-						*((gint*)p[j].target) |= p[j].flagval;
+					if(!err) {
+						if(value) {
+							*((gint*)p[j].target) |= p[j].flagval;
+						} else {
+							*((gint*)p[j].target) &= ~(p[j].flagval);
+						}
 					}
 					break;
 			}
@@ -516,7 +559,37 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				return NULL;
 			}
 		}
-		g_array_append_val(retval, s);
+		if(virtstyle) {
+			if(!strncmp(virtstyle, "none", 4)) {
+				s.virtstyle=VIRT_NONE;
+			} else if(!strncmp(virtstyle, "ipliteral", 9)) {
+				s.virtstyle=VIRT_IPLIT;
+			} else if(!strncmp(virtstyle, "iphash", 6)) {
+				s.virtstyle=VIRT_IPHASH;
+			} else if(!strncmp(virtstyle, "cidrhash", 8)) {
+				s.virtstyle=VIRT_CIDR;
+				if(strlen(virtstyle)<10) {
+					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
+					g_array_free(retval, TRUE);
+					g_key_file_free(cfile);
+					return NULL;
+				}
+				s.cidrlen=strtol(virtstyle+8, NULL, 0);
+			} else {
+				g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
+				g_array_free(retval, TRUE);
+				g_key_file_free(cfile);
+				return NULL;
+			}
+		} else {
+			s.virtstyle=VIRT_IPLIT;
+		}
+		/* Don't need to free this, it's not our string */
+		virtstyle=NULL;
+		/* Don't append values for the [generic] group */
+		if(i>0) {
+			g_array_append_val(retval, s);
+		}
 	}
 	return retval;
 }
@@ -848,7 +921,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 			if (write(client->difffile, buf, wrlen) != wrlen) return -1 ;
 		} else { /* the block is not there */
 			myseek(client->difffile,client->difffilelen*DIFFPAGESIZE) ;
-			client->difmap[mapcnt]=client->difffilelen++ ;
+			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
 			DEBUG3("Page %Lu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
@@ -874,7 +947,7 @@ void negotiate(CLIENT *client) {
 	char zeros[300];
 	u64 size_host;
 
-	memset(zeros, 0, 290);
+	memset(zeros, '\0', 290);
 	if (write(client->net, INIT_PASSWD, 8) < 0)
 		err("Negotiation failed: %m");
 	cliserv_magic = htonll(cliserv_magic);
@@ -926,8 +999,8 @@ int mainloop(CLIENT *client) {
 
 		if (request.type==NBD_CMD_DISC) {
 			msg2(LOG_INFO, "Disconnect request received.");
-			if (client->difmap) g_free(client->difmap) ;
                 	if (client->server->flags & F_COPYONWRITE) { 
+				if (client->difmap) g_free(client->difmap) ;
                 		close(client->difffile);
 				unlink(client->difffilename);
 				free(client->difffilename);
@@ -1108,7 +1181,8 @@ void serveconnection(CLIENT *client) {
 /**
  * Find the name of the file we have to serve. This will use g_strdup_printf
  * to put the IP address of the client inside a filename containing
- * "%s". That name is then written to client->exportname.
+ * "%s" (in the form as specified by the "virtstyle" option). That name
+ * is then written to client->exportname.
  *
  * @param net A socket connected to an nbd client
  * @param client information about the client. The IP address in human-readable
@@ -1117,13 +1191,37 @@ void serveconnection(CLIENT *client) {
  **/
 void set_peername(int net, CLIENT *client) {
 	struct sockaddr_in addrin;
-	int addrinlen = sizeof( addrin );
-	char *peername ;
+	struct sockaddr_in netaddr;
+	size_t addrinlen = sizeof( addrin );
+	char *peername;
+	char *netname;
+	char *tmp;
+	int i;
 
 	if (getpeername(net, (struct sockaddr *) &addrin, (socklen_t *)&addrinlen) < 0)
 		err("getsockname failed: %m");
 	peername = inet_ntoa(addrin.sin_addr);
-	client->exportname=g_strdup_printf(client->server->exportname, peername);
+	switch(client->server->virtstyle) {
+		case VIRT_NONE:
+			client->exportname=g_strdup(client->server->exportname);
+			break;
+		case VIRT_IPHASH:
+			for(i=0;i<strlen(peername);i++) {
+				if(peername[i]=='.') {
+					peername[i]='/';
+				}
+			}
+		case VIRT_IPLIT:
+			client->exportname=g_strdup_printf(client->server->exportname, peername);
+			break;
+		case VIRT_CIDR:
+			memcpy(&netaddr, &addrin, addrinlen);
+			netaddr.sin_addr.s_addr=netaddr.sin_addr.s_addr>>(client->server->cidrlen)<<(client->server->cidrlen);
+			netname = inet_ntoa(netaddr.sin_addr);
+			tmp=g_strdup_printf("%s/%s", netname, peername);
+			client->exportname=g_strdup_printf(client->server->exportname, tmp);
+			break;
+	}
 
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
@@ -1326,6 +1424,24 @@ int serveloop(GArray* servers) {
 }
 
 /**
+ * Set up user-ID and/or group-ID
+ **/
+void dousers(void) {
+	struct passwd *pw;
+	struct group *gr;
+	if(runuser) {
+		pw=getpwnam(runuser);
+		if(setuid(pw->pw_uid)<0)
+			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
+	}
+	if(rungroup) {
+		gr=getgrnam(rungroup);
+		if(setgid(gr->gr_gid)<0)
+			msg3(LOG_DEBUG, "Could not set GID: %s", strerror(errno));
+	}
+}
+
+/**
  * Main entry point...
  **/
 int main(int argc, char *argv[]) {
@@ -1378,6 +1494,7 @@ int main(int argc, char *argv[]) {
 	}
 	daemonize(serve);
 	setup_servers(servers);
+	dousers();
 	serveloop(servers);
 	return 0 ;
 }
