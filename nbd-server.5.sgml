@@ -363,6 +363,16 @@ manpage.1: manpage.sgml
 	  </para>
 	  <variablelist>
 	    <varlistentry>
+	      <term><option>none</option></term>
+	      <listitem>
+		<para>
+		  No virtualization. Will attempt to open the filename
+		  as it was written, even if it contains '%s' in the
+		  name.
+		</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
 	      <term><option>ipliteral</option></term>
 	      <listitem>
 		<para>
@@ -418,27 +428,6 @@ manpage.1: manpage.sgml
       </varlistentry>
     </variablelist>
 
-  </refsect1>
-  <refsect1>
-    <title>EXAMPLES</title>
-    <para>Some examples of nbd-server usage:</para>
-    <itemizedlist mark="none">
-      <listitem>
-	<para>To export a file /export/nbd/exp-bl-dev on port 2000:</para>
-	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev</command></para>
-      </listitem>
-      <listitem>
-	<para>To export a the same file read-only:</para>
-	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev -r</command></para>
-      </listitem>
-      <listitem>
-	<para>To export the same file read-write, but make sure
-	  changes are lost after restarting the client or the
-	  server:</para>
-	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev
-	  -c</command></para>
-      </listitem>
-    </itemizedlist>
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
