@@ -64,7 +64,7 @@ manpage.1: manpage.sgml
     nbd-server.</para>
 
     <para>The default configuration file is
-      <filename>@SCD@/nbd-server/config</filename>, but this
+      <filename>@sysconfdir@/nbd-server/config</filename>, but this
       can be varied with the <option>-C</option> option to
       <command>nbd-server</command>(1).
     </para>
@@ -154,12 +154,14 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>
 	    Optional; string; default
-	    <filename>@SCD@/nbd-server/allow</filename>.
+	    <filename>@sysconfdir@/nbd-server/allow</filename>.
 	  </para>
 	  <para>
 	    The name of the authorization file for this export. This
-	    file should contain one line per IP-address, and must not
-	    contain wildcards of any kind or empty lines. If the file
+	    file should contain one line per IP-address, or per
+	    network (which must be specified in CIDR-style
+	    <option><replaceable>network</replaceable>/<replaceable>masklen</replaceable></option>)
+	    and must not contain empty lines. If the file
 	    does not exist, everyone is allowed to connect. If the
 	    file exists but is empty, nobody is allowed to
 	    connect. Otherwise, <command>nbd-server</command> will
@@ -456,6 +458,34 @@ manpage.1: manpage.sgml
       the terms of the <acronym>GNU</acronym> General Public License,
       version 2, as published by the Free Software Foundation.</para>
 
+  </refsect1>
+  <refsect1>
+    <title>EXAMPLES</title>
+    <para>A simple <command>nbd-server</command> configuration file
+      would look like this:</para>
+    <programlisting>
+      [generic]
+      [export]
+          exportname = /export/blkdev
+          port = 12345
+    </programlisting>
+    <para>For increased security, one might want to create an
+      authorization file, and set the UID and GID to run as:</para>
+    <programlisting>
+      [generic]
+          user = nbd
+          group = nbd
+      [export]
+          exportname = /export/blkdev
+          port = 12345
+          authfile = /etc/nbd-server/allow
+    </programlisting>
+    <para>With /etc/nbd-server/allow containing the following:</para>
+    <programlisting>
+      127.0.0.1
+      192.168.0.0/8
+      192.168.1.1
+    </programlisting>
   </refsect1>
 </refentry>
 
