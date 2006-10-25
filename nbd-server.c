@@ -239,9 +239,14 @@ typedef struct {
  * @return 0 - authorization refused, 1 - OK
  **/
 int authorized_client(CLIENT *opts) {
+	const char ERRMSG="Invalid entry '%s' in authfile '%s', so, refusing all connections.";
 	FILE *f ;
-   
 	char line[LINELEN]; 
+	char *tmp;
+	struct in_addr addr;
+	struct in_addr client;
+	struct in_addr cltemp;
+	int len;
 
 	if ((f=fopen(opts->server->authname,"r"))==NULL) {
 		msg4(LOG_INFO,"Can't open authorization file %s (%s).",
@@ -249,14 +254,35 @@ int authorized_client(CLIENT *opts) {
 		return 1 ; 
 	}
   
+  	inet_aton(opts->clientname, &client);
 	while (fgets(line,LINELEN,f)!=NULL) {
+		if((tmp=index(line, '/'))) {
+			if(strlen(line)<=tmp-line) {
+				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
+				return 0;
+			}
+			*(tmp++)=0;
+			if(inet_aton(line,&addr)) {
+				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
+				return 0;
+			}
+			len=strtol(tmp, NULL, 0);
+			addr.sin_addr.s_addr>>=32-len;
+			addr.sin_addr.s_addr<<=32-len;
+			memcpy(&cltemp,&client,sizeof(client));
+			cltemp.sin_addr.s_addr>>=32-len;
+			cltemp.sin_addr.s_addr<<=32-len;
+			if(addr.sin_addr.s_addr == cltemp.sin_addr.s_addr) {
+				return 1;
+			}
+		}
 		if (strncmp(line,opts->clientname,strlen(opts->clientname))==0) {
 			fclose(f);
 			return 1;
 		}
 	}
-	fclose(f) ;
-	return 0 ;
+	fclose(f);
+	return 0;
 }
 
 /**
@@ -1216,7 +1242,8 @@ void set_peername(int net, CLIENT *client) {
 			break;
 		case VIRT_CIDR:
 			memcpy(&netaddr, &addrin, addrinlen);
-			netaddr.sin_addr.s_addr=netaddr.sin_addr.s_addr>>(client->server->cidrlen)<<(client->server->cidrlen);
+			netaddr.sin_addr.s_addr>>=32-(client->server->cidrlen);
+			netaddr.sin_addr.s_addr<<=32-(client->server->cidrlen);
 			netname = inet_ntoa(netaddr.sin_addr);
 			tmp=g_strdup_printf("%s/%s", netname, peername);
 			client->exportname=g_strdup_printf(client->server->exportname, tmp);
