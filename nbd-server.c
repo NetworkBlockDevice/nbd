@@ -503,7 +503,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	GArray *retval=NULL;
 	gchar **groups;
 	gboolean value;
-	gint i,j;
+	gint i;
+	gint j;
 
 	errdomain = g_quark_from_string("parse_cfile");
 	cfile = g_key_file_new();
@@ -1226,7 +1227,7 @@ void set_peername(int net, CLIENT *client) {
 
 	if (getpeername(net, (struct sockaddr *) &addrin, (socklen_t *)&addrinlen) < 0)
 		err("getsockname failed: %m");
-	peername = inet_ntoa(addrin.sin_addr);
+	peername = g_strdup(inet_ntoa(addrin.sin_addr));
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
 			client->exportname=g_strdup(client->server->exportname);
@@ -1250,6 +1251,7 @@ void set_peername(int net, CLIENT *client) {
 			break;
 	}
 
+	g_free(peername);
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
 	client->clientname=g_strdup(peername);
