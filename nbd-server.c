@@ -239,7 +239,7 @@ typedef struct {
  * @return 0 - authorization refused, 1 - OK
  **/
 int authorized_client(CLIENT *opts) {
-	const char ERRMSG="Invalid entry '%s' in authfile '%s', so, refusing all connections.";
+	const char *ERRMSG="Invalid entry '%s' in authfile '%s', so, refusing all connections.";
 	FILE *f ;
 	char line[LINELEN]; 
 	char *tmp;
@@ -267,12 +267,12 @@ int authorized_client(CLIENT *opts) {
 				return 0;
 			}
 			len=strtol(tmp, NULL, 0);
-			addr.sin_addr.s_addr>>=32-len;
-			addr.sin_addr.s_addr<<=32-len;
+			addr.s_addr>>=32-len;
+			addr.s_addr<<=32-len;
 			memcpy(&cltemp,&client,sizeof(client));
-			cltemp.sin_addr.s_addr>>=32-len;
-			cltemp.sin_addr.s_addr<<=32-len;
-			if(addr.sin_addr.s_addr == cltemp.sin_addr.s_addr) {
+			cltemp.s_addr>>=32-len;
+			cltemp.s_addr<<=32-len;
+			if(addr.s_addr == cltemp.s_addr) {
 				return 1;
 			}
 		}
