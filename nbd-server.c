@@ -149,6 +149,7 @@ gchar* rungroup=NULL;
 #define F_SPARSE 16
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
+char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
 /**
@@ -327,13 +328,14 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file]\n"
+	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
-	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n\n"
+	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n"
+	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" );
@@ -357,6 +359,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"idle-time", required_argument, NULL, 'a'},
 		{"config-file", required_argument, NULL, 'C'},
+		{"pid-file", required_argument, NULL, 'p'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -369,7 +372,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	}
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
-	while((c=getopt_long(argc, argv, "-a:C:cl:mr", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-a:C:cl:mrp:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -407,6 +410,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'm':
 			serve->flags |= F_MULTIFILE;
+			break;
+		case 'p':
+			strncpy(pidftemplate, optarg, 256);
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
@@ -1279,11 +1285,14 @@ void daemonize(SERVER* serve) {
 	if(daemon(0,0)<0) {
 		err("daemon");
 	}
-	if(serve) {
-		snprintf(pidfname, sizeof(char)*255, "/var/run/nbd-server.%d.pid", serve->port);
-	} else {
-		strncpy(pidfname, "/var/run/nbd-server.pid", sizeof(char)*255);
+	if(!*pidftemplate) {
+		if(serve) {
+			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
+		} else {
+			strncpy(pidftemplate, "/var/run/server.pid", 255);
+		}
 	}
+	snprintf(pidfname, 255, pidftemplate, serve->port);
 	pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
@@ -1482,6 +1491,8 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
 		exit(-1) ;
 	}
+
+	memset(pidftemplate, '\0', 256);
 
 	logging();
 	config_file_pos = g_strdup(CFILE);
