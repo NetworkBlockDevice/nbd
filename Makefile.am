@@ -21,4 +21,4 @@ nbd-server.5.in: nbd-server.5.sgml
 	docbook2man nbd-server.5.sgml
 	mv NBD-SERVER.5 nbd-server.5.in
 dist-hook:
-	rm -Rf `find $(distdir) -name 'CVS' -type d -print`
+	rm -Rf `find $(distdir) -name '.svn' -type d -print`
