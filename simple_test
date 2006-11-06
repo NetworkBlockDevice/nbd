@@ -4,9 +4,9 @@
 tmpnam=`mktemp`
 
 # Create a one-meg device
-dd if=/dev/zero -C /dev/null of=$tmpnam bs=1024 count=1024
+dd if=/dev/zero of=$tmpnam bs=1024 count=1024
 
-./nbd-server -p ./nbd-server.pid 11111 $tmpnam &
+./nbd-server -C /dev/null -p ./nbd-server.pid 11111 $tmpnam &
 sleep 1
 ./nbd-tester-client localhost 11111
 retval=$?
