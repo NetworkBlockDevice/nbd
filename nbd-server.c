@@ -1292,7 +1292,7 @@ void daemonize(SERVER* serve) {
 			strncpy(pidftemplate, "/var/run/server.pid", 255);
 		}
 	}
-	snprintf(pidfname, 255, pidftemplate, serve->port);
+	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
 	pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
