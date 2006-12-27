@@ -86,7 +86,13 @@ AC_TRY_COMPILE([#define u32 int
 [int foo=NBD_CMD_DISC],
     [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
       NBD_H='<linux/nbd.h>'],
+    AC_TRY_COMPILE([#include <linux/nbd.h>
+      ],
+      [int foo=NBD_CMD_DISC],
+      [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
+        NBD_H='<linux/nbd.h>'],
     AC_MSG_ERROR(Could not find an nbd.h from 2.6 or above.)
+    )
   )
 )
 if test -f nbd.h
