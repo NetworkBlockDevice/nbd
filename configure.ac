@@ -49,6 +49,7 @@ fi
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
+AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
 AC_C_CONST
@@ -60,8 +61,8 @@ AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strs
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
-case "`uname`" in
-     *Linux*) sbin_PROGRAMS=nbd-client
+case $host_os in
+     linux*) sbin_PROGRAMS=nbd-client
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;
