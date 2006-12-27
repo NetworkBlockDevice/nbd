@@ -1,2 +1,7 @@
-gznbd: gznbd.c
-	gcc -s -Wall -O2 -DTRACE gznbd.c -o gznbd -lz
+CC ?= gcc
+CFLAGS ?= -s -O2
+CFLAGS += -Wall
+CPPFLAGS += -DTRACE
+LDLIBS += -lz
+
+all: gznbd
