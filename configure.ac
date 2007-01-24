@@ -97,12 +97,15 @@ AC_TRY_COMPILE([#define u32 int
 )
 if test -f nbd.h
 then
-  if test $NBD_H='<linux/nbd.h>'
+  if test "$NBD_H" = '<linux/nbd.h>'
   then
     AC_MSG_WARN([there is a local nbd.h, but it is from the 2.4-series of kernels. Using the system-provided, working, nbd.h])
   fi
 fi
 AC_MSG_RESULT($NBD_H)
+AC_SEARCH_LIBS(bind, socket,, AC_MSG_ERROR([Could not find an implementation of the bind() system call]))
+AC_SEARCH_LIBS(inet_ntoa, nsl,, AC_MSG_ERROR([Could not find an implementation of the inet_ntoa() system call]))
+AC_SEARCH_LIBS(daemon, resolv,, AC_MSG_ERROR([Could not find an implementation of the daemon() system call]))
 AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
