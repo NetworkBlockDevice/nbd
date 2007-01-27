@@ -735,16 +735,16 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int fhandle) {
 	off_t es;
-	u32 es32;
+	unsigned long sectors;
 	struct stat stat_buf;
 	int error;
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE
-	DEBUG("looking for fhandle size with ioctl BLKGETSIZE\n");
-	if (!ioctl(fhandle, BLKGETSIZE, &es32) && es32) {
-		es = (off_t)es32 * (off_t)512;
+	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
+	if (!ioctl(fhandle, BLKGETSIZE, &sectors) && sectors) {
+		es = (off_t)sectors * (off_t)512;
 		return es;
 	}
 #endif /* BLKGETSIZE */
