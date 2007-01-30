@@ -25,3 +25,10 @@ mkinstalldirs
 nbd-tester-client
 nbd-client
 nbd-server
+config.guess
+config.sub
+doc
+nbd-server.config
+nbd-server.1.in
+nbd-server.5.in
+nbd.h
