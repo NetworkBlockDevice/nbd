@@ -267,20 +267,3 @@ manpage.1: manpage.sgml
 
   </refsect1>
 </refentry>
-
-<!-- Keep this comment at the end of the file
-Local variables:
-mode: sgml
-sgml-omittag:t
-sgml-shorttag:t
-sgml-minimize-attributes:nil
-sgml-always-quote-attributes:t
-sgml-indent-step:2
-sgml-indent-data:t
-sgml-parent-document:nil
-sgml-default-dtd-file:nil
-sgml-exposed-tags:nil
-sgml-local-catalogs:nil
-sgml-local-ecat-files:nil
-End:
--->
