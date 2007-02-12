@@ -680,7 +680,7 @@ void sigchld_handler(int s) {
 	pid_t pid;
 
 	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
-		if(WIFEXITED(&status)) {
+		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 		}
 		i=g_hash_table_lookup(children, &pid);
