@@ -16,7 +16,6 @@
 #include "config.h"
 #include "lfs.h"
 
-#include <asm/page.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
