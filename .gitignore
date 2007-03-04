@@ -9,6 +9,7 @@ config.status
 file
 nbd-client.8
 nbd-server.1
+nbd-server.5
 stamp-h.in
 stamp-h1
 Doxyfile
