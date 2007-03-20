@@ -139,8 +139,8 @@ gchar* rungroup=NULL;
  **/
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
-			       authorization file (yuck) */
-#define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
+			    authorization file (yuck) */
+#define BUFSIZE (1024*1024)+sizeof(struct nbd_reply) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
@@ -1100,6 +1100,8 @@ int mainloop(CLIENT *client) {
 	struct nbd_request request;
 	struct nbd_reply reply;
 	gboolean go_on=TRUE;
+	char buf;
+	buf=malloc(BUFSIZE)
 #ifdef DODBG
 	int i = 0;
 #endif
@@ -1108,7 +1110,6 @@ int mainloop(CLIENT *client) {
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
 	while (go_on) {
-		char buf[BUFSIZE];
 		size_t len;
 #ifdef DODBG
 		i++;
@@ -1187,6 +1188,7 @@ int mainloop(CLIENT *client) {
 		writeit(client->net, buf, len + sizeof(struct nbd_reply));
 		DEBUG("OK!\n");
 	}
+	free(buf);
 	return 0;
 }
 
