@@ -1100,8 +1100,8 @@ int mainloop(CLIENT *client) {
 	struct nbd_request request;
 	struct nbd_reply reply;
 	gboolean go_on=TRUE;
-	char buf;
-	buf=malloc(BUFSIZE)
+	char *buf;
+	buf=malloc(BUFSIZE);
 #ifdef DODBG
 	int i = 0;
 #endif
