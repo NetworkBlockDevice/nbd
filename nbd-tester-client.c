@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <glib.h>
+#include <netinet/in.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>

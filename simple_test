@@ -1,7 +1,7 @@
 #!/bin/sh
 # Yes, that's POSIX sh, not bash!
 
-tmpnam=`mktemp`
+tmpnam=`mktemp /tmp/nbd-test.XXXXXX`
 
 # Create a one-meg device
 dd if=/dev/zero of=$tmpnam bs=1024 count=1024
