@@ -65,6 +65,7 @@ manpage.1: manpage.sgml
       <arg><option>-c</option></arg>
       <arg><option>-a <replaceable>timeout</replaceable></option></arg>
       <arg><option>-l <replaceable>host list</replaceable></option></arg>
+      <arg><option>-o <replaceable>section name</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -201,6 +202,17 @@ manpage.1: manpage.sgml
 	    current directory, unless nbd-server is compiled as a
 	    daemon, in which case it is looked for in the
 	    root-directory.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+      	<term><option>section name</option></term>
+	<listitem>
+	  <para>If the <option>-o</option> argument is given on the
+	  command line, then &dhpackage; will output a configuration
+	  file section with this as the header that is functionally
+	  equivalent to the other options specified on the command line,
+	  and exit. This is useful for migrating pre-2.9 nbd-server
+	  initscript configuration files to the new format.</para>
 	</listitem>
       </varlistentry>
     </variablelist>

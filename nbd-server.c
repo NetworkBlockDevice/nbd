@@ -328,18 +328,45 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name]\n"
+	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n"
-	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n\n"
+	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
+	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" );
 	printf("Using configuration file %s\n", CFILE);
+}
+
+/* Dumps a config file section of the given SERVER*, and exits. */
+void dump_section(SERVER* serve, gchar* section_header) {
+	printf("[%s]\n", section_header);
+	printf("\texportname = %s\n", serve->exportname);
+	printf("\tport = %d\n", serve->port);
+	if(serve->flags & F_READONLY) {
+		printf("\treadonly = true\n");
+	}
+	if(serve->flags & F_MULTIFILE) {
+		printf("\tmultifile = true\n");
+	}
+	if(serve->flags & F_COPYONWRITE) {
+		printf("\tcopyonwrite = true\n");
+	}
+	if(serve->expected_size) {
+		printf("\tfilesize = %Ld\n", (long long int)serve->expected_size);
+	}
+	if(serve->authname) {
+		printf("\tauthfile = %s\n", serve->authname);
+	}
+	if(serve->timeout) {
+		printf("\ttimeout = %d\n", serve->timeout);
+	}
+	exit(EXIT_SUCCESS);
 }
 
 /**
@@ -360,19 +387,22 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"idle-time", required_argument, NULL, 'a'},
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
+		{"output-config", required_argument, NULL, 'o'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
 	off_t es;
 	size_t last;
 	char suffix;
+	gboolean do_output=FALSE;
+	gchar* section_header;
 
 	if(argc==1) {
 		return NULL;
 	}
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
-	while((c=getopt_long(argc, argv, "-a:C:cl:mrp:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-a:C:cl:mo:rp:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -411,6 +441,10 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'm':
 			serve->flags |= F_MULTIFILE;
 			break;
+		case 'o':
+			do_output = TRUE;
+			section_header = g_strdup(optarg);
+			break;
 		case 'p':
 			strncpy(pidftemplate, optarg, 256);
 			break;
@@ -439,6 +473,13 @@ SERVER* cmdline(int argc, char *argv[]) {
 	if(nonspecial<2) {
 		g_free(serve);
 		serve=NULL;
+	}
+	if(do_output) {
+		if(!serve) {
+			g_critical("Need a complete configuration on the command line to output a config file section!");
+			exit(EXIT_FAILURE);
+		}
+		dump_section(serve, section_header);
 	}
 	return serve;
 }
