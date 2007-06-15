@@ -1298,10 +1298,10 @@ void set_peername(int net, CLIENT *client) {
 			break;
 	}
 
-	g_free(peername);
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
 	client->clientname=g_strdup(peername);
+	g_free(peername);
 }
 
 /**
