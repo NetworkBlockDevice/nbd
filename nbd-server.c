@@ -1323,6 +1323,9 @@ void destroy_pid_t(gpointer data) {
 void daemonize(SERVER* serve) {
 	FILE*pidf;
 
+	if(!(serve->port)) {
+		return;
+	}
 	if(daemon(0,0)<0) {
 		err("daemon");
 	}
@@ -1546,8 +1549,6 @@ int main(int argc, char *argv[]) {
 		g_array_append_val(servers, *serve);
 	}
 
-/* We don't support this at this time */
-#if 0
 	if (!(serve->port)) {
 	  	CLIENT *client;
 #ifndef ISSERVER
@@ -1568,7 +1569,6 @@ int main(int argc, char *argv[]) {
           	serveconnection(client);
           	return 0;
         }
-#endif
 	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);
