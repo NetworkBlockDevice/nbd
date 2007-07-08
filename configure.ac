@@ -38,10 +38,35 @@ AC_ARG_ENABLE(
   ],
   [ISSERVER=0]
 )
+
 AC_MSG_CHECKING([whether syslog logging is requested])
 if test $ISSERVER -eq 1; then
   AC_DEFINE(ISSERVER,1, [Define to 1 if you want nbd-server to log through syslog])
   AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
+fi
+
+AC_ARG_ENABLE(
+  debug,
+  AC_HELP_STRING(--enable-debug,Build a debugging version of the server),
+  [
+    if test "x$enableval" = "xyes"; then
+      DODBG=1
+    else
+      DODBG=0
+    fi
+  ],
+  [DODBG=0]
+)
+AC_MSG_CHECKING([whether a debugging version is requested])
+if test $DODBG -eq 1; then
+  AC_MSG_RESULT([yes])
+  if test $ISSERVER -eq 1; then
+    AC_MSG_ERROR([You requested both syslog logging and a debugging version of the server. Bad idea!])
+  fi
+  AC_DEFINE(DODBG,1,[Define if you want a debugging version of nbd-server (lots of copious output)])
+  AC_DEFINE(NOFORK,1,[Define if you don't want the nbd-server to fork()])
 else
   AC_MSG_RESULT([no])
 fi
