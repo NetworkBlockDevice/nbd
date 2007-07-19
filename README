@@ -52,9 +52,13 @@ This configuration file is expected to be found at
 
 # This is a comment
 [generic]
-	# The [generic] section is required, but can not currently
-	# contain any options. This section name is reserved for future
-	# use.
+	# The [generic] section is required, even if nothing is specified
+	# there.
+	# When either of these options are specified, nbd-server drops
+	# privileges to the given user and group after opening ports, but
+	# _before_ opening files.
+	user = nbd
+	group = nbd
 [export1]
 	exportname = /export/nbd/export1-file
 	port = 12345
