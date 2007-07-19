@@ -28,7 +28,7 @@ fi
 cat > nbd-server.conf <<EOF
 [generic]
 [export]
-	exportname = `pwd`/$tmpnam
+	exportname = $tmpnam
 	port = 11111
 EOF
 ./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
