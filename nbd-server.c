@@ -1323,7 +1323,7 @@ void destroy_pid_t(gpointer data) {
 void daemonize(SERVER* serve) {
 	FILE*pidf;
 
-	if(!(serve->port)) {
+	if(serve && !(serve->port)) {
 		return;
 	}
 	if(daemon(0,0)<0) {
