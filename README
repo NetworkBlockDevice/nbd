@@ -68,6 +68,8 @@ This configuration file is expected to be found at
 	readonly = false
 	multifile = false
 	copyonwrite = false
+	prerun = dd if=/dev/zero of=%s bs=1k count=500
+	postrun = rm -f %s
 [otherexport]
 	exportname = /export/nbd/experiment
 	port = 12346
