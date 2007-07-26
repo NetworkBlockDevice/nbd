@@ -179,6 +179,10 @@ typedef struct {
 	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
 	uint8_t cidrlen;     /**< The length of the mask when we use
 				  CIDR-style virtualization */
+	gchar* prerun;	     /**< command to be ran after connecting a client,
+				  but before starting to serve */
+	gchar* postrun;	     /**< command that will be ran after the client
+				  disconnects */
 } SERVER;
 
 /**
@@ -530,6 +534,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "timeout",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
+		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
+		{ "postrun",	FALSE,	PARAM_STRING,	NULL, 0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
@@ -576,8 +582,11 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[3].target=&(s.timeout);
 		lp[4].target=&(s.expected_size);
 		lp[5].target=&(virtstyle);
-		lp[6].target=lp[7].target=lp[8].target=
-				lp[9].target=lp[10].target=&(s.flags);
+		lp[6].target=&(s.prerun);
+		lp[7].target=&(s.postrun);
+		lp[8].target=lp[9].target=lp[10].target=
+				lp[11].target=lp[12].target=&(s.flags);
+		
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
 			p=lp;
@@ -1045,7 +1054,7 @@ void negotiate(CLIENT *client) {
  * pieces. Preferably with a chainsaw.
  *
  * @param client The client we're going to serve to.
- * @return never
+ * @return when the client disconnects
  **/
 int mainloop(CLIENT *client) {
 	struct nbd_request request;
@@ -1233,6 +1242,25 @@ int copyonwrite_prepare(CLIENT* client) {
 }
 
 /**
+ * Run a command. This is used for the ``prerun'' and ``postrun'' config file
+ * options
+ *
+ * @param command the command to be ran. Read from the config file
+ * @param file the file name we're about to export
+ **/
+int do_run(gchar* command, gchar* file) {
+	gchar* cmd;
+	int retval=0;
+
+	if(*command) {
+		cmd = g_strdup_printf(command, file);
+		retval=system(cmd);
+		g_free(cmd);
+	}
+	return retval;
+}
+
+/**
  * Serve a connection. 
  *
  * @todo allow for multithreading, perhaps use libevent. Not just yet, though;
@@ -1249,7 +1277,10 @@ void serveconnection(CLIENT *client) {
 
 	setmysockopt(client->net);
 
-	mainloop(client);
+	if(!do_run(client->server->prerun, client->exportname)) {
+		mainloop(client);
+	}
+	do_run(client->server->postrun, client->exportname);
 }
 
 /**
@@ -1499,6 +1530,7 @@ int serveloop(GArray* servers) {
 #endif // NOFORK
 					msg2(LOG_INFO,"Starting to serve");
 					serveconnection(client);
+					exit(EXIT_SUCCESS);
 				}
 			}
 		}
