@@ -188,13 +188,16 @@ typedef struct {
 } SERVER;
 
 /**
- * Variables associated with a client socket.
+ * Variables associated with an opened file
  **/
 typedef struct {
 	int fhandle;      /**< file descriptor */
 	off_t startoff;   /**< starting offset of this file */
 } FILE_INFO;
 
+/**
+ * Variables associated with a client socket.
+ **/
 typedef struct {
 	off_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer */
@@ -350,7 +353,9 @@ void usage() {
 	printf("Using configuration file %s\n", CFILE);
 }
 
-/* Dumps a config file section of the given SERVER*, and exits. */
+/**
+ * Dumps a config file section of the given SERVER*, and exits.
+ **/
 void dump_section(SERVER* serve, gchar* section_header) {
 	printf("[%s]\n", section_header);
 	printf("\texportname = %s\n", serve->exportname);
