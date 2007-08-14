@@ -177,16 +177,6 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 		err("Unable to set read-only attribute for device");
 }
 
-void set_timeout(int nbd, int timeout) {
-#ifdef NBD_SET_TIMEOUT
-	if (timeout) {
-		if (ioctl(nbd, NBD_SET_TIMEOUT, (unsigned long)timeout) < 0)
-			err("Ioctl NBD_SET_TIMEOUT failed: %m\n");
-		fprintf(stderr, "timeout=%d\n", timeout);
-	}
-#endif
-}
-
 void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
@@ -316,7 +306,6 @@ int main(int argc, char *argv[]) {
 
 	negotiate(sock, &size64, &flags);
 	setsizes(nbd, size64, blocksize, flags);
-	set_timeout(nbd, timeout);
 	finish_sock(sock, nbd, swap);
 
 	/* Go daemon */
@@ -357,7 +346,6 @@ int main(int argc, char *argv[]) {
 					setsizes(nbd, size64, blocksize,
 								new_flags);
 
-					set_timeout(nbd, timeout);
 					finish_sock(sock,nbd,swap);
 				}
 			}
