@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <sys/mount.h>
 
 #ifndef __GNUC__
 #error I need GCC to work
@@ -59,7 +60,7 @@ int opennet(char *name, int port) {
 	return sock;
 }
 
-u64 negotiate(int sock, int blocksize) {
+void negotiate(int sock, u64 *rsize64, u32 *flags) {
 	u64 magic, size64;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
 
@@ -96,15 +97,20 @@ u64 negotiate(int sock, int blocksize) {
 		printf("size = %lu", (unsigned long)(size64));
 #endif
 
-	if (read(sock, &buf, 128) < 0)
+	if (read(sock, flags, sizeof(*flags)) < 0)
 		err("Failed/4: %m\n");
+	*flags = ntohl(*flags);
+
+	if (read(sock, &buf, 124) < 0)
+		err("Failed/5: %m\n");
 	printf("\n");
 
-	return size64;
+	*rsize64 = size64;
 }
 
-void setsizes(int nbd, u64 size64, int blocksize) {
+void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	unsigned long size;
+	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
 #ifdef NBD_SET_SIZE_BLOCKS
 	if (size64/blocksize > (~0UL >> 1))
@@ -129,6 +135,9 @@ void setsizes(int nbd, u64 size64, int blocksize) {
 #endif
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
+
+	if (ioctl(nbd, BLKROSET, (unsigned long) &read_only) < 0)
+		err("Unable to set read-only attribute for device");
 }
 
 void finish_sock(int sock, int nbd, int swap) {
@@ -152,6 +161,7 @@ int main(int argc, char *argv[]) {
 	int swap=0;
 	int cont=0;
 	u64 size64;
+	u32 flags;
 
 	logging();
 
@@ -227,8 +237,8 @@ int main(int argc, char *argv[]) {
 	}
 	argv=NULL; argc=0; /* don't use it later suddenly */
 
-	size64 = negotiate(sock, blocksize);
-	setsizes(nbd, size64, blocksize);
+	negotiate(sock, &size64, &flags);
+	setsizes(nbd, size64, blocksize, flags);
 	finish_sock(sock, nbd, swap);
 
 	/* Go daemon */
@@ -248,14 +258,20 @@ int main(int argc, char *argv[]) {
 				cont=0;
 			} else {
 				if(cont) {
+					u64 new_size;
+					u32 new_flags;
+
 					fprintf(stderr, " Reconnecting\n");
 					close(sock); close(nbd);
 					sock = opennet(hostname, port);
 					nbd = open(nbddev, O_RDWR);
-					if(size64!=negotiate(sock,blocksize)) {
+					negotiate(sock, &new_size, &new_flags);
+					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}
-					setsizes(nbd, size64, blocksize);
+					setsizes(nbd, size64, blocksize,
+								new_flags);
+
 					finish_sock(sock,nbd,swap);
 				}
 			}

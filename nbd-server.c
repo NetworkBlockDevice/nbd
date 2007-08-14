@@ -1027,10 +1027,11 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param client The client we're negotiating with.
  **/
 void negotiate(CLIENT *client) {
-	char zeros[300];
+	char zeros[128];
 	u64 size_host;
+	u32 flags = NBD_FLAG_HAS_FLAGS;
 
-	memset(zeros, '\0', 290);
+	memset(zeros, '\0', sizeof(zeros));
 	if (write(client->net, INIT_PASSWD, 8) < 0)
 		err("Negotiation failed: %m");
 	cliserv_magic = htonll(cliserv_magic);
@@ -1039,7 +1040,12 @@ void negotiate(CLIENT *client) {
 	size_host = htonll((u64)(client->exportsize));
 	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed: %m");
-	if (write(client->net, zeros, 128) < 0)
+	if (client->server->flags & F_READONLY)
+		flags |= NBD_FLAG_READ_ONLY;
+	flags = htonl(flags);
+	if (write(client->net, &flags, 4) < 0)
+		err("Negotiation failed: %m");
+	if (write(client->net, zeros, 124) < 0)
 		err("Negotiation failed: %m");
 }
 
