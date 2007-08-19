@@ -68,6 +68,7 @@
 #include <sys/mount.h>		/* For BLKGETSIZE */
 #endif
 #include <signal.h>		/* sigaction */
+#include <errno.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
 #include <netdb.h>		/* hostent, gethostby*, getservby* */
@@ -1052,7 +1053,7 @@ void negotiate(CLIENT *client) {
 /** sending macro. */
 #define SEND(net,reply) writeit( net, &reply, sizeof( reply ));
 /** error macro. */
-#define ERROR(client,reply) { reply.error = htonl(-1); SEND(client->net,reply); reply.error = 0; }
+#define ERROR(client,reply,errcode) { reply.error = htonl(errcode); SEND(client->net,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -1112,13 +1113,13 @@ int mainloop(CLIENT *client) {
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 		if ((request.from + len) > (OFFT_MAX)) {
 			DEBUG("[Number too large!]");
-			ERROR(client, reply);
+			ERROR(client, reply, EINVAL);
 			continue;
 		}
 
 		if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
 			DEBUG("[RANGE!]");
-			ERROR(client, reply);
+			ERROR(client, reply, EINVAL);
 			continue;
 		}
 
@@ -1129,12 +1130,12 @@ int mainloop(CLIENT *client) {
 			if ((client->server->flags & F_READONLY) ||
 			    (client->server->flags & F_AUTOREADONLY)) {
 				DEBUG("[WRITE to READONLY!]");
-				ERROR(client, reply);
+				ERROR(client, reply, EPERM);
 				continue;
 			}
 			if (expwrite(request.from, buf, len, client)) {
 				DEBUG("Write failed: %m" );
-				ERROR(client, reply);
+				ERROR(client, reply, errno);
 				continue;
 			}
 			SEND(client->net, reply);
@@ -1146,7 +1147,7 @@ int mainloop(CLIENT *client) {
 		DEBUG("exp->buf, ");
 		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
 			DEBUG("Read failed: %m");
-			ERROR(client, reply);
+			ERROR(client, reply, errno);
 			continue;
 		}
 
@@ -1549,15 +1550,15 @@ int serveloop(GArray* servers) {
 void dousers(void) {
 	struct passwd *pw;
 	struct group *gr;
-	if(runuser) {
-		pw=getpwnam(runuser);
-		if(setuid(pw->pw_uid)<0)
-			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
-	}
 	if(rungroup) {
 		gr=getgrnam(rungroup);
 		if(setgid(gr->gr_gid)<0)
 			msg3(LOG_DEBUG, "Could not set GID: %s", strerror(errno));
+	}
+	if(runuser) {
+		pw=getpwnam(runuser);
+		if(setuid(pw->pw_uid)<0)
+			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
 	}
 }
 
