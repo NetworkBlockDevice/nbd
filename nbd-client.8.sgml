@@ -61,7 +61,6 @@ manpage.1: manpage.sgml
       <arg choice=plain><option><replaceable>nbd-device</replaceable></option></arg>
       <arg><option>-swap</option></arg>
       <arg><option>-persist</option></arg>
-      <arg><option>-timeout <replaceable>timeout</replaceable></option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>

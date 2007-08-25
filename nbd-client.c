@@ -160,7 +160,6 @@ int main(int argc, char *argv[]) {
 	char *hostname, *nbddev;
 	int swap=0;
 	int cont=0;
-	int timeout=0;
 	u64 size64;
 	u32 flags;
 
@@ -223,7 +222,7 @@ int main(int argc, char *argv[]) {
 	  err("Can not open NBD: %m");
 	++argv; --argc; /* skip device */
 
-	if (argc>3) goto errmsg;
+	if (argc>2) goto errmsg;
 	if (argc!=0) {
 		if(strncmp(argv[0], "-swap", 5)==0) {
 			swap=1;
@@ -234,17 +233,6 @@ int main(int argc, char *argv[]) {
 		if(strncmp(argv[0], "-persist", 8)==0) {
 			cont=1;
 			++argv;--argc;
-		}
-	}
-	if(argc!=0) {
-		if(strncmp(argv[0], "-timeout", 8)==0) {
-#ifdef NBD_SET_TIMEOUT
-			timeout=strtol(++argv, NULL, 0);
-			++argv;--argc--;
-#else
-			fprintf(stderr, "This nbd-client does not support -timeout yet; please recompile on a more recent kernel");
-			exit(EXIT_FAILURE);
-#endif
 		}
 	}
 	argv=NULL; argc=0; /* don't use it later suddenly */
@@ -261,12 +249,6 @@ int main(int argc, char *argv[]) {
 		exit(0);
 #endif
 
-#ifdef NBD_SET_TIMEOUT
-	if(ioctl(nbd, NBD_SET_TIMEOUT, &timeout)<0) {
-		fprintf(stderr, "Setting timeout failed: %m");
-		exit(EXIT_FAILURE);
-	}
-#endif
 	do {
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
 			fprintf(stderr, "Kernel call returned: %m");
