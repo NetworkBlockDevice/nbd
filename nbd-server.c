@@ -1582,7 +1582,8 @@ int main(int argc, char *argv[]) {
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
 	if(!servers || !servers->len) {
-		g_warning("Could not parse config file: %s", err->message);
+		g_warning("Could not parse config file: %s", 
+				err ? err->message : "Unknown error");
 	}
 	if(serve) {
 		g_array_append_val(servers, *serve);
