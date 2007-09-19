@@ -1276,6 +1276,9 @@ int do_run(gchar* command, gchar* file) {
  * @param client a connected client
  **/
 void serveconnection(CLIENT *client) {
+	if(do_run(client->server->prerun, client->exportname)) {
+		exit(EXIT_FAILURE);
+	}
 	setupexport(client);
 
 	if (client->server->flags & F_COPYONWRITE) {
@@ -1284,9 +1287,7 @@ void serveconnection(CLIENT *client) {
 
 	setmysockopt(client->net);
 
-	if(!do_run(client->server->prerun, client->exportname)) {
-		mainloop(client);
-	}
+	mainloop(client);
 	do_run(client->server->postrun, client->exportname);
 }
 
