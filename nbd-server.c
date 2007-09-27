@@ -407,6 +407,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	}
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
+	serve->virtstyle=VIRT_IPLIT;
 	while((c=getopt_long(argc, argv, "-a:C:cl:mo:rp:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
@@ -1525,7 +1526,8 @@ int serveloop(GArray* servers) {
 					}
 					/* child */
 					g_hash_table_destroy(children);
-					for(i=0;i<servers->len,serve=(g_array_index(servers, SERVER*, i));i++) {
+					for(i=0;i<servers->len;i++) {
+						serve=g_array_index(servers, SERVER*, i);
 						close(serve->socket);
 					}
 					/* FALSE does not free the
