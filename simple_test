@@ -36,6 +36,12 @@ PID=$!
 sleep 1
 ./nbd-tester-client localhost 11111
 retval=$?
+if [ -f nbd-server.pid ]
+then
+	kill `cat nbd-server.pid`
+else
+	kill $PID
+fi
 rm -f nbd-server.pid
 rm -f nbd-server.conf
 rm -f $tmpnam
