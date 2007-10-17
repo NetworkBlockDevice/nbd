@@ -59,6 +59,7 @@ AC_ARG_ENABLE(
   ],
   [DODBG=0]
 )
+
 AC_MSG_CHECKING([whether a debugging version is requested])
 if test $DODBG -eq 1; then
   AC_MSG_RESULT([yes])
@@ -70,6 +71,16 @@ if test $DODBG -eq 1; then
 else
   AC_MSG_RESULT([no])
 fi
+
+AC_ARG_ENABLE(
+  sdp,
+  AC_HELP_STRING(--enable-sdp,Build a version of nbd-server with support for the Socket Direct Protocol (SDP). Requires you to build and install a kernel with the InfiniBand patches (default disabled)),
+  [
+    if test "x$enableval" = "xyes"; then
+      AC_DEFINE(WITH_SDP, 1, [Define to 1 if you have and want support for the Socket Direct Protocol])
+    fi
+  ]
+)
 
 AC_PROG_CC
 AC_PROG_CPP

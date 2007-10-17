@@ -147,7 +147,8 @@ gchar* rungroup=NULL;
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
 			    copyonwrite */
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
-#define F_SPARSE 16
+#define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
+#define F_SDP		  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -543,8 +544,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
 		{ "autoreadonly", FALSE, PARAM_BOOL,	NULL, F_AUTOREADONLY },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
+		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 	};
-	const int lp_size=11;
+	const int lp_size=14;
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
@@ -587,8 +589,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[6].target=&(s.prerun);
 		lp[7].target=&(s.postrun);
 		lp[8].target=lp[9].target=lp[10].target=
-				lp[11].target=lp[12].target=&(s.flags);
-		
+				lp[11].target=lp[12].target=
+				lp[13].target=&(s.flags);
+
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
 			p=lp;
@@ -675,6 +678,14 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		if(i>0) {
 			g_array_append_val(retval, s);
 		}
+#ifndef WITH_SDP
+		if(s.flags && F_SDP) {
+			g_set_error(e, errdomain, CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
+			return NULL;
+		}
+#endif
 	}
 	return retval;
 }
@@ -1400,12 +1411,20 @@ void setup_serve(SERVER *serve) {
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
 	int sock_flags;
+	int af;
 #ifndef sun
 	int yes=1;
 #else
 	char yes='1';
 #endif /* sun */
-	if ((serve->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+
+	af = AF_INET;
+#ifdef WITH_SDP
+	if ((serve->flags) && F_SDP) {
+		af = AF_INET_SDP;
+	}
+#endif
+	if ((serve->socket = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
 
 	/* lose the pesky "Address already in use" error message */
@@ -1426,6 +1445,11 @@ void setup_serve(SERVER *serve) {
 
 	DEBUG("Waiting for connections... bind, ");
 	addrin.sin_family = AF_INET;
+#ifdef WITH_SDP
+	if(serve->flags && F_SDP) {
+		addrin.sin_family = AF_INET_SDP;
+	}
+#endif
 	addrin.sin_port = htons(serve->port);
 	addrin.sin_addr.s_addr = 0;
 	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
