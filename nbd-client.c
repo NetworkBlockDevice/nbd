@@ -241,7 +241,6 @@ int main(int argc, char *argv[]) {
 	++argv; --argc; /* skip port */
 
 	if (argc==0) goto errmsg;
-	sock = opennet(hostname, port);
 	nbddev = argv[0];
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
@@ -268,6 +267,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	if(argc) goto errmsg;
+	sock = opennet(hostname, port, sdp);
 	argv=NULL; argc=0; /* don't use it later suddenly */
 
 	negotiate(sock, &size64, &flags);
@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
 
 					fprintf(stderr, " Reconnecting\n");
 					close(sock); close(nbd);
-					sock = opennet(hostname, port);
+					sock = opennet(hostname, port, sdp);
 					nbd = open(nbddev, O_RDWR);
 					negotiate(sock, &new_size, &new_flags);
 					if (size64 != new_size) {

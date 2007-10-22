@@ -148,7 +148,7 @@ gchar* rungroup=NULL;
 			    copyonwrite */
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
 #define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
-#define F_SDP		  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
+#define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -499,6 +499,7 @@ typedef enum {
 	CFILE_MISSING_GENERIC,	/**< The (required) group "generic" is missing */
 	CFILE_KEY_MISSING,	/**< A (required) key is missing */
 	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
+	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
 	CFILE_PROGERR		/**< Programmer error */
 } CFILE_ERRORS;
 
