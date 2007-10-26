@@ -74,6 +74,16 @@ void setmysockopt(int sock) {
 #endif
 }
 
+#ifndef G_GNUC_NORETURN
+#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
+#define G_GNUC_NORETURN __attribute__((__noreturn__))
+#else
+#define G_GNUC_NORETURN
+#endif
+#endif
+
+void err(const char *s) G_GNUC_NORETURN;
+
 void err(const char *s) {
 	const int maxlen = 150;
 	char s1[maxlen], *s2;

@@ -422,9 +422,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 				addr_port=g_strsplit(optarg, ":", 2);
 				if(addr_port[1]) {
 					serve->port=strtol(addr_port[1], NULL, 0);
-					serve->host=g_strdup(addr_port[0]);
+					serve->listenaddr=g_strdup(addr_port[0]);
 				} else {
-					serve->host=g_strdup("0.0.0.0");
+					serve->listenaddr=g_strdup("0.0.0.0");
 					serve->port=strtol(addr_port[0], NULL, 0);
 				}
 				g_strfreev(addr_port);
@@ -605,7 +605,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[8].target=lp[9].target=lp[10].target=
 				lp[11].target=lp[12].target=
 				lp[13].target=&(s.flags);
-		lp[14].target=&(s.listnaddr);
+		lp[14].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -691,6 +691,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
 		if(i>0) {
+			if(!s.listenaddr) {
+				s.listenaddr = g_strdup("0.0.0.0");
+			}
 			g_array_append_val(retval, s);
 		}
 #ifndef WITH_SDP
@@ -1381,7 +1384,7 @@ void destroy_pid_t(gpointer data) {
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
-int serveloop(GArray* servers) G_GNUC_NORETURN {
+int serveloop(GArray* servers) {
 	struct sockaddr_in addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	SERVER *serve;
@@ -1518,7 +1521,7 @@ void setup_serve(SERVER *serve) {
 	}
 #endif
 	addrin.sin_port = htons(serve->port);
-	if(!inet_aton(serve->listenaddr, &(addrin.sin_addr.s_addr)))
+	if(!inet_aton(serve->listenaddr, &(addrin.sin_addr)))
 		err("could not parse listen address");
 	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
 		err("bind: %m");
@@ -1592,7 +1595,9 @@ void daemonize(SERVER* serve) {
  * The stuff above daemonize() isn't.
  */
 
-void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN {
+void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN;
+
+void serve_err(SERVER* serve, const char* msg) {
 	g_message("Export of %s on port %d failed:", serve->exportname,
 			serve->port);
 	err(msg);
@@ -1622,7 +1627,7 @@ void dousers(void) {
 			exit(EXIT_FAILURE);
 		}
 		if(setuid(pw->pw_uid)<0) {
-			g_message(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
+			g_message("Could not set UID: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	}
