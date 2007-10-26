@@ -680,7 +680,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 			g_array_append_val(retval, s);
 		}
 #ifndef WITH_SDP
-		if(s.flags && F_SDP) {
+		if(s.flags & F_SDP) {
 			g_set_error(e, errdomain, CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
 			g_array_free(retval, TRUE);
 			g_key_file_free(cfile);
@@ -1447,7 +1447,7 @@ void setup_serve(SERVER *serve) {
 	DEBUG("Waiting for connections... bind, ");
 	addrin.sin_family = AF_INET;
 #ifdef WITH_SDP
-	if(serve->flags && F_SDP) {
+	if(serve->flags & F_SDP) {
 		addrin.sin_family = AF_INET_SDP;
 	}
 #endif
@@ -1580,11 +1580,19 @@ void dousers(void) {
 	struct group *gr;
 	if(rungroup) {
 		gr=getgrnam(rungroup);
+		if(!gr) {
+			g_message("Invalid group name: %s", rungroup);
+			exit(EXIT_FAILURE);
+		}
 		if(setgid(gr->gr_gid)<0)
 			msg3(LOG_DEBUG, "Could not set GID: %s", strerror(errno));
 	}
 	if(runuser) {
 		pw=getpwnam(runuser);
+		if(!pw) {
+			g_message("Invalid user name: %s", runuser);
+			exit(EXIT_FAILURE);
+		}
 		if(setuid(pw->pw_uid)<0)
 			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
 	}
