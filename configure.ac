@@ -109,8 +109,13 @@ AC_TRY_COMPILE([#define u32 int
 #define __be32 int
 #define __be64 int
 #include "nbd.h"
+#ifdef __GNUC__
+#define UNUSED __attribute__((__unused__))
+#else
+#define UNUSED
+#endif
 ],
-[int foo=NBD_CMD_DISC], 
+[int UNUSED foo=NBD_CMD_DISC], 
   [AC_DEFINE(NBD_H_LOCAL, 1, Set to 1 if a (2.6) nbd.h can be found in the current directory)
     NBD_H='"nbd.h"'],
   AC_TRY_COMPILE([#define u32 int
@@ -118,13 +123,23 @@ AC_TRY_COMPILE([#define u32 int
 #define __be32 int
 #define __be64 int
 #include <linux/nbd.h>
+#ifdef __GNUC__
+#define UNUSED __attribute__((__unused__))
+#else
+#define UNUSED
+#endif
   ],
-[int foo=NBD_CMD_DISC],
+[int UNUSED foo=NBD_CMD_DISC],
     [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
       NBD_H='<linux/nbd.h>'],
     AC_TRY_COMPILE([#include <linux/nbd.h>
+#ifdef __GNUC__
+#define UNUSED __attribute__((__unused__))
+#else
+#define UNUSED
+#endif
       ],
-      [int foo=NBD_CMD_DISC],
+      [int UNUSED foo=NBD_CMD_DISC],
       [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
         NBD_H='<linux/nbd.h>'],
     AC_MSG_ERROR(Could not find an nbd.h from 2.6 or above.)
