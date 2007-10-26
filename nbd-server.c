@@ -404,7 +404,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	size_t last;
 	char suffix;
 	gboolean do_output=FALSE;
-	gchar* section_header;
+	gchar* section_header="";
 	gchar** addr_port;
 
 	if(argc==1) {
@@ -905,7 +905,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * @return 0 on success, nonzero on failure
  **/
 int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
-	ssize_t ret;
+	ssize_t ret=0;
 
 	while(len > 0 && (ret=rawexpwrite(a, buf, len, client)) > 0 ) {
 		a += ret;
@@ -947,7 +947,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @return 0 on success, nonzero on failure
  **/
 int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
-	ssize_t ret;
+	ssize_t ret=0;
 
 	while(len > 0 && (ret=rawexpread(a, buf, len, client)) > 0 ) {
 		a += ret;
