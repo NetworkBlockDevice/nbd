@@ -139,7 +139,7 @@ gchar* rungroup=NULL;
  **/
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
-			    authorization file (yuck) */
+			       authorization file (yuck) */
 #define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
@@ -1365,127 +1365,9 @@ void destroy_pid_t(gpointer data) {
 }
 
 /**
- * Go daemon (unless we specified at compile time that we didn't want this)
- * @param serve the first server of our configuration. If its port is zero,
- * 	then do not daemonize, because we're doing inetd then. This parameter
- * 	is only used to create a PID file of the form
- * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
+ * Loop through the available servers, and serve them. Never returns.
  **/
-#if !defined(NODAEMON) && !defined(NOFORK)
-void daemonize(SERVER* serve) {
-	FILE*pidf;
-
-	if(serve && !(serve->port)) {
-		return;
-	}
-	if(daemon(0,0)<0) {
-		err("daemon");
-	}
-	if(!*pidftemplate) {
-		if(serve) {
-			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
-		} else {
-			strncpy(pidftemplate, "/var/run/server.pid", 255);
-		}
-	}
-	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
-	pidf=fopen(pidfname, "w");
-	if(pidf) {
-		fprintf(pidf,"%d\n", (int)getpid());
-		fclose(pidf);
-	} else {
-		perror("fopen");
-		fprintf(stderr, "Not fatal; continuing");
-	}
-}
-#else
-#define daemonize(serve)
-#endif /* !defined(NODAEMON) && !defined(NOFORK) */
-
-/**
- * Connect a server's socket.
- *
- * @param serve the server we want to connect.
- **/
-void setup_serve(SERVER *serve) {
-	struct sockaddr_in addrin;
-	struct sigaction sa;
-	int addrinlen = sizeof(addrin);
-	int sock_flags;
-	int af;
-#ifndef sun
-	int yes=1;
-#else
-	char yes='1';
-#endif /* sun */
-
-	af = AF_INET;
-#ifdef WITH_SDP
-	if ((serve->flags) && F_SDP) {
-		af = AF_INET_SDP;
-	}
-#endif
-	if ((serve->socket = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
-		err("socket: %m");
-
-	/* lose the pesky "Address already in use" error message */
-	if (setsockopt(serve->socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-	        err("setsockopt SO_REUSEADDR");
-	}
-	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
-		err("setsockopt SO_KEEPALIVE");
-	}
-
-	/* make the listening socket non-blocking */
-	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
-		err("fcntl F_SETFL O_NONBLOCK");
-	}
-
-	DEBUG("Waiting for connections... bind, ");
-	addrin.sin_family = AF_INET;
-#ifdef WITH_SDP
-	if(serve->flags & F_SDP) {
-		addrin.sin_family = AF_INET_SDP;
-	}
-#endif
-	addrin.sin_port = htons(serve->port);
-	addrin.sin_addr.s_addr = 0;
-	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
-		err("bind: %m");
-	DEBUG("listen, ");
-	if (listen(serve->socket, 1) < 0)
-		err("listen: %m");
-	sa.sa_handler = sigchld_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	if(sigaction(SIGCHLD, &sa, NULL) == -1)
-		err("sigaction: %m");
-	sa.sa_handler = sigterm_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	if(sigaction(SIGTERM, &sa, NULL) == -1)
-		err("sigaction: %m");
-}
-
-/**
- * Connect our servers.
- **/
-void setup_servers(GArray* servers) {
-	int i;
-
-	for(i=0;i<servers->len;i++) {
-		setup_serve(&(g_array_index(servers, SERVER, i)));
-	}
-	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
-}
-
-/**
- * Loop through the available servers, and serve them.
- **/
-int serveloop(GArray* servers) {
+int serveloop(GArray* servers) G_GNUC_NORETURN {
 	struct sockaddr_in addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	SERVER *serve;
@@ -1570,6 +1452,135 @@ int serveloop(GArray* servers) {
 			}
 		}
 	}
+}
+
+/**
+ * Go daemon (unless we specified at compile time that we didn't want this)
+ * @param serve the first server of our configuration. If its port is zero,
+ * 	then do not daemonize, because we're doing inetd then. This parameter
+ * 	is only used to create a PID file of the form
+ * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
+ **/
+#if !defined(NODAEMON) && !defined(NOFORK)
+void daemonize(SERVER* serve) {
+	FILE*pidf;
+
+	if(serve && !(serve->port)) {
+		return;
+	}
+	if(daemon(0,0)<0) {
+		err("daemon");
+	}
+	if(!*pidftemplate) {
+		if(serve) {
+			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
+		} else {
+			strncpy(pidftemplate, "/var/run/server.pid", 255);
+		}
+	}
+	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
+	pidf=fopen(pidfname, "w");
+	if(pidf) {
+		fprintf(pidf,"%d\n", (int)getpid());
+		fclose(pidf);
+	} else {
+		perror("fopen");
+		fprintf(stderr, "Not fatal; continuing");
+	}
+}
+#else
+#define daemonize(serve)
+#endif /* !defined(NODAEMON) && !defined(NOFORK) */
+
+/*
+ * Everything beyond this point (in the file) is run in non-daemon mode.
+ * The stuff above daemonize() isn't.
+ */
+
+void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN {
+	g_message("Export of %s on port %d failed:", serve->exportname,
+			serve->port);
+	err(msg);
+}
+
+/**
+ * Connect a server's socket.
+ *
+ * @param serve the server we want to connect.
+ **/
+void setup_serve(SERVER *serve) {
+	struct sockaddr_in addrin;
+	struct sigaction sa;
+	int addrinlen = sizeof(addrin);
+	int sock_flags;
+	int af;
+#ifndef sun
+	int yes=1;
+#else
+	char yes='1';
+#endif /* sun */
+
+	af = AF_INET;
+#ifdef WITH_SDP
+	if ((serve->flags) && F_SDP) {
+		af = AF_INET_SDP;
+	}
+#endif
+	if ((serve->socket = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
+		err("socket: %m");
+
+	/* lose the pesky "Address already in use" error message */
+	if (setsockopt(serve->socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
+	        err("setsockopt SO_REUSEADDR");
+	}
+	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
+		err("setsockopt SO_KEEPALIVE");
+	}
+
+	/* make the listening socket non-blocking */
+	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+		err("fcntl F_SETFL O_NONBLOCK");
+	}
+
+	DEBUG("Waiting for connections... bind, ");
+	addrin.sin_family = AF_INET;
+#ifdef WITH_SDP
+	if(serve->flags & F_SDP) {
+		addrin.sin_family = AF_INET_SDP;
+	}
+#endif
+	addrin.sin_port = htons(serve->port);
+	addrin.sin_addr.s_addr = 0;
+	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
+		err("bind: %m");
+	DEBUG("listen, ");
+	if (listen(serve->socket, 1) < 0)
+		err("listen: %m");
+	sa.sa_handler = sigchld_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGCHLD, &sa, NULL) == -1)
+		err("sigaction: %m");
+	sa.sa_handler = sigterm_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGTERM, &sa, NULL) == -1)
+		err("sigaction: %m");
+}
+
+/**
+ * Connect our servers.
+ **/
+void setup_servers(GArray* servers) {
+	int i;
+
+	for(i=0;i<servers->len;i++) {
+		setup_serve(&(g_array_index(servers, SERVER, i)));
+	}
+	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 }
 
 /**

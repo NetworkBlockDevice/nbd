@@ -96,9 +96,8 @@ void err(const char *s) {
 	s1[maxlen-1] = '\0';
 #ifdef ISSERVER
 	syslog(LOG_ERR, "%s", s1);
-#else
-	fprintf(stderr, "Error: %s\n", s1);
 #endif
+	fprintf(stderr, "Error: %s\n", s1);
 	exit(1);
 }
 
