@@ -250,6 +250,17 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term>listenaddr</term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>If this option is set, it should contain the local IP
+	  address (in "dotted-quad" notation) on which we should
+	  listen to <command>nbd-client</command>(8) connections. If
+	  it is not set, 0.0.0.0 is used (i.e., "listen on all local
+	  IP addresses")</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>multifile</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>
