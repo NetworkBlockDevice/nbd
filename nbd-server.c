@@ -172,6 +172,7 @@ typedef struct {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
+	gchar* listenaddr;   /**< The IP address we're listening on */
 	unsigned int port;   /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
 	int flags;           /**< flags associated with this exported file */
@@ -334,7 +335,7 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -345,7 +346,8 @@ void usage() {
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
-	       "\t\taddress of the machine trying to connect\n" );
+	       "\t\taddress of the machine trying to connect\n" 
+	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
 	printf("Using configuration file %s\n", CFILE);
 }
 
@@ -353,6 +355,7 @@ void usage() {
 void dump_section(SERVER* serve, gchar* section_header) {
 	printf("[%s]\n", section_header);
 	printf("\texportname = %s\n", serve->exportname);
+	printf("\tlistenaddr = %s\n", serve->listenaddr);
 	printf("\tport = %d\n", serve->port);
 	if(serve->flags & F_READONLY) {
 		printf("\treadonly = true\n");
@@ -402,6 +405,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	char suffix;
 	gboolean do_output=FALSE;
 	gchar* section_header;
+	gchar** addr_port;
 
 	if(argc==1) {
 		return NULL;
@@ -415,7 +419,15 @@ SERVER* cmdline(int argc, char *argv[]) {
 			/* non-option argument */
 			switch(nonspecial++) {
 			case 0:
-				serve->port=strtol(optarg, NULL, 0);
+				addr_port=g_strsplit(optarg, ":", 2);
+				if(addr_port[1]) {
+					serve->port=strtol(addr_port[1], NULL, 0);
+					serve->host=g_strdup(addr_port[0]);
+				} else {
+					serve->host=g_strdup("0.0.0.0");
+					serve->port=strtol(addr_port[0], NULL, 0);
+				}
+				g_strfreev(addr_port);
 				break;
 			case 1:
 				serve->exportname = g_strdup(optarg);
@@ -546,8 +558,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "autoreadonly", FALSE, PARAM_BOOL,	NULL, F_AUTOREADONLY },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
+		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
-	const int lp_size=14;
+	const int lp_size=15;
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
@@ -592,6 +605,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[8].target=lp[9].target=lp[10].target=
 				lp[11].target=lp[12].target=
 				lp[13].target=&(s.flags);
+		lp[14].target=&(s.listnaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -1455,55 +1469,6 @@ int serveloop(GArray* servers) G_GNUC_NORETURN {
 }
 
 /**
- * Go daemon (unless we specified at compile time that we didn't want this)
- * @param serve the first server of our configuration. If its port is zero,
- * 	then do not daemonize, because we're doing inetd then. This parameter
- * 	is only used to create a PID file of the form
- * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
- **/
-#if !defined(NODAEMON) && !defined(NOFORK)
-void daemonize(SERVER* serve) {
-	FILE*pidf;
-
-	if(serve && !(serve->port)) {
-		return;
-	}
-	if(daemon(0,0)<0) {
-		err("daemon");
-	}
-	if(!*pidftemplate) {
-		if(serve) {
-			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
-		} else {
-			strncpy(pidftemplate, "/var/run/server.pid", 255);
-		}
-	}
-	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
-	pidf=fopen(pidfname, "w");
-	if(pidf) {
-		fprintf(pidf,"%d\n", (int)getpid());
-		fclose(pidf);
-	} else {
-		perror("fopen");
-		fprintf(stderr, "Not fatal; continuing");
-	}
-}
-#else
-#define daemonize(serve)
-#endif /* !defined(NODAEMON) && !defined(NOFORK) */
-
-/*
- * Everything beyond this point (in the file) is run in non-daemon mode.
- * The stuff above daemonize() isn't.
- */
-
-void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN {
-	g_message("Export of %s on port %d failed:", serve->exportname,
-			serve->port);
-	err(msg);
-}
-
-/**
  * Connect a server's socket.
  *
  * @param serve the server we want to connect.
@@ -1553,7 +1518,8 @@ void setup_serve(SERVER *serve) {
 	}
 #endif
 	addrin.sin_port = htons(serve->port);
-	addrin.sin_addr.s_addr = 0;
+	if(!inet_aton(serve->listenaddr, &(addrin.sin_addr.s_addr)))
+		err("could not parse listen address");
 	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
 		err("bind: %m");
 	DEBUG("listen, ");
@@ -1584,6 +1550,55 @@ void setup_servers(GArray* servers) {
 }
 
 /**
+ * Go daemon (unless we specified at compile time that we didn't want this)
+ * @param serve the first server of our configuration. If its port is zero,
+ * 	then do not daemonize, because we're doing inetd then. This parameter
+ * 	is only used to create a PID file of the form
+ * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
+ **/
+#if !defined(NODAEMON) && !defined(NOFORK)
+void daemonize(SERVER* serve) {
+	FILE*pidf;
+
+	if(serve && !(serve->port)) {
+		return;
+	}
+	if(daemon(0,0)<0) {
+		err("daemon");
+	}
+	if(!*pidftemplate) {
+		if(serve) {
+			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
+		} else {
+			strncpy(pidftemplate, "/var/run/server.pid", 255);
+		}
+	}
+	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
+	pidf=fopen(pidfname, "w");
+	if(pidf) {
+		fprintf(pidf,"%d\n", (int)getpid());
+		fclose(pidf);
+	} else {
+		perror("fopen");
+		fprintf(stderr, "Not fatal; continuing");
+	}
+}
+#else
+#define daemonize(serve)
+#endif /* !defined(NODAEMON) && !defined(NOFORK) */
+
+/*
+ * Everything beyond this point (in the file) is run in non-daemon mode.
+ * The stuff above daemonize() isn't.
+ */
+
+void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN {
+	g_message("Export of %s on port %d failed:", serve->exportname,
+			serve->port);
+	err(msg);
+}
+
+/**
  * Set up user-ID and/or group-ID
  **/
 void dousers(void) {
@@ -1595,8 +1610,10 @@ void dousers(void) {
 			g_message("Invalid group name: %s", rungroup);
 			exit(EXIT_FAILURE);
 		}
-		if(setgid(gr->gr_gid)<0)
-			msg3(LOG_DEBUG, "Could not set GID: %s", strerror(errno));
+		if(setgid(gr->gr_gid)<0) {
+			g_message("Could not set GID: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 	if(runuser) {
 		pw=getpwnam(runuser);
@@ -1604,8 +1621,10 @@ void dousers(void) {
 			g_message("Invalid user name: %s", runuser);
 			exit(EXIT_FAILURE);
 		}
-		if(setuid(pw->pw_uid)<0)
-			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
+		if(setuid(pw->pw_uid)<0) {
+			g_message(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 
