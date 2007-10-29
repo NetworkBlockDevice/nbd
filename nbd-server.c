@@ -139,7 +139,7 @@ gchar* rungroup=NULL;
  **/
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
-			    authorization file (yuck) */
+			       authorization file (yuck) */
 #define BUFSIZE (1024*1024)+sizeof(struct nbd_reply) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
@@ -598,14 +598,15 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[0].target=&(s.exportname);
 		lp[1].target=&(s.port);
 		lp[2].target=&(s.authname);
-		lp[3].target=&(s.expected_size);
-		lp[4].target=&(virtstyle);
-		lp[5].target=&(s.prerun);
-		lp[6].target=&(s.postrun);
-		lp[7].target=lp[8].target=lp[9].target=
-				lp[10].target=lp[11].target=
-				lp[12].target=&(s.flags);
-		lp[13].target=&(s.listenaddr);
+		lp[3].target=&(s.timeout);
+		lp[4].target=&(s.expected_size);
+		lp[5].target=&(virtstyle);
+		lp[6].target=&(s.prerun);
+		lp[7].target=&(s.postrun);
+		lp[8].target=lp[9].target=lp[10].target=
+				lp[11].target=lp[12].target=
+				lp[13].target=&(s.flags);
+		lp[14].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -1467,7 +1468,7 @@ int serveloop(GArray* servers) {
 					/* child */
 					g_hash_table_destroy(children);
 					for(i=0;i<servers->len;i++) {
-						serve=(g_array_index(servers, SERVER*, i));
+						serve=g_array_index(servers, SERVER*, i);
 						close(serve->socket);
 					}
 					/* FALSE does not free the
@@ -1698,6 +1699,10 @@ int main(int argc, char *argv[]) {
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
 	
+	if(!servers || !servers->len) {
+		g_warning("Could not parse config file: %s", 
+				err ? err->message : "Unknown error");
+	}
 	if(serve) {
 		g_array_append_val(servers, *serve);
      
