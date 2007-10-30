@@ -762,7 +762,7 @@ void sigterm_handler(int s) {
 		unlink(pidfname);
 	}
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 /**
@@ -1643,7 +1643,7 @@ int main(int argc, char *argv[]) {
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
-		exit(-1) ;
+		exit(EXIT_FAILURE) ;
 	}
 
 	memset(pidftemplate, '\0', 256);
