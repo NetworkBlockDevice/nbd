@@ -1571,9 +1571,9 @@ void daemonize(SERVER* serve) {
 	}
 	if(!*pidftemplate) {
 		if(serve) {
-			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
+			strncpy(pidftemplate, "/var/run/nbd-server.%d.pid", 255);
 		} else {
-			strncpy(pidftemplate, "/var/run/server.pid", 255);
+			strncpy(pidftemplate, "/var/run/nbd-server.pid", 255);
 		}
 	}
 	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
