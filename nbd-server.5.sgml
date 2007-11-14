@@ -144,6 +144,7 @@ manpage.1: manpage.sgml
         </listitem>
       </varlistentry>
     </variablelist>
+  </refsect1>
   <refsect1>
     <title>OPTIONS FOR EXPORT SECTIONS</title>
 
@@ -324,7 +325,7 @@ manpage.1: manpage.sgml
       </varlistentry>
       <varlistentry>
         <term><option>sdp</option></term>
-	<lisitem>
+	<listitem>
 	  <para>Optional; boolean.</para>
 	  <para>
 	    When this option is enabled, <command>nbd-server</command>
@@ -343,6 +344,7 @@ manpage.1: manpage.sgml
 	    message.
 	  </para>
 	</listitem
+      </varlistentry>
       <varlistentry>
 	<term><option>sparse_cow</option></term>
 	<listitem>

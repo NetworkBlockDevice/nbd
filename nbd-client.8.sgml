@@ -60,7 +60,7 @@ manpage.1: manpage.sgml
       <arg choice=plain><option><replaceable>host</replaceable></option></arg>
       <arg choice=plain><option><replaceable>port</replaceable></option></arg>
       <arg choice=plain><option><replaceable>nbd-device</replaceable></option></arg>
-      <arg><optoin>-sdp</option></arg>
+      <arg><option>-sdp</option></arg>
       <arg><option>-swap</option></arg>
       <arg><option>-persist</option></arg>
     </cmdsynopsis>
@@ -125,6 +125,7 @@ manpage.1: manpage.sgml
 	    (SDP), rather than IP. See nbd-server(1) for details.
 	  </para>
 	</listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>-swap</option></term>
 	<listitem>
