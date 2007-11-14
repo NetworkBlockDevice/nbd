@@ -88,6 +88,8 @@
 
 #include <glib.h>
 
+#include <nbd-server.h>
+
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
@@ -304,6 +306,7 @@ int authorized_client(CLIENT *opts) {
  **/
 inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
+
 	while (len > 0) {
 		DEBUG("*");
 		if ((res = read(f, buf, len)) <= 0)
@@ -322,10 +325,11 @@ inline void readit(int f, void *buf, size_t len) {
  **/
 inline void writeit(int f, void *buf, size_t len) {
 	ssize_t res;
+
 	while (len > 0) {
 		DEBUG("+");
 		if ((res = write(f, buf, len)) <= 0)
-			err("Send failed: %m");
+			err("Write failed: %m");
 		len -= res;
 		buf += res;
 	}
@@ -935,7 +939,7 @@ int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
  * @return The number of bytes actually read, or -1 in case of an
  * error.
  **/
-ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
+ssize_t rawexpread(off_t a, size_t len, CLIENT *client) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
@@ -948,19 +952,18 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG4("(READ from fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
-	return read(fhandle, buf, len);
+	return backend_send(fhandle, client->net, a, len);
 }
 
 /**
  * Call rawexpread repeatedly until all data has been read.
  * @return 0 on success, nonzero on failure
  **/
-int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
+int rawexpread_fully(off_t a, size_t len, CLIENT *client) {
 	ssize_t ret=0;
 
-	while(len > 0 && (ret=rawexpread(a, buf, len, client)) > 0 ) {
+	while(len > 0 && (ret=rawexpread(a, len, client)) > 0 ) {
 		a += ret;
-		buf += ret;
 		len -= ret;
 	}
 	return (ret < 0 || len != 0);
@@ -976,13 +979,13 @@ int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param client The client we're going to read for
  * @return 0 on success, nonzero on failure
  **/
-int expread(off_t a, char *buf, size_t len, CLIENT *client) {
+int expread(off_t a, size_t len, CLIENT *client) {
 	off_t rdlen, offset;
 	off_t mapcnt, mapl, maph, pagestart;
 
 	if (!(client->server->flags & F_COPYONWRITE))
-		return(rawexpread_fully(a, buf, len, client));
-	DEBUG3("Asked to read %d bytes at %llu.\n", len, (unsigned long long)a);
+		return(rawexpread_fully(a, len, client));
+	DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
@@ -994,14 +997,12 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
-			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
-			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
 		} else { /* the block is not there */
 			DEBUG2("Page %llu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
-			if(rawexpread_fully(a, buf, rdlen, client)) return -1;
+			if(rawexpread_fully(a, rdlen, client)) return -1;
 		}
-		len-=rdlen; a+=rdlen; buf+=rdlen;
+		len-=rdlen; a+=rdlen; 
 	}
 	return 0;
 }
@@ -1049,7 +1050,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			rdlen=DIFFPAGESIZE ;
-			if (rawexpread_fully(pagestart, pagebuf, rdlen, client))
+			if (rawexpwrite_fully(pagestart, pagebuf, rdlen, client))
 				return -1;
 			memcpy(pagebuf+offset,buf,wrlen) ;
 			if (write(client->difffile, pagebuf, DIFFPAGESIZE) !=
@@ -1183,7 +1184,8 @@ int mainloop(CLIENT *client) {
 		/* READ */
 
 		DEBUG("exp->buf, ");
-		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
+		writeit(client->net, buf, sizeof(struct nbd_reply));
+		if (expread(request.from, len, client)) {
 			DEBUG("Read failed: %m");
 			ERROR(client, reply, errno);
 			continue;
@@ -1191,7 +1193,6 @@ int mainloop(CLIENT *client) {
 
 		DEBUG("buf->net, ");
 		memcpy(buf, &reply, sizeof(struct nbd_reply));
-		writeit(client->net, buf, len + sizeof(struct nbd_reply));
 		DEBUG("OK!\n");
 	}
 	free(buf);
@@ -1611,7 +1612,6 @@ void daemonize(SERVER* serve) {
  * Everything beyond this point (in the file) is run in non-daemon mode.
  * The stuff above daemonize() isn't.
  */
-
 void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN;
 
 void serve_err(SERVER* serve, const char* msg) {
@@ -1729,7 +1729,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
     
-    if(!servers || !servers->len) {
+	if(!servers || !servers->len) {
 		g_warning("Could not parse config file: %s", 
 				err ? err->message : "Unknown error");
 	}

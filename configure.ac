@@ -96,6 +96,22 @@ AC_CHECK_SIZEOF(unsigned long long int)
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr])
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
+AC_MSG_CHECKING([for backend to use])
+AC_COMPILE_IFELSE([#include <sys/sendfile.h>
+int main(void) {
+	sendfile(0, 0, 0, 0);
+	return 0;
+}], [BACKEND='backend-sendfile-linux.$(OBJEXT)'], [
+dnl This backend needs some extra include files
+  AC_COMPILE_IFELSE([#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+int main(void) {
+	sendfile(0, 0, 0, 0, NULL, NULL, 0);
+}], [BACKEND='backend-sendfile-freebsd.$(OBJEXT)'], [BACKEND='backend-read-write.$(OBJEXT)'])])
+AC_MSG_RESULT($BACKEND)
+AC_SUBST(BACKEND)
+
 AC_MSG_CHECKING(whether client should be built)
 case $host_os in
      linux*) sbin_PROGRAMS="$sbin_PROGRAMS nbd-client"
