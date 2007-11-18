@@ -82,7 +82,7 @@ manpage.1: manpage.sgml
     either in the kernel, or as a module, you can connect to an NBD
     server and use its exported file through a block special file with
     major mode 43.</para>
-
+    
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
@@ -105,6 +105,15 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>timeout=<replaceable>seconds</replaceable></option></term>
+	<listitem>
+	  <para>Set the connection timeout to "seconds". For this to
+	  work, you need a kernel with support for the NBD_SET_TIMEOUT
+	  ioctl; this was introduced into Linus' tree on 2007-10-11,
+	  and will be part of kernel 2.6.24.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>port</option></term>
 	<listitem>
 	  <para>The TCP port on which <command>nbd-server</command> is
@@ -116,6 +125,22 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The block special file this nbd-client should connect
 	    to.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>-d</term>
+	<listitem>
+	  <para>Disconnect the specified nbd device from the
+	  server</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>-persist</term>
+	<listitem>
+	  <para>When this option is specified, &dhpackage; will
+	    immediately try to reconnect an nbd device if the
+	    connection ever drops unexpectedly due to a lost
+	    server or something similar.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
