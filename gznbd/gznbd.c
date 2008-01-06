@@ -52,7 +52,6 @@
 
 #define MY_NAME "gznbd"
 
-
 /* these headers take care of endianness */
 #include "../config.h"
 #include "../cliserv.h"
