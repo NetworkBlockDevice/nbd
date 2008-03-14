@@ -3,8 +3,8 @@ Makefile
 autom4te.cache
 autoscan.log
 config.h
-*~
 config.h.in
+*~
 config.log
 config.status
 file
