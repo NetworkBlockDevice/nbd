@@ -124,3 +124,7 @@ more than one block device at the same time.
 If, while your kblockd is emptying the NBD buffer cache, the kernel
 decides that the cache of the block device your nbd-server is writing to
 needs to be emptied, then you've got a deadlock.
+
+A kernel patch exists[2] to create a separate kernel thread for NBD
+writes which woul fix this problem; however, it has not made it into
+mainline yet.
