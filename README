@@ -103,6 +103,7 @@ FreeBSD: "net/nbd-server", available in the ports tree since 2003.
 	FreeBSD doesn't have kernel support for NBD, so obviously the
 	client isn't built there.
 SuSE: "nbd", since SuSE 10.0
+Fedora: "nbd", since Fedora 7
 
 If you're packaging NBD for a different operating system that isn't in
 the above list, I'd like to know about it.
