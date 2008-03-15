@@ -1349,7 +1349,7 @@ void serveconnection(CLIENT *client) {
 void set_peername(int net, CLIENT *client) {
 	struct sockaddr_in addrin;
 	struct sockaddr_in netaddr;
-	size_t addrinlen = sizeof( addrin );
+	socklen_t addrinlen = sizeof( addrin );
 	char *peername;
 	char *netname;
 	char *tmp;

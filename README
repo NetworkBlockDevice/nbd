@@ -12,14 +12,16 @@ deadlock issues if you do that[1].
 To install the package, please see the INSTALL file. You'll need to
 install it on both the client and the server.
 
-Using NBD is quite easy. First, on the client, you need to create the
-device nodes:
+Using NBD is quite easy. First, on the client, you need to load the nbd
+kernel module; on modern systems, udev will create the needed devices
+nodes /dev/nbdX.
+Otherwise, you can create them manually:
 
 # cd /dev
-# ./MAKEDEV nb0
+# ./MAKEDEV nbd0
 
-(if you need more than one NBD device, repeat the above command for nb1,
-nb2, ...)
+(if you need more than one NBD device, repeat the above command for nbd1,
+nbd2, ...)
 
 Since there's a problem with nbd and the (default) cfq I/O scheduler,
 you may want to set it to deadline:
@@ -47,7 +49,7 @@ nbd-client <hostname> <port> <nbd device>
 
 e.g.,
 
-nbd-client 10.0.0.1 1234 /dev/nb0
+nbd-client 10.0.0.1 1234 /dev/nbd0
 
 nbd-client must be ran as root; the same is not true for nbd-server (but
 do make sure that /var/run is writeable by the server that nbd-server

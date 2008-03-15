@@ -197,21 +197,21 @@ manpage.1: manpage.sgml
       <listitem>
 	<para>To connect to a server running on port 2000 at host
 	  "server.domain.com", using the client's block special file
-	  "/dev/nb0":</para>
+	  "/dev/nbd0":</para>
 	<para><command>nbd-client server.domain.com 2000
-	  /dev/nb0</command></para>
+	  /dev/nbd0</command></para>
       </listitem>
       <listitem>
 	<para>To connect to a server running on port 2001 at host
 	  "swapserver.domain.com", using the client's block special
-	  file "/dev/nb1", for swap purposes:</para>
-	<para><command>nbd-client swapserver.domain.com 2001 /dev/nb1
+	  file "/dev/nbd1", for swap purposes:</para>
+	<para><command>nbd-client swapserver.domain.com 2001 /dev/nbd1
 	  -swap</command></para>
       </listitem>
       <listitem>
 	<para>To disconnect the above connection again (after making
 	  sure the block special file is not in use anymore):</para>
-	<para><command>nbd-client -d /dev/nb1</command></para>
+	<para><command>nbd-client -d /dev/nbd1</command></para>
       </listitem>
     </itemizedlist>
   </refsect1>
