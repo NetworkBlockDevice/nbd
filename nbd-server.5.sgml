@@ -343,7 +343,7 @@ manpage.1: manpage.sgml
 	    then <command>nbd-server</command> will exit with an error
 	    message.
 	  </para>
-	</listitem
+	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>sparse_cow</option></term>
