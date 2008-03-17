@@ -1220,8 +1220,12 @@ void setupexport(CLIENT* client) {
 			/* Try again because maybe media was read-only */
 			fi.fhandle = open(tmpname, O_RDONLY);
 			if(fi.fhandle != -1) {
-				client->server->flags |= F_AUTOREADONLY;
-				client->server->flags |= F_READONLY;
+				/* Opening the base file in copyonwrite mode is
+				 * okay */
+				if(!(client->server->flags & F_COPYONWRITE)) {
+					client->server->flags |= F_AUTOREADONLY;
+					client->server->flags |= F_READONLY;
+				}
 			}
 		}
 		if(fi.fhandle == -1) {
