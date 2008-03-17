@@ -559,7 +559,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
-	const int lp_size=15;
+	const int lp_size=14;
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },

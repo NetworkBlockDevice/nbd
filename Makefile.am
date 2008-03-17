@@ -2,6 +2,7 @@ bin_PROGRAMS = nbd-server
 EXTRA_PROGRAMS = nbd-client knbd-client
 TESTS = $(srcdir)/simple_test
 check_PROGRAMS = nbd-tester-client
+knbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_server_SOURCES = nbd-server.c cliserv.h
 nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.h
