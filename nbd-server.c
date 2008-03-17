@@ -1393,7 +1393,6 @@ int serveloop(GArray* servers) {
 	int sock;
 	fd_set mset;
 	fd_set rset;
-	struct timeval tv;
 
 	/* 
 	 * Set up the master fd_set. The set of descriptors we need
@@ -1415,9 +1414,7 @@ int serveloop(GArray* servers) {
 		pid_t *pid;
 
 		memcpy(&rset, &mset, sizeof(fd_set));
-		tv.tv_sec=0;
-		tv.tv_usec=500;
-		if(select(max+1, &rset, NULL, NULL, &tv)>0) {
+		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
 			DEBUG("accept, ");
 			for(i=0;i<servers->len;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
