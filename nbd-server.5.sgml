@@ -174,23 +174,6 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>autoreadonly</option></term>
-	<listitem>
-	  <para>Optional; boolean.</para>
-	  <para>
-	    If this option is set to true, then
-	    <command>nbd-server</command> will automatically switch to
-	    readonly if it cannot write to the file.
-	  </para>
-	  <para>Does not have a corresponding command-line
-	    argument</para>
-	  <para>TODO: verify whether this option actually works as
-	    documented. I have a feeling I've been terribly
-	    stupid.
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
 	<term><option>copyonwrite</option></term>
 	<listitem>
 	  <para>

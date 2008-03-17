@@ -555,7 +555,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
-		{ "autoreadonly", FALSE, PARAM_BOOL,	NULL, F_AUTOREADONLY },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
