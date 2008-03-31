@@ -68,6 +68,10 @@ manpage.1: manpage.sgml
       <command>&dhpackage;</command>
       <arg choice=plain><option>-d <replaceable>nbd-device</replaceable></option></arg>
     </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
+      <arg choice="plain"><option>-c <replaceable>nbd-device</replaceable></option></arg>
+    </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>DESCRIPTION</title>
@@ -125,6 +129,22 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The block special file this nbd-client should connect
 	    to.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>-c</term>
+	<listitem>
+	  <para>Check whether the specified nbd device is
+	  connected.</para>
+	  <para>If the device is connected, &dhpackage; will exit
+	  with an exit state of 0 and print the PID of the &dhpackage;
+	  instance that connected it to stdout.
+	  <para>If the device is not
+	  connected or does not exist (for example because the nbd
+	  module was not loaded), &dhpackage; will exit with an exit
+	  state of 1 and not print anything on stdout.</para>
+	  <para>If an error occurred, &dhpackage; will exit with an exit
+	  state of 2, and not print anything on stdout either.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
