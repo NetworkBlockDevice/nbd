@@ -38,7 +38,7 @@
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
 
-int check_conn(char* devname) {
+int check_conn(char* devname, int do_print) {
 	char buf[256];
 	int fd;
 	int len;
@@ -55,7 +55,7 @@ int check_conn(char* devname) {
 	}
 	len=read(fd, buf, 256);
 	buf[len-1]='\0';
-	printf("%s\n", buf);
+	if(do_print) printf("%s\n", buf);
 	return 0;
 }
 
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 	if(strcmp(argv[0], "-c")==0) {
-		return check_conn(argv[1]);
+		return check_conn(argv[1], 1);
 	}
 	
 	if (strncmp(argv[0], "bs=", 3)==0) {
@@ -304,12 +304,17 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 	chdir("/");
+	do {
 #ifndef NOFORK
-	if (fork())
-		exit(0);
+		if (fork()) {
+			while(check_conn(nbddev, 0)) {
+				sleep(1);
+			}
+			open(nbddev, O_RDONLY);
+			exit(0);
+		}
 #endif
 
-	do {
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
 			fprintf(stderr, "Kernel call returned: %m");
 			if(errno==EBADR) {
