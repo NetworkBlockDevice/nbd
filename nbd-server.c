@@ -559,13 +559,13 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
-	const int lp_size=14;
+	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
 	};
 	PARAM* p=gp;
-	int p_size=2;
+	int p_size=sizeof(gp)/sizeof(PARAM);
 	GKeyFile *cfile;
 	GError *err = NULL;
 	const char *err_msg=NULL;
@@ -602,9 +602,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[6].target=&(s.prerun);
 		lp[7].target=&(s.postrun);
 		lp[8].target=lp[9].target=lp[10].target=
-				lp[11].target=lp[12].target=
-				lp[13].target=&(s.flags);
-		lp[14].target=&(s.listenaddr);
+				lp[11].target=lp[12].target=&(s.flags);
+		lp[13].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
