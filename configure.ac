@@ -93,7 +93,12 @@ AC_ARG_WITH(
 	sbin_PROGRAMS=knbd-client
 	AC_MSG_RESULT($KLCC)
       else
-        AC_MSG_ERROR("specified klcc is not executable or does not exist.")
+      	if test "$withval" = "no"; then
+	  KLCC=""
+	  AC_MSG_RESULT(Disabled)
+	else
+          AC_MSG_ERROR([specified klcc ($withval) is not executable or does not exist.])
+	fi
       fi
     else
       if test -x /usr/bin/klcc; then
@@ -101,7 +106,7 @@ AC_ARG_WITH(
 	sbin_PROGRAMS=knbd-client
 	AC_MSG_RESULT($KLCC)
       else
-        AC_MSG_ERROR("klcc not found! Please specify it as a parameter to the --with-klcc option");
+        AC_MSG_ERROR([klcc not found! Please specify it as a parameter to the --with-klcc option]);
       fi
     fi
   ],
