@@ -1,6 +1,7 @@
 bin_PROGRAMS = nbd-server
 EXTRA_PROGRAMS = nbd-client knbd-client
-TESTS = $(srcdir)/simple_test
+TESTS_ENVIRONMENT=$(srcdir)/simple_test
+TESTS = cmd cfg1 cfgmulti
 check_PROGRAMS = nbd-tester-client
 knbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_client_SOURCES = nbd-client.c cliserv.h
@@ -24,3 +25,6 @@ nbd-server.5.in: nbd-server.5.sgml
 	mv NBD-SERVER.5 nbd-server.5.in
 dist-hook:
 	rm -Rf `find $(distdir) -name '.svn' -type d -print`
+cmd:
+cfg1:
+cfgmulti:
