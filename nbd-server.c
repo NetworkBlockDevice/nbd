@@ -170,7 +170,6 @@ typedef enum {
  **/
 typedef struct {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
-	gchar* cowname;	     /**< template for the filename of the copy-on-write file */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
 	gchar* listenaddr;   /**< The IP address we're listening on */
@@ -559,7 +558,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
-		{ "cowname",	FALSE,	PARAM_STRING,	NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
@@ -606,9 +604,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[8].target=lp[9].target=lp[10].target=
 				lp[11].target=lp[12].target=&(s.flags);
 		lp[13].target=&(s.listenaddr);
-		lp[14].target=&(s.cowname);
-
-		s.cowname = "$F-$I-$P.diff";
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
