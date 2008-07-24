@@ -1421,9 +1421,16 @@ int serveloop(GArray* servers) {
 			for(i=0;i<servers->len;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
+					int sock_flags;
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 						err("accept: %m");
 
+					if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
+						err("fcntl F_GETFL");
+					}
+					if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
+						err("fcntl F_SETFL ~O_NONBLOCK");
+					}
 					client = g_malloc(sizeof(CLIENT));
 					client->server=serve;
 					client->exportsize=OFFT_MAX;
