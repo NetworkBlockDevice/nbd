@@ -367,7 +367,7 @@ void dump_section(SERVER* serve, gchar* section_header) {
 		printf("\tcopyonwrite = true\n");
 	}
 	if(serve->expected_size) {
-		printf("\tfilesize = %Ld\n", (long long int)serve->expected_size);
+		printf("\tfilesize = %lld\n", (long long int)serve->expected_size);
 	}
 	if(serve->authname) {
 		printf("\tauthfile = %s\n", serve->authname);
