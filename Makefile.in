@@ -40,7 +40,7 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Doxyfile.in \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(srcdir)/nbd-server.1.in \
 	$(srcdir)/nbd-server.5.in $(top_srcdir)/configure INSTALL \
-	compile config.guess config.sub depcomp install-sh missing
+	config.guess config.sub depcomp install-sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
