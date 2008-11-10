@@ -96,11 +96,11 @@
 /* Define to 1 if you want nbd-server to log through syslog */
 #undef ISSERVER
 
-/* Set to 1 if a (kernel 2.6) nbd.h can be found in the linux directory in the
-   search path */
+/* Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search
+   path */
 #undef NBD_H_LINUX
 
-/* Set to 1 if a (kernel 2.6) nbd.h can be found in the current directory */
+/* Set to 1 if a (2.6) nbd.h can be found in the current directory */
 #undef NBD_H_LOCAL
 
 /* Define to 1 if Large File Support should be enabled */

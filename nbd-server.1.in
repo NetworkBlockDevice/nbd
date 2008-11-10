@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "07 juni 2006" "" ""
+.TH "NBD-SERVER" "1" "24 oktober 2006" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
@@ -12,12 +12,6 @@ nbd-server \- serve a file as a block device to other computers    running the G
 \fBnbd-server \fR \fB\fIport\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-a \fItimeout\fB\fR ] [ \fB-l \fIhost list\fB\fR ]
 
 .SH "DESCRIPTION"
-.PP
-This manual page documents the
-\fBnbd-server\fR command.
-.PP
-This manual page was written for the Debian GNU/Linux distribution
-because the original program does not have a manual page.
 .PP
 \fBnbd-server\fR is the server for the Linux
 Network Block Device (NBD). With NBD, a client can use a file,
@@ -92,6 +86,18 @@ with lots of writes), and that after disconnecting and
 reconnecting the client or the server, all changes are
 lost.
 .TP
+\fB-C\fR
+Specify configuration file. The default configuration
+file, if this parameter is not specified, is
+\fI@sysconfdir@/nbd-server/config\fR\&.
+
+Note that the configuration file is always parsed and
+the entries in the file used, even if an extra server is
+specified on the command line. To disable the configuration
+file entirely, either move it away or use the -C option to
+point \fBnbd-server\fR(1) to a non-existing or
+empty configuration file.
+.TP
 \fBtimeout\fR
 Maximum number of idle seconds. If a connection is
 inactive for this amount of time, it is terminated; this is to
@@ -131,15 +137,20 @@ server:
 -c\fR
 .SH "SEE ALSO"
 .PP
-nbd-client (8), http://nbd.sourceforge.net/roadmap.html
+nbd-client (8), nbd-server (5), http://nbd.sourceforge.net/roadmap.html
 .SH "AUTHOR"
 .PP
 The NBD kernel module and the NBD tools were originally
 written by Pavel Machek (pavel@ucw.cz)
 .PP
-The kernel module is now maintained by Paul Clements
+The Linux kernel module is now maintained by Paul Clements
 (Paul.Clements@steeleye.com), while the userland tools are
 maintained by Wouter Verhelst (<wouter@debian.org>)
+.PP
+On The Hurd there is a regular translator available to perform the
+client side of the protocol, and the use of
+\fBnbd-client\fR is not required. Please see the
+relevant documentation for more information.
 .PP
 This manual page was written by Wouter Verhelst (<wouter@debian.org>) for
 the Debian GNU/Linux system (but may be used by others).  Permission is

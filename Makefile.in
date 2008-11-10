@@ -37,11 +37,13 @@ POST_UNINSTALL = :
 sbin_PROGRAMS = @sbin_PROGRAMS@
 bin_PROGRAMS = nbd-server$(EXEEXT)
 EXTRA_PROGRAMS = nbd-client$(EXEEXT)
+check_PROGRAMS = nbd-tester-client$(EXEEXT)
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Doxyfile.in \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(srcdir)/config.h.in $(top_srcdir)/configure compile depcomp \
-	install-sh missing
+	$(srcdir)/config.h.in $(srcdir)/nbd-server.1.in \
+	$(srcdir)/nbd-server.5.in $(top_srcdir)/configure compile \
+	depcomp install-sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -50,9 +52,10 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno configure.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = Doxyfile
+CONFIG_CLEAN_FILES = Doxyfile nbd-server.1 nbd-server.5
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" \
-	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man8dir)"
+	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man5dir)" \
+	"$(DESTDIR)$(man8dir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(sbin_PROGRAMS)
@@ -62,6 +65,10 @@ nbd_client_LDADD = $(LDADD)
 am_nbd_server_OBJECTS = nbd_server-nbd-server.$(OBJEXT)
 nbd_server_OBJECTS = $(am_nbd_server_OBJECTS)
 nbd_server_DEPENDENCIES =
+am_nbd_tester_client_OBJECTS =  \
+	nbd_tester_client-nbd-tester-client.$(OBJEXT)
+nbd_tester_client_OBJECTS = $(am_nbd_tester_client_OBJECTS)
+nbd_tester_client_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I.
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -69,12 +76,15 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(nbd_client_SOURCES) $(nbd_server_SOURCES)
-DIST_SOURCES = $(nbd_client_SOURCES) $(nbd_server_SOURCES)
+SOURCES = $(nbd_client_SOURCES) $(nbd_server_SOURCES) \
+	$(nbd_tester_client_SOURCES)
+DIST_SOURCES = $(nbd_client_SOURCES) $(nbd_server_SOURCES) \
+	$(nbd_tester_client_SOURCES)
 man1dir = $(mandir)/man1
+man5dir = $(mandir)/man5
 man8dir = $(mandir)/man8
 NROFF = nroff
-MANS = $(man1_MANS) $(man8_MANS)
+MANS = $(man_MANS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -164,9 +174,9 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
-man8_MANS = @man8_MANS@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
+nbd_server_CPPFLAGS = @nbd_server_CPPFLAGS@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 prefix = @prefix@
@@ -176,13 +186,16 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
+TESTS = $(srcdir)/simple_test
 nbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_server_SOURCES = nbd-server.c cliserv.h
+nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.h
 nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
+nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@
-man1_MANS = nbd-server.1
-EXTRA_MANS = nbd-client.8
-EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd/gznbd.c gznbd/Makefile winnbd/license.txt winnbd/nbdsrvr.dsp winnbd/NBDSvrWin2000.zip winnbd/readme.txt winnbd/nbdsrvr.cpp winnbd/nbdsrvr.dsw winnbd/README lfs.h nbd-client.8 nbd-server.1
+nbd_tester_client_LDADD = @GLIB_LIBS@
+man_MANS = nbd-server.1 nbd-server.5 nbd-client.8
+EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml nbd-server.5.sgml gznbd winnbd lfs.h nbd-client.8 CodingStyle
 MAINTAINERCLEANFILES = nbd-client.8 nbd-server.1
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -241,6 +254,10 @@ distclean-hdr:
 	-rm -f config.h stamp-h1
 Doxyfile: $(top_builddir)/config.status $(srcdir)/Doxyfile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
+nbd-server.1: $(top_builddir)/config.status $(srcdir)/nbd-server.1.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+nbd-server.5: $(top_builddir)/config.status $(srcdir)/nbd-server.5.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	test -z "$(bindir)" || $(mkdir_p) "$(DESTDIR)$(bindir)"
@@ -264,6 +281,9 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+
+clean-checkPROGRAMS:
+	-test -z "$(check_PROGRAMS)" || rm -f $(check_PROGRAMS)
 install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	test -z "$(sbindir)" || $(mkdir_p) "$(DESTDIR)$(sbindir)"
@@ -293,6 +313,9 @@ nbd-client$(EXEEXT): $(nbd_client_OBJECTS) $(nbd_client_DEPENDENCIES)
 nbd-server$(EXEEXT): $(nbd_server_OBJECTS) $(nbd_server_DEPENDENCIES) 
 	@rm -f nbd-server$(EXEEXT)
 	$(LINK) $(nbd_server_LDFLAGS) $(nbd_server_OBJECTS) $(nbd_server_LDADD) $(LIBS)
+nbd-tester-client$(EXEEXT): $(nbd_tester_client_OBJECTS) $(nbd_tester_client_DEPENDENCIES) 
+	@rm -f nbd-tester-client$(EXEEXT)
+	$(LINK) $(nbd_tester_client_LDFLAGS) $(nbd_tester_client_OBJECTS) $(nbd_tester_client_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -302,6 +325,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd-client.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_server-nbd-server.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_tester_client-nbd-tester-client.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -318,18 +342,32 @@ distclean-compile:
 @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
 
 nbd_server-nbd-server.o: nbd-server.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-nbd-server.o -MD -MP -MF "$(DEPDIR)/nbd_server-nbd-server.Tpo" -c -o nbd_server-nbd-server.o `test -f 'nbd-server.c' || echo '$(srcdir)/'`nbd-server.c; \
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-nbd-server.o -MD -MP -MF "$(DEPDIR)/nbd_server-nbd-server.Tpo" -c -o nbd_server-nbd-server.o `test -f 'nbd-server.c' || echo '$(srcdir)/'`nbd-server.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/nbd_server-nbd-server.Tpo" "$(DEPDIR)/nbd_server-nbd-server.Po"; else rm -f "$(DEPDIR)/nbd_server-nbd-server.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-server.c' object='nbd_server-nbd-server.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.o `test -f 'nbd-server.c' || echo '$(srcdir)/'`nbd-server.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.o `test -f 'nbd-server.c' || echo '$(srcdir)/'`nbd-server.c
 
 nbd_server-nbd-server.obj: nbd-server.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-nbd-server.obj -MD -MP -MF "$(DEPDIR)/nbd_server-nbd-server.Tpo" -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`; \
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-nbd-server.obj -MD -MP -MF "$(DEPDIR)/nbd_server-nbd-server.Tpo" -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/nbd_server-nbd-server.Tpo" "$(DEPDIR)/nbd_server-nbd-server.Po"; else rm -f "$(DEPDIR)/nbd_server-nbd-server.Tpo"; exit 1; fi
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-server.c' object='nbd_server-nbd-server.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`
+
+nbd_tester_client-nbd-tester-client.o: nbd-tester-client.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_tester_client_CFLAGS) $(CFLAGS) -MT nbd_tester_client-nbd-tester-client.o -MD -MP -MF "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo" -c -o nbd_tester_client-nbd-tester-client.o `test -f 'nbd-tester-client.c' || echo '$(srcdir)/'`nbd-tester-client.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo" "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Po"; else rm -f "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-tester-client.c' object='nbd_tester_client-nbd-tester-client.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_tester_client_CFLAGS) $(CFLAGS) -c -o nbd_tester_client-nbd-tester-client.o `test -f 'nbd-tester-client.c' || echo '$(srcdir)/'`nbd-tester-client.c
+
+nbd_tester_client-nbd-tester-client.obj: nbd-tester-client.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_tester_client_CFLAGS) $(CFLAGS) -MT nbd_tester_client-nbd-tester-client.obj -MD -MP -MF "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo" -c -o nbd_tester_client-nbd-tester-client.obj `if test -f 'nbd-tester-client.c'; then $(CYGPATH_W) 'nbd-tester-client.c'; else $(CYGPATH_W) '$(srcdir)/nbd-tester-client.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo" "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Po"; else rm -f "$(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-tester-client.c' object='nbd_tester_client-nbd-tester-client.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_tester_client_CFLAGS) $(CFLAGS) -c -o nbd_tester_client-nbd-tester-client.obj `if test -f 'nbd-tester-client.c'; then $(CYGPATH_W) 'nbd-tester-client.c'; else $(CYGPATH_W) '$(srcdir)/nbd-tester-client.c'; fi`
 uninstall-info-am:
 install-man1: $(man1_MANS) $(man_MANS)
 	@$(NORMAL_INSTALL)
@@ -375,6 +413,51 @@ uninstall-man1:
 	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
 	  echo " rm -f '$(DESTDIR)$(man1dir)/$$inst'"; \
 	  rm -f "$(DESTDIR)$(man1dir)/$$inst"; \
+	done
+install-man5: $(man5_MANS) $(man_MANS)
+	@$(NORMAL_INSTALL)
+	test -z "$(man5dir)" || $(mkdir_p) "$(DESTDIR)$(man5dir)"
+	@list='$(man5_MANS) $(dist_man5_MANS) $(nodist_man5_MANS)'; \
+	l2='$(man_MANS) $(dist_man_MANS) $(nodist_man_MANS)'; \
+	for i in $$l2; do \
+	  case "$$i" in \
+	    *.5*) list="$$list $$i" ;; \
+	  esac; \
+	done; \
+	for i in $$list; do \
+	  if test -f $(srcdir)/$$i; then file=$(srcdir)/$$i; \
+	  else file=$$i; fi; \
+	  ext=`echo $$i | sed -e 's/^.*\\.//'`; \
+	  case "$$ext" in \
+	    5*) ;; \
+	    *) ext='5' ;; \
+	  esac; \
+	  inst=`echo $$i | sed -e 's/\\.[0-9a-z]*$$//'`; \
+	  inst=`echo $$inst | sed -e 's/^.*\///'`; \
+	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
+	  echo " $(INSTALL_DATA) '$$file' '$(DESTDIR)$(man5dir)/$$inst'"; \
+	  $(INSTALL_DATA) "$$file" "$(DESTDIR)$(man5dir)/$$inst"; \
+	done
+uninstall-man5:
+	@$(NORMAL_UNINSTALL)
+	@list='$(man5_MANS) $(dist_man5_MANS) $(nodist_man5_MANS)'; \
+	l2='$(man_MANS) $(dist_man_MANS) $(nodist_man_MANS)'; \
+	for i in $$l2; do \
+	  case "$$i" in \
+	    *.5*) list="$$list $$i" ;; \
+	  esac; \
+	done; \
+	for i in $$list; do \
+	  ext=`echo $$i | sed -e 's/^.*\\.//'`; \
+	  case "$$ext" in \
+	    5*) ;; \
+	    *) ext='5' ;; \
+	  esac; \
+	  inst=`echo $$i | sed -e 's/\\.[0-9a-z]*$$//'`; \
+	  inst=`echo $$inst | sed -e 's/^.*\///'`; \
+	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
+	  echo " rm -f '$(DESTDIR)$(man5dir)/$$inst'"; \
+	  rm -f "$(DESTDIR)$(man5dir)/$$inst"; \
 	done
 install-man8: $(man8_MANS) $(man_MANS)
 	@$(NORMAL_INSTALL)
@@ -470,10 +553,83 @@ GTAGS:
 distclean-tags:
 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 
+check-TESTS: $(TESTS)
+	@failed=0; all=0; xfail=0; xpass=0; skip=0; \
+	srcdir=$(srcdir); export srcdir; \
+	list='$(TESTS)'; \
+	if test -n "$$list"; then \
+	  for tst in $$list; do \
+	    if test -f ./$$tst; then dir=./; \
+	    elif test -f $$tst; then dir=; \
+	    else dir="$(srcdir)/"; fi; \
+	    if $(TESTS_ENVIRONMENT) $${dir}$$tst; then \
+	      all=`expr $$all + 1`; \
+	      case " $(XFAIL_TESTS) " in \
+	      *" $$tst "*) \
+		xpass=`expr $$xpass + 1`; \
+		failed=`expr $$failed + 1`; \
+		echo "XPASS: $$tst"; \
+	      ;; \
+	      *) \
+		echo "PASS: $$tst"; \
+	      ;; \
+	      esac; \
+	    elif test $$? -ne 77; then \
+	      all=`expr $$all + 1`; \
+	      case " $(XFAIL_TESTS) " in \
+	      *" $$tst "*) \
+		xfail=`expr $$xfail + 1`; \
+		echo "XFAIL: $$tst"; \
+	      ;; \
+	      *) \
+		failed=`expr $$failed + 1`; \
+		echo "FAIL: $$tst"; \
+	      ;; \
+	      esac; \
+	    else \
+	      skip=`expr $$skip + 1`; \
+	      echo "SKIP: $$tst"; \
+	    fi; \
+	  done; \
+	  if test "$$failed" -eq 0; then \
+	    if test "$$xfail" -eq 0; then \
+	      banner="All $$all tests passed"; \
+	    else \
+	      banner="All $$all tests behaved as expected ($$xfail expected failures)"; \
+	    fi; \
+	  else \
+	    if test "$$xpass" -eq 0; then \
+	      banner="$$failed of $$all tests failed"; \
+	    else \
+	      banner="$$failed of $$all tests did not behave as expected ($$xpass unexpected passes)"; \
+	    fi; \
+	  fi; \
+	  dashes="$$banner"; \
+	  skipped=""; \
+	  if test "$$skip" -ne 0; then \
+	    skipped="($$skip tests were not run)"; \
+	    test `echo "$$skipped" | wc -c` -le `echo "$$banner" | wc -c` || \
+	      dashes="$$skipped"; \
+	  fi; \
+	  report=""; \
+	  if test "$$failed" -ne 0 && test -n "$(PACKAGE_BUGREPORT)"; then \
+	    report="Please report to $(PACKAGE_BUGREPORT)"; \
+	    test `echo "$$report" | wc -c` -le `echo "$$banner" | wc -c` || \
+	      dashes="$$report"; \
+	  fi; \
+	  dashes=`echo "$$dashes" | sed s/./=/g`; \
+	  echo "$$dashes"; \
+	  echo "$$banner"; \
+	  test -z "$$skipped" || echo "$$skipped"; \
+	  test -z "$$report" || echo "$$report"; \
+	  echo "$$dashes"; \
+	  test "$$failed" -eq 0; \
+	else :; fi
+
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/. $(distdir)/gznbd $(distdir)/winnbd
+	$(mkdir_p) $(distdir)/.
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -601,10 +757,12 @@ distcleancheck: distclean
 	       $(distcleancheck_listfiles) ; \
 	       exit 1; } >&2
 check-am: all-am
+	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
+	$(MAKE) $(AM_MAKEFLAGS) check-TESTS
 check: check-am
 all-am: Makefile $(PROGRAMS) $(MANS) config.h
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man8dir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man5dir)" "$(DESTDIR)$(man8dir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: install-am
@@ -634,8 +792,8 @@ maintainer-clean-generic:
 	-test -z "$(MAINTAINERCLEANFILES)" || rm -f $(MAINTAINERCLEANFILES)
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic clean-sbinPROGRAMS \
-	mostlyclean-am
+clean-am: clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
+	clean-sbinPROGRAMS mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
@@ -660,7 +818,7 @@ install-exec-am: install-binPROGRAMS install-sbinPROGRAMS
 
 install-info: install-info-am
 
-install-man: install-man1 install-man8
+install-man: install-man1 install-man5 install-man8
 
 installcheck-am:
 
@@ -686,33 +844,36 @@ ps-am:
 uninstall-am: uninstall-binPROGRAMS uninstall-info-am uninstall-man \
 	uninstall-sbinPROGRAMS
 
-uninstall-man: uninstall-man1 uninstall-man8
+uninstall-man: uninstall-man1 uninstall-man5 uninstall-man8
 
-.PHONY: CTAGS GTAGS all all-am am--refresh check check-am clean \
-	clean-binPROGRAMS clean-generic clean-sbinPROGRAMS ctags dist \
-	dist-all dist-bzip2 dist-gzip dist-hook dist-shar dist-tarZ \
-	dist-zip distcheck distclean distclean-compile \
-	distclean-generic distclean-hdr distclean-tags distcleancheck \
-	distdir distuninstallcheck dvi dvi-am html html-am info \
-	info-am install install-am install-binPROGRAMS install-data \
-	install-data-am install-exec install-exec-am install-info \
-	install-info-am install-man install-man1 install-man8 \
-	install-sbinPROGRAMS install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-binPROGRAMS uninstall-info-am \
-	uninstall-man uninstall-man1 uninstall-man8 \
-	uninstall-sbinPROGRAMS
+.PHONY: CTAGS GTAGS all all-am am--refresh check check-TESTS check-am \
+	clean clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
+	clean-sbinPROGRAMS ctags dist dist-all dist-bzip2 dist-gzip \
+	dist-hook dist-shar dist-tarZ dist-zip distcheck distclean \
+	distclean-compile distclean-generic distclean-hdr \
+	distclean-tags distcleancheck distdir distuninstallcheck dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-binPROGRAMS install-data install-data-am install-exec \
+	install-exec-am install-info install-info-am install-man \
+	install-man1 install-man5 install-man8 install-sbinPROGRAMS \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-info-am uninstall-man uninstall-man1 uninstall-man5 \
+	uninstall-man8 uninstall-sbinPROGRAMS
 
-nbd-server.1: nbd-server.1.sgml
+nbd-server.1.in: nbd-server.1.sgml
 	docbook2man nbd-server.1.sgml
-	mv NBD-SERVER.1 nbd-server.1
+	mv NBD-SERVER.1 nbd-server.1.in
 nbd-client.8: nbd-client.8.sgml
 	docbook2man nbd-client.8.sgml
 	mv NBD-CLIENT.8 nbd-client.8
+nbd-server.5.in: nbd-server.5.sgml
+	docbook2man nbd-server.5.sgml
+	mv NBD-SERVER.5 nbd-server.5.in
 dist-hook:
-	rm -Rf `find $(distdir) -name 'CVS' -type d -print`
+	rm -Rf `find $(distdir) -name '.svn' -type d -print`
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

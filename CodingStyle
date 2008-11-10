@@ -1,0 +1,46 @@
+NBD Coding style.
+=================
+
+The following expresses my opinion of what C code should look like. I'm
+not as strict as the Kernel maintainers on this one (NBD isn't even
+remotely as large anyway), but code that does not follow these rules
+needs to be updated so that it does, which is useless time wasted for
+me. Therefore, it's appreciated if you would follow these rules.
+
+Thanks.
+
+* Use a tab width of 8 characters. You may use tab or 8 spaces as you
+  please, it doesn't really matter to me.
+* opening curly brackets occur on the same line as whatever they're
+  curly brackets for, _in all cases_. This includes function
+  definitions, if structures, loops, and so on; every code block appears
+  like so:
+
+int foo(int bar) {
+  	...
+}
+
+* Variable declarations are separated from the rest of a function block
+  by a line of whitespace. It's okay to assign a value to a variable
+  when you're declaring it if you can do that on one line of code, but
+  it must still be in the block of declarations at the top with a
+  whiteline below.
+* Variables are declared one on each line. So no
+
+	int foo, bar;
+
+  use
+
+	int foo;
+	int bar;
+
+  instead.
+* Try to fit everything in 80 columns. This goes especially for comment
+  lines, but may be relaxed for function calls with 79 arguments, or so,
+  if that's not feasible.
+* If your function block is more than three or so screenfulls, there's a
+  hint that you should break it up.
+
+It is true that not all of the code currently follows these rules; but
+that should not stop you from following them for new code, or from
+cleaning up if you can (i.e., you have commit rights).

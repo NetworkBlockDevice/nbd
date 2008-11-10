@@ -35,17 +35,15 @@ typedef unsigned long long u64;
 #error I need at least some 64-bit type
 #endif
 
-/* 2.6.18 and above use __be* rather than u* */
 #define __be32 u32
 #define __be64 u64
 
 #ifdef NBD_H_LOCAL
 #include "nbd.h"
-#else
+#endif
 #ifdef NBD_H_LINUX
 #include <linux/nbd.h>
-#endif // NBD_H_LINUX
-#endif // NBD_H_LOCAL
+#endif
 
 #if NBD_LFS==1
 #define _LARGEFILE_SOURCE
@@ -57,8 +55,7 @@ u64 cliserv_magic = 0x00420281861253LL;
 
 #define INFO(a) do { } while(0)
 
-void setmysockopt(int sock)
-{
+void setmysockopt(int sock) {
 	int size = 1;
 #if 0
 	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(int)) < 0)
@@ -76,8 +73,7 @@ void setmysockopt(int sock)
 #endif
 }
 
-void err(const char *s)
-{
+void err(const char *s) {
 	const int maxlen = 150;
 	char s1[maxlen], *s2;
 
@@ -105,8 +101,7 @@ void err(const char *s)
 	exit(1);
 }
 
-void logging(void)
-{
+void logging(void) {
 #ifdef ISSERVER
 	openlog(MY_NAME, LOG_PID, LOG_DAEMON);
 #endif
@@ -115,13 +110,11 @@ void logging(void)
 }
 
 #ifdef WORDS_BIGENDIAN
-u64 ntohll(u64 a)
-{
+u64 ntohll(u64 a) {
 	return a;
 }
 #else
-u64 ntohll(u64 a)
-{
+u64 ntohll(u64 a) {
 	u32 lo = a & 0xffffffff;
 	u32 hi = a >> 32U;
 	lo = ntohl(lo);
