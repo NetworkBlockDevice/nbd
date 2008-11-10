@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svnroot/nbd/!svn/ver/68/branches/release_2_7/nbd/gznbd
+END
+gznbd.c
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svnroot/nbd/!svn/ver/68/branches/release_2_7/nbd/gznbd/gznbd.c
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svnroot/nbd/!svn/ver/68/branches/release_2_7/nbd/gznbd/Makefile
+END

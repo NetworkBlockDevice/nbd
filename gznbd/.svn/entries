@@ -1,32 +1,54 @@
-<?xml version="1.0" encoding="utf-8"?>
-<wc-entries
-   xmlns="svn:">
-<entry
-   committed-rev="7"
-   name=""
-   committed-date="2000-12-10T21:37:05.000000Z"
-   url="https://svn.sourceforge.net/svnroot/nbd/branches/release_2_7/nbd/gznbd"
-   last-author="pavel"
-   kind="dir"
-   uuid="c136e6c4-970e-0410-a1d0-886ecdd65105"
-   repos="https://svn.sourceforge.net/svnroot/nbd"
-   revision="177"/>
-<entry
-   committed-rev="7"
-   name="gznbd.c"
-   text-time="2006-04-03T20:26:20.000000Z"
-   committed-date="2000-12-10T21:37:05.000000Z"
-   checksum="4a5210350de8e8c0d7f265162d75a3d6"
-   last-author="pavel"
-   kind="file"
-   prop-time="2006-04-03T20:26:20.000000Z"/>
-<entry
-   committed-rev="7"
-   name="Makefile"
-   text-time="2006-04-03T20:26:20.000000Z"
-   committed-date="2000-12-10T21:37:05.000000Z"
-   checksum="d4a15452985a83245dd4e8d5db4335aa"
-   last-author="pavel"
-   kind="file"
-   prop-time="2006-04-03T20:26:20.000000Z"/>
-</wc-entries>
+8
+
+dir
+186
+https://svn.sourceforge.net/svnroot/nbd/branches/release_2_7/nbd/gznbd
+https://svn.sourceforge.net/svnroot/nbd
+
+
+
+2000-12-10T21:37:05.000000Z
+7
+pavel
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+c136e6c4-970e-0410-a1d0-886ecdd65105
+
+gznbd.c
+file
+
+
+
+
+2006-04-03T20:26:20.000000Z
+4a5210350de8e8c0d7f265162d75a3d6
+2000-12-10T21:37:05.000000Z
+7
+pavel
+has-props
+
+Makefile
+file
+
+
+
+
+2006-04-03T20:26:20.000000Z
+d4a15452985a83245dd4e8d5db4335aa
+2000-12-10T21:37:05.000000Z
+7
+pavel
+has-props
+
