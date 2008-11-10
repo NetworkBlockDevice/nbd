@@ -68,6 +68,7 @@
 #include <sys/mount.h>		/* For BLKGETSIZE */
 #endif
 #include <signal.h>		/* sigaction */
+#include <errno.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
 #include <netdb.h>		/* hostent, gethostby*, getservby* */
@@ -179,6 +180,10 @@ typedef struct {
 	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
 	uint8_t cidrlen;     /**< The length of the mask when we use
 				  CIDR-style virtualization */
+	gchar* prerun;	     /**< command to be ran after connecting a client,
+				  but before starting to serve */
+	gchar* postrun;	     /**< command that will be ran after the client
+				  disconnects */
 } SERVER;
 
 /**
@@ -530,6 +535,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "timeout",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
+		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
+		{ "postrun",	FALSE,	PARAM_STRING,	NULL, 0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
@@ -576,8 +583,11 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[3].target=&(s.timeout);
 		lp[4].target=&(s.expected_size);
 		lp[5].target=&(virtstyle);
-		lp[6].target=lp[7].target=lp[8].target=
-				lp[9].target=lp[10].target=&(s.flags);
+		lp[6].target=&(s.prerun);
+		lp[7].target=&(s.postrun);
+		lp[8].target=lp[9].target=lp[10].target=
+				lp[11].target=lp[12].target=&(s.flags);
+		
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
 			p=lp;
@@ -1018,10 +1028,11 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param client The client we're negotiating with.
  **/
 void negotiate(CLIENT *client) {
-	char zeros[300];
+	char zeros[128];
 	u64 size_host;
+	u32 flags = NBD_FLAG_HAS_FLAGS;
 
-	memset(zeros, '\0', 290);
+	memset(zeros, '\0', sizeof(zeros));
 	if (write(client->net, INIT_PASSWD, 8) < 0)
 		err("Negotiation failed: %m");
 	cliserv_magic = htonll(cliserv_magic);
@@ -1030,14 +1041,19 @@ void negotiate(CLIENT *client) {
 	size_host = htonll((u64)(client->exportsize));
 	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed: %m");
-	if (write(client->net, zeros, 128) < 0)
+	if (client->server->flags & F_READONLY)
+		flags |= NBD_FLAG_READ_ONLY;
+	flags = htonl(flags);
+	if (write(client->net, &flags, 4) < 0)
+		err("Negotiation failed: %m");
+	if (write(client->net, zeros, 124) < 0)
 		err("Negotiation failed: %m");
 }
 
 /** sending macro. */
 #define SEND(net,reply) writeit( net, &reply, sizeof( reply ));
 /** error macro. */
-#define ERROR(client,reply) { reply.error = htonl(-1); SEND(client->net,reply); reply.error = 0; }
+#define ERROR(client,reply,errcode) { reply.error = htonl(errcode); SEND(client->net,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -1045,7 +1061,7 @@ void negotiate(CLIENT *client) {
  * pieces. Preferably with a chainsaw.
  *
  * @param client The client we're going to serve to.
- * @return never
+ * @return when the client disconnects
  **/
 int mainloop(CLIENT *client) {
 	struct nbd_request request;
@@ -1097,13 +1113,13 @@ int mainloop(CLIENT *client) {
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 		if ((request.from + len) > (OFFT_MAX)) {
 			DEBUG("[Number too large!]");
-			ERROR(client, reply);
+			ERROR(client, reply, EINVAL);
 			continue;
 		}
 
 		if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
 			DEBUG("[RANGE!]");
-			ERROR(client, reply);
+			ERROR(client, reply, EINVAL);
 			continue;
 		}
 
@@ -1114,12 +1130,12 @@ int mainloop(CLIENT *client) {
 			if ((client->server->flags & F_READONLY) ||
 			    (client->server->flags & F_AUTOREADONLY)) {
 				DEBUG("[WRITE to READONLY!]");
-				ERROR(client, reply);
+				ERROR(client, reply, EPERM);
 				continue;
 			}
 			if (expwrite(request.from, buf, len, client)) {
 				DEBUG("Write failed: %m" );
-				ERROR(client, reply);
+				ERROR(client, reply, errno);
 				continue;
 			}
 			SEND(client->net, reply);
@@ -1131,7 +1147,7 @@ int mainloop(CLIENT *client) {
 		DEBUG("exp->buf, ");
 		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
 			DEBUG("Read failed: %m");
-			ERROR(client, reply);
+			ERROR(client, reply, errno);
 			continue;
 		}
 
@@ -1233,6 +1249,25 @@ int copyonwrite_prepare(CLIENT* client) {
 }
 
 /**
+ * Run a command. This is used for the ``prerun'' and ``postrun'' config file
+ * options
+ *
+ * @param command the command to be ran. Read from the config file
+ * @param file the file name we're about to export
+ **/
+int do_run(gchar* command, gchar* file) {
+	gchar* cmd;
+	int retval=0;
+
+	if(command && *command) {
+		cmd = g_strdup_printf(command, file);
+		retval=system(cmd);
+		g_free(cmd);
+	}
+	return retval;
+}
+
+/**
  * Serve a connection. 
  *
  * @todo allow for multithreading, perhaps use libevent. Not just yet, though;
@@ -1249,7 +1284,10 @@ void serveconnection(CLIENT *client) {
 
 	setmysockopt(client->net);
 
-	mainloop(client);
+	if(!do_run(client->server->prerun, client->exportname)) {
+		mainloop(client);
+	}
+	do_run(client->server->postrun, client->exportname);
 }
 
 /**
@@ -1499,6 +1537,7 @@ int serveloop(GArray* servers) {
 #endif // NOFORK
 					msg2(LOG_INFO,"Starting to serve");
 					serveconnection(client);
+					exit(EXIT_SUCCESS);
 				}
 			}
 		}
@@ -1511,15 +1550,15 @@ int serveloop(GArray* servers) {
 void dousers(void) {
 	struct passwd *pw;
 	struct group *gr;
-	if(runuser) {
-		pw=getpwnam(runuser);
-		if(setuid(pw->pw_uid)<0)
-			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
-	}
 	if(rungroup) {
 		gr=getgrnam(rungroup);
 		if(setgid(gr->gr_gid)<0)
 			msg3(LOG_DEBUG, "Could not set GID: %s", strerror(errno));
+	}
+	if(runuser) {
+		pw=getpwnam(runuser);
+		if(setuid(pw->pw_uid)<0)
+			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
 	}
 }
 
@@ -1543,7 +1582,8 @@ int main(int argc, char *argv[]) {
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
 	if(!servers || !servers->len) {
-		g_warning("Could not parse config file: %s", err->message);
+		g_warning("Could not parse config file: %s", 
+				err ? err->message : "Unknown error");
 	}
 	if(serve) {
 		g_array_append_val(servers, *serve);

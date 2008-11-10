@@ -3,13 +3,13 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "19 juli 2007" "" ""
+.TH "NBD-CLIENT" "8" "09 september 2007" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device
 .SH SYNOPSIS
 
-\fBnbd-client\fR [ \fBbs=\fIblocksize\fB\fR ] \fB\fIhost\fB\fR \fB\fIport\fB\fR \fB\fInbd-device\fB\fR [ \fB-swap\fR ]
+\fBnbd-client\fR [ \fBbs=\fIblocksize\fB\fR ] [ \fBtimeout=\fIseconds\fB\fR ] \fB\fIhost\fB\fR \fB\fIport\fB\fR \fB\fInbd-device\fB\fR [ \fB-swap\fR ] [ \fB-persist\fR ]
 
 
 \fBnbd-client\fR \fB-d \fInbd-device\fB\fR

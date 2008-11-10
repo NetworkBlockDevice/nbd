@@ -320,7 +320,8 @@ manpage.1: manpage.sgml
 	    will use sparse files to implement the copy-on-write
 	    option; such files take up less space then they appear to,
 	    which allows <command>nbd-server</command> to handle the
-	    file as if it was just as large as the block device it's for.
+	    file as if it was just as large as the block device it's
+	    for.
 	  </para>
 	  <para>
 	    If this option is disabled, <command>nbd-server</command>
@@ -414,11 +415,11 @@ manpage.1: manpage.sgml
 		  after it. <command>nbd-server</command> will use the
 		  number as a network mask in CIDR style, and use that
 		  as a hash cutoff point. In the above example, if
-		  <option>virtstyle</option> has been specified
-		  as <constant>cidrhash 16</constant>, then
+		  <option>virtstyle</option> has been specified as
+		  <constant>cidrhash 16</constant>, then
 		  <command>nbd-server</command> will try to open
-		  <filename>/export/192.168.0.0/192.168.1.100</filename>; if
-		  <option>virtstyle</option> were specified as
+		  <filename>/export/192.168.0.0/192.168.1.100</filename>;
+		  if <option>virtstyle</option> were specified as
 		  <constant>cidrhash 26</constant>, then
 		  <command>nbd-server</command> will try to open
 		  <filename>/export/192.168.1.64/192.168.1.100</filename>.
@@ -428,8 +429,55 @@ manpage.1: manpage.sgml
 	  </variablelist>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>prerun</option></term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>
+	    If specified, then this command will be ran after a
+	    client has connected to the server (and has been
+	    accepted), but before the server starts serving. If
+	    the command contains the literal string '%s', then
+	    this string will be replaced by the filename of the
+	    file which nbd-server wants to export.
+	  </para>
+	  <para>
+	    This is useful to create export files on the fly, or
+	    to verify that a file can be used for export, to
+	    write something to a log file, or similar.
+	  </para>
+	  <para>
+	    If the command runs with a non-zero exit status,
+	    then nbd-server will assume the export will fail,
+	    and refuse to serve it.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>postrun</option></term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>
+	    If specified, then it is assumed to be a command
+	    that will be ran when a client has
+	    disconnected. This can be useful to clean up
+	    whatever <option>prerun</option> has set up, to log
+	    something, or similar.
+	  </para>
+	  <para>
+	    If the literal string '%s' is present in the
+	    command, it will be replaced by the file name that
+	    has just been closed.
+	  </para>
+	  <para>
+	    In contrast to the <option>prerun</option> option,
+	    the exit state of <option>postrun</option> is
+	    <emphasis>ignored</emphasis>.
+	  </para>
+	</listitem>
+      </varlistentry>
     </variablelist>
-
+    
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>

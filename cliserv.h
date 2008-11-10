@@ -124,3 +124,7 @@ u64 ntohll(u64 a) {
 }
 #endif
 #define htonll ntohll
+
+/* Flags used between the client and server */
+#define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */
+#define NBD_FLAG_READ_ONLY	(1 << 1)	/* Device is read-only */
