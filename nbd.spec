@@ -3,11 +3,11 @@
 %def_enable lfs
 %def_disable sdp
 %def_with gznbd
-%def_with static_client
+%def_without static_client
 
 %define Name NBD
 Name: nbd
-Version: 2.9.9
+Version: 2.9.10
 Release: alt1
 Summary: Tools for using the Network Block Device
 License: GPL
@@ -15,8 +15,7 @@ Group: Networking/Other
 URL: http://%name.sourceforge.net/
 Source0: %name-%version.tar.bz2
 Source1: %name.init
-Patch0:	%name-types.patch
-Patch1:	%name-2.9.6-gznbd.patch
+Patch: %name-2.9.10-types.patch
 BuildRequires: glib2-devel >= 2.6.0
 %{?_with_gznbd:BuildRequires: zlib-devel}
 %{?_with_static_client:BuildRequires: dietlibc}
@@ -71,8 +70,7 @@ This package contains static %name-client (can be used for initrd).
 
 %prep
 %setup
-%patch0 -p1
-%patch1 -p1
+%patch -p1
 
 
 %build
@@ -86,7 +84,7 @@ This package contains static %name-client (can be used for initrd).
 mv %name-client{,.static}
 %make_build clean
 %endif
-%make_build
+%make_build sbin_PROGRAMS=nbd-client
 %{?_with_gznbd:%make_build -C gznbd CFLAGS="%optflags -DMY_NAME='\"gznbd\"'"}
 
 
@@ -132,6 +130,11 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
+* Thu Apr 03 2008 Led <led@altlinux.ru> 2.9.10-alt1
+- 2.9.10
+- removed %name-2.9.6-gznbd.patch (fixed in upstream)
+- updated %name-2.9.10-types.patch
+
 * Mon Dec 10 2007 Led <led@altlinux.ru> 2.9.9-alt1
 - 2.9.9
 - removed nbd-2.9.8-close.patch

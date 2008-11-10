@@ -1,17 +1,7 @@
---- nbd-2.8.1/gznbd/gznbd.c.orig	2005-10-27 19:39:06.000000000 +0200
-+++ nbd-2.8.1/gznbd/gznbd.c	2005-10-29 15:50:12.000000000 +0200
-@@ -49,8 +49,10 @@
- /* asm/types defines __u??, at least on my system */
- #include <asm/types.h>
- 
-+/* defined in cliserv
- #define u32 __u32
- #define u64 __u64
-+*/
- 
- /* these headers take care of endianness */
- #include "../config.h"
-@@ -95,7 +97,7 @@
+diff -urN nbd-2.9.10.orig/gznbd/gznbd.c nbd-2.9.10/gznbd/gznbd.c
+--- nbd-2.9.10.orig/gznbd/gznbd.c	2008-03-14 14:19:32 +0200
++++ nbd-2.9.10/gznbd/gznbd.c	2008-04-03 23:33:10 +0300
+@@ -95,7 +95,7 @@
        fprintf(stderr,"%s: %s does not appear to be a valid size\n",argv[0],argv[3]);
        exit(1);
      }
@@ -20,7 +10,7 @@
    } else {
      char buffer[BLOCK];
      int result;
-@@ -110,7 +112,7 @@
+@@ -110,7 +110,7 @@
      }
  
      if(result==0){
