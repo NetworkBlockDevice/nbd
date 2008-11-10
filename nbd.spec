@@ -5,7 +5,7 @@
 
 %define Name NBD
 Name: nbd
-Version: 2.9.6
+Version: 2.9.7
 Release: alt1
 Summary: Tools for using the Network Block Device
 License: GPL
@@ -91,6 +91,9 @@ install -d %buildroot%_sysconfdir/%name-server
 
 
 %changelog
+* Fri Sep 21 2007 Led <led@altlinux.ru> 2.9.7-alt1
+- 2.9.7
+
 * Mon Aug 06 2007 Led <led@altlinux.ru> 2.9.6-alt1
 - 2.9.6
 - updated %name-2.9.6-gznbd.patch
