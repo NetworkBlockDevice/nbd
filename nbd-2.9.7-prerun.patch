@@ -1,0 +1,30 @@
+diff -urN nbd-2.9.7.orig/nbd-server.c nbd-2.9.7/nbd-server.c
+--- nbd-2.9.7.orig/nbd-server.c	2007-09-18 15:29:55 +0300
++++ nbd-2.9.7/nbd-server.c	2007-10-14 01:16:03 +0300
+@@ -1276,18 +1276,17 @@
+  * @param client a connected client
+  **/
+ void serveconnection(CLIENT *client) {
+-	setupexport(client);
+-
+-	if (client->server->flags & F_COPYONWRITE) {
+-		copyonwrite_prepare(client);
+-	}
+-
+-	setmysockopt(client->net);
+-
+ 	if(!do_run(client->server->prerun, client->exportname)) {
++		setupexport(client);
++		if (client->server->flags & F_COPYONWRITE) {
++			copyonwrite_prepare(client);
++		}
++		setmysockopt(client->net);
+ 		mainloop(client);
++		do_run(client->server->postrun, client->exportname);
++	} else {
++		msg2(LOG_INFO, "prerun command finished with non-zero code!");
+ 	}
+-	do_run(client->server->postrun, client->exportname);
+ }
+ 
+ /**
