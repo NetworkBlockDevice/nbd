@@ -1,5 +1,9 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define if you want a debugging version of nbd-server (lots of copious
+   output) */
+#undef DODBG
+
 /* Define to 1 if you have the `alarm' function. */
 #undef HAVE_ALARM
 
@@ -105,6 +109,9 @@
 
 /* Define to 1 if Large File Support should be enabled */
 #undef NBD_LFS
+
+/* Define if you don't want the nbd-server to fork() */
+#undef NOFORK
 
 /* Name of package */
 #undef PACKAGE

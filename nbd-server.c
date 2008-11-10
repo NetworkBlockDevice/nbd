@@ -1547,28 +1547,28 @@ int main(int argc, char *argv[]) {
 	}
 	if(serve) {
 		g_array_append_val(servers, *serve);
-	}
-
-	if (!(serve->port)) {
-	  	CLIENT *client;
+     
+		if (!(serve->port)) {
+			CLIENT *client;
 #ifndef ISSERVER
-		/* You really should define ISSERVER if you're going to use
-		 * inetd mode, but if you don't, closing stdout and stderr
-		 * (which inetd had connected to the client socket) will let it
-		 * work. */
-          	close(1);
-          	close(2);
-          	open("/dev/null", O_WRONLY);
-          	open("/dev/null", O_WRONLY);
+			/* You really should define ISSERVER if you're going to use
+			 * inetd mode, but if you don't, closing stdout and stderr
+			 * (which inetd had connected to the client socket) will let it
+			 * work. */
+			close(1);
+			close(2);
+			open("/dev/null", O_WRONLY);
+			open("/dev/null", O_WRONLY);
 #endif
-		client=g_malloc(sizeof(CLIENT));
-		client->server=serve;
-		client->net=0;
-		client->exportsize=OFFT_MAX;
-          	set_peername(0,client);
-          	serveconnection(client);
-          	return 0;
-        }
+			client=g_malloc(sizeof(CLIENT));
+			client->server=serve;
+			client->net=0;
+			client->exportsize=OFFT_MAX;
+			set_peername(0,client);
+			serveconnection(client);
+			return 0;
+		}
+	}
 	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);
