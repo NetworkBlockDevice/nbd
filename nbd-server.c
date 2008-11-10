@@ -847,12 +847,16 @@ void set_peername(int net,char *clientname)
  *
  * @param port the port where we will listen
  **/
-void connectme(unsigned int port)
-{
+void connectme(unsigned int port) {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	size_t addrinlen = sizeof(addrin);
-	int net, sock, newpid, i;
+	int net;
+	int sock;
+	int newpid;
+	int i;
+	int sock_flags;
+	fd_set read_fds;
 #ifndef sun
 	int yes=1;
 #else
@@ -881,13 +885,21 @@ void connectme(unsigned int port)
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
-
+	
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
 	        err("setsockopt SO_REUSEADDR");
 	}
 	if (setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
 		err("setsockopt SO_KEEPALIVE");
+	}
+
+	/* make the listening socket non-blocking */
+	if ((sock_flags = fcntl(sock, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	if (fcntl(sock, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+		err("fcntl F_SETFL O_NONBLOCK");
 	}
 
 	DEBUG("Waiting for connections... bind, ");
@@ -913,47 +925,61 @@ void connectme(unsigned int port)
 	children=malloc(sizeof(pid_t)*child_arraysize);
 	memset(children, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
 	for(;;) { /* infinite loop */
-		if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-			err("accept: %m");
-		
-		set_peername(net,clientname);
-		if (!authorized_client(clientname)) {
-			msg2(LOG_INFO,"Unauthorized client") ;
-			close(net) ;
-			continue ;
-		}
-		msg2(LOG_INFO,"Authorized client") ;
-		for(i=0;children[i]&&i<child_arraysize;i++);
-		if(i>=child_arraysize) {
-			pid_t*ptr;
-
-			ptr=realloc(children, sizeof(pid_t)*child_arraysize);
-			if(ptr) {
-				children=ptr;
-				memset(children+child_arraysize, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
-				i=child_arraysize+1;
-				child_arraysize+=DEFAULT_CHILD_ARRAY;
-			} else {
-				msg2(LOG_INFO,"Not enough memory to store child PID");
-				close(net);
+		DEBUG("select, ");
+		if(select(sock+1, &read_fds, NULL, NULL, NULL) <= 0) {
+			if(errno == EINTR) {
 				continue;
 			}
+			msg2(LOG_ERR, "select: %m");
+			continue;
 		}
+		if (FD_ISSET(sock, &read_fds)) {
+			if ((net = accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+				if(errno != EAGAIN) {
+					err("accept: %m");
+				}
+				continue;
+			}
+			
+			set_peername(net,clientname);
+			if (!authorized_client(clientname)) {
+				msg2(LOG_INFO,"Unauthorized client") ;
+				close(net) ;
+				continue ;
+			}
+			msg2(LOG_INFO,"Authorized client") ;
+			for(i=0;children[i]&&i<child_arraysize;i++);
+			if(i>=child_arraysize) {
+				pid_t*ptr;
+
+				ptr=realloc(children, sizeof(pid_t)*child_arraysize);
+				if(ptr) {
+					children=ptr;
+					memset(children+child_arraysize, 0, sizeof(pid_t)*DEFAULT_CHILD_ARRAY);
+					i=child_arraysize+1;
+					child_arraysize+=DEFAULT_CHILD_ARRAY;
+				} else {
+					msg2(LOG_INFO,"Not enough memory to store child PID");
+					close(net);
+					continue;
+				}
+			}
 #ifndef NOFORK
-		if ((children[i]=fork())<0) {
-			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-			close(net) ;
-			continue ;
-		}
-		if (children[i]>0) { /* parent */
-			close(net) ; continue ; }
-		/* child */
-		realloc(children,0);
-		child_arraysize=0;
-		close(sock) ;
+			if ((children[i]=fork())<0) {
+				msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+				close(net) ;
+				continue ;
+			}
+			if (children[i]>0) { /* parent */
+				close(net) ; continue ; }
+			/* child */
+			realloc(children,0);
+			child_arraysize=0;
+			close(sock) ;
 #endif // NOFORK
-		msg2(LOG_INFO,"Starting to serve") ;
-		serveconnection(net) ;        
+			msg2(LOG_INFO,"Starting to serve") ;
+			serveconnection(net) ;        
+		}
 	}
 }
 
