@@ -13,7 +13,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
   <!ENTITY dhsurname   "<surname>Verhelst</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>$Date: 2006-10-23 20:45:02 +0200 (ma, 23 okt 2006) $</date>">
+  <!ENTITY dhdate      "<date>$Date: 2007-06-13 12:07:26 +0100 (wo, 13 jun 2007) $</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
@@ -65,6 +65,7 @@ manpage.1: manpage.sgml
       <arg><option>-c</option></arg>
       <arg><option>-a <replaceable>timeout</replaceable></option></arg>
       <arg><option>-l <replaceable>host list</replaceable></option></arg>
+      <arg><option>-o <replaceable>section name</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -201,6 +202,17 @@ manpage.1: manpage.sgml
 	    current directory, unless nbd-server is compiled as a
 	    daemon, in which case it is looked for in the
 	    root-directory.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+      	<term><option>section name</option></term>
+	<listitem>
+	  <para>If the <option>-o</option> argument is given on the
+	  command line, then &dhpackage; will output a configuration
+	  file section with this as the header that is functionally
+	  equivalent to the other options specified on the command line,
+	  and exit. This is useful for migrating pre-2.9 nbd-server
+	  initscript configuration files to the new format.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
