@@ -1292,7 +1292,7 @@ void daemonize(SERVER* serve) {
 			strncpy(pidftemplate, "/var/run/server.pid", 255);
 		}
 	}
-	snprintf(pidfname, 255, pidftemplate, serve->port);
+	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
 	pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
@@ -1359,7 +1359,6 @@ void setup_serve(SERVER *serve) {
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
 		err("sigaction: %m");
-	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 }
 
 /**
@@ -1371,6 +1370,7 @@ void setup_servers(GArray* servers) {
 	for(i=0;i<servers->len;i++) {
 		setup_serve(&(g_array_index(servers, SERVER, i)));
 	}
+	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 }
 
 /**

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Yes, that's POSIX sh, not bash!
+
+tmpnam=`mktemp`
+
+# Create a one-meg device
+dd if=/dev/zero of=$tmpnam bs=1024 count=1024
+
+./nbd-server -C /dev/null -p `pwd`/nbd-server.pid 11111 $tmpnam &
+# -p only works if nbd-server wasn't compiled with -DNOFORK or -DNODAEMON,
+# which I sometimes do for testing and debugging.
+PID=$!
+sleep 1
+./nbd-tester-client localhost 11111
+retval=$?
+if [ -f nbd-server.pid ]
+then
+	kill `cat nbd-server.pid`
+else
+	kill $PID
+fi
+rm -f nbd-server.pid
+rm -f $tmpnam
+exit $retval

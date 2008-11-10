@@ -201,10 +201,16 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 	int requests=0;
 	fd_set set;
 	struct timeval tv;
+	struct timeval start;
+	struct timeval stop;
+	float timespan;
+	int speed;
+	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
 	size_t tmp;
 	signed int do_write=TRUE;
 
+	size=0;
 	if(!sock_is_open) {
 		if((sock=setup_connection(hostname, port, CONNECTION_TYPE_CLISERV))<0) {
 			g_warning("Could not open socket: %s", errstr);
@@ -216,7 +222,6 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 		 * this way, but, well. */
 		size=4096;
 	}
-	size=0;
 	if((tmp=read_all(sock, &size, sizeof(u64)))<0) {
 		retval=-1;
 		snprintf(errstr, errstr_len, "Could not read from socket: %s", strerror(errno));
@@ -232,6 +237,11 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 	req.magic=htonl(NBD_REQUEST_MAGIC);
 	req.type=htonl(NBD_CMD_READ);
 	req.len=htonl(1024);
+	if(gettimeofday(&start, NULL)<0) {
+		retval=-1;
+		snprintf(errstr, errstr_len, "Could not measure start time: %s", strerror(errno));
+		goto err_open;
+	}
 	for(i=0;i+1024<=size;i+=1024) {
 		if(do_write) {
 			*((u64*)req.handle)=i;
@@ -283,6 +293,26 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 			printf("Requests(-): %d\n", --requests);
 		}
 	} while (requests);
+	if(gettimeofday(&stop, NULL)<0) {
+		retval=-1;
+		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
+		goto err_open;
+	}
+	timespan=stop.tv_sec-start.tv_sec+(stop.tv_usec-start.tv_usec)/1000000;
+	speed=(int)(size/timespan);
+	if(speed>1024) {
+		speed>>=10;
+		speedchar[0]='K';
+	}
+	if(speed>1024) {
+		speed>>=10;
+		speedchar[0]='M';
+	}
+	if(speed>1024) {
+		speed>>=10;
+		speedchar[0]='G';
+	}
+	g_message("Throughput test complete. Took %.3f seconds to complete, %d%sB/s",timespan,speed,speedchar);
 
 err_open:
 	if(close_sock) {
