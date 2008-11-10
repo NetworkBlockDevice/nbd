@@ -35,6 +35,10 @@ typedef unsigned long long u64;
 #error I need at least some 64-bit type
 #endif
 
+/* 2.6.18 and above use __be* rather than u* */
+#define __be32 u32
+#define __be64 u64
+
 #ifdef NBD_H_LOCAL
 #include "nbd.h"
 #else

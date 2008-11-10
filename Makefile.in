@@ -182,7 +182,7 @@ nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@
 man1_MANS = nbd-server.1
 EXTRA_MANS = nbd-client.8
-EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h nbd-client.8 nbd-server.1
+EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd/gznbd.c gznbd/Makefile winnbd/license.txt winnbd/nbdsrvr.dsp winnbd/NBDSvrWin2000.zip winnbd/readme.txt winnbd/nbdsrvr.cpp winnbd/nbdsrvr.dsw winnbd/README lfs.h nbd-client.8 nbd-server.1
 MAINTAINERCLEANFILES = nbd-client.8 nbd-server.1
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -473,7 +473,7 @@ distclean-tags:
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/.
+	$(mkdir_p) $(distdir)/. $(distdir)/gznbd $(distdir)/winnbd
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \

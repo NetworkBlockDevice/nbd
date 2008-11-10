@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2004 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.8.6],[wouter@debian.org])
+AC_INIT([nbd],[2.8.7],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -77,6 +77,8 @@ dnl in the old or new versions, even if we don't really care about that.
 dnl This might break at some time, but it should work for now, so...
 AC_TRY_COMPILE([#define u32 int
 #define u64 int
+#define __be32 int
+#define __be64 int
 #include "nbd.h"
 ],
 [int foo=NBD_CMD_DISC], 
@@ -84,6 +86,8 @@ AC_TRY_COMPILE([#define u32 int
     NBD_H='"nbd.h"'],
   AC_TRY_COMPILE([#define u32 int
 #define u64 int
+#define __be32 int
+#define __be64 int
 #include <linux/nbd.h>
   ],
 [int foo=NBD_CMD_DISC],
