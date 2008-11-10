@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.1],[wouter@debian.org])
+AC_INIT([nbd],[2.9.2],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -49,6 +49,7 @@ fi
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
+AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
 AC_C_CONST
@@ -60,8 +61,8 @@ AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strs
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
-case "`uname`" in
-     *Linux*) sbin_PROGRAMS=nbd-client
+case $host_os in
+     linux*) sbin_PROGRAMS=nbd-client
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;
@@ -85,17 +86,26 @@ AC_TRY_COMPILE([#define u32 int
 [int foo=NBD_CMD_DISC],
     [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
       NBD_H='<linux/nbd.h>'],
+    AC_TRY_COMPILE([#include <linux/nbd.h>
+      ],
+      [int foo=NBD_CMD_DISC],
+      [AC_DEFINE(NBD_H_LINUX, 1, Set to 1 if a (2.6) nbd.h can be found in the linux directory in the search path)
+        NBD_H='<linux/nbd.h>'],
     AC_MSG_ERROR(Could not find an nbd.h from 2.6 or above.)
+    )
   )
 )
 if test -f nbd.h
 then
-  if test $NBD_H='<linux/nbd.h>'
+  if test "$NBD_H" = '<linux/nbd.h>'
   then
     AC_MSG_WARN([there is a local nbd.h, but it is from the 2.4-series of kernels. Using the system-provided, working, nbd.h])
   fi
 fi
 AC_MSG_RESULT($NBD_H)
+AC_SEARCH_LIBS(bind, socket,, AC_MSG_ERROR([Could not find an implementation of the bind() system call]))
+AC_SEARCH_LIBS(inet_ntoa, nsl,, AC_MSG_ERROR([Could not find an implementation of the inet_ntoa() system call]))
+AC_SEARCH_LIBS(daemon, resolv,, AC_MSG_ERROR([Could not find an implementation of the daemon() system call]))
 AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])

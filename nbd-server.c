@@ -295,12 +295,33 @@ int authorized_client(CLIENT *opts) {
  **/
 inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
+	gboolean tried = FALSE;
+
 	while (len > 0) {
 		DEBUG("*");
-		if ((res = read(f, buf, len)) <= 0)
-			err("Read failed: %m");
-		len -= res;
-		buf += res;
+		if ((res = read(f, buf, len)) <= 0) {
+			if(!tried && errno==EAGAIN) {
+				/* Assume the connection will work some time in
+				 * the future, but don't run away with CPU time
+				 * in case it doesn't */
+				fd_set set;
+				struct timeval tv;
+
+				DEBUG("Read failed, trying again");
+				tried=TRUE;
+				FD_ZERO(&set);
+				FD_SET(f, &set);
+				tv.tv_sec=30;
+				tv.tv_usec=0;
+				select(f+1, &set, NULL, NULL, &tv);
+			} else {
+				err("Read failed: %m");
+			}
+		} else {
+			len -= res;
+			buf += res;
+			tried=FALSE;
+		}
 	}
 }
 
@@ -313,12 +334,33 @@ inline void readit(int f, void *buf, size_t len) {
  **/
 inline void writeit(int f, void *buf, size_t len) {
 	ssize_t res;
+	gboolean tried=FALSE;
+
 	while (len > 0) {
 		DEBUG("+");
-		if ((res = write(f, buf, len)) <= 0)
-			err("Send failed: %m");
-		len -= res;
-		buf += res;
+		if ((res = write(f, buf, len)) <= 0) {
+			if(!tried && errno==EAGAIN) {
+				/* Assume the connection will work some time in
+				 * the future, but don't run away with CPU time
+				 * in case it doesn't */
+				fd_set set;
+				struct timeval tv;
+
+				DEBUG("Write failed, trying again");
+				tried=TRUE;
+				FD_ZERO(&set);
+				FD_SET(f, &set);
+				tv.tv_sec=30;
+				tv.tv_usec=0;
+				select(f+1, NULL, &set, NULL, &tv);
+			} else {
+				err("Send failed: %m");
+			}
+		} else {
+			len -= res;
+			buf += res;
+			tried=FALSE;
+		}
 	}
 }
 
@@ -693,16 +735,16 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int fhandle) {
 	off_t es;
-	u32 es32;
+	unsigned long sectors;
 	struct stat stat_buf;
 	int error;
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE
-	DEBUG("looking for fhandle size with ioctl BLKGETSIZE\n");
-	if (!ioctl(fhandle, BLKGETSIZE, &es32) && es32) {
-		es = (off_t)es32 * (off_t)512;
+	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
+	if (!ioctl(fhandle, BLKGETSIZE, &sectors) && sectors) {
+		es = (off_t)sectors * (off_t)512;
 		return es;
 	}
 #endif /* BLKGETSIZE */
@@ -1337,7 +1379,7 @@ void setup_serve(SERVER *serve) {
 		err("fcntl F_GETFL");
 	}
 	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
-		err("fcntl F_SETFL O_NONBLOCK");
+		err("fcntl F_SETFL O_NONBLOCK on server socket");
 	}
 
 	DEBUG("Waiting for connections... bind, ");
@@ -1414,12 +1456,20 @@ int serveloop(GArray* servers) {
 			for(i=0;i<servers->len;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
+					int sock_flags;
+
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 						err("accept: %m");
 
 					client = g_malloc(sizeof(CLIENT));
 					client->server=serve;
 					client->exportsize=OFFT_MAX;
+					if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
+						err("fcntl F_GETFL");
+					}
+					if (fcntl(net, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+						err("fcntl F_SETFL O_NONBLOCK on client socket");
+					}
 					client->net=net;
 					set_peername(net, client);
 					if (!authorized_client(client)) {
