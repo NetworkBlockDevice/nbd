@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "05 augustus 2006" "" ""
+.TH "NBD-SERVER" "1" "30 januari 2006" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
@@ -15,6 +15,9 @@ nbd-server \- serve a file as a block device to other computers    running the G
 .PP
 This manual page documents the
 \fBnbd-server\fR command.
+.PP
+This manual page was written for the Debian GNU/Linux distribution
+because the original program does not have a manual page.
 .PP
 \fBnbd-server\fR is the server for the Linux
 Network Block Device (NBD). With NBD, a client can use a file,
@@ -96,13 +99,14 @@ avoid stale nbd-server processes staying in memory. Use of
 this option is strongly recommended.
 .TP
 \fBhost list\fR
-This argument should be the name of a file containing a list of
-IP-addresses for hosts that may connect to the server. Wildcards are
-\fBnot\fR allowed. If the file does not exist, it is
-ignored (and any host can connect); If the file does exist, but is
-empty, no host can connect. By default, the name 'nbd_server.allow'
-is used, and looked for in the current directory, unless nbd-server
-is compiled as a daemon, in which case it is looked for in the
+This argument should contain a list of IP-addresses
+for hosts that may connect to the server. Wildcards are
+\fBnot\fR allowed. If the file does not
+exist, it is ignored (and any host can connect); If the file
+does exist, but is empty, no host can connect. By default,
+the name 'nbd_server.allow' is used, and looked for in the
+current directory, unless nbd-server is compiled as a
+daemon, in which case it is looked for in the
 root-directory.
 .SH "EXAMPLES"
 .PP
@@ -131,13 +135,13 @@ nbd-client (8), http://nbd.sourceforge.net/roadmap.html
 .SH "AUTHOR"
 .PP
 The NBD kernel module and the NBD tools were originally
-written by Pavel Machek <pavel@ucw.cz>
+written by Pavel Machek (pavel@ucw.cz)
 .PP
 The kernel module is now maintained by Paul Clements
-<Paul.Clements@steeleye.com>, while the userland tools are
-maintained by Wouter Verhelst <wouter@debian.org>
+(Paul.Clements@steeleye.com), while the userland tools are
+maintained by Wouter Verhelst (<wouter@debian.org>)
 .PP
-This manual page was written by Wouter Verhelst <wouter@debian.org> for
+This manual page was written by Wouter Verhelst (<wouter@debian.org>) for
 the Debian GNU/Linux system (but may be used by others).  Permission is
 granted to copy, distribute and/or modify this document under
 the terms of the GNU General Public License,

@@ -52,29 +52,14 @@
 #define u32 __u32
 #define u64 __u64
 
-#include <linux/nbd.h>
+/* these headers take care of endianness */
+#include "../config.h"
+#include "../cliserv.h"
 
 #define BLOCK 1024
 
 /* don't ask me why this value, I only copied it */
 #define CHUNK BLOCK*20
-
-/* taken litterally from the original nbd */
-#ifdef WORDS_BIGENDIAN
-u64 ntohll(u64 a)
-{
-  return a;
-}
-#else
-u64 ntohll(u64 a)
-{
-  u32 lo = a & 0xffffffff;
-  u32 hi = a >> 32U;
-  lo = ntohl(lo);
-  hi = ntohl(hi);
-  return ((u64) lo) << 32U | hi;
-}
-#endif
 
 
 int main(int argc, char **argv)

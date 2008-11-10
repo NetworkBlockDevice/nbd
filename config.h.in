@@ -21,15 +21,8 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
-/* Define to 1 if you have the <linux/nbd.h> header file. */
-#undef HAVE_LINUX_NBD_H
-
 /* Define to 1 if you have the `llseek' function. */
 #undef HAVE_LLSEEK
-
-/* Define to 1 if you want to use a local nbd.h (not provided, must be
-   supplied by you) */
-#undef HAVE_LOCAL_NBD_H
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
@@ -103,6 +96,13 @@
 /* Define to 1 if you want nbd-server to log through syslog */
 #undef ISSERVER
 
+/* Set to 1 if a (kernel 2.6) nbd.h can be found in the linux directory in the
+   search path */
+#undef NBD_H_LINUX
+
+/* Set to 1 if a (kernel 2.6) nbd.h can be found in the current directory */
+#undef NBD_H_LOCAL
+
 /* Define to 1 if Large File Support should be enabled */
 #undef NBD_LFS
 
@@ -132,16 +132,16 @@
    release 3. */
 #undef SETVBUF_REVERSED
 
-/* The size of `unsigned int', as computed by sizeof. */
+/* The size of a `unsigned int', as computed by sizeof. */
 #undef SIZEOF_UNSIGNED_INT
 
-/* The size of `unsigned long int', as computed by sizeof. */
+/* The size of a `unsigned long int', as computed by sizeof. */
 #undef SIZEOF_UNSIGNED_LONG_INT
 
-/* The size of `unsigned long long int', as computed by sizeof. */
+/* The size of a `unsigned long long int', as computed by sizeof. */
 #undef SIZEOF_UNSIGNED_LONG_LONG_INT
 
-/* The size of `unsigned short int', as computed by sizeof. */
+/* The size of a `unsigned short int', as computed by sizeof. */
 #undef SIZEOF_UNSIGNED_SHORT_INT
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -166,7 +166,7 @@
 #undef inline
 #endif
 
-/* Define to `long int' if <sys/types.h> does not define. */
+/* Define to `long' if <sys/types.h> does not define. */
 #undef off_t
 
 /* Define to `int' if <sys/types.h> does not define. */

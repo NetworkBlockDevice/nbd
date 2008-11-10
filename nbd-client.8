@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "05 augustus 2006" "" ""
+.TH "NBD-CLIENT" "8" "30 januari 2006" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device
@@ -18,6 +18,9 @@ nbd-client \- connect to a server running nbd-server(1), to use its    exported 
 .PP
 This manual page documents briefly the
 \fBnbd-client\fR command.
+.PP
+This manual page was written for the Debian GNU/Linux distribution
+because the original program does not have a manual page.
 .PP
 With \fBnbd-client\fR, you can connect to a
 server running \fBnbd-server\fR, thus using raw
@@ -86,12 +89,13 @@ nbd-server (1).
 .SH "AUTHOR"
 .PP
 The NBD kernel module and the NBD tools have been written by
-Pavel Macheck (pavel@ucw.cz). Maintenance of the kernel module was taken
-over by Paul Clements <Paul.Clements@steeleye.com>>, while
-Wouter Verhelst <wouter@debian.org> took over maintenance of the NBD userland
-tools.
+Pavel Macheck (pavel@ucw.cz).
 .PP
-This manual page was written by Wouter Verhelst <wouter@debian.org> for
+The kernel module is now maintained by Paul Clements
+(Paul.Clements@steeleye.com), while the userland tools are maintained by
+Wouter Verhelst (wouter@debian.org)
+.PP
+This manual page was written by Wouter Verhelst (<wouter@debian.org>) for
 the Debian GNU/Linux system (but may be used by others).  Permission is
 granted to copy, distribute and/or modify this document under the
 terms of the GNU General Public License,

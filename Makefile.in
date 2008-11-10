@@ -38,9 +38,10 @@ sbin_PROGRAMS = @sbin_PROGRAMS@
 bin_PROGRAMS = nbd-server$(EXEEXT)
 EXTRA_PROGRAMS = nbd-client$(EXEEXT)
 subdir = .
-DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
-	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(top_srcdir)/configure depcomp install-sh missing
+DIST_COMMON = README $(am__configure_deps) $(srcdir)/Doxyfile.in \
+	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(srcdir)/config.h.in $(top_srcdir)/configure compile depcomp \
+	install-sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -49,7 +50,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno configure.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES =
+CONFIG_CLEAN_FILES = Doxyfile
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" \
 	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man8dir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
@@ -58,9 +59,9 @@ PROGRAMS = $(bin_PROGRAMS) $(sbin_PROGRAMS)
 am_nbd_client_OBJECTS = nbd-client.$(OBJEXT)
 nbd_client_OBJECTS = $(am_nbd_client_OBJECTS)
 nbd_client_LDADD = $(LDADD)
-am_nbd_server_OBJECTS = nbd-server.$(OBJEXT)
+am_nbd_server_OBJECTS = nbd_server-nbd-server.$(OBJEXT)
 nbd_server_OBJECTS = $(am_nbd_server_OBJECTS)
-nbd_server_LDADD = $(LDADD)
+nbd_server_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I.
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -108,7 +109,11 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-GREP = @GREP@
+GLIB_CFLAGS = @GLIB_CFLAGS@
+GLIB_GENMARSHAL = @GLIB_GENMARSHAL@
+GLIB_LIBS = @GLIB_LIBS@
+GLIB_MKENUMS = @GLIB_MKENUMS@
+GOBJECT_QUERY = @GOBJECT_QUERY@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -129,11 +134,13 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_STRIP = @ac_ct_STRIP@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
 am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
 am__include = @am__include@
@@ -144,35 +151,31 @@ am__untar = @am__untar@
 bindir = @bindir@
 build_alias = @build_alias@
 datadir = @datadir@
-datarootdir = @datarootdir@
-docdir = @docdir@
-dvidir = @dvidir@
 exec_prefix = @exec_prefix@
 host_alias = @host_alias@
-htmldir = @htmldir@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 libdir = @libdir@
 libexecdir = @libexecdir@
-localedir = @localedir@
 localstatedir = @localstatedir@
+man8_MANS = @man8_MANS@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
-pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
-psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 nbd_client_SOURCES = nbd-client.c cliserv.h
-nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h
+nbd_server_SOURCES = nbd-server.c cliserv.h
+nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
+nbd_server_LDADD = @GLIB_LIBS@
 man1_MANS = nbd-server.1
-man8_MANS = nbd-client.8
-EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd nbd-client.8 nbd-server.1
+EXTRA_MANS = nbd-client.8
+EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml gznbd winnbd lfs.h nbd-client.8 nbd-server.1
 MAINTAINERCLEANFILES = nbd-client.8 nbd-server.1
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -229,6 +232,8 @@ $(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f config.h stamp-h1
+Doxyfile: $(top_builddir)/config.status $(srcdir)/Doxyfile.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	test -z "$(bindir)" || $(mkdir_p) "$(DESTDIR)$(bindir)"
@@ -289,7 +294,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd-client.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd-server.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_server-nbd-server.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -304,6 +309,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+
+nbd_server-nbd-server.o: nbd-server.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-nbd-server.o -MD -MP -MF "$(DEPDIR)/nbd_server-nbd-server.Tpo" -c -o nbd_server-nbd-server.o `test -f 'nbd-server.c' || echo '$(srcdir)/'`nbd-server.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/nbd_server-nbd-server.Tpo" "$(DEPDIR)/nbd_server-nbd-server.Po"; else rm -f "$(DEPDIR)/nbd_server-nbd-server.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-server.c' object='nbd_server-nbd-server.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.o `test -f 'nbd-server.c' || echo '$(srcdir)/'`nbd-server.c
+
+nbd_server-nbd-server.obj: nbd-server.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-nbd-server.obj -MD -MP -MF "$(DEPDIR)/nbd_server-nbd-server.Tpo" -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/nbd_server-nbd-server.Tpo" "$(DEPDIR)/nbd_server-nbd-server.Po"; else rm -f "$(DEPDIR)/nbd_server-nbd-server.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-server.c' object='nbd_server-nbd-server.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`
 uninstall-info-am:
 install-man1: $(man1_MANS) $(man_MANS)
 	@$(NORMAL_INSTALL)
@@ -447,6 +466,7 @@ distclean-tags:
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
+	$(mkdir_p) $(distdir)/.
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
