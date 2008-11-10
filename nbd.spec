@@ -7,7 +7,7 @@
 %define Name NBD
 Name: nbd
 Version: 2.9.7
-Release: alt3
+Release: alt4
 Summary: Tools for using the Network Block Device
 License: GPL
 Group: Networking/Other
@@ -132,6 +132,9 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
+* Thu Oct 18 2007 Led <led@altlinux.ru> 2.9.7-alt4
+- fixed init-script for %name-server
+
 * Mon Oct 15 2007 Led <led@altlinux.ru> 2.9.7-alt3
 - cleaned up spec
 - added init-script for %name-server
