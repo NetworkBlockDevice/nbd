@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "5" "14 augustus 2007" "" ""
+.TH "NBD-SERVER" "5" "26 oktober 2007" "" ""
 
 .SH NAME
 /etc/nbd-server/config \- configuration file for nbd-server
@@ -16,10 +16,10 @@
 \fB/etc/nbd-server/config\fR allows to configure the
 nbd-server.
 .PP
-The default configuration file is
-\fI@sysconfdir@/nbd-server/config\fR, but this
-can be varied with the \fB-C\fR option to
-\fBnbd-server\fR(1).
+While
+\fI@sysconfdir@/nbd-server/config\fR is the default
+configuration file, this can be varied with the \fB-C\fR
+option to \fBnbd-server\fR(1).
 .PP
 The configuration file consists of section header lines, comment
 lines, and option lines.
@@ -153,6 +153,15 @@ files.
 When specified on the command line, this should be the
 third argument.
 .TP
+\fBlistenaddr\fR
+Optional; string
+
+If this option is set, it should contain the local IP
+address (in "dotted-quad" notation) on which we should
+listen to \fBnbd-client\fR(8) connections. If
+it is not set, 0.0.0.0 is used (i.e., "listen on all local
+IP addresses")
+.TP
 \fBmultifile\fR
 Optional; boolean.
 
@@ -199,6 +208,24 @@ Use of this option in conjunction with
 
 Corresponds to the \fB-r\fR option on the
 command line.
+.TP
+\fBsdp\fR
+.PP
+Optional; boolean.
+.PP
+When this option is enabled, \fBnbd-server\fR
+will use the Socket Direct Protocol (SDP) to serve the
+export, rather than just IP. This is faster, but requires
+special hardware (usually something like InfiniBand) and
+support in the kernel.
+.PP
+Additionally, support for this option must be enabled at
+compile time, using the \fB--enable-sdp\fR option
+to the \fBconfigure\fR script. If this option
+is found in a configuration file and
+\fBnbd-server\fR does not have support for SDP,
+then \fBnbd-server\fR will exit with an error
+message.
 .TP
 \fBsparse_cow\fR
 Optional; boolean.

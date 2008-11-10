@@ -37,20 +37,29 @@
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
 
-int opennet(char *name, int port) {
+int opennet(char *name, int port, int sdp) {
 	int sock;
 	struct sockaddr_in xaddrin;
 	int xaddrinlen = sizeof(xaddrin);
 	struct hostent *hostn;
+	int af;
 
 	hostn = gethostbyname(name);
 	if (!hostn)
 		err("Gethostname failed: %h\n");
 
-	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+	af = AF_INET;
+	if(sdp) {
+#ifdef WITH_SDP
+		af = AF_INET_SDP;
+#else
+		err("Can't do SDP: I was not compiled with SDP support!");
+#endif
+	}
+	if ((sock = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("Socket failed: %m");
 
-	xaddrin.sin_family = AF_INET;
+	xaddrin.sin_family = af;
 	xaddrin.sin_port = htons(port);
 	xaddrin.sin_addr.s_addr = *((int *) hostn->h_addr);
 	if ((connect(sock, (struct sockaddr *) &xaddrin, xaddrinlen) < 0))
@@ -171,6 +180,7 @@ int main(int argc, char *argv[]) {
 	int swap=0;
 	int cont=0;
 	int timeout=0;
+	int sdp=0;
 	u64 size64;
 	u32 flags;
 
@@ -231,26 +241,33 @@ int main(int argc, char *argv[]) {
 	++argv; --argc; /* skip port */
 
 	if (argc==0) goto errmsg;
-	sock = opennet(hostname, port);
 	nbddev = argv[0];
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Can not open NBD: %m");
 	++argv; --argc; /* skip device */
 
-	if (argc>2) goto errmsg;
-	if (argc!=0) {
+	if (argc>3) goto errmsg;
+	if (argc) {
 		if(strncmp(argv[0], "-swap", 5)==0) {
 			swap=1;
 			++argv;--argc;
 		}
 	}
-	if (argc!=0) {
+	if (argc) {
 		if(strncmp(argv[0], "-persist", 8)==0) {
 			cont=1;
 			++argv;--argc;
 		}
 	}
+	if (argc) {
+		if(strncmp(argv[0], "-sdp", 4)==0) {
+			sdp=1;
+			++argv;--argc;
+		}
+	}
+	if(argc) goto errmsg;
+	sock = opennet(hostname, port, sdp);
 	argv=NULL; argc=0; /* don't use it later suddenly */
 
 	negotiate(sock, &size64, &flags);
@@ -280,7 +297,7 @@ int main(int argc, char *argv[]) {
 
 					fprintf(stderr, " Reconnecting\n");
 					close(sock); close(nbd);
-					sock = opennet(hostname, port);
+					sock = opennet(hostname, port, sdp);
 					nbd = open(nbddev, O_RDWR);
 					negotiate(sock, &new_size, &new_flags);
 					if (size64 != new_size) {

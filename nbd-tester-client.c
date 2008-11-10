@@ -178,12 +178,12 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	rep.magic=ntohl(rep.magic);
 	rep.error=ntohl(rep.error);
 	if(rep.magic!=NBD_REPLY_MAGIC) {
-		snprintf(errstr, errstr_len, "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX", curhandle, curhandle, *((u64*)rep.handle), *((u64*)rep.handle), rep.magic, NBD_REPLY_MAGIC);
+		snprintf(errstr, errstr_len, "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX", curhandle, curhandle, *((u64*)rep.handle), *((u64*)rep.handle), (long unsigned int)rep.magic, (long unsigned int)NBD_REPLY_MAGIC);
 		retval=-1;
 		goto end;
 	}
 	if(rep.error) {
-		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", rep.error, *((u64*)rep.handle), *((u64*)rep.handle));
+		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", (long int)rep.error, (long unsigned int)rep.error, (long long int)(*((u64*)rep.handle)), *((u64*)rep.handle));
 		retval=-1;
 		goto end;
 	}
@@ -326,7 +326,7 @@ int main(int argc, char**argv) {
 	gchar *hostname;
 	long int p;
 	int port;
-	int sock;
+	int sock=0;
 
 	if(argc<3) {
 		g_message("Not enough arguments");

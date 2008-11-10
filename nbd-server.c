@@ -139,7 +139,7 @@ gchar* rungroup=NULL;
  **/
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
-			    authorization file (yuck) */
+			       authorization file (yuck) */
 #define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
@@ -147,7 +147,8 @@ gchar* rungroup=NULL;
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
 			    copyonwrite */
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
-#define F_SPARSE 16
+#define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
+#define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -171,6 +172,7 @@ typedef struct {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
+	gchar* listenaddr;   /**< The IP address we're listening on */
 	unsigned int port;   /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
 	int flags;           /**< flags associated with this exported file */
@@ -333,7 +335,7 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -344,7 +346,8 @@ void usage() {
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
-	       "\t\taddress of the machine trying to connect\n" );
+	       "\t\taddress of the machine trying to connect\n" 
+	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
 	printf("Using configuration file %s\n", CFILE);
 }
 
@@ -352,6 +355,7 @@ void usage() {
 void dump_section(SERVER* serve, gchar* section_header) {
 	printf("[%s]\n", section_header);
 	printf("\texportname = %s\n", serve->exportname);
+	printf("\tlistenaddr = %s\n", serve->listenaddr);
 	printf("\tport = %d\n", serve->port);
 	if(serve->flags & F_READONLY) {
 		printf("\treadonly = true\n");
@@ -400,20 +404,30 @@ SERVER* cmdline(int argc, char *argv[]) {
 	size_t last;
 	char suffix;
 	gboolean do_output=FALSE;
-	gchar* section_header;
+	gchar* section_header="";
+	gchar** addr_port;
 
 	if(argc==1) {
 		return NULL;
 	}
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
+	serve->virtstyle=VIRT_IPLIT;
 	while((c=getopt_long(argc, argv, "-a:C:cl:mo:rp:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
 			switch(nonspecial++) {
 			case 0:
-				serve->port=strtol(optarg, NULL, 0);
+				addr_port=g_strsplit(optarg, ":", 2);
+				if(addr_port[1]) {
+					serve->port=strtol(addr_port[1], NULL, 0);
+					serve->listenaddr=g_strdup(addr_port[0]);
+				} else {
+					serve->listenaddr=g_strdup("0.0.0.0");
+					serve->port=strtol(addr_port[0], NULL, 0);
+				}
+				g_strfreev(addr_port);
 				break;
 			case 1:
 				serve->exportname = g_strdup(optarg);
@@ -497,6 +511,7 @@ typedef enum {
 	CFILE_MISSING_GENERIC,	/**< The (required) group "generic" is missing */
 	CFILE_KEY_MISSING,	/**< A (required) key is missing */
 	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
+	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
 	CFILE_PROGERR		/**< Programmer error */
 } CFILE_ERRORS;
 
@@ -542,8 +557,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
 		{ "autoreadonly", FALSE, PARAM_BOOL,	NULL, F_AUTOREADONLY },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
+		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
+		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
-	const int lp_size=11;
+	const int lp_size=15;
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
@@ -586,8 +603,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[6].target=&(s.prerun);
 		lp[7].target=&(s.postrun);
 		lp[8].target=lp[9].target=lp[10].target=
-				lp[11].target=lp[12].target=&(s.flags);
-		
+				lp[11].target=lp[12].target=
+				lp[13].target=&(s.flags);
+		lp[14].target=&(s.listenaddr);
+
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
 			p=lp;
@@ -672,8 +691,19 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
 		if(i>0) {
+			if(!s.listenaddr) {
+				s.listenaddr = g_strdup("0.0.0.0");
+			}
 			g_array_append_val(retval, s);
 		}
+#ifndef WITH_SDP
+		if(s.flags & F_SDP) {
+			g_set_error(e, errdomain, CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
+			return NULL;
+		}
+#endif
 	}
 	return retval;
 }
@@ -875,7 +905,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * @return 0 on success, nonzero on failure
  **/
 int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
-	ssize_t ret;
+	ssize_t ret=0;
 
 	while(len > 0 && (ret=rawexpwrite(a, buf, len, client)) > 0 ) {
 		a += ret;
@@ -917,7 +947,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @return 0 on success, nonzero on failure
  **/
 int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
-	ssize_t ret;
+	ssize_t ret=0;
 
 	while(len > 0 && (ret=rawexpread(a, buf, len, client)) > 0 ) {
 		a += ret;
@@ -1276,6 +1306,9 @@ int do_run(gchar* command, gchar* file) {
  * @param client a connected client
  **/
 void serveconnection(CLIENT *client) {
+	if(do_run(client->server->prerun, client->exportname)) {
+		exit(EXIT_FAILURE);
+	}
 	setupexport(client);
 
 	if (client->server->flags & F_COPYONWRITE) {
@@ -1284,9 +1317,7 @@ void serveconnection(CLIENT *client) {
 
 	setmysockopt(client->net);
 
-	if(!do_run(client->server->prerun, client->exportname)) {
-		mainloop(client);
-	}
+	mainloop(client);
 	do_run(client->server->postrun, client->exportname);
 }
 
@@ -1351,112 +1382,7 @@ void destroy_pid_t(gpointer data) {
 }
 
 /**
- * Go daemon (unless we specified at compile time that we didn't want this)
- * @param serve the first server of our configuration. If its port is zero,
- * 	then do not daemonize, because we're doing inetd then. This parameter
- * 	is only used to create a PID file of the form
- * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
- **/
-#if !defined(NODAEMON) && !defined(NOFORK)
-void daemonize(SERVER* serve) {
-	FILE*pidf;
-
-	if(serve && !(serve->port)) {
-		return;
-	}
-	if(daemon(0,0)<0) {
-		err("daemon");
-	}
-	if(!*pidftemplate) {
-		if(serve) {
-			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
-		} else {
-			strncpy(pidftemplate, "/var/run/server.pid", 255);
-		}
-	}
-	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
-	pidf=fopen(pidfname, "w");
-	if(pidf) {
-		fprintf(pidf,"%d\n", (int)getpid());
-		fclose(pidf);
-	} else {
-		perror("fopen");
-		fprintf(stderr, "Not fatal; continuing");
-	}
-}
-#else
-#define daemonize(serve)
-#endif /* !defined(NODAEMON) && !defined(NOFORK) */
-
-/**
- * Connect a server's socket.
- *
- * @param serve the server we want to connect.
- **/
-void setup_serve(SERVER *serve) {
-	struct sockaddr_in addrin;
-	struct sigaction sa;
-	int addrinlen = sizeof(addrin);
-	int sock_flags;
-#ifndef sun
-	int yes=1;
-#else
-	char yes='1';
-#endif /* sun */
-	if ((serve->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-		err("socket: %m");
-
-	/* lose the pesky "Address already in use" error message */
-	if (setsockopt(serve->socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-	        err("setsockopt SO_REUSEADDR");
-	}
-	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
-		err("setsockopt SO_KEEPALIVE");
-	}
-
-	/* make the listening socket non-blocking */
-	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
-		err("fcntl F_SETFL O_NONBLOCK");
-	}
-
-	DEBUG("Waiting for connections... bind, ");
-	addrin.sin_family = AF_INET;
-	addrin.sin_port = htons(serve->port);
-	addrin.sin_addr.s_addr = 0;
-	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
-		err("bind: %m");
-	DEBUG("listen, ");
-	if (listen(serve->socket, 1) < 0)
-		err("listen: %m");
-	sa.sa_handler = sigchld_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	if(sigaction(SIGCHLD, &sa, NULL) == -1)
-		err("sigaction: %m");
-	sa.sa_handler = sigterm_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	if(sigaction(SIGTERM, &sa, NULL) == -1)
-		err("sigaction: %m");
-}
-
-/**
- * Connect our servers.
- **/
-void setup_servers(GArray* servers) {
-	int i;
-
-	for(i=0;i<servers->len;i++) {
-		setup_serve(&(g_array_index(servers, SERVER, i)));
-	}
-	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
-}
-
-/**
- * Loop through the available servers, and serve them.
+ * Loop through the available servers, and serve them. Never returns.
  **/
 int serveloop(GArray* servers) {
 	struct sockaddr_in addrin;
@@ -1524,7 +1450,8 @@ int serveloop(GArray* servers) {
 					}
 					/* child */
 					g_hash_table_destroy(children);
-					for(i=0;i<servers->len,serve=(g_array_index(servers, SERVER*, i));i++) {
+					for(i=0;i<servers->len;i++) {
+						serve=g_array_index(servers, SERVER*, i);
 						close(serve->socket);
 					}
 					/* FALSE does not free the
@@ -1545,6 +1472,138 @@ int serveloop(GArray* servers) {
 }
 
 /**
+ * Connect a server's socket.
+ *
+ * @param serve the server we want to connect.
+ **/
+void setup_serve(SERVER *serve) {
+	struct sockaddr_in addrin;
+	struct sigaction sa;
+	int addrinlen = sizeof(addrin);
+	int sock_flags;
+	int af;
+#ifndef sun
+	int yes=1;
+#else
+	char yes='1';
+#endif /* sun */
+
+	af = AF_INET;
+#ifdef WITH_SDP
+	if ((serve->flags) && F_SDP) {
+		af = AF_INET_SDP;
+	}
+#endif
+	if ((serve->socket = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
+		err("socket: %m");
+
+	/* lose the pesky "Address already in use" error message */
+	if (setsockopt(serve->socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
+	        err("setsockopt SO_REUSEADDR");
+	}
+	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
+		err("setsockopt SO_KEEPALIVE");
+	}
+
+	/* make the listening socket non-blocking */
+	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+		err("fcntl F_SETFL O_NONBLOCK");
+	}
+
+	DEBUG("Waiting for connections... bind, ");
+	addrin.sin_family = AF_INET;
+#ifdef WITH_SDP
+	if(serve->flags & F_SDP) {
+		addrin.sin_family = AF_INET_SDP;
+	}
+#endif
+	addrin.sin_port = htons(serve->port);
+	if(!inet_aton(serve->listenaddr, &(addrin.sin_addr)))
+		err("could not parse listen address");
+	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
+		err("bind: %m");
+	DEBUG("listen, ");
+	if (listen(serve->socket, 1) < 0)
+		err("listen: %m");
+	sa.sa_handler = sigchld_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGCHLD, &sa, NULL) == -1)
+		err("sigaction: %m");
+	sa.sa_handler = sigterm_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGTERM, &sa, NULL) == -1)
+		err("sigaction: %m");
+}
+
+/**
+ * Connect our servers.
+ **/
+void setup_servers(GArray* servers) {
+	int i;
+
+	for(i=0;i<servers->len;i++) {
+		setup_serve(&(g_array_index(servers, SERVER, i)));
+	}
+	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
+}
+
+/**
+ * Go daemon (unless we specified at compile time that we didn't want this)
+ * @param serve the first server of our configuration. If its port is zero,
+ * 	then do not daemonize, because we're doing inetd then. This parameter
+ * 	is only used to create a PID file of the form
+ * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
+ **/
+#if !defined(NODAEMON) && !defined(NOFORK)
+void daemonize(SERVER* serve) {
+	FILE*pidf;
+
+	if(serve && !(serve->port)) {
+		return;
+	}
+	if(daemon(0,0)<0) {
+		err("daemon");
+	}
+	if(!*pidftemplate) {
+		if(serve) {
+			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
+		} else {
+			strncpy(pidftemplate, "/var/run/server.pid", 255);
+		}
+	}
+	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
+	pidf=fopen(pidfname, "w");
+	if(pidf) {
+		fprintf(pidf,"%d\n", (int)getpid());
+		fclose(pidf);
+	} else {
+		perror("fopen");
+		fprintf(stderr, "Not fatal; continuing");
+	}
+}
+#else
+#define daemonize(serve)
+#endif /* !defined(NODAEMON) && !defined(NOFORK) */
+
+/*
+ * Everything beyond this point (in the file) is run in non-daemon mode.
+ * The stuff above daemonize() isn't.
+ */
+
+void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN;
+
+void serve_err(SERVER* serve, const char* msg) {
+	g_message("Export of %s on port %d failed:", serve->exportname,
+			serve->port);
+	err(msg);
+}
+
+/**
  * Set up user-ID and/or group-ID
  **/
 void dousers(void) {
@@ -1552,13 +1611,25 @@ void dousers(void) {
 	struct group *gr;
 	if(rungroup) {
 		gr=getgrnam(rungroup);
-		if(setgid(gr->gr_gid)<0)
-			msg3(LOG_DEBUG, "Could not set GID: %s", strerror(errno));
+		if(!gr) {
+			g_message("Invalid group name: %s", rungroup);
+			exit(EXIT_FAILURE);
+		}
+		if(setgid(gr->gr_gid)<0) {
+			g_message("Could not set GID: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 	if(runuser) {
 		pw=getpwnam(runuser);
-		if(setuid(pw->pw_uid)<0)
-			msg3(LOG_DEBUG, "Could not set UID: %s", strerror(errno));
+		if(!pw) {
+			g_message("Invalid user name: %s", runuser);
+			exit(EXIT_FAILURE);
+		}
+		if(setuid(pw->pw_uid)<0) {
+			g_message("Could not set UID: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 

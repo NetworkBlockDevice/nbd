@@ -3,13 +3,13 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "15 juni 2007" "" ""
+.TH "NBD-SERVER" "1" "26 oktober 2007" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
 .SH SYNOPSIS
 
-\fBnbd-server \fR \fB\fIport\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-a \fItimeout\fB\fR ] [ \fB-l \fIhost list\fB\fR ] [ \fB-o \fIsection name\fB\fR ]
+\fBnbd-server \fR \fB\fI[ip:]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-a \fItimeout\fB\fR ] [ \fB-l \fIhost list\fB\fR ] [ \fB-o \fIsection name\fB\fR ]
 
 .SH "DESCRIPTION"
 .PP
@@ -29,6 +29,10 @@ This file must list the IP-addresses of clients that are allowed
 to connect. If it does not exist, all clients are able to connect.
 If the file is empty, no clients can connect.
 .SH "OPTIONS"
+.TP
+\fBip\fR
+The ip address the server should listen on. If
+omitted, 0.0.0.0 (aka "any address") is used.
 .TP
 \fBport \fR
 The port the server should listen to. A valid port is

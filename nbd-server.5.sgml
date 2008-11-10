@@ -63,10 +63,10 @@ manpage.1: manpage.sgml
     <para><command>&dhpackage;</command> allows to configure the
     nbd-server.</para>
 
-    <para>The default configuration file is
-      <filename>@sysconfdir@/nbd-server/config</filename>, but this
-      can be varied with the <option>-C</option> option to
-      <command>nbd-server</command>(1).
+    <para>While
+      <filename>@sysconfdir@/nbd-server/config</filename> is the default
+      configuration file, this can be varied with the <option>-C</option>
+      option to <command>nbd-server</command>(1).
     </para>
     <para>
       The configuration file consists of section header lines, comment
@@ -250,6 +250,17 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term>listenaddr</term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>If this option is set, it should contain the local IP
+	  address (in "dotted-quad" notation) on which we should
+	  listen to <command>nbd-client</command>(8) connections. If
+	  it is not set, 0.0.0.0 is used (i.e., "listen on all local
+	  IP addresses")</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>multifile</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>
@@ -311,6 +322,27 @@ manpage.1: manpage.sgml
 	  command line.</para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+        <term><option>sdp</option></term>
+	<lisitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    When this option is enabled, <command>nbd-server</command>
+	    will use the Socket Direct Protocol (SDP) to serve the
+	    export, rather than just IP. This is faster, but requires
+	    special hardware (usually something like InfiniBand) and
+	    support in the kernel.
+	  </para>
+	  <para>
+	    Additionally, support for this option must be enabled at
+	    compile time, using the <option>--enable-sdp</option> option
+	    to the <command>configure</command> script. If this option
+	    is found in a configuration file and
+	    <command>nbd-server</command> does not have support for SDP,
+	    then <command>nbd-server</command> will exit with an error
+	    message.
+	  </para>
+	</listitem
       <varlistentry>
 	<term><option>sparse_cow</option></term>
 	<listitem>

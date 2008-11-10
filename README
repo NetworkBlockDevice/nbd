@@ -21,6 +21,14 @@ device nodes:
 (if you need more than one NBD device, repeat the above command for nb1,
 nb2, ...)
 
+Since there's a problem with nbd and the (default) cfq I/O scheduler,
+you may want to set it to deadline:
+
+echo 'deadline' > /sys/block/nbd0/queue/scheduler
+
+(again, repeat the above for nbd1, nbd2, etc, if you need more than one
+device)
+
 Next, start the server. You can use a file or a block device for that:
 
 nbd-server <port> <filename>
