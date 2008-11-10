@@ -13,7 +13,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
   <!ENTITY dhsurname   "<surname>Verhelst</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>$Date: 2007-10-26 20:01:51 +0200 (vr, 26 okt 2007) $</date>">
+  <!ENTITY dhdate      "<date>$Date: 2007-10-30 11:35:12 +0100 (di, 30 okt 2007) $</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
@@ -66,6 +66,7 @@ manpage.1: manpage.sgml
       <arg><option>-a <replaceable>timeout</replaceable></option></arg>
       <arg><option>-l <replaceable>host list</replaceable></option></arg>
       <arg><option>-o <replaceable>section name</replaceable></option></arg>
+      <arg><option>-C <replaceable>config file</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -152,9 +153,6 @@ manpage.1: manpage.sgml
 	    with names in the format "name.X", where "name" is given as
 	    the filename argument to nbd-server, and "X" is a number
 	    starting by 0 and going up for each file.
-	  </para>
-	  <para>
-	    The files must all be 1GB in size.
 	  </para>
 	  <para>
 	    Allowing more flexibility for this option is planned for

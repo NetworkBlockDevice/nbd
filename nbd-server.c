@@ -762,7 +762,7 @@ void sigterm_handler(int s) {
 		unlink(pidfname);
 	}
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 /**
@@ -1451,7 +1451,7 @@ int serveloop(GArray* servers) {
 					/* child */
 					g_hash_table_destroy(children);
 					for(i=0;i<servers->len;i++) {
-						serve=g_array_index(servers, SERVER*, i);
+						serve=&g_array_index(servers, SERVER, i);
 						close(serve->socket);
 					}
 					/* FALSE does not free the
@@ -1571,9 +1571,9 @@ void daemonize(SERVER* serve) {
 	}
 	if(!*pidftemplate) {
 		if(serve) {
-			strncpy(pidftemplate, "/var/run/server.%d.pid", 255);
+			strncpy(pidftemplate, "/var/run/nbd-server.%d.pid", 255);
 		} else {
-			strncpy(pidftemplate, "/var/run/server.pid", 255);
+			strncpy(pidftemplate, "/var/run/nbd-server.pid", 255);
 		}
 	}
 	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
@@ -1643,7 +1643,7 @@ int main(int argc, char *argv[]) {
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
-		exit(-1) ;
+		exit(EXIT_FAILURE) ;
 	}
 
 	memset(pidftemplate, '\0', 256);

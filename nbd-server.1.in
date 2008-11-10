@@ -3,13 +3,13 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "26 oktober 2007" "" ""
+.TH "NBD-SERVER" "1" "14 november 2007" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
 .SH SYNOPSIS
 
-\fBnbd-server \fR \fB\fI[ip:]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-a \fItimeout\fB\fR ] [ \fB-l \fIhost list\fB\fR ] [ \fB-o \fIsection name\fB\fR ]
+\fBnbd-server \fR \fB\fI[ip:]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-a \fItimeout\fB\fR ] [ \fB-l \fIhost list\fB\fR ] [ \fB-o \fIsection name\fB\fR ] [ \fB-C \fIconfig file\fB\fR ]
 
 .SH "DESCRIPTION"
 .PP
@@ -74,8 +74,6 @@ To use this option, you must create a number of files
 with names in the format "name.X", where "name" is given as
 the filename argument to nbd-server, and "X" is a number
 starting by 0 and going up for each file.
-
-The files must all be 1GB in size.
 
 Allowing more flexibility for this option is planned for
 future versions.
