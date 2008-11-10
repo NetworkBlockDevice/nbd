@@ -1,0 +1,257 @@
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+
+<!-- Process this file with docbook-to-man to generate an nroff manual
+     page: `docbook-to-man manpage.sgml > manpage.1'.  You may view
+     the manual page with: `docbook-to-man manpage.sgml | nroff -man |
+     less'.  A typical entry in a Makefile or Makefile.am is:
+
+manpage.1: manpage.sgml
+	docbook-to-man $< > $@
+  -->
+
+  <!-- Fill in your name for FIRSTNAME and SURNAME. -->
+  <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
+  <!ENTITY dhsurname   "<surname>Verhelst</surname>">
+  <!-- Please adjust the date whenever revising the manpage. -->
+  <!ENTITY dhdate      "<date>september 19, 2001</date>">
+  <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
+       allowed: see man(7), man(1). -->
+  <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
+  <!ENTITY dhemail     "<email>wouter@debian.org</email>">
+  <!ENTITY dhusername  "Wouter Verhelst">
+  <!ENTITY dhucpackage "<refentrytitle>NBD-SERVER</refentrytitle>">
+  <!ENTITY dhpackage   "nbd-server">
+
+  <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
+  <!ENTITY gnu         "<acronym>GNU</acronym>">
+]>
+
+<refentry>
+  <refentryinfo>
+    <address>
+      &dhemail;
+    </address>
+    <author>
+      &dhfirstname;
+      &dhsurname;
+    </author>
+    <copyright>
+      <year>2001</year>
+      <holder>&dhusername;</holder>
+    </copyright>
+    &dhdate;
+  </refentryinfo>
+  <refmeta>
+    &dhucpackage;
+
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>&dhpackage;</refname>
+
+    <refpurpose>serve a file as a block device to other computers
+    running the &gnu;/Linux(tm) or &gnu;/Hurd Operating
+    System</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&dhpackage; </command>
+
+      <arg choice=plain><replaceable>port</replaceable</arg>
+      <arg choice=plain><replaceable>filename</replaceable></arg>
+      <arg><replaceable>size</replaceable></arg>
+      <arg><option>-r</option></arg>
+      <arg><option>-m</option></arg>
+      <arg><option>-c</option></arg>
+      <arg><option>-a <replaceable>timeout</replaceable></option></arg>
+      <arg><option>-l <replaceable>host list</replaceable></option></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para>This manual page documents the
+      <command>&dhpackage;</command> command.</para>
+
+    <para><command>&dhpackage;</command> is the server for the Linux
+    Network Block Device (NBD). With NBD, a client can use a file,
+    exported over the network from a server, as a block device. It can
+    then be used for whatever purpose a normal block device (harddisk,
+    CD-ROM, ...) can be used for.</para>
+
+    <para>NBD can be useful for diskless clients that need swapspace,
+    but you can also create a filesystem on it and use it as though it
+    were a local filesystem.</para>
+
+    <para><command>&dhpackage;</command> implements some security
+    through a file called "nbd_server.allow" in the current directory (by default; a different file can be chosen with the '-l' option).
+    This file must list the IP-addresses of clients that are allowed
+    to connect. If it does not exist, all clients are able to connect.
+    If the file is empty, no clients can connect.</para>
+  </refsect1>
+  <refsect1>
+    <title>OPTIONS</title>
+    
+    <variablelist>
+      <varlistentry>
+        <term><option>port</option>
+        </term>
+        <listitem>
+          <para>The port the server should listen to. A valid port is
+	    any number between 1 and 65536; if 0 is used, nbd-server
+	    will listen on stdin (so that nbd-server can be ran from
+	    inetd)</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>filename</option></term>
+	<listitem>
+	  <para>The filename of the file that should be exported. This
+	  can be any file, including "real" blockdevices (i.e. a file
+	  from /dev). If the filename includes the literal string
+	  "%s", then this %s will be substituded with the IP-address
+	  of the client trying to connect.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>size</option></term>
+	<listitem>
+	  <para>The size of the block device at the client side. This
+	    is especially usefull in conjunction with the -m
+	    option</para>
+	  <para>Can optionally be followed by one of K,k,M or
+	    m, in which case the size will be multiplied by 1024 (K
+	    or k) or 1048576 (M or m)</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-r</option></term>
+	<listitem>
+	  <para>Export the file read-only. If a client tries to write
+	    to a read-only exported file, it will receive an error, but
+	    the connection will stay up.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-m</option></term>
+	<listitem>
+	  <para>Work with multiple files. This can be used to export
+	    blockdevices that are larger than the maximum allowed
+	    filesize on a given filesystem; i.e. when the filesystem
+	    does not allow files larger than 2GB (which is true for
+	    Linux 2.2 and below), you can use this option to store the
+	    data in multiple files and export a larger filesystem, if
+	    needed.</para>
+	  <para>
+	    To use this option, you must create a number of files
+	    with names in the format "name.X", where "name" is given as
+	    the filename argument to nbd-server, and "X" is a number
+	    starting by 0 and going up for each file.
+	  </para>
+	  <para>
+	    The files must all be 1GB in size.
+	  </para>
+	  <para>
+	    Allowing more flexibility for this option is planned for
+	    future versions.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-c</option></term>
+	<listitem>
+	  <para>Copy on write. When this option is provided,
+	  write-operations are not done to the exported file, but to a
+	  separate file. This separate file is removed when the
+	  connection is closed, which means that serving this way will
+	  make nbd-server slow down (especially on large block devices
+	  with lots of writes), and that after disconnecting and
+	  reconnecting the client or the server, all changes are
+	  lost.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+      	<term><option>timeout</option></term>
+	<listitem>
+	  <para>Maximum number of idle seconds. If a connection is
+	  inactive for this amount of time, it is terminated; this is to
+	  avoid stale nbd-server processes staying in memory. Use of
+	  this option is strongly recommended.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>host list</option></term>
+	<listitem>
+	  <para>This argument should be the name of a file containing a list of
+	  IP-addresses for hosts that may connect to the server. Wildcards are
+	  <emphasis>not</emphasis> allowed. If the file does not exist, it is
+	  ignored (and any host can connect); If the file does exist, but is
+	  empty, no host can connect. By default, the name 'nbd_server.allow'
+	  is used, and looked for in the current directory, unless nbd-server
+	  is compiled as a daemon, in which case it is looked for in the
+	  root-directory.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </refsect1>
+  <refsect1>
+    <title>EXAMPLES</title>
+    <para>Some examples of nbd-server usage:</para>
+    <itemizedlist mark="none">
+      <listitem>
+	<para>To export a file /export/nbd/exp-bl-dev on port 2000:</para>
+	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev</command></para>
+      </listitem>
+      <listitem>
+	<para>To export a the same file read-only:</para>
+	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev -r</command></para>
+      </listitem>
+      <listitem>
+	<para>To export the same file read-write, but make sure
+	  changes are lost after restarting the client or the
+	  server:</para>
+	<para><command>nbd-server 2000 /export/nbd/exp-bl-dev
+	  -c</command></para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para>nbd-client (8), http://nbd.sourceforge.net/roadmap.html</para>
+
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>The NBD kernel module and the NBD tools were originally
+      written by Pavel Machek <email>pavel@ucw.cz</email></para>
+
+    <para>The kernel module is now maintained by Paul Clements
+    <email>Paul.Clements@steeleye.com</email>, while the userland tools are
+    maintained by &dhusername; &dhemail;</para>
+
+    <para>This manual page was written by &dhusername; &dhemail; for
+      the &debian; system (but may be used by others).  Permission is
+      granted to copy, distribute and/or modify this document under
+      the terms of the <acronym>GNU</acronym> General Public License,
+      version 2, as published by the Free Software Foundation.</para>
+
+  </refsect1>
+</refentry>
+
+<!-- Keep this comment at the end of the file
+Local variables:
+mode: sgml
+sgml-omittag:t
+sgml-shorttag:t
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:2
+sgml-indent-data:t
+sgml-parent-document:nil
+sgml-default-dtd-file:nil
+sgml-exposed-tags:nil
+sgml-local-catalogs:nil
+sgml-local-ecat-files:nil
+End:
+-->
