@@ -1,2 +1,2 @@
 tar.bz2: @version@:.
-copy: *.patch
+copy: *.patch *.init

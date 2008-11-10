@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+# nbd		This shell script takes care of starting and stopping
+#		nbd-server
+#
+# chkconfig: - 60 20
+# description:	Service for export a network block device.
+# processname: nbd-server
+# config: /etc/nbd-server/config
+# pidfile: /var/run/nbd-server.pid
+
+# Do not load RH compatibility interface.
+WITHOUT_RC_COMPAT=1
+
+# Source function library.
+. /etc/init.d/functions
+
+SourceIfNotEmpty /etc/sysconfig/nbd-server
+
+PIDFILE=/var/run/nbd-server.pid
+LOCKFILE=/var/lock/subsys/nbd-server
+RETVAL=0
+
+start()
+{
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- nbd-server $NBD_OPTS --pid-file $PIDFILE
+	RETVAL=$?
+	return $RETVAL
+}
+
+stop()
+{
+	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- nbd-server
+	RETVAL=$?
+	return $RETVAL
+}
+
+restart()
+{
+	stop
+	start
+}
+
+# See how we were called.
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	condstop)
+		if [ -e "$LOCKFILE" ]; then
+			stop
+		fi
+		;;
+	condrestart)
+		if [ -e "$LOCKFILE" ]; then
+			restart
+		fi
+		;;
+	status)
+		status --pidfile "$PIDFILE" --expect-user root -- nbd-server
+		RETVAL=$?
+		;;
+	*)
+		msg_usage "${0##*/} {start|stop|restart|condstop|condrestart|status}"
+		RETVAL=1
+esac
+
+exit $RETVAL

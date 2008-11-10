@@ -7,12 +7,13 @@
 %define Name NBD
 Name: nbd
 Version: 2.9.7
-Release: alt2
+Release: alt3
 Summary: Tools for using the Network Block Device
 License: GPL
 Group: Networking/Other
 URL: http://%name.sourceforge.net/
-Source:	%name-%version.tar.bz2
+Source0: %name-%version.tar.bz2
+Source1: %name.init
 Patch0:	%name-types.patch
 Patch1:	%name-2.9.6-gznbd.patch
 Patch2: %name-2.9.7-prerun.patch
@@ -22,11 +23,10 @@ BuildRequires: glib2-devel >= 2.6.0
 
 %description
 %Name contains the tools needed to export a network block device and to
-use a network block device. The nbd module is part of the 2.2 kernels
+use a network block device. The %name module is part of the 2.2 kernels
 and higher.
-If you have a kernel patched for it, you can use the network block
-device to swap over the net, which is particularly useful for diskless
-workstations.
+You can use the network block device to swap over the net, which is
+particularly useful for diskless workstations.
 
 
 %package doc
@@ -70,7 +70,7 @@ This package contains static %name-client (can be used for initrd).
 
 
 %prep
-%setup -q
+%setup
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
@@ -82,7 +82,7 @@ This package contains static %name-client (can be used for initrd).
     %{subst_enable syslog} \
     %{subst_enable lfs}
 %if_with static_client
-%make_build CC="diet -Os %__cc" %name-client
+%make_build CC="diet %__cc" %name-client
 mv %name-client{,.static}
 %make_build clean
 %endif
@@ -92,20 +92,32 @@ mv %name-client{,.static}
 
 %install
 install -d %buildroot%_sysconfdir/%name-server
+touch %buildroot%_sysconfdir/%name-server/config
 %make_install DESTDIR=%buildroot install
 %{?_with_static_client:install -m 0755 %name-client.static %buildroot%_sbindir/}
-%{?_with_gznbd:install -m 0755 gznbd/gznbd %buildroot/%_bindir/}
+%{?_with_gznbd:install -m 0755 gznbd/gznbd %buildroot%_bindir/}
+install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
+
+
+%post -n %name-server
+%post_service %name ||:
+
+
+%preun -n %name-server
+%preun_service %name ||:
 
 
 %files doc
-%doc README
+%doc README simple_test
 
 
 %files server
 %_bindir/*
-%dir %_sysconfdir/nbd-server
+%dir %_sysconfdir/%name-server
+%config(noreplace) %_sysconfdir/%name-server/config
 %_man1dir/*
 %_man5dir/*
+%_initdir/*
 
 
 %files client
@@ -120,6 +132,10 @@ install -d %buildroot%_sysconfdir/%name-server
 
 
 %changelog
+* Mon Oct 15 2007 Led <led@altlinux.ru> 2.9.7-alt3
+- cleaned up spec
+- added init-script for %name-server
+
 * Sun Oct 14 2007 Led <led@altlinux.ru> 2.9.7-alt2
 - added %name-client.static
 - added %name-2.9.7-prerun.patch
