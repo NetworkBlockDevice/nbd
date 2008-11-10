@@ -144,6 +144,7 @@ manpage.1: manpage.sgml
         </listitem>
       </varlistentry>
     </variablelist>
+  </refsect1>
   <refsect1>
     <title>OPTIONS FOR EXPORT SECTIONS</title>
 
@@ -170,23 +171,6 @@ manpage.1: manpage.sgml
 	  </para>
 	  <para>Corresponds to the <option>-l</option> option on the
 	  command line</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>autoreadonly</option></term>
-	<listitem>
-	  <para>Optional; boolean.</para>
-	  <para>
-	    If this option is set to true, then
-	    <command>nbd-server</command> will automatically switch to
-	    readonly if it cannot write to the file.
-	  </para>
-	  <para>Does not have a corresponding command-line
-	    argument</para>
-	  <para>TODO: verify whether this option actually works as
-	    documented. I have a feeling I've been terribly
-	    stupid.
-	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -324,7 +308,7 @@ manpage.1: manpage.sgml
       </varlistentry>
       <varlistentry>
         <term><option>sdp</option></term>
-	<lisitem>
+	<listitem>
 	  <para>Optional; boolean.</para>
 	  <para>
 	    When this option is enabled, <command>nbd-server</command>
@@ -342,7 +326,8 @@ manpage.1: manpage.sgml
 	    then <command>nbd-server</command> will exit with an error
 	    message.
 	  </para>
-	</listitem
+	</listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>sparse_cow</option></term>
 	<listitem>

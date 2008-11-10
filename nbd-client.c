@@ -28,6 +28,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <sys/mount.h>
+#include <errno.h>
 
 #ifndef __GNUC__
 #error I need GCC to work
@@ -36,6 +37,27 @@
 #include <linux/ioctl.h>
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
+
+int check_conn(char* devname, int do_print) {
+	char buf[256];
+	int fd;
+	int len;
+	if(!strncmp(devname, "/dev/", 5)) {
+		devname+=5;
+	}
+	snprintf(buf, 256, "/sys/block/%s/pid", devname);
+	if((fd=open(buf, O_RDONLY))<0) {
+		if(errno==ENOENT) {
+			return 1;
+		} else {
+			return 2;
+		}
+	}
+	len=read(fd, buf, 256);
+	buf[len-1]='\0';
+	if(do_print) printf("%s\n", buf);
+	return 0;
+}
 
 int opennet(char *name, int port, int sdp) {
 	int sock;
@@ -191,6 +213,7 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist]\n");
 		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
+		fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 		fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 		fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
@@ -220,6 +243,9 @@ int main(int argc, char *argv[]) {
 			err("Ioctl failed: %m\n");
 		printf("done\n");
 		return 0;
+	}
+	if(strcmp(argv[0], "-c")==0) {
+		return check_conn(argv[1], 1);
 	}
 	
 	if (strncmp(argv[0], "bs=", 3)==0) {
@@ -278,12 +304,17 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 	chdir("/");
+	do {
 #ifndef NOFORK
-	if (fork())
-		exit(0);
+		if (fork()) {
+			while(check_conn(nbddev, 0)) {
+				sleep(1);
+			}
+			open(nbddev, O_RDONLY);
+			exit(0);
+		}
 #endif
 
-	do {
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
 			fprintf(stderr, "Kernel call returned: %m");
 			if(errno==EBADR) {

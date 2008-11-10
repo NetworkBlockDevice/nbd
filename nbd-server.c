@@ -555,12 +555,11 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
-		{ "autoreadonly", FALSE, PARAM_BOOL,	NULL, F_AUTOREADONLY },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
-	const int lp_size=15;
+	const int lp_size=14;
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
@@ -1220,8 +1219,12 @@ void setupexport(CLIENT* client) {
 			/* Try again because maybe media was read-only */
 			fi.fhandle = open(tmpname, O_RDONLY);
 			if(fi.fhandle != -1) {
-				client->server->flags |= F_AUTOREADONLY;
-				client->server->flags |= F_READONLY;
+				/* Opening the base file in copyonwrite mode is
+				 * okay */
+				if(!(client->server->flags & F_COPYONWRITE)) {
+					client->server->flags |= F_AUTOREADONLY;
+					client->server->flags |= F_READONLY;
+				}
 			}
 		}
 		if(fi.fhandle == -1) {
@@ -1393,7 +1396,6 @@ int serveloop(GArray* servers) {
 	int sock;
 	fd_set mset;
 	fd_set rset;
-	struct timeval tv;
 
 	/* 
 	 * Set up the master fd_set. The set of descriptors we need
@@ -1415,9 +1417,7 @@ int serveloop(GArray* servers) {
 		pid_t *pid;
 
 		memcpy(&rset, &mset, sizeof(fd_set));
-		tv.tv_sec=0;
-		tv.tv_usec=500;
-		if(select(max+1, &rset, NULL, NULL, &tv)>0) {
+		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
 			DEBUG("accept, ");
 			for(i=0;i<servers->len;i++) {
 				serve=&(g_array_index(servers, SERVER, i));

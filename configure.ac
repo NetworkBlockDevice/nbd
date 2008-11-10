@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.9],[wouter@debian.org])
+AC_INIT([nbd],[2.9.10],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -82,6 +82,40 @@ AC_ARG_ENABLE(
   ]
 )
 
+AC_MSG_CHECKING(for klcc)
+AC_ARG_WITH(
+  klcc,
+  AC_HELP_STRING(--with-klcc,[Build a version of nbd-client against klibc (for initramfs uses). Specify the path to 'klcc' (default autodetected)]),
+  [
+    if test "x$withval" != "x"; then
+      if test -x "$withval"; then
+        KLCC="$withval"
+	sbin_PROGRAMS=knbd-client
+	AC_MSG_RESULT($KLCC)
+      else
+        AC_MSG_ERROR("specified klcc is not executable or does not exist.")
+      fi
+    else
+      if test -x /usr/bin/klcc; then
+        KLCC=/usr/bin/klcc
+	sbin_PROGRAMS=knbd-client
+	AC_MSG_RESULT($KLCC)
+      else
+        AC_MSG_ERROR("klcc not found! Please specify it as a parameter to the --with-klcc option");
+      fi
+    fi
+  ],
+  [ if test -x /usr/bin/klcc; then
+      sbin_PROGRAMS=knbd-client
+      KLCC=/usr/bin/klcc
+      AC_MSG_RESULT($KLCC)
+    else
+      AC_MSG_RESULT(not found)
+    fi
+  ]
+)
+AC_SUBST(KLCC)
+
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -98,7 +132,7 @@ AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 case $host_os in
-     linux*) sbin_PROGRAMS=nbd-client
+     linux*) sbin_PROGRAMS="$sbin_PROGRAMS nbd-client"
 	      AC_MSG_RESULT(yes)
               ;;
      *) AC_MSG_RESULT(no) ;;

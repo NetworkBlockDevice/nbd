@@ -24,9 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <glib.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <syslog.h>
@@ -35,6 +33,9 @@
 #include "lfs.h"
 #define MY_NAME "nbd-tester-client"
 #include "cliserv.h"
+
+#include <netinet/in.h>
+#include <glib.h>
 
 static gchar errstr[1024];
 const static int errstr_len=1024;

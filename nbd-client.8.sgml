@@ -13,7 +13,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
   <!ENTITY dhsurname   "<surname>Verhelst</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>$Date: 2007-10-17 11:52:50 +0200 (wo, 17 okt 2007) $</date>">
+  <!ENTITY dhdate      "<date>$Date: 2008-03-31 10:18:51 +0200 (ma, 31 mrt 2008) $</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>8</manvolnum>">
@@ -60,13 +60,17 @@ manpage.1: manpage.sgml
       <arg choice=plain><option><replaceable>host</replaceable></option></arg>
       <arg choice=plain><option><replaceable>port</replaceable></option></arg>
       <arg choice=plain><option><replaceable>nbd-device</replaceable></option></arg>
-      <arg><optoin>-sdp</option></arg>
+      <arg><option>-sdp</option></arg>
       <arg><option>-swap</option></arg>
       <arg><option>-persist</option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
       <arg choice=plain><option>-d <replaceable>nbd-device</replaceable></option></arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
+      <arg choice="plain"><option>-c <replaceable>nbd-device</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -82,7 +86,7 @@ manpage.1: manpage.sgml
     either in the kernel, or as a module, you can connect to an NBD
     server and use its exported file through a block special file with
     major mode 43.</para>
-
+    
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
@@ -105,6 +109,15 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>timeout=<replaceable>seconds</replaceable></option></term>
+	<listitem>
+	  <para>Set the connection timeout to "seconds". For this to
+	  work, you need a kernel with support for the NBD_SET_TIMEOUT
+	  ioctl; this was introduced into Linus' tree on 2007-10-11,
+	  and will be part of kernel 2.6.24.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>port</option></term>
 	<listitem>
 	  <para>The TCP port on which <command>nbd-server</command> is
@@ -119,12 +132,45 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term>-c</term>
+	<listitem>
+	  <para>Check whether the specified nbd device is
+	  connected.</para>
+	  <para>If the device is connected, &dhpackage; will exit
+	  with an exit state of 0 and print the PID of the &dhpackage;
+	  instance that connected it to stdout.
+	  <para>If the device is not
+	  connected or does not exist (for example because the nbd
+	  module was not loaded), &dhpackage; will exit with an exit
+	  state of 1 and not print anything on stdout.</para>
+	  <para>If an error occurred, &dhpackage; will exit with an exit
+	  state of 2, and not print anything on stdout either.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>-d</term>
+	<listitem>
+	  <para>Disconnect the specified nbd device from the
+	  server</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>-persist</term>
+	<listitem>
+	  <para>When this option is specified, &dhpackage; will
+	    immediately try to reconnect an nbd device if the
+	    connection ever drops unexpectedly due to a lost
+	    server or something similar.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
         <term><option>-sdp</option></term>
 	<listitem>
 	  <para>Connect to the server using the Socket Direct Protocol
 	    (SDP), rather than IP. See nbd-server(1) for details.
 	  </para>
 	</listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>-swap</option></term>
 	<listitem>

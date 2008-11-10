@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "5" "26 oktober 2007" "" ""
+.TH "NBD-SERVER" "5" "17 maart 2008" "" ""
 
 .SH NAME
 /etc/nbd-server/config \- configuration file for nbd-server
@@ -92,20 +92,6 @@ this file.
 
 Corresponds to the \fB-l\fR option on the
 command line
-.TP
-\fBautoreadonly\fR
-Optional; boolean.
-
-If this option is set to true, then
-\fBnbd-server\fR will automatically switch to
-readonly if it cannot write to the file.
-
-Does not have a corresponding command-line
-argument
-
-TODO: verify whether this option actually works as
-documented. I have a feeling I've been terribly
-stupid.
 .TP
 \fBcopyonwrite\fR
 Optional; boolean.
@@ -210,15 +196,14 @@ Corresponds to the \fB-r\fR option on the
 command line.
 .TP
 \fBsdp\fR
-.PP
 Optional; boolean.
-.PP
+
 When this option is enabled, \fBnbd-server\fR
 will use the Socket Direct Protocol (SDP) to serve the
 export, rather than just IP. This is faster, but requires
 special hardware (usually something like InfiniBand) and
 support in the kernel.
-.PP
+
 Additionally, support for this option must be enabled at
 compile time, using the \fB--enable-sdp\fR option
 to the \fBconfigure\fR script. If this option

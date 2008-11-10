@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include <sys/ioctl.h>
@@ -49,8 +50,7 @@
 /* asm/types defines __u??, at least on my system */
 #include <asm/types.h>
 
-#define u32 __u32
-#define u64 __u64
+#define MY_NAME "gznbd"
 
 /* these headers take care of endianness */
 #include "../config.h"

@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "22 oktober 2007" "" ""
+.TH "NBD-CLIENT" "8" "02 april 2008" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device
@@ -13,6 +13,9 @@ nbd-client \- connect to a server running nbd-server(1), to use its    exported 
 
 
 \fBnbd-client\fR \fB-d \fInbd-device\fB\fR
+
+
+\fBnbd-client\fR \fB-c \fInbd-device\fB\fR
 
 .SH "DESCRIPTION"
 .PP
@@ -38,6 +41,12 @@ allowed values are either 512, 1024, 2048 or 4096
 The hostname of the machine running
 \fBnbd-server\fR\&.
 .TP
+\fBtimeout=\fIseconds\fB\fR
+Set the connection timeout to "seconds". For this to
+work, you need a kernel with support for the NBD_SET_TIMEOUT
+ioctl; this was introduced into Linus' tree on 2007-10-11,
+and will be part of kernel 2.6.24.
+.TP
 \fBport\fR
 The TCP port on which \fBnbd-server\fR is
 running at the server.
@@ -45,6 +54,32 @@ running at the server.
 \fBnbd-device\fR
 The block special file this nbd-client should connect
 to.
+.TP
+\fB-c\fR
+Check whether the specified nbd device is
+connected.
+
+If the device is connected, nbd-client will exit
+with an exit state of 0 and print the PID of the nbd-client
+instance that connected it to stdout.
+
+If the device is not
+connected or does not exist (for example because the nbd
+module was not loaded), nbd-client will exit with an exit
+state of 1 and not print anything on stdout.
+
+If an error occurred, nbd-client will exit with an exit
+state of 2, and not print anything on stdout either.
+.TP
+\fB-d\fR
+Disconnect the specified nbd device from the
+server
+.TP
+\fB-persist\fR
+When this option is specified, nbd-client will
+immediately try to reconnect an nbd device if the
+connection ever drops unexpectedly due to a lost
+server or something similar.
 .TP
 \fB-sdp\fR
 Connect to the server using the Socket Direct Protocol
