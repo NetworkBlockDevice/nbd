@@ -10,7 +10,7 @@
    kind="dir"
    uuid="c136e6c4-970e-0410-a1d0-886ecdd65105"
    repos="https://svn.sourceforge.net/svnroot/nbd"
-   revision="166"/>
+   revision="168"/>
 <entry
    committed-rev="99"
    name="gznbd.c"

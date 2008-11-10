@@ -58,6 +58,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/select.h>		/* select */
 #include <sys/wait.h>		/* wait */
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
@@ -87,11 +88,6 @@
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
-
-/** how much space for child PIDs we have by default. Dynamically
-   allocated, and will be realloc()ed if out of space, so this should
-   probably be fair for most situations. */
-#define DEFAULT_CHILD_ARRAY 256
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -363,12 +359,12 @@ SERVER* cmdline(int argc, char *argv[]) {
  * is severely wrong)
  **/
 void sigchld_handler(int s) {
-        int* status=NULL;
+        int status;
 	int* i;
 	pid_t pid;
 	int done=0;
 
-	while(!done && (pid=wait(status)) > 0) {
+	while(!done && (pid=waitpid(-1, &status, WNOHANG)) > 0) {
 		if(WIFEXITED(status)) {
 			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 			msg3(LOG_INFO, "pid is %d", pid);
@@ -901,6 +897,7 @@ void setup_serve(SERVER* serve) {
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
 	int fhandle;
+	int sock_flags;
 #ifndef sun
 	int yes=1;
 #else
@@ -938,6 +935,14 @@ void setup_serve(SERVER* serve) {
 		err("setsockopt SO_KEEPALIVE");
 	}
 
+	/* make the listening socket non-blocking */
+	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+		err("fcntl F_SETFL O_NONBLOCK");
+	}
+
 	DEBUG("Waiting for connections... bind, ");
 	addrin.sin_family = AF_INET;
 	addrin.sin_port = htons(serve->port);
@@ -969,47 +974,68 @@ void setup_serve(SERVER* serve) {
 int serveloop(SERVER* serve) {
 	struct sockaddr_in addrin;
 	socklen_t addrinlen=sizeof(addrin);
+	int max_fd = serve->socket;
+	fd_set read_fds;
+
+	FD_ZERO(&read_fds);
+	FD_SET(serve->socket, &read_fds);
+
 	for(;;) {
-		CLIENT *client;
-		int net;
-		pid_t *pid;
-
-		DEBUG("accept, ");
-		if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
-			msg2(LOG_ERR,"accept: %m");
+		DEBUG("select, ");
+		/* use to select to tell us when a connection is ready to be
+		 * accepted */
+		if (select(max_fd+1, &read_fds, NULL, NULL, NULL) <= 0) {
+			if (errno == EINTR)
+				continue;
+			msg2(LOG_ERR,"select: %m");
 			continue;
 		}
 
-		client = g_malloc(sizeof(CLIENT));
-		client->server=serve;
-		client->exportsize=OFFT_MAX;
-		client->net=net;
-		set_peername(net, client);
-		if (!authorized_client(client)) {
-			msg2(LOG_INFO,"Unauthorized client") ;
-			close(net) ;
-			continue ;
-		}
-		msg2(LOG_INFO,"Authorized client") ;
-		pid=g_malloc(sizeof(pid_t));
+		if (FD_ISSET(serve->socket, &read_fds)) {
+			/* accept the new client connection */
+			CLIENT *client;
+			int net;
+			pid_t *pid;			
+
+			DEBUG("accept, ");
+			if ((net = accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+				if(errno!=EAGAIN) {
+					msg2(LOG_ERR,"accept: %m");
+				}
+				continue;
+			}
+
+			client = g_malloc(sizeof(CLIENT));
+			client->server=serve;
+			client->exportsize=OFFT_MAX;
+			client->net=net;
+			set_peername(net, client);
+			if (!authorized_client(client)) {
+				msg2(LOG_INFO,"Unauthorized client");
+				close(net);
+				continue;
+			}
+			msg2(LOG_INFO,"Authorized client");
+			pid=g_malloc(sizeof(pid_t));
 #ifndef NOFORK
-		if ((*pid=fork())<0) {
-			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-			close(net) ;
-			continue ;
-		}
-		if (*pid>0) { /* parent */
-			close(net);
-			g_hash_table_insert(children, pid, pid);
-			continue;
-		}
-		/* child */
-		g_hash_table_destroy(children);
-		close(serve->socket) ;
+			if ((*pid=fork())<0) {
+				msg3(LOG_INFO,"Could not fork (%s)",strerror(errno));
+				close(net);
+				continue;
+			}
+			if (*pid>0) { /* parent */
+				close(net);
+				g_hash_table_insert(children, pid, pid);
+				continue;
+			}
+			/* child */
+			g_hash_table_destroy(children);
+			close(serve->socket);
 #endif // NOFORK
-		msg2(LOG_INFO,"Starting to serve") ;
-		serveconnection(client);
-		return 0;
+			msg2(LOG_INFO,"Starting to serve");
+			serveconnection(client);
+			return 0;
+		}
 	}
 }
 
