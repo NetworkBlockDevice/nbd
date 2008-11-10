@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="30"
+   name=""
+   committed-date="2003-07-13T21:23:55.000000Z"
+   url="https://svn.sourceforge.net/svnroot/nbd/branches/release_2_8/nbd/winnbd"
+   last-author="pavel"
+   kind="dir"
+   uuid="c136e6c4-970e-0410-a1d0-886ecdd65105"
+   repos="https://svn.sourceforge.net/svnroot/nbd"
+   revision="166"/>
+<entry
+   committed-rev="29"
+   name="NBDSvrWin2000.zip"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-05-23T15:37:41.000000Z"
+   checksum="e7167e716bf7dc267d74f2c648403a98"
+   last-author="acrux"
+   kind="file"
+   prop-time="2006-04-03T20:40:55.000000Z"/>
+<entry
+   committed-rev="30"
+   name="license.txt"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-07-13T21:23:55.000000Z"
+   checksum="bbd187b04e129808a9bb4920d01cc774"
+   last-author="pavel"
+   kind="file"
+   prop-time="2006-04-03T20:40:55.000000Z"/>
+<entry
+   committed-rev="30"
+   name="nbdsrvr.cpp"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-07-13T21:23:55.000000Z"
+   checksum="d79b244317ba120f602949dd7480a240"
+   last-author="pavel"
+   kind="file"
+   prop-time="2006-04-03T20:40:59.000000Z"/>
+<entry
+   committed-rev="30"
+   name="nbdsrvr.dsp"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-07-13T21:23:55.000000Z"
+   checksum="e46838e1594ab5f64629218dcf02e113"
+   last-author="pavel"
+   kind="file"
+   prop-time="2006-04-03T20:41:01.000000Z"/>
+<entry
+   committed-rev="30"
+   name="readme.txt"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-07-13T21:23:55.000000Z"
+   checksum="aaccff3c791bcd8a687ce622b2d2baf2"
+   last-author="pavel"
+   kind="file"
+   prop-time="2006-04-03T20:41:01.000000Z"/>
+<entry
+   committed-rev="30"
+   name="nbdsrvr.dsw"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-07-13T21:23:55.000000Z"
+   checksum="5dd4140bde4f8665046cfa1887ff8613"
+   last-author="pavel"
+   kind="file"
+   prop-time="2006-04-03T20:41:03.000000Z"/>
+<entry
+   committed-rev="28"
+   name="README"
+   text-time="2006-04-03T20:41:03.000000Z"
+   committed-date="2003-05-23T15:09:23.000000Z"
+   checksum="48685faadc97e113232797b483b2c20b"
+   last-author="acrux"
+   kind="file"
+   prop-time="2006-04-03T20:41:03.000000Z"/>
+</wc-entries>

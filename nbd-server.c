@@ -704,6 +704,7 @@ int mainloop(CLIENT *client) {
 		if (((ssize_t)((off_t)request.from + len) > client->exportsize) ||
 		    ((client->server->flags & F_READONLY) && request.type)) {
 			DEBUG("[RANGE!]");
+			readit(client->net, buf, len);
 			ERROR(client, reply);
 			continue;
 		}
@@ -899,12 +900,33 @@ void setup_serve(SERVER* serve) {
 	struct sockaddr_in addrin;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
+	int fhandle;
 #ifndef sun
 	int yes=1;
 #else
 	char yes='1';
 #endif /* sun */
 
+	if (strstr(serve->exportname, "%s") == NULL) {
+		/**
+		 * verify the existence of the block device that
+		 * this server instance will export
+		 **/
+		DEBUG2( "Opening %s\n", serve->exportname );
+		if ((fhandle = open(serve->exportname,
+				    (serve->flags & F_READONLY) ? O_RDONLY : O_RDWR)) == -1) {
+			err("Could not open exported file: %m");
+		}
+		/**
+		 * if the exported file's size can't be detected	   
+		 * size_autodetect() will exit()... and export can be
+		 * considered invalid
+		 **/
+		size_autodetect(fhandle);
+		close(fhandle);
+	}	
+	daemonize(serve);
+	
 	if ((serve->socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("socket: %m");
 
@@ -1026,8 +1048,7 @@ int main(int argc, char *argv[]) {
           	set_peername(0,client);
           	serveconnection(client);
           	return 0;
-        }
-	daemonize(serve);
+        }	
 	setup_serve(serve);
 	serveloop(serve);
 	return 0 ;
