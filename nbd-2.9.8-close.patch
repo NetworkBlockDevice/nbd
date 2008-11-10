@@ -1,0 +1,13 @@
+diff -urN nbd-2.9.8.orig/nbd-server.c nbd-2.9.8/nbd-server.c
+--- nbd-2.9.8.orig/nbd-server.c	2007-10-26 23:25:18 +0300
++++ nbd-2.9.8/nbd-server.c	2007-11-09 02:15:40 +0200
+@@ -1450,8 +1450,7 @@
+ 					}
+ 					/* child */
+ 					g_hash_table_destroy(children);
+-					for(i=0;i<servers->len;i++) {
+-						serve=g_array_index(servers, SERVER*, i);
++					for(i=0;serve=g_array_index(servers, SERVER*, i);i++) {
+ 						close(serve->socket);
+ 					}
+ 					/* FALSE does not free the

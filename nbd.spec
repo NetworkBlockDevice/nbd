@@ -8,7 +8,7 @@
 %define Name NBD
 Name: nbd
 Version: 2.9.8
-Release: alt1
+Release: alt2
 Summary: Tools for using the Network Block Device
 License: GPL
 Group: Networking/Other
@@ -17,6 +17,7 @@ Source0: %name-%version.tar.bz2
 Source1: %name.init
 Patch0:	%name-types.patch
 Patch1:	%name-2.9.6-gznbd.patch
+Patch2:	%name-2.9.8-close.patch
 BuildRequires: glib2-devel >= 2.6.0
 %{?_with_gznbd:BuildRequires: zlib-devel}
 %{?_with_static_client:BuildRequires: dietlibc}
@@ -73,6 +74,7 @@ This package contains static %name-client (can be used for initrd).
 %setup
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 
 %build
@@ -132,6 +134,9 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
+* Fri Nov 09 2007 Led <led@altlinux.ru> 2.9.8-alt2
+- added %name-2.9.8-close.patch
+
 * Mon Oct 29 2007 Led <led@altlinux.ru> 2.9.8-alt1
 - 2.9.8
 - removed %name-2.9.7-prerun.patch (fixed in upstream)
