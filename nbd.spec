@@ -3,19 +3,21 @@
 %def_enable lfs
 %def_disable sdp
 %def_with gznbd
-%def_without static_client
+%def_with static_client
 
 %define Name NBD
 Name: nbd
-Version: 2.9.10
-Release: alt1
+Version: 2.9.11
+Release: alt2
 Summary: Tools for using the Network Block Device
 License: GPL
 Group: Networking/Other
 URL: http://%name.sourceforge.net/
 Source0: %name-%version.tar.bz2
 Source1: %name.init
-Patch: %name-2.9.10-types.patch
+Patch0: %name-2.9.11-configure.patch
+Patch1: %name-2.9.11-types.patch
+Patch2: %name-2.9.11-alt-doc.patch
 BuildRequires: glib2-devel >= 2.6.0
 %{?_with_gznbd:BuildRequires: zlib-devel}
 %{?_with_static_client:BuildRequires: dietlibc}
@@ -70,21 +72,24 @@ This package contains static %name-client (can be used for initrd).
 
 %prep
 %setup
-%patch -p1
+%patch0 -p1
+%patch1 -p1
+%patch2 -p1
 
 
 %build
+%autoreconf
 %configure \
     %{subst_enable debug} \
     %{subst_enable syslog} \
     %{subst_enable lfs} \
     %{subst_enable sdp}
 %if_with static_client
-%make_build CC="diet %__cc" %name-client
+make CC="diet %__cc" CFLAGS="%optflags -Os" %name-client
 mv %name-client{,.static}
 %make_build clean
 %endif
-%make_build sbin_PROGRAMS=nbd-client
+%make_build
 %{?_with_gznbd:%make_build -C gznbd CFLAGS="%optflags -DMY_NAME='\"gznbd\"'"}
 
 
@@ -130,10 +135,16 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
-* Thu Apr 03 2008 Led <led@altlinux.ru> 2.9.10-alt1
-- 2.9.10
-- removed %name-2.9.6-gznbd.patch (fixed in upstream)
-- updated %name-2.9.10-types.patch
+* Tue Jun 10 2008 Led <led@altlinux.ru> 2.9.11-alt2
+- added:
+  + %name-2.9.11-configure.patch
+  + %name-2.9.11-alt-doc.patch
+- updated %name-2.9.11-types.patch
+
+* Thu May 08 2008 Led <led@altlinux.ru> 2.9.11-alt1
+- 2.9.11
+- removed %name-2.9.6-gznbd.patch
+- updated %name-2.9.11-types.patch
 
 * Mon Dec 10 2007 Led <led@altlinux.ru> 2.9.9-alt1
 - 2.9.9

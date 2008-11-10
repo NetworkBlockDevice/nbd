@@ -1,0 +1,26 @@
+diff -urN nbd-2.9.11.orig/README nbd-2.9.11/README
+--- nbd-2.9.11.orig/README	2008-05-01 21:56:34 +0300
++++ nbd-2.9.11/README	2008-06-10 17:48:20 +0300
+@@ -16,10 +16,10 @@
+ device nodes:
+ 
+ # cd /dev
+-# ./MAKEDEV nb0
++# ./MAKEDEV nbd0
+ 
+-(if you need more than one NBD device, repeat the above command for nb1,
+-nb2, ...)
++(if you need more than one NBD device, repeat the above command for nbd1,
++nbd2, ...)
+ 
+ Since there's a problem with nbd and the (default) cfq I/O scheduler,
+ you may want to set it to deadline:
+@@ -47,7 +47,7 @@
+ 
+ e.g.,
+ 
+-nbd-client 10.0.0.1 1234 /dev/nb0
++nbd-client 10.0.0.1 1234 /dev/nbd0
+ 
+ nbd-client must be ran as root; the same is not true for nbd-server (but
+ do make sure that /var/run is writeable by the server that nbd-server

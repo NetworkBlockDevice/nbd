@@ -1,0 +1,56 @@
+diff -urN nbd-2.9.11.orig/configure.ac nbd-2.9.11/configure.ac
+--- nbd-2.9.11.orig/configure.ac	2008-05-01 22:06:14 +0300
++++ nbd-2.9.11/configure.ac	2008-06-10 17:40:16 +0300
+@@ -82,40 +82,6 @@
+   ]
+ )
+ 
+-AC_MSG_CHECKING(for klcc)
+-AC_ARG_WITH(
+-  klcc,
+-  AC_HELP_STRING(--with-klcc,[Build a version of nbd-client against klibc (for initramfs uses). Specify the path to 'klcc' (default autodetected)]),
+-  [
+-    if test "x$withval" != "x"; then
+-      if test -x "$withval"; then
+-        KLCC="$withval"
+-	sbin_PROGRAMS=knbd-client
+-	AC_MSG_RESULT($KLCC)
+-      else
+-        AC_MSG_ERROR("specified klcc is not executable or does not exist.")
+-      fi
+-    else
+-      if test -x /usr/bin/klcc; then
+-        KLCC=/usr/bin/klcc
+-	sbin_PROGRAMS=knbd-client
+-	AC_MSG_RESULT($KLCC)
+-      else
+-        AC_MSG_ERROR("klcc not found! Please specify it as a parameter to the --with-klcc option");
+-      fi
+-    fi
+-  ],
+-  [ if test -x /usr/bin/klcc; then
+-      sbin_PROGRAMS=knbd-client
+-      KLCC=/usr/bin/klcc
+-      AC_MSG_RESULT($KLCC)
+-    else
+-      AC_MSG_RESULT(not found)
+-    fi
+-  ]
+-)
+-AC_SUBST(KLCC)
+-
+ AC_PROG_CC
+ AC_PROG_CPP
+ AC_PROG_INSTALL
+diff -urN nbd-2.9.11.orig/Makefile.am nbd-2.9.11/Makefile.am
+--- nbd-2.9.11.orig/Makefile.am	2008-05-01 21:56:34 +0300
++++ nbd-2.9.11/Makefile.am	2008-06-10 17:40:04 +0300
+@@ -24,8 +24,3 @@
+ 	mv NBD-SERVER.5 nbd-server.5.in
+ dist-hook:
+ 	rm -Rf `find $(distdir) -name '.svn' -type d -print`
+-knbd_client-nbd-client.o: nbd-client.c
+-	$(KLCC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(knbd_client_CPPFLAGS) $(CPPFLAGS) $(knbd_client_CFLAGS) $(CFLAGS) -c -o knbd_client-nbd-client.o nbd-client.c
+-knbd-client$(EXEEXT): knbd_client-nbd-client.o $(knbd_client_DEPENDENCIES)
+-	@rm -f knbd-client$(EXEEXT)
+-	$(LINK) $(knbd_client_LDFLAGS) knbd_client-nbd-client.o $(knbd_client_LDADD) $(LIBS)
