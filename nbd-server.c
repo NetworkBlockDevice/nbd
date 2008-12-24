@@ -573,6 +573,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	GArray *retval=NULL;
 	gchar **groups;
 	gboolean value;
+	gchar* startgroup;
 	gint i;
 	gint j;
 
@@ -585,7 +586,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		g_key_file_free(cfile);
 		return retval;
 	}
-	if(strcmp(g_key_file_get_start_group(cfile), "generic")) {
+	startgroup = g_key_file_get_start_group(cfile);
+	if(!startgroup || strcmp(startgroup, "generic")) {
 		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
