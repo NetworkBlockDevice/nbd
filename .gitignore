@@ -34,3 +34,4 @@ nbd-server.1.in
 nbd-server.5.in
 nbd-server.5
 nbd.h
+*.o
