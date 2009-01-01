@@ -42,8 +42,13 @@ typedef unsigned long long u64;
 #include "nbd.h"
 #endif
 #ifdef NBD_H_LINUX
-#include <linux/types.h>
-#include <linux/nbd.h>
+# ifdef HAVE_LINUX_TYPES_H
+#  include <linux/types.h>
+# else
+#  define __be32 u32
+#  define __be64 u64
+# endif
+# include <linux/nbd.h>
 #endif
 
 #if NBD_LFS==1

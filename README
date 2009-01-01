@@ -109,13 +109,6 @@ uClibc's "buildroot" script also seems to have support for NBD.
 If you're packaging NBD for a different operating system that isn't in
 the above list, I'd like to know about it.
 
-Thanks, and have fun,
-
-Wouter Verhelst
-
-
-
-
 [1] When you write something to a block device, the kernel will not
 immediately write that to the physical block device; instead, your
 changes are written to a cache, which is periodically flushed by a
@@ -127,6 +120,26 @@ If, while your kblockd is emptying the NBD buffer cache, the kernel
 decides that the cache of the block device your nbd-server is writing to
 needs to be emptied, then you've got a deadlock.
 
-A kernel patch exists[2] to create a separate kernel thread for NBD
-writes which woul fix this problem; however, it has not made it into
-mainline yet.
+A kernel patch exists to create a separate kernel thread for NBD writes
+which woul fix this problem; however, it has not made it into mainline
+yet.
+
+BUILDING THE SERVER FOR NON-LINUX OPERATING SYSTEMS
+===================================================
+
+Since the client requires kernel-side support, you can't just compile
+nbd-client on a non-Linux kernel and hope it'll work; you'd have to
+write a kernel-space driver before that would be possible.
+
+However, nbd-server assumes nothing more than POSIX and one headerfile
+from the Linux kernel. Compiling it can be done as follows:
+- Fetch the nbd userland sources, and unpack them. Since you're reading
+  this README file, you have already done this step.
+- Fetch the "nbd.h" file from /usr/include/linux on a Linux system, or
+  from include/linux in the Linux source tree, and store it in the
+  toplevel directory of the nbd userland sources
+- Edit the headerfile, and remove the line that says '#include
+  <linux/types.h>' (on non-Linux systems, the userland source is smart
+  enough to figure out how this works by itself)
+- now it's just a regular './configure && make && sudo make install'
+
