@@ -512,7 +512,9 @@ typedef enum {
 	CFILE_KEY_MISSING,	/**< A (required) key is missing */
 	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
 	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
-	CFILE_PROGERR		/**< Programmer error */
+	CFILE_PROGERR,		/**< Programmer error */
+	CFILE_NO_EXPORTS	/**< A config file was specified that does not
+				     define any exports */
 } CFILE_ERRORS;
 
 /**
@@ -705,6 +707,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		}
 #endif
 	}
+	if(i==1) {
+		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
+	}
+	g_key_file_free(cfile);
 	return retval;
 }
 
