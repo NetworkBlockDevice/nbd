@@ -442,7 +442,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 				if (suffix == 'k' || suffix == 'K' ||
 				    suffix == 'm' || suffix == 'M')
 					optarg[last] = '\0';
-				es = (off_t)atol(optarg);
+				es = (off_t)atoll(optarg);
 				switch (suffix) {
 					case 'm':
 					case 'M':  es <<= 10;
