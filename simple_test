@@ -9,7 +9,7 @@ dd if=/dev/zero of=$tmpnam bs=1024 count=1024
 echo $1
 
 case $1 in
-	./cmd)
+	*/cmd)
 		# Test with export specified on command line
 		./nbd-server -C /dev/null -p `pwd`/nbd-server.pid 11111 $tmpnam &
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
@@ -20,7 +20,7 @@ case $1 in
 		retval=$?
 	;;
 
-	./cfg1)
+	*/cfg1)
 		# Test with export specified in config file
 		cat > nbd-server.conf <<EOF
 [generic]
@@ -34,7 +34,7 @@ EOF
 		./nbd-tester-client localhost 11111
 		retval=$?
 	;;
-	./cfgmulti)
+	*/cfgmulti)
 		# Test with multiple exports specified in config file, and
 		# testing more options too
 		cat >nbd-server.conf <<EOF

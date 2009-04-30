@@ -169,6 +169,6 @@ AC_SUBST(sbin_PROGRAMS)
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile Doxyfile nbd-server.1 nbd-server.5])
+AC_CONFIG_FILES([Makefile Doxyfile nbd-server.1 nbd-server.5 nbd-client.8])
 AC_OUTPUT
 
