@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 	if (strcmp(argv[0], "-d")==0) {
 		nbd = open(argv[1], O_RDWR);
 		if (nbd < 0)
-			err("Can not open NBD: %m");
+			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 		printf("Disconnecting: que, ");
 		if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
 			err("Ioctl failed: %m\n");
@@ -276,7 +276,7 @@ int main(int argc, char *argv[]) {
 	nbddev = argv[0];
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
-	  err("Can not open NBD: %m");
+	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 	++argv; --argc; /* skip device */
 
 	if (argc>3) goto errmsg;
