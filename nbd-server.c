@@ -176,8 +176,6 @@ typedef struct {
 	unsigned int port;   /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
 	int flags;           /**< flags associated with this exported file */
-	unsigned int timeout;/**< how long a connection may be idle
-			       (0=forever) */
 	int socket;	     /**< The socket of this server. */
 	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
 	uint8_t cidrlen;     /**< The length of the mask when we use
@@ -335,7 +333,7 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -371,9 +369,6 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	}
 	if(serve->authname) {
 		printf("\tauthfile = %s\n", serve->authname);
-	}
-	if(serve->timeout) {
-		printf("\ttimeout = %d\n", serve->timeout);
 	}
 	exit(EXIT_SUCCESS);
 }
@@ -478,9 +473,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 			g_free(serve->authname);
 			serve->authname=g_strdup(optarg);
 			break;
-		case 'a': 
-			serve->timeout=strtol(optarg, NULL, 0);
-			break;
 		default:
 			usage();
 			exit(EXIT_FAILURE);
@@ -549,7 +541,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
 		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
 		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "timeout",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
 		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
@@ -600,14 +591,13 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[0].target=&(s.exportname);
 		lp[1].target=&(s.port);
 		lp[2].target=&(s.authname);
-		lp[3].target=&(s.timeout);
-		lp[4].target=&(s.expected_size);
-		lp[5].target=&(virtstyle);
-		lp[6].target=&(s.prerun);
-		lp[7].target=&(s.postrun);
-		lp[8].target=lp[9].target=lp[10].target=
-				lp[11].target=lp[12].target=&(s.flags);
-		lp[13].target=&(s.listenaddr);
+		lp[3].target=&(s.expected_size);
+		lp[4].target=&(virtstyle);
+		lp[5].target=&(s.prerun);
+		lp[6].target=&(s.postrun);
+		lp[7].target=lp[8].target=lp[9].target=
+				lp[10].target=lp[11].target=&(s.flags);
+		lp[12].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -1117,8 +1107,6 @@ int mainloop(CLIENT *client) {
 		i++;
 		printf("%d: ", i);
 #endif
-		if (client->server->timeout) 
-			alarm(client->server->timeout);
 		readit(client->net, &request, sizeof(request));
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);

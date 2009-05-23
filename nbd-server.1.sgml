@@ -63,7 +63,6 @@ manpage.1: manpage.sgml
       <arg><option>-r</option></arg>
       <arg><option>-m</option></arg>
       <arg><option>-c</option></arg>
-      <arg><option>-a <replaceable>timeout</replaceable></option></arg>
       <arg><option>-l <replaceable>host list filename</replaceable></option></arg>
       <arg><option>-o <replaceable>section name</replaceable></option></arg>
       <arg><option>-C <replaceable>config file</replaceable></option></arg>
@@ -184,15 +183,6 @@ manpage.1: manpage.sgml
 	    file entirely, either move it away or use the -C option to
 	    point <command>nbd-server</command>(1) to a non-existing or
 	    empty configuration file.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-      	<term><option>timeout</option></term>
-	<listitem>
-	  <para>Maximum number of idle seconds. If a connection is
-	    inactive for this amount of time, it is terminated; this is to
-	    avoid stale nbd-server processes staying in memory. Use of
-	    this option is strongly recommended.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
