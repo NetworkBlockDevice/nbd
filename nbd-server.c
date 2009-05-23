@@ -1635,6 +1635,35 @@ void dousers(void) {
 	}
 }
 
+#ifndef ISSERVER
+void glib_message_syslog_redirect(const gchar *log_domain,
+                                  GLogLevelFlags log_level,
+                                  const gchar *message,
+                                  gpointer user_data)
+{
+    int level=LOG_DEBUG;
+    
+    switch( log_level )
+    {
+      case G_LOG_FLAG_FATAL:
+      case G_LOG_LEVEL_CRITICAL:
+      case G_LOG_LEVEL_ERROR:    
+        level=LOG_ERR; 
+        break;
+      case G_LOG_LEVEL_WARNING:
+        level=LOG_WARNING;
+        break;
+      case G_LOG_LEVEL_MESSAGE:
+      case G_LOG_LEVEL_INFO:
+        level=LOG_INFO;
+        break;
+      case G_LOG_LEVEL_DEBUG:
+        level=LOG_DEBUG;
+    }
+    syslog(level, message);
+}
+#endif
+
 /**
  * Main entry point...
  **/
@@ -1654,10 +1683,7 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
-	if(!servers || !servers->len) {
-		g_warning("Could not parse config file: %s", 
-				err ? err->message : "Unknown error");
-	}
+	
 	if(serve) {
 		g_array_append_val(servers, *serve);
      
@@ -1672,6 +1698,7 @@ int main(int argc, char *argv[]) {
 			close(2);
 			open("/dev/null", O_WRONLY);
 			open("/dev/null", O_WRONLY);
+			g_log_set_default_handler( glib_message_syslog_redirect, NULL );
 #endif
 			client=g_malloc(sizeof(CLIENT));
 			client->server=serve;
@@ -1682,6 +1709,12 @@ int main(int argc, char *argv[]) {
 			return 0;
 		}
 	}
+    
+    if(!servers || !servers->len) {
+		g_warning("Could not parse config file: %s", 
+				err ? err->message : "Unknown error");
+	}
+    
 	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);
