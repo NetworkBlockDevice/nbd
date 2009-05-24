@@ -209,6 +209,7 @@ int main(int argc, char *argv[]) {
 	int cont=0;
 	int timeout=0;
 	int sdp=0;
+	int nofork=0;
 	u64 size64;
 	u32 flags;
 
@@ -217,7 +218,7 @@ int main(int argc, char *argv[]) {
 	if (argc < 3) {
 	errmsg:
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
-		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist]\n");
+		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist] [-nofork]\n");
 		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 		fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
@@ -298,6 +299,12 @@ int main(int argc, char *argv[]) {
 			++argv;--argc;
 		}
 	}
+	if (argc) {
+		if(strncmp(argv[0], "-nofork", 7)==0) {
+			nofork=1;
+			++argv;--argc;
+		}
+	}
 	if(argc) goto errmsg;
 	sock = opennet(hostname, port, sdp);
 	argv=NULL; argc=0; /* don't use it later suddenly */
@@ -312,12 +319,14 @@ int main(int argc, char *argv[]) {
 	chdir("/");
 	do {
 #ifndef NOFORK
-		if (fork()) {
-			while(check_conn(nbddev, 0)) {
-				sleep(1);
+		if (!nofork) {
+			if (fork()) {
+				while(check_conn(nbddev, 0)) {
+					sleep(1);
+				}
+				open(nbddev, O_RDONLY);
+				exit(0);
 			}
-			open(nbddev, O_RDONLY);
-			exit(0);
 		}
 #endif
 
