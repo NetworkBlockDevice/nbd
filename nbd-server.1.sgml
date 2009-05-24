@@ -13,7 +13,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
   <!ENTITY dhsurname   "<surname>Verhelst</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>$Date: 2007-10-30 11:35:12 +0100 (di, 30 okt 2007) $</date>">
+  <!ENTITY dhdate      "<date>$Date$</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
@@ -64,7 +64,7 @@ manpage.1: manpage.sgml
       <arg><option>-m</option></arg>
       <arg><option>-c</option></arg>
       <arg><option>-a <replaceable>timeout</replaceable></option></arg>
-      <arg><option>-l <replaceable>host list</replaceable></option></arg>
+      <arg><option>-l <replaceable>host list filename</replaceable></option></arg>
       <arg><option>-o <replaceable>section name</replaceable></option></arg>
       <arg><option>-C <replaceable>config file</replaceable></option></arg>
     </cmdsynopsis>
@@ -196,7 +196,7 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>host list</option></term>
+	<term><option>host list filename</option></term>
 	<listitem>
 	  <para>This argument should contain a list of IP-addresses
 	    for hosts that may connect to the server. Wildcards are

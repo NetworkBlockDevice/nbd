@@ -367,7 +367,7 @@ void dump_section(SERVER* serve, gchar* section_header) {
 		printf("\tcopyonwrite = true\n");
 	}
 	if(serve->expected_size) {
-		printf("\tfilesize = %Ld\n", (long long int)serve->expected_size);
+		printf("\tfilesize = %lld\n", (long long int)serve->expected_size);
 	}
 	if(serve->authname) {
 		printf("\tauthfile = %s\n", serve->authname);
@@ -442,7 +442,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 				if (suffix == 'k' || suffix == 'K' ||
 				    suffix == 'm' || suffix == 'M')
 					optarg[last] = '\0';
-				es = (off_t)atol(optarg);
+				es = (off_t)atoll(optarg);
 				switch (suffix) {
 					case 'm':
 					case 'M':  es <<= 10;
@@ -512,7 +512,9 @@ typedef enum {
 	CFILE_KEY_MISSING,	/**< A (required) key is missing */
 	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
 	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
-	CFILE_PROGERR		/**< Programmer error */
+	CFILE_PROGERR,		/**< Programmer error */
+	CFILE_NO_EXPORTS	/**< A config file was specified that does not
+				     define any exports */
 } CFILE_ERRORS;
 
 /**
@@ -573,6 +575,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	GArray *retval=NULL;
 	gchar **groups;
 	gboolean value;
+	gchar* startgroup;
 	gint i;
 	gint j;
 
@@ -585,7 +588,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		g_key_file_free(cfile);
 		return retval;
 	}
-	if(strcmp(g_key_file_get_start_group(cfile), "generic")) {
+	startgroup = g_key_file_get_start_group(cfile);
+	if(!startgroup || strcmp(startgroup, "generic")) {
 		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
@@ -703,6 +707,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		}
 #endif
 	}
+	if(i==1) {
+		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
+	}
+	g_key_file_free(cfile);
 	return retval;
 }
 
@@ -892,7 +900,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("(WRITE to fd %d offset %Lu len %u), ", fhandle, foffset, len);
+	DEBUG4("(WRITE to fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
 	return write(fhandle, buf, len);
@@ -934,7 +942,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("(READ from fd %d offset %Lu len %u), ", fhandle, foffset, len);
+	DEBUG4("(READ from fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
 	return read(fhandle, buf, len);
@@ -971,7 +979,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 
 	if (!(client->server->flags & F_COPYONWRITE))
 		return(rawexpread_fully(a, buf, len, client));
-	DEBUG3("Asked to read %d bytes at %Lu.\n", len, (unsigned long long)a);
+	DEBUG3("Asked to read %d bytes at %llu.\n", len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
@@ -981,12 +989,12 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		rdlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
 			len : (size_t)DIFFPAGESIZE-offset;
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
+			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
 			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
 		} else { /* the block is not there */
-			DEBUG2("Page %Lu is not here, we read the original one\n",
+			DEBUG2("Page %llu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
 			if(rawexpread_fully(a, buf, rdlen, client)) return -1;
 		}
@@ -1015,7 +1023,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 
 	if (!(client->server->flags & F_COPYONWRITE))
 		return(rawexpwrite_fully(a, buf, len, client)); 
-	DEBUG3("Asked to write %d bytes at %Lu.\n", len, (unsigned long long)a);
+	DEBUG3("Asked to write %d bytes at %llu.\n", len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -1026,7 +1034,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 			len : (size_t)DIFFPAGESIZE-offset;
 
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-			DEBUG3("Page %Lu is at %lu\n", (unsigned long long)mapcnt,
+			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
 			myseek(client->difffile,
 					client->difmap[mapcnt]*DIFFPAGESIZE+offset);
@@ -1034,7 +1042,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 		} else { /* the block is not there */
 			myseek(client->difffile,client->difffilelen*DIFFPAGESIZE) ;
 			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
-			DEBUG3("Page %Lu is not here, we put it at %lu\n",
+			DEBUG3("Page %llu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			rdlen=DIFFPAGESIZE ;
@@ -1134,7 +1142,7 @@ int mainloop(CLIENT *client) {
 		if (len > BUFSIZE + sizeof(struct nbd_reply))
 			err("Request too big!");
 #ifdef DODBG
-		printf("%s from %Lu (%Lu) len %d, ", request.type ? "WRITE" :
+		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
 				"READ", (unsigned long long)request.from,
 				(unsigned long long)request.from / 512, len);
 #endif
@@ -1257,7 +1265,7 @@ void setupexport(CLIENT* client) {
 		client->exportsize = client->server->expected_size;
 	}
 
-	msg3(LOG_INFO, "Size of exported file/device is %Lu", (unsigned long long)client->exportsize);
+	msg3(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
 	if(multifile) {
 		msg3(LOG_INFO, "Total number of files: %d", i);
 	}
@@ -1421,9 +1429,16 @@ int serveloop(GArray* servers) {
 			for(i=0;i<servers->len;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
+					int sock_flags;
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 						err("accept: %m");
 
+					if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
+						err("fcntl F_GETFL");
+					}
+					if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
+						err("fcntl F_SETFL ~O_NONBLOCK");
+					}
 					client = g_malloc(sizeof(CLIENT));
 					client->server=serve;
 					client->exportsize=OFFT_MAX;

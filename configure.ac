@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.11],[wouter@debian.org])
+AC_INIT([nbd],[2.9.12],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -82,40 +82,6 @@ AC_ARG_ENABLE(
   ]
 )
 
-AC_MSG_CHECKING(for klcc)
-AC_ARG_WITH(
-  klcc,
-  AC_HELP_STRING(--with-klcc,[Build a version of nbd-client against klibc (for initramfs uses). Specify the path to 'klcc' (default autodetected)]),
-  [
-    if test "x$withval" != "x"; then
-      if test -x "$withval"; then
-        KLCC="$withval"
-	sbin_PROGRAMS=knbd-client
-	AC_MSG_RESULT($KLCC)
-      else
-        AC_MSG_ERROR("specified klcc is not executable or does not exist.")
-      fi
-    else
-      if test -x /usr/bin/klcc; then
-        KLCC=/usr/bin/klcc
-	sbin_PROGRAMS=knbd-client
-	AC_MSG_RESULT($KLCC)
-      else
-        AC_MSG_ERROR("klcc not found! Please specify it as a parameter to the --with-klcc option");
-      fi
-    fi
-  ],
-  [ if test -x /usr/bin/klcc; then
-      sbin_PROGRAMS=knbd-client
-      KLCC=/usr/bin/klcc
-      AC_MSG_RESULT($KLCC)
-    else
-      AC_MSG_RESULT(not found)
-    fi
-  ]
-)
-AC_SUBST(KLCC)
-
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -194,7 +160,7 @@ AC_SEARCH_LIBS(daemon, resolv,, AC_MSG_ERROR([Could not find an implementation o
 AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h])
 AM_PATH_GLIB_2_0(2.6.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
@@ -203,6 +169,6 @@ AC_SUBST(sbin_PROGRAMS)
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile Doxyfile nbd-server.1 nbd-server.5])
+AC_CONFIG_FILES([Makefile Doxyfile nbd-server.1 nbd-server.5 nbd-client.8])
 AC_OUTPUT
 

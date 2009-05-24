@@ -28,6 +28,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <sys/mount.h>
+#include <sys/mman.h>
 #include <errno.h>
 
 #ifndef __GNUC__
@@ -185,6 +186,9 @@ void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
 
+/*
+ * If anyone ever forward-patches this patch, I'll happily re-enable
+ * this code. Until then...
 #ifndef SO_SWAPPING
 	if (swap)
 		err("You have to compile me on machine with swapping patch enabled in order to use it later.");
@@ -193,6 +197,8 @@ void finish_sock(int sock, int nbd, int swap) {
 		if (setsockopt(sock, SOL_SOCKET, SO_SWAPPING, &one, sizeof(int)) < 0)
 			err("Could not enable swapping: %m");
 #endif
+*/
+	mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
 int main(int argc, char *argv[]) {
@@ -222,7 +228,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	++argv; --argc; /* skip programname */
-	
+
 	if (strcmp(argv[0], "-d")==0) {
 		nbd = open(argv[1], O_RDWR);
 		if (nbd < 0)
