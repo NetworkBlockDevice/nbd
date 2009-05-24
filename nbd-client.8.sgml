@@ -63,6 +63,7 @@ manpage.1: manpage.sgml
       <arg><option>-sdp</option></arg>
       <arg><option>-swap</option></arg>
       <arg><option>-persist</option></arg>
+      <arg><option>-nofork</option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
@@ -175,11 +176,16 @@ manpage.1: manpage.sgml
 	<term><option>-swap</option></term>
 	<listitem>
 	  <para>Specifies that this NBD device will be used as
-	    swapspace. If you intend to do that, please use this
-	    option to prevent deadlocks. You'll need a special kernel
-	    patch, available at NBD's homepage:
-	    http://atrey.karlin.mff.cuni.cz/~pavel</para>
+	  swapspace. This option attempts to prevent deadlocks by
+	  performing mlockall() at an appropriate time. It does not
+	  however guarantee that such deadlocks can be avoided.</para>
 	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-nofork</option></term>
+	<listitem>
+	  <para>Specifies that the NBD client should not detach and
+	  daemonize itself. This is mostly useful for debugging.</para>
       </varlistentry>
     </variablelist>
   </refsect1>
