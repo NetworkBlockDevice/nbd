@@ -63,6 +63,7 @@ manpage.1: manpage.sgml
       <arg><option>-sdp</option></arg>
       <arg><option>-swap</option></arg>
       <arg><option>-persist</option></arg>
+      <arg><option>-nofork</option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
@@ -180,6 +181,12 @@ manpage.1: manpage.sgml
 	    patch, available at NBD's homepage:
 	    http://atrey.karlin.mff.cuni.cz/~pavel</para>
 	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-nofork</option></term>
+	<listitem>
+	  <para>Specifies that the NBD client should not detach and
+	  daemonize itself. This is mostly useful for debugging.</para>
       </varlistentry>
     </variablelist>
   </refsect1>
