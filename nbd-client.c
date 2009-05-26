@@ -316,7 +316,7 @@ int main(int argc, char *argv[]) {
 
 	/* Go daemon */
 	
-	chdir("/");
+	daemon(0,0);
 	do {
 #ifndef NOFORK
 		if (!nofork) {
