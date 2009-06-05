@@ -245,7 +245,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 	}
 	for(i=0;i+1024<=size;i+=1024) {
 		if(do_write) {
-			*((u64*)req.handle)=i;
+			memcpy(&(req.handle),&i,sizeof(i));
 			req.from=htonll(i);
 			write(sock, &req, sizeof(req));
 			printf("Requests(+): %d\n", ++requests);
