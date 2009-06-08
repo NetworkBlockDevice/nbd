@@ -770,19 +770,18 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int fhandle) {
 	off_t es;
-	unsigned long sectors;
+	u64 bytes;
 	struct stat stat_buf;
 	int error;
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
-#ifdef BLKGETSIZE
-	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
-	if (!ioctl(fhandle, BLKGETSIZE, &sectors) && sectors) {
-		es = (off_t)sectors * (off_t)512;
-		return es;
+#ifdef BLKGETSIZE64
+	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
+	if (!ioctl(fhandle, BLKGETSIZE64, bytes) && bytes) {
+		return (off_t)bytes;
 	}
-#endif /* BLKGETSIZE */
+#endif /* BLKGETSIZE64 */
 #endif /* HAVE_SYS_IOCTL_H */
 #endif /* HAVE_SYS_MOUNT_H */
 
