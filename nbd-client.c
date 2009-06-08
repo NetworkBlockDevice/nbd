@@ -41,10 +41,15 @@
 
 int check_conn(char* devname, int do_print) {
 	char buf[256];
+	char* p;
 	int fd;
 	int len;
 	if(!strncmp(devname, "/dev/", 5)) {
 		devname+=5;
+	}
+	if((p=strchr(devname, 'p'))) {
+		/* We can't do checks on partitions. */
+		*p='\0';
 	}
 	snprintf(buf, 256, "/sys/block/%s/pid", devname);
 	if((fd=open(buf, O_RDONLY))<0) {
