@@ -183,6 +183,11 @@ manpage.1: manpage.sgml
 	    file entirely, either move it away or use the -C option to
 	    point <command>nbd-server</command>(1) to a non-existing or
 	    empty configuration file.</para>
+	  <para>Also note that if an empty, incomplete, or invalid
+	    configuration file is specified, nbd-server will produce a
+	    warning about failure to parse the config file. If the
+	    command line contains a fully specified configuration, this
+	    warning is harmless and may be ignored.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

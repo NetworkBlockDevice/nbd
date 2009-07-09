@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "23 May 2009" "" ""
+.TH "NBD-SERVER" "1" "09 July 2009" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
@@ -99,6 +99,12 @@ specified on the command line. To disable the configuration
 file entirely, either move it away or use the -C option to
 point \fBnbd-server\fR(1) to a non-existing or
 empty configuration file.
+
+Also note that if an empty, incomplete, or invalid
+configuration file is specified, nbd-server will produce a
+warning about failure to parse the config file. If the
+command line contains a fully specified configuration, this
+warning is harmless and may be ignored.
 .TP
 \fBhost list filename\fR
 This argument should contain a list of IP-addresses
