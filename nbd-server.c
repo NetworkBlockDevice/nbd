@@ -149,6 +149,7 @@ gchar* rungroup=NULL;
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
 #define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
 #define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
+#define F_SYNC 64	  /**< Whether to fsync() after a write */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -550,6 +551,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
+		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
@@ -596,8 +598,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[5].target=&(s.prerun);
 		lp[6].target=&(s.postrun);
 		lp[7].target=lp[8].target=lp[9].target=
-				lp[10].target=lp[11].target=&(s.flags);
-		lp[12].target=&(s.listenaddr);
+				lp[10].target=lp[11].target=
+				lp[12].target=&(s.flags);
+		lp[13].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -883,6 +886,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
+	ssize_t retval;
 
 	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
 		return -1;
@@ -892,7 +896,11 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG4("(WRITE to fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
-	return write(fhandle, buf, len);
+	retval = write(fhandle, buf, len);
+	if(client->server->flags & F_SYNC) {
+		fsync(fhandle);
+	}
+	return retval;
 }
 
 /**

@@ -329,6 +329,23 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>sync</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will call an fsync() after every
+	    write to the backend storage. Calling fsync() increases
+	    reliability in case of an unclean shutdown of nbd-server; but,
+	    depending on the file system used on the nbd-server side, may
+	    degrade performance. The use of this option isn't always
+	    necessary; e.g., on ext3 filesystems, it is recommended that
+	    it is <emphasis>not</emphasis> enabled, since it seriously
+	    reduces performance on ext3 filesystems while not
+	    importantly impacting performance.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>sparse_cow</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>
