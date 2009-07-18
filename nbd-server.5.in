@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "5" "17 July 2009" "" ""
+.TH "NBD-SERVER" "5" "18 July 2009" "" ""
 
 .SH NAME
 /etc/nbd-server/config \- configuration file for nbd-server
@@ -224,7 +224,7 @@ degrade performance. The use of this option isn't always
 necessary; e.g., on ext3 filesystems, it is recommended that
 it is \fBnot\fR enabled, since it seriously
 reduces performance on ext3 filesystems while not
-importantly impacting performance.
+importantly impacting reliability.
 .TP
 \fBsparse_cow\fR
 Optional; boolean.

@@ -341,7 +341,7 @@ manpage.1: manpage.sgml
 	    necessary; e.g., on ext3 filesystems, it is recommended that
 	    it is <emphasis>not</emphasis> enabled, since it seriously
 	    reduces performance on ext3 filesystems while not
-	    importantly impacting performance.
+	    importantly impacting reliability.
 	  </para>
 	</listitem>
       </varlistentry>
