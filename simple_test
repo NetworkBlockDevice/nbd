@@ -1,7 +1,7 @@
 #!/bin/sh
 # Yes, that's POSIX sh, not bash!
 
-tmpnam=`mktemp /tmp/nbd-test.XXXXXX`
+tmpnam=`mktemp`
 
 # Create a one-meg device
 dd if=/dev/zero of=$tmpnam bs=1024 count=1024
@@ -81,30 +81,8 @@ then
 else
 	kill $PID
 fi
-rm -f nbd-server.pid
 if [ $retval -ne 0 ]
 then
-	rm -f $tmpnam
 	exit $retval
 fi
-cat > nbd-server.conf <<EOF
-[generic]
-[export]
-	exportname = $tmpnam
-	port = 11111
-EOF
-./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
-PID=$!
-sleep 1
-./nbd-tester-client localhost 11111
-retval=$?
-if [ -f nbd-server.pid ]
-then
-	kill `cat nbd-server.pid`
-else
-	kill $PID
-fi
-rm -f nbd-server.pid
-rm -f nbd-server.conf
-rm -f $tmpnam
-exit $retval
+rm -f $tmpnam nbd-server.conf
