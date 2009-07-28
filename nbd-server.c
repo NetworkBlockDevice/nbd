@@ -602,15 +602,14 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[0].target=&(s.exportname);
 		lp[1].target=&(s.port);
 		lp[2].target=&(s.authname);
-		lp[3].target=&(s.timeout);
-		lp[4].target=&(s.expected_size);
-		lp[5].target=&(virtstyle);
-		lp[6].target=&(s.prerun);
-		lp[7].target=&(s.postrun);
-		lp[8].target=lp[9].target=lp[10].target=
-				lp[11].target=lp[12].target=
-				lp[13].target=&(s.flags);
-		lp[14].target=&(s.listenaddr);
+		lp[3].target=&(s.expected_size);
+		lp[4].target=&(virtstyle);
+		lp[5].target=&(s.prerun);
+		lp[6].target=&(s.postrun);
+		lp[7].target=lp[8].target=lp[9].target=
+				lp[10].target=lp[11].target=
+				lp[12].target=&(s.flags);
+		lp[13].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
