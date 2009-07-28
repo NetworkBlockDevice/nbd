@@ -17,7 +17,16 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #include <sys/sendfile.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <nbd-server.h>
+
+int backend_setup(int net) {
+	int yes=1;
+	return setsockopt(net, IPPROTO_TCP, TCP_CORK, &yes, sizeof(int));
+}
 
 ssize_t backend_send(int fh, int net, off_t offset, size_t len) {
 	return sendfile(net, fh, &offset, len);

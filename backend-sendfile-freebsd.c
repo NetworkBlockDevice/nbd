@@ -19,6 +19,10 @@
 #include <glib.h>
 #include <nbd-server.h>
 
+int backend_setup(int net) {
+	return 0;
+}
+
 ssize_t backend_read(int fh, int net, off_t offset, size_t len) {
 	if(sendfile(fhandle, client->net, foffset, len, NULL, &retval, 0)) {
 		return -1;

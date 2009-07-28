@@ -4,6 +4,10 @@
 
 #include <nbd-server.h>
 
+int backend_setup(int net) {
+	return 0;
+}
+
 ssize_t backend_send(int fh, int net, off_t offset, size_t len) {
 	char *buf;
 	ssize_t retval;
