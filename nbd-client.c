@@ -178,13 +178,15 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 }
 
 void set_timeout(int nbd, int timeout) {
-#ifdef NBD_SET_TIMEOUT
 	if (timeout) {
+#ifdef NBD_SET_TIMEOUT
 		if (ioctl(nbd, NBD_SET_TIMEOUT, (unsigned long)timeout) < 0)
 			err("Ioctl NBD_SET_TIMEOUT failed: %m\n");
 		fprintf(stderr, "timeout=%d\n", timeout);
-	}
+#else
+		err("Ioctl NBD_SET_TIMEOUT cannot be called when compiled on a system that does not support it\n");
 #endif
+	}
 }
 
 void finish_sock(int sock, int nbd, int swap) {
