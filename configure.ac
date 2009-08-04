@@ -97,6 +97,23 @@ AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strs
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING([for backend to use])
+AC_ARG_WITH(backend, AC_HELP_STRING(--with-backend,Select backend (freebsd, linux, read-write) to use (default: autodetected)),
+  [
+    if test "x$withval" = "xlinux" ; then
+      BACKEND='backend-sendfile-linux.$(OBJEXT)'
+    else
+      if test "x$withval" = "xfreebsd" ; then
+        BACKEND='backend-sendfile-freebsd.$(OBJEXT)'
+      else
+        if test "x$withval" = "xread-write" ; then
+          BACKEND='backend-read-write.$(OBJEXT)'
+        else
+          AC_MSG_ERROR([Unknown backend $withval])
+        fi
+      fi
+    fi
+  ],
+  [
 AC_COMPILE_IFELSE([#include <sys/sendfile.h>
 int main(void) {
 	sendfile(0, 0, 0, 0);
@@ -109,6 +126,7 @@ dnl This backend needs some extra include files
 int main(void) {
 	sendfile(0, 0, 0, 0, NULL, NULL, 0);
 }], [BACKEND='backend-sendfile-freebsd.$(OBJEXT)'], [BACKEND='backend-read-write.$(OBJEXT)'])])
+  ])
 AC_MSG_RESULT($BACKEND)
 AC_SUBST(BACKEND)
 

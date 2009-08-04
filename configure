@@ -701,6 +701,7 @@ enable_syslog
 enable_debug
 enable_sdp
 enable_dependency_tracking
+with_backend
 enable_glibtest
 '
       ac_precious_vars='build_alias
@@ -1344,6 +1345,12 @@ Optional Features:
   --disable-dependency-tracking  speeds up one-time build
   --enable-dependency-tracking   do not reject slow dependency extractors
   --disable-glibtest      do not try to compile and run a test GLIB program
+
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-backend          Select backend (freebsd, linux, read-write) to use
+                          (default: autodetected)
 
 Some influential environment variables:
   CC          C compiler command
@@ -5110,6 +5117,26 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for backend to use" >&5
 $as_echo_n "checking for backend to use... " >&6; }
+
+# Check whether --with-backend was given.
+if test "${with_backend+set}" = set; then :
+  withval=$with_backend;
+    if test "x$withval" = "xlinux" ; then
+      BACKEND='backend-sendfile-linux.$(OBJEXT)'
+    else
+      if test "x$withval" = "xfreebsd" ; then
+        BACKEND='backend-sendfile-freebsd.$(OBJEXT)'
+      else
+        if test "x$withval" = "xread-write" ; then
+          BACKEND='backend-read-write.$(OBJEXT)'
+        else
+          as_fn_error "Unknown backend $withval" "$LINENO" 5
+        fi
+      fi
+    fi
+
+else
+
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <sys/sendfile.h>
@@ -5139,6 +5166,9 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $BACKEND" >&5
 $as_echo "$BACKEND" >&6; }
 
