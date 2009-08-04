@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "26 May 2009" "" ""
+.TH "NBD-CLIENT" "8" "04 August 2009" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device
@@ -101,24 +101,24 @@ Some examples of nbd-client usage:
 \(bu
 To connect to a server running on port 2000 at host
 "server.domain.com", using the client's block special file
-"/dev/nb0":
+"/dev/nbd0":
 
 \fBnbd-client server.domain.com 2000
-/dev/nb0\fR
+/dev/nbd0\fR
 .TP 0.2i
 \(bu
 To connect to a server running on port 2001 at host
 "swapserver.domain.com", using the client's block special
-file "/dev/nb1", for swap purposes:
+file "/dev/nbd1", for swap purposes:
 
-\fBnbd-client swapserver.domain.com 2001 /dev/nb1
+\fBnbd-client swapserver.domain.com 2001 /dev/nbd1
 -swap\fR
 .TP 0.2i
 \(bu
 To disconnect the above connection again (after making
 sure the block special file is not in use anymore):
 
-\fBnbd-client -d /dev/nb1\fR
+\fBnbd-client -d /dev/nbd1\fR
 .SH "SEE ALSO"
 .PP
 nbd-server (1).

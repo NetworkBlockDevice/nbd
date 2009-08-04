@@ -40,8 +40,8 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Doxyfile.in \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(srcdir)/nbd-client.8.in \
 	$(srcdir)/nbd-server.1.in $(srcdir)/nbd-server.5.in \
-	$(top_srcdir)/configure INSTALL config.guess config.sub \
-	depcomp install-sh missing
+	$(top_srcdir)/configure config.guess config.sub depcomp \
+	install-sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -65,7 +65,7 @@ nbd_client_OBJECTS = $(am_nbd_client_OBJECTS)
 nbd_client_LDADD = $(LDADD)
 am_nbd_server_OBJECTS = nbd_server-nbd-server.$(OBJEXT)
 nbd_server_OBJECTS = $(am_nbd_server_OBJECTS)
-nbd_server_DEPENDENCIES =
+am__DEPENDENCIES_1 =
 nbd_server_LINK = $(CCLD) $(nbd_server_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am_nbd_tester_client_OBJECTS =  \
@@ -82,9 +82,11 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(knbd_client_SOURCES) $(nbd_client_SOURCES) \
-	$(nbd_server_SOURCES) $(nbd_tester_client_SOURCES)
+	$(nbd_server_SOURCES) $(EXTRA_nbd_server_SOURCES) \
+	$(nbd_tester_client_SOURCES)
 DIST_SOURCES = $(knbd_client_SOURCES) $(nbd_client_SOURCES) \
-	$(nbd_server_SOURCES) $(nbd_tester_client_SOURCES)
+	$(nbd_server_SOURCES) $(EXTRA_nbd_server_SOURCES) \
+	$(nbd_tester_client_SOURCES)
 man1dir = $(mandir)/man1
 man5dir = $(mandir)/man5
 man8dir = $(mandir)/man8
@@ -109,6 +111,7 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BACKEND = @BACKEND@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
@@ -146,6 +149,7 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
@@ -209,11 +213,13 @@ TESTS_ENVIRONMENT = $(srcdir)/simple_test
 TESTS = cmd cfg1 cfgmulti
 knbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_client_SOURCES = nbd-client.c cliserv.h
-nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h
+nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd-server.h
+EXTRA_nbd_server_SOURCES = backend-read-write.c backend-sendfile-freebsd.c backend-sendfile-linux.c
 nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.h
 nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
-nbd_server_LDADD = @GLIB_LIBS@
+nbd_server_LDADD = @GLIB_LIBS@ $(BACKEND)
+nbd_server_DEPENDENCIES = $(BACKEND)
 nbd_tester_client_LDADD = @GLIB_LIBS@
 man_MANS = nbd-server.1 nbd-server.5 nbd-client.8
 EXTRA_DIST = nbd-client.8.sgml nbd-server.1.sgml nbd-server.5.sgml gznbd simple_test
@@ -350,6 +356,9 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd-client.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_server-backend-read-write.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_server-backend-sendfile-freebsd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_server-backend-sendfile-linux.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_server-nbd-server.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nbd_tester_client-nbd-tester-client.Po@am__quote@
 
@@ -380,6 +389,48 @@ nbd_server-nbd-server.obj: nbd-server.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nbd-server.c' object='nbd_server-nbd-server.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-nbd-server.obj `if test -f 'nbd-server.c'; then $(CYGPATH_W) 'nbd-server.c'; else $(CYGPATH_W) '$(srcdir)/nbd-server.c'; fi`
+
+nbd_server-backend-read-write.o: backend-read-write.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-backend-read-write.o -MD -MP -MF $(DEPDIR)/nbd_server-backend-read-write.Tpo -c -o nbd_server-backend-read-write.o `test -f 'backend-read-write.c' || echo '$(srcdir)/'`backend-read-write.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/nbd_server-backend-read-write.Tpo $(DEPDIR)/nbd_server-backend-read-write.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='backend-read-write.c' object='nbd_server-backend-read-write.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-backend-read-write.o `test -f 'backend-read-write.c' || echo '$(srcdir)/'`backend-read-write.c
+
+nbd_server-backend-read-write.obj: backend-read-write.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-backend-read-write.obj -MD -MP -MF $(DEPDIR)/nbd_server-backend-read-write.Tpo -c -o nbd_server-backend-read-write.obj `if test -f 'backend-read-write.c'; then $(CYGPATH_W) 'backend-read-write.c'; else $(CYGPATH_W) '$(srcdir)/backend-read-write.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/nbd_server-backend-read-write.Tpo $(DEPDIR)/nbd_server-backend-read-write.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='backend-read-write.c' object='nbd_server-backend-read-write.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-backend-read-write.obj `if test -f 'backend-read-write.c'; then $(CYGPATH_W) 'backend-read-write.c'; else $(CYGPATH_W) '$(srcdir)/backend-read-write.c'; fi`
+
+nbd_server-backend-sendfile-freebsd.o: backend-sendfile-freebsd.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-backend-sendfile-freebsd.o -MD -MP -MF $(DEPDIR)/nbd_server-backend-sendfile-freebsd.Tpo -c -o nbd_server-backend-sendfile-freebsd.o `test -f 'backend-sendfile-freebsd.c' || echo '$(srcdir)/'`backend-sendfile-freebsd.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/nbd_server-backend-sendfile-freebsd.Tpo $(DEPDIR)/nbd_server-backend-sendfile-freebsd.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='backend-sendfile-freebsd.c' object='nbd_server-backend-sendfile-freebsd.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-backend-sendfile-freebsd.o `test -f 'backend-sendfile-freebsd.c' || echo '$(srcdir)/'`backend-sendfile-freebsd.c
+
+nbd_server-backend-sendfile-freebsd.obj: backend-sendfile-freebsd.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-backend-sendfile-freebsd.obj -MD -MP -MF $(DEPDIR)/nbd_server-backend-sendfile-freebsd.Tpo -c -o nbd_server-backend-sendfile-freebsd.obj `if test -f 'backend-sendfile-freebsd.c'; then $(CYGPATH_W) 'backend-sendfile-freebsd.c'; else $(CYGPATH_W) '$(srcdir)/backend-sendfile-freebsd.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/nbd_server-backend-sendfile-freebsd.Tpo $(DEPDIR)/nbd_server-backend-sendfile-freebsd.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='backend-sendfile-freebsd.c' object='nbd_server-backend-sendfile-freebsd.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-backend-sendfile-freebsd.obj `if test -f 'backend-sendfile-freebsd.c'; then $(CYGPATH_W) 'backend-sendfile-freebsd.c'; else $(CYGPATH_W) '$(srcdir)/backend-sendfile-freebsd.c'; fi`
+
+nbd_server-backend-sendfile-linux.o: backend-sendfile-linux.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-backend-sendfile-linux.o -MD -MP -MF $(DEPDIR)/nbd_server-backend-sendfile-linux.Tpo -c -o nbd_server-backend-sendfile-linux.o `test -f 'backend-sendfile-linux.c' || echo '$(srcdir)/'`backend-sendfile-linux.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/nbd_server-backend-sendfile-linux.Tpo $(DEPDIR)/nbd_server-backend-sendfile-linux.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='backend-sendfile-linux.c' object='nbd_server-backend-sendfile-linux.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-backend-sendfile-linux.o `test -f 'backend-sendfile-linux.c' || echo '$(srcdir)/'`backend-sendfile-linux.c
+
+nbd_server-backend-sendfile-linux.obj: backend-sendfile-linux.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -MT nbd_server-backend-sendfile-linux.obj -MD -MP -MF $(DEPDIR)/nbd_server-backend-sendfile-linux.Tpo -c -o nbd_server-backend-sendfile-linux.obj `if test -f 'backend-sendfile-linux.c'; then $(CYGPATH_W) 'backend-sendfile-linux.c'; else $(CYGPATH_W) '$(srcdir)/backend-sendfile-linux.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/nbd_server-backend-sendfile-linux.Tpo $(DEPDIR)/nbd_server-backend-sendfile-linux.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='backend-sendfile-linux.c' object='nbd_server-backend-sendfile-linux.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nbd_server_CPPFLAGS) $(CPPFLAGS) $(nbd_server_CFLAGS) $(CFLAGS) -c -o nbd_server-backend-sendfile-linux.obj `if test -f 'backend-sendfile-linux.c'; then $(CYGPATH_W) 'backend-sendfile-linux.c'; else $(CYGPATH_W) '$(srcdir)/backend-sendfile-linux.c'; fi`
 
 nbd_tester_client-nbd-tester-client.o: nbd-tester-client.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nbd_tester_client_CFLAGS) $(CFLAGS) -MT nbd_tester_client-nbd-tester-client.o -MD -MP -MF $(DEPDIR)/nbd_tester_client-nbd-tester-client.Tpo -c -o nbd_tester_client-nbd-tester-client.o `test -f 'nbd-tester-client.c' || echo '$(srcdir)/'`nbd-tester-client.c
