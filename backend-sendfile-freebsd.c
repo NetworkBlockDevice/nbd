@@ -16,17 +16,21 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#include <glib.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
 #include <nbd-server.h>
 
 int backend_setup(int net) {
 	return 0;
 }
 
-ssize_t backend_read(int fh, int net, off_t offset, size_t len) {
-	if(sendfile(fhandle, client->net, foffset, len, NULL, &retval, 0)) {
+ssize_t backend_send(int fh, int net, off_t offset, size_t len) {
+	off_t retval;
+	if(sendfile(fh, net, offset, len, NULL, &retval, 0)) {
 		return -1;
 	} else {
-		return (ssize_t)retval;
+		return retval;
 	}
 }

@@ -123,6 +123,7 @@ dnl This backend needs some extra include files
   AC_COMPILE_IFELSE([#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <stdlib.h>
 int main(void) {
 	sendfile(0, 0, 0, 0, NULL, NULL, 0);
 }], [BACKEND='backend-sendfile-freebsd.$(OBJEXT)'], [BACKEND='backend-read-write.$(OBJEXT)'])])
