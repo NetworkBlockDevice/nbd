@@ -303,10 +303,14 @@ inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
-		if ((res = read(f, buf, len)) <= 0)
-			err("Read failed: %m");
-		len -= res;
-		buf += res;
+		if ((res = read(f, buf, len)) <= 0) {
+			if(errno != EAGAIN) {
+				err("Read failed: %m");
+			}
+		} else {
+			len -= res;
+			buf += res;
+		}
 	}
 }
 
@@ -577,7 +581,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file.");
+		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file.", f);
 		g_key_file_free(cfile);
 		return retval;
 	}
@@ -1208,6 +1212,7 @@ void setupexport(CLIENT* client) {
 	for(i=0; ; i++) {
 		FILE_INFO fi;
 		gchar *tmpname;
+		gchar* error_string;
 		mode_t mode = (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR;
 
 		if(multifile) {
@@ -1232,7 +1237,10 @@ void setupexport(CLIENT* client) {
 		if(fi.fhandle == -1) {
 			if(multifile && i>0)
 				break;
-			err("Could not open exported file: %m");
+			error_string=g_strdup_printf(
+				"Could not open exported file %s: %%m",
+				tmpname);
+			err(error_string);
 		}
 		fi.startoff = laststartoff + lastsize;
 		g_array_append_val(client->export, fi);
