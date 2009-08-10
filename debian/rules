@@ -1,0 +1,112 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper. 
+# GNU copyright 1997 by Joey Hess.
+#
+# This version is for a hypothetical package that builds an
+# architecture-dependant package, as well as an architecture-independent
+# package.
+
+# Uncomment this to turn on verbose mode. 
+#export DH_VERBOSE=1
+
+DEB_BUILD_GNU_TYPE := $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_HOST_GNU_TYPE := $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_HOST_GNU_SYSTEM := $(shell dpkg-architecture -qDEB_HOST_GNU_SYSTEM)
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+	chmod +x configure
+	./configure --disable-dependency-tracking --enable-lfs		\
+			--enable-syslog	--disable-maintainer-mode	\
+			--prefix=/ --mandir=/usr/share/man		\
+			--infodir=\$${prefix}/share/info		\
+			--host=$(DEB_HOST_GNU_TYPE)			\
+			--build=$(DEB_BUILD_GNU_TYPE)			\
+			--sysconfdir=/etc
+
+	touch configure-stamp
+
+build: configure-stamp build-stamp
+build-stamp:
+	dh_testdir
+	test -f nbd.h
+
+	$(MAKE)
+ifeq (,$(filter nocheck, $(DEB_BUILD_OPTIONS)))
+	$(MAKE) check
+endif
+
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+
+	# Add here commands to clean up after the build process.
+	[ ! -f Makefile ] || $(MAKE) distclean
+
+	dh_clean
+
+install: DH_OPTIONS=
+install: build
+	dh_testdir
+	dh_testroot
+	dh_installdirs 
+
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	cp -a debian/nbd-server.conf.tmpl $(CURDIR)/debian/nbd-server/usr/share/nbd-server/
+
+# It makes no sense installing nbd-client for non-linux ports.
+# but the server should be able to run...
+ifeq ($(findstring linux, $(DEB_HOST_GNU_SYSTEM)),linux)
+	dh_install --sourcedir=debian/tmp -a
+else
+	dh_install --sourcedir=debian/tmp -pnbd-server
+endif
+
+# Build architecture-independent files here.
+# Pass -i to all debhelper commands in this target to reduce clutter.
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	# We don't have architecture-independent files
+
+debian/po/templates.pot: debian/nbd-client.templates debian/nbd-server.templates
+	@debconf-updatepo
+
+# Build architecture-dependent files here.
+binary-arch: build install debian/po/templates.pot
+	dh_testdir -a
+	dh_testroot -a
+	dh_installdebconf -a
+	dh_installinit -p nbd-client --no-start -- start 41 S . start 34 0 6 .
+	install -m 755 debian/nbd-client.initrd debian/nbd-client/usr/share/initramfs-tools/scripts/local-top/nbd
+	install -m 755 debian/nbd-client.initramfs-hook debian/nbd-client/usr/share/initramfs-tools/hooks/nbd
+	dh_installinit -p nbd-server
+	dh_installmodules -p nbd-client
+	dh_installman -a
+	dh_installchangelogs -a
+	cp debian/nbd-client.cf debian/nbd-client/usr/share/nbd-client/
+	dh_strip -a
+	dh_link -a
+	dh_installdocs -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+ifeq ($(findstring linux, $(DEB_HOST_GNU_SYSTEM)),linux)
+	dh_gencontrol -a
+else
+	dh_gencontrol -pnbd-server
+endif
+	dh_md5sums -a
+ifeq ($(findstring linux, $(DEB_HOST_GNU_SYSTEM)),linux)
+	dh_builddeb -a
+else
+	dh_builddeb -pnbd-server
+endif
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

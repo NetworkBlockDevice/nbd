@@ -1,0 +1,80 @@
+# These templates have been reviewed by the debian-l10n-english
+# team
+#
+# If modifications/additions/rewording are needed, please ask
+# debian-l10n-english@lists.debian.org for advice.
+#
+# Even minor modifications require translation updates and such
+# changes should be coordinated with translators and reviewers.
+
+Template: nbd-client/no-auto-config
+Type: error
+_Description: AUTO_GEN is set to "n" in /etc/nbd-client
+ The /etc/nbd-client file contains a line that sets the AUTO_GEN variable
+ to "n". The file will therefore not be regenerated automatically.
+ .
+ If that's wrong, remove the line and call "dpkg-reconfigure nbd-client"
+ afterwards.
+
+Template: nbd-client/number
+Type: string
+Default: 0
+_Description: Number of nbd-client connections to use:
+ nbd-client can handle multiple concurrent connections. Please specify the
+ number of connections you'd like this configuration script to set up.
+ .
+ Note that if something has already been specified in /etc/nbd-client, the
+ current configuration will be used as defaults in these dialogs.
+
+Template: nbd-client/type
+Type: select
+_Choices: swap, filesystem, raw
+Default: raw
+_Description: Intended use of the network block device number ${number}:
+ The network block device can serve multiple purposes. One of the most
+ interesting is to provide swap space over the network for diskless clients,
+ but you can store a filesystem on it, or do other things with it for which
+ a block device is interesting.
+ .
+ If you intend to use the network block device as a swap device, choose
+ "swap". If you intend to use it as a filesystem, add a line to /etc/fstab,
+ give it the option "_netdev" (else init will try to mount it before it's
+ usable), and choose "filesystem". For all other purposes, choose "raw".
+ The only thing the nbd-client boot script will do then is start an
+ nbd-client process; you will have to set it up manually.
+
+Template: nbd-client/host
+Type: string
+_Description: Hostname of the server (number: ${number})?
+ Please enter the network name or IP address of the machine on which
+ the nbd-server process is running.
+
+Template: nbd-client/port
+Type: string
+_Description: Port on which the nbd-server is running (number: ${number})?
+ Please enter the TCP port number to access nbd-server.
+
+Template: nbd-client/device
+Type: string
+_Description: /dev entry for this nbd-client (number: ${number})?
+ Every nbd-client process needs to be associated with a /dev entry with
+ major number 43. Please enter the name of the /dev entry you want to use for
+ this nbd-client. Note that this needs to be the full path to that entry,
+ not just the last part.
+ .
+ If the /dev entry specified does not exist, it will be created with minor
+ number ${number}.
+
+Template: nbd-client/killall
+Type: boolean
+Default: true
+_Description: Disconnect all NBD devices on "stop"?
+ When the nbd-client init script is called to stop the nbd-client service,
+ there are two things that can be done: either it can disconnect all
+ nbd-client devices (which are assumed not to be in use), or it can
+ disconnect only those nbd-client devices that it knows about in its
+ config file.
+ .
+ The default (and the traditional behavior) is to disconnect all
+ nbd-client devices. If the root device or other critical file systems
+ are on NBD this will cause data loss and should not be accepted.

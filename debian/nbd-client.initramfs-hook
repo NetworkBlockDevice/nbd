@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# We don't have any prerequirements
+case $1 in
+prereqs)
+	exit 0
+	;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+force_load nbd
+auto_add_modules net
+copy_exec /sbin/nbd-client /sbin

@@ -1,0 +1,20 @@
+nbd (1:2.9.9-4) unstable; urgency=low
+
+  * In order to mount a filesystem on an nbd device, you should now
+    specify the option "_netdev" in /etc/fstab, rather than "noauto".
+    This way, the regular mount initscripts will take care of mounting
+    and unmounting NBD devices, rather than the nbd-client initscript.
+    The traditional method of using the "noauto" option will continue to
+    work for now, but this method is now deprecated. 
+    To update your configuration to the _netdev method, please run the
+    following, as root:
+
+      sed -i -e "s/noauto/_netdev/g" /etc/fstab
+      update-rc.d nbd-client remove
+      update-rc.d nbd-client start 41 S . start 34 0 6
+
+    Note that this will remove and recreate any initscript symlinks you
+    may have created; if you have modified them, please review the
+    symlinks after running the above commands.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 30 Dec 2007 14:08:28 +0100

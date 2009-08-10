@@ -1,0 +1,1059 @@
+nbd (1:2.9.13-2) unstable; urgency=low
+
+  * The "Black Finger DebConf" release.
+  * Add avr32 to nbd-client-udeb, too. Oops. Closes: #533694, hopefully
+    for good.
+  * nbd-client.README.Debian: add a bit more clarification on how
+    root-on-NBD is supposed to work.
+  * nbd-client.init.d: parse /proc/cmdline rather than /proc/mounts
+    (the same way as how nbd-client.initrd does it) to figure out what
+    the NBD root device is, so that root-on-LVM-on-nbd or something
+    equally batshit insane does not confuse the sendsigs.omit.d
+    generating code.
+  * nbd-client.init.d: add support for an OMITKILL variable that will
+    allow to specify extra nbd devices that should receive the same
+    protection as for the above.
+  * nbd-client.config: fetch KILLALL value from /etc/nbd-client (if it
+    exists) and use it to db_set nbd-client/killall
+  * nbd-client.postinst: fix so that KILLALL is correctly written to
+    /etc/nbd-client, even if the number of devices is zero.
+  * The above four were inspired by conversations with Vagrant
+    Cascadian, while he was working on LTSP support in Debian. Thanks!
+  * Updated Swedish translation. Thanks, Martin Bagge; Closes: #534246.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 17 Jul 2009 01:25:26 +0200
+
+nbd (1:2.9.13-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 09 Jul 2009 11:18:51 +0200
+
+nbd (1:2.9.12-3) unstable; urgency=low
+
+  * Add Finnish translation. Thanks, Esko Arajärvi; Closes: #533451.
+  * Add 'avr32' to nbd-client's 'Architecture:' list. Closes: #533694.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 20 Jun 2009 16:30:40 +0200
+
+nbd (1:2.9.12-2) unstable; urgency=low
+
+  * Steal a patch from git HEAD so that nbd-tester-client doesn't try to
+    do unaligned access on SPARC.
+  * Add German translation too. Oops. Closes: #530835.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 06 Jun 2009 02:15:16 +0200
+
+nbd (1:2.9.12-1) unstable; urgency=low
+
+  * The "spring cleaning" release.
+  * New upstream release.
+    - The meaning of the -swap option has been changed; rather than
+      trying to use a kernel patch which hasn't been maintained since
+      the Linux 2.1.something days, use mlockall() to make sure we don't
+      get swapped out. Closes: #409530.
+      - Steal patch from git HEAD to document this change in nbd-client(8).
+    - Removed (corrupt) winnbd.zip. Closes: #473823.
+  * The Debconf templates have been reviewed by the debian-l10n-english
+    team; incorporate those changes. Closes: #528476, 430701, 530711.
+  * Updated debconf translations, to reflect the above:
+    - Dutch, by myself
+    - Swedish, by Martin Bagge; Closes: #529859.
+    - Czech, by Miroslav Kure; Closes: #530236.
+    - French, by Christian Perrier and the French l10n team; Closes: #530332.
+    - Portuguese, by "Traduz - Portuguese Translation Team"; Closes: #531303.
+  * New debconf translations:
+    - Russian, by Yuri Kozlov; Closes: #531203.
+  * nbd-client: install nbd-client.modprobe using debhelper rather than
+    using our own 'install' invocation. This takes care of giving it the
+    proper name (re recent module-init-tools) and moving files from the
+    old to the new location. Depend on debhelper (>= 7.2.2) to make sure
+    it has the required functionality to handle this correctly.
+  * nbd-client.init.d: remove '-k' option from modprobe. This was once
+    useful in the 2.4 days, but module-init-tools modprobe has never
+    needed that option, and now produces an error message when it's
+    used. Closes: #531620.
+  * (Conditionally, compliant with the new DEB_BUILD_OPTIONS' "nocheck"
+    option) re-enable the test suite. It did /not/ give false positives,
+    ever.  However, it did indeed break at some point...
+  * Update to debhelper compat level 7. 
+  * nbd-client.postinst: don't use full path to update-initramfs.
+  * copyright: refer to common-licenses/GPL-2 rather than the versionless
+    variant.
+  * That leaves one TODO for Policy 3.8.1: initscripts must not error
+    out when 'start' is called and the daemon is already running. This
+    will require some work (it might be there already, but I'm not sure
+    and would need to test extensively).
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 05 Jun 2009 20:42:25 +0200
+
+nbd (1:2.9.11-4) unstable; urgency=low
+
+  * Support third parameter in initrd script so that the user can
+    explicitly specify what device to connect. Useful when doing
+    something crazy like root-on-LVM-on-NBD.
+  * Added Swedish debconf translation. Thanks, Martin Bagge; Closes: #513654
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 15 Feb 2009 14:51:16 +0100
+
+nbd (1:2.9.11-3) unstable; urgency=low
+
+  * use atoll() instead of atol(), so that it doesn't overflow on
+    positively huge export sizes. Closes: #513568.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 31 Jan 2009 03:03:37 +0100
+
+nbd (1:2.9.11-2) unstable; urgency=low
+
+  * The "merry christmas" release.
+  * nbd-client: Install /etc/modprobe.d/nbd, which specifies a
+    'max_part' parameter, to support partitions in NBD.
+  * nbd-client.initrd: Strip partition number off the nbdbasedev and
+    nbdrootdev parameters, to support booting off a partition rather
+    than a device, if that is wanted.
+  * nbd-client.init.d: In case of root-on-nbd, save our PID to
+    /lib/init/rw/sendsigs.omit.d, so that we don't lose our root
+    filesystem prematurely on shutdown.
+  * nbd-client.postinst: call update-initramfs -u, to make initramfs
+    script be actually installed.
+  * configure.ac: remove KLCC crap, so that compilation doesn't break if
+    klcc was accidentally installed. Is applied upstream for 2.9.12, but
+    that isn't ready yet. Also, re-run autoconf.
+  * nbd-server.1: clarify '-l host list' to be '-l host list filename',
+    which it really is. Closes: #507875.
+  * debian/control: bump standards-version to 3.8.0 (nothing applicable
+    to nbd); add ${misc:Depends} to depends line on both nbd-server and
+    nbd-client, both silence lintian to some extent.
+  * debian/nbd-client.README.Debian: update
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 24 Dec 2008 07:54:50 +0100
+
+nbd (1:2.9.11-1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes listenaddr handling; Closes: #478725.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 01 May 2008 21:22:53 +0200
+
+nbd (1:2.9.10-1) unstable; urgency=low
+
+  * New upstream release
+    - New '-c' option to check whether a device is active; Closes: #471712.
+    - No longer wakes up 100 times per second; Closes: #471269.
+    - No longer requires write access to the base file with copy-on-write
+      option. Closes: #470851.
+  * Changes to initramfs script:
+    - Get the NBD server name from DHCP if not otherwise specified; Closes:
+      #471591.
+    - Use the device that is specified on the root= parameter to set up the
+      nbd device, rather than hardcoding it to nbd0. Closes: #471592.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 02 Apr 2008 16:09:18 +0200
+
+nbd (1:2.9.9-6) unstable; urgency=low
+
+  * Disable the test suite for the time being, since it produces false
+    negatives.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 26 Jan 2008 14:14:23 +0100
+
+nbd (1:2.9.9-5) unstable; urgency=low
+
+  * Removed erroneous TODO item from previous changelog entry. Oops.
+  * Fix syntax error in update-rc.d call. Closes: #460967.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 16 Jan 2008 17:18:23 +0100
+
+nbd (1:2.9.9-4) unstable; urgency=low
+
+  * Don't touch devices that have the _netdev option.
+  * Move nbd-client initscript to 41 in runlevel S, and S34 in runlevel 0 and
+    6, so that it's called before resp. after mountnfs.sh
+  * Add NEWS file to document change from "noauto" to "_netdev", containing a
+    procedure for system administrators explaining how to do it.
+  * Fix LSB headers in both initscripts. Closes: #458837.
+  * Document root-on-NBD setup in nbd-client README.Debian.
+  * Updated debconf translations:
+    - Dutch, by $SELF
+    - Portuguese, by Américo Monteiro
+    - Vietnamese, by Clytie Siddall; Closes: #458619.
+    - Czech, by Miroslav Kure; Closes: #459330.
+    - French, by Christian Perrier and the French Cabal; Closes: #459347.
+    - German, by Helge Kreutzman; Closes: #459785.
+  * Updated nbd-client.templates to mention "_netdev" rather than "noauto",
+    and defuzzied translation files.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 06 Jan 2008 17:39:24 +0100
+
+nbd (1:2.9.9-3) unstable; urgency=low
+
+  * Fix nbd initramfs boot script. Silly me, why didn't I test that? Oh well.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 30 Dec 2007 00:06:17 +0100
+
+nbd (1:2.9.9-2) unstable; urgency=low
+
+  * Add nbd-client/killall template to disable killing of all nbd-client
+    devices. Set to 'no' if you want nbd-client to touch only those devices it
+    knows about in its config file; set to 'yes' if you want it to kill all
+    devices on 'stop' in the initscript. Closes: #457736
+  * Add lpia to nbd-client-udeb Architecture: line, too. Sorry, Ubuntu.
+  * Update Standards-Version to 3.7.3 (no changes applicable to nbd)
+  * Add "make check" to debian/rules build target.
+  * Add initrd support to nbd-client package, to allow for running root on
+    NBD. This is highly experimental for the moment, please proceed with
+    caution!
+    Note: this currently does not support complex cases yet, such as using
+    LVM-on-NBD or something equally insane. Stay tuned.
+  * Do not switch away from cfq if we're not at cfq to start with; this allows
+    for selecting something else than deadline if necessary.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 27 Dec 2007 22:23:59 +0100
+
+nbd (1:2.9.9-1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes PID file naming; Closes: #450430.
+    - Fixes segfault on multiple exports in config file; Closes: #451231.
+  * Add experimental LSB headers. Initscript dependency info should really be
+    calculated dynamically, but at least this is better than nothing.
+    Closes: #448225.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 14 Nov 2007 20:53:29 +0100
+
+nbd (1:2.9.8-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 26 Oct 2007 22:50:12 +0200
+
+nbd (1:2.9.7-2) unstable; urgency=low
+
+  * Set scheduler for the nbd blockdevice to "deadline"; Closes: #447638.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 23 Oct 2007 12:41:10 +0200
+
+nbd (1:2.9.7-1) unstable; urgency=low
+
+  * New upstream release; contains patch for a segfault bug fixed by Ubuntu in
+    nbd 1:2.9.6-1ubuntu2.
+  * Updated translations:
+    - Dutch, by myself.
+    - French, by Christian Perrier; Closes: #439756
+    - German, by Helge Kreutzman; Closes: #438412
+    - Portuguese, by "Traduz - Portuguese Translation Team"; Closes: #438583
+    Apologies to all translators for failing to send them the final version of
+    the .po file last time. I suck, suck suck!
+  * Add lpia to nbd-client's architecture; Patch pulled from Ubuntu.
+  * Fix dh_installman usage: insall nbd-server.5 as well. Patch pulled from
+    Ubuntu, slightly modified by $SELF.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 18 Sep 2007 13:55:27 +0200
+
+nbd (1:2.9.6-2) unstable; urgency=low
+
+  * debian/nbd-server.postrm: don't break if ucf isn't available.
+    Closes: #431517.
+  * debian/nbd-server.postinst, debian/nbd-server.config,
+    debian/nbd-server.templates: overhaul config file generation. Rather than
+    generating an old-style config file and then converting that to the new
+    style (ugly, ugly), add a function to convert old-style config files to
+    the new style and then generate new-style config files. Still leave stuff
+    there for migration, however. Clarify templates regarding the new setup.
+  * debian/nbd-server.postinst: Don't forget to create the nbd system user
+    which we refer to in the default config file.
+  * debian/control: depend on adduser for the above
+  * Updated debconf translations:
+    - Dutch, by myself.
+    - Vietnamese, by Clytie Siddall; Closes: #436412.
+    - French, by Christian Perrier; Closes: #436832.
+    - Czech, by Miroslav Kure; Closes: #437224.
+    - German, by Helge Kreutzmann; Closes: #430700, #437689
+  * New debconf translation: Portuguese, by Américo Monteiro; Closes: #435301
+  * debian/rules: use DEB_HOST_GNU_SYSTEM rather than `uname -s`, to improve
+    crosscompilability.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 14 Aug 2007 08:55:56 +0200
+
+nbd (1:2.9.6-1) unstable; urgency=low
+
+  * New upstream (brown paper bag) release, that *really* fixes the segfault
+    this time.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 19 Jul 2007 12:04:22 +0200
+
+nbd (1:2.9.5-1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes segfault in nbd-server
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 17 Jul 2007 09:34:26 +0200
+
+nbd (1:2.9.4-2) unstable; urgency=low
+
+  * Generate dependencies for nbd-client-udeb, too
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 13 Jul 2007 03:58:33 +0200
+
+nbd (1:2.9.4-1) unstable; urgency=low
+
+  * New upstream release
+    - Contains r258 proper
+    - Contains fix for and re-enables inetd mode. Hi, LTSP! Closes: #317888
+  * Modify debian/rules' clean: target to make lintian happy.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 25 Jun 2007 20:51:30 +0100
+
+nbd (1:2.9.3-3) unstable; urgency=low
+
+  * Add nbd-client-udeb
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 17 Jun 2007 16:20:39 +0100
+
+nbd (1:2.9.3-2) unstable; urgency=low
+
+  * Use $TMPFILE only inside the if block where we defined it.
+    Closes: #428914.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 15 Jun 2007 09:55:21 +0100
+
+nbd (1:2.9.3-1) unstable; urgency=low
+
+  * New upstream release
+  * Steal r258 from SVN to allow generating config file fragments from command
+    lines
+  * Add code to postinst to convert old-style nbd-server config files to
+    new-style ones.
+  * The above uses ucf, so depend on that from nbd-server.
+  * Update nbd-server templates to reflect the new code.
+  * The update greatly simplifies nbd-server's init script, so that we don't
+    need bash anymore; Closes: #368224
+  * Add LSB-style headers to nbd-server's initscript. Closes: #426090. I think
+    the LSB headers are an ugly, ugly hack, but hey -- I don't have any better
+    alternative myself.
+  * Apply patch from Ubuntu to run mkswap on the device before doing swapon.
+    Closes: #426399.
+  * Still leaves #395295, but I need to give that some thought.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 13 Jun 2007 13:39:25 +0100
+
+nbd (1:2.8.7-5) unstable; urgency=low
+
+  * Add m32r to debian/control. Closes: #414070.
+  * Port fix for "config file isn't generated on first install" from
+    nbd-server to nbd-client. Squish this bug on my forehead with a giant
+    cluebat. Note to self: nbd has *two* binary packages, not one. Two. That
+    means bugs reported against one package will most likely occur in the
+    other, too, so need fixing there as well. Sigh. This Closes: #415580,
+    hopefully for good.
+  * Don't use debconf in postrm unless it really exists. Closes: #417010.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 11 Apr 2007 21:59:42 +0200
+
+nbd (1:2.8.7-4) unstable; urgency=low
+
+  * Properly quote NBD_SERVER_OPTS array stuff when rewriting nbd-server
+    config file.
+  * Properly quote same variable when testing it with [.
+  * The above two Closes: #406963.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 16 Jan 2007 10:18:07 +0100
+
+nbd (1:2.8.7-3) unstable; urgency=low
+
+  * Updated German debconf translation. Closes: #396916. Thanks, Helge
+    Kreutzmann.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 31 Dec 2006 14:40:46 +0100
+
+nbd (1:2.8.7-2) unstable; urgency=low
+
+  * Support armel
+  * Update Standards-Version: to 3.7.2, from 3.6.2. No changes applicable to
+    nbd
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 28 Oct 2006 02:08:56 +0200
+
+nbd (1:2.8.7-1) unstable; urgency=low
+
+  * New upstream release. Contains build fix against nbd.h from linux
+    2.6.18.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 17 Oct 2006 19:53:56 +0200
+
+nbd (1:2.8.5-2) unstable; urgency=low
+
+  * Set a proper default value in processing the return value to the first
+    nbd-client debconf question, both in nbd-client.config and
+    nbd-client.postinst. Closes: #367437.
+  * Perform the same change for nbd-server.
+  * Set the template type of nbd-client/no-auto-config and nbd-server/autogen
+    to "error" instead of "text" resp. "note". Closes: #388942, #388943.
+
+ -- Wouter Verhelst <wouter@grep.be>  Thu, 28 Sep 2006 15:42:54 +0200
+
+nbd (1:2.8.5-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed,  7 Jun 2006 10:26:30 +0200
+
+nbd (1:2.8.4-1) unstable; urgency=low
+
+  * The "Fix bugs before they apper" release.
+  * New upstream release. Contained a one-line change compared to 2.8.3,
+    which was already in the Debian package; but, well, newer version
+    numbers look good :-)
+  * Use invoke-rc.d rather than directly running the initscript in
+    nbd-client.postinst.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon,  3 Apr 2006 09:04:15 +0200
+
+nbd (1:2.8.3-2) unstable; urgency=low
+
+  * Steal patch from CVS for nbd-server.c to make children exit when they
+    finish serving, rather than having them loop over "Help, I can't accept()
+    anymore!". Closes: #350357.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 31 Jan 2006 11:17:25 +0100
+
+nbd (1:2.8.3-1) unstable; urgency=low
+
+  * New upstream release; this one includes the fix for CVE-2005-3534 (and
+    some more stability improvements).
+  * Removed (outdated) local nbd.h, in favour of /usr/include/linux/nbd.h
+    (which was being used anyway).
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 22 Dec 2005 22:32:04 +0100
+
+nbd (1:2.8.2-1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes command line parsing; Closes: #338346.
+  * Updated debhelper compatibility level to 4.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 10 Nov 2005 11:46:00 +0100
+
+nbd (1:2.8.1-1) unstable; urgency=low
+
+  * New upstream release
+  * Seriously reduces the CLIENT struct in size. Not only is this a good idea
+    for 1023 int's that are hardly ever used, it also fixes an internal
+    compiler error on s390. There.
+  * Add armeb to debian/control. Closes: #335683.
+  * Remove debian/nbd-server.1, debian/nbd-client.8,
+    debian/nbd-server.manpages, and debian/nbd-client.manpages. They're old
+    cruft that should have been dead for _ages_. Whoops.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 27 Oct 2005 21:54:09 +0200
+
+nbd (1:2.8.0-2) unstable; urgency=low
+
+  * Add libglib2.0-dev to build-depends. Whoops.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 25 Oct 2005 21:31:31 +0200
+
+nbd (1:2.8.0-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 25 Oct 2005 19:56:08 +0200
+
+nbd (1:2.7.5-1) unstable; urgency=low
+
+  * New upstream release. Includes fixes to nbd-client manpage; Closes:
+    #317322.
+  * Grammar and spelling fixes to both templates files (with .po files
+    unfuzzied, as these are errors in the English version rather than
+    changes); Closes: #315707.
+  * Updated FSF address in debian/copyright.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 20 Sep 2005 16:39:35 +0200
+
+nbd (1:2.7.4-3) unstable; urgency=low
+
+  * Fix debian/rules to populate debian/nbd-client if DEB_HOST_GNU_SYSTEM is
+    "linux-gnu" in addition to when it is "linux". Closes: #321280. I hate it
+    when interfaces change (note to self: no late-night uploads anymore).
+  * While we're at it, make better use of debhelper. debian/nbd-client.dirs
+    doesn't need to contain /bin; and dh_movefiles has been deprecated ages
+    ago.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu,  4 Aug 2005 20:52:02 +0200
+
+nbd (1:2.7.4-2) unstable; urgency=low
+
+  * Add alternate dependency on the virtual package debconf-2.0
+  * Add ppc64 to the list of build architectures for nbd-client;
+    Closes: #318716.
+  * Add Vietnamese translation. Thanks, Clytie Siddall; Closes: #315705.
+  * Add Czech translation. Thanks, Miroslav Kure; Closes: #318912.
+  * Standards-Version bump to 3.6.2. No changes applicable to nbd.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed,  3 Aug 2005 02:22:23 +0200
+
+nbd (1:2.7.4-1) unstable; urgency=low
+
+  * New upstream release. Contains patches from Roy Keene to make it all work
+    a tad bit more reliable (thanks, Roy!)
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat,  7 May 2005 11:37:20 +0200
+
+nbd (1:2.7.3-2) unstable; urgency=low
+
+  * Re-add nbd.h to the source package, so that it will (again) build on 
+    non-linux ports
+  * As a precaution, modified the build target to barf out if it 
+    disappears again.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon,  4 Apr 2005 00:27:27 +0200
+
+nbd (1:2.7.3-1) unstable; urgency=low
+
+  * New upstream release.
+  * Ensure we build as a non-native package again. Whoops.
+  * Remove docbook-to-man from build-depends, and don't remove the manpages in
+    the clean target. The upstream build system now supports this, and this
+    will reduce the load on buildd hosts (as if it'd matter for this little
+    package).
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 14 Dec 2004 15:41:58 +0100
+
+nbd (1:2.7.1-4) unstable; urgency=low
+
+  * Remove the "docs" target from debian/rules. Docs are being generated from
+    the upstream makefile since ages, so we don't need to do it a second time.
+  * add --disable-dependency-tracking to configure call; that's only
+    interesting if you would change stuff between doing the configure and the
+    make, which we won't do, so don't waste time doing so. As if it'd
+    matter...
+  * nbd-server:
+    - Bail out if the path provided to nbd-server isn't fully qualified. This
+      won't work anyway (because we do daemon(), which changes the working
+      directory to be /), and we don't want to confuse people.
+      Closes: #274697.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 26 Oct 2004 16:21:38 +0200
+
+nbd (1:2.7.1-3) unstable; urgency=low
+
+  * Fix debian/copyright file to point to the sourceforge.net pages, and
+    to reflect the fact that I'm doing upstream maintenance these days as
+    well.
+  * Invoke "db_stop" at the right place in nbd-client.postinst, to make
+    sure upgrades don't hang.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 18 Aug 2004 10:49:36 +0200
+
+nbd (1:2.7.1-2) unstable; urgency=low
+
+  * Fix nbd-client initscript to use /sbin/nbd-client instead of
+    /bin/nbd-client. Closes: #254713.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 19 Jun 2004 22:32:03 +0200
+
+nbd (1:2.7.1-1) unstable; urgency=low
+
+  * New upstream release
+  * Fixes multiple file snprintf, so that the "normal" use of NBD works
+    again. Nbd-client will still hang when the server can't find a to be
+    exported file (since the server doesn't close the socket, as it
+    should), but that bug is a wee bit nastier, and this fix should get
+    into stable.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 12 Jun 2004 12:19:24 +0200
+
+nbd (1:2.7-3) unstable; urgency=low
+
+  * Add amd64 to debian/control. Closes: #251777.
+  * This release was never uploaded by itself
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 31 May 2004 10:36:57 +0200
+
+nbd (1:2.7-2) unstable; urgency=low
+
+  * Cleaned up LFS fuckup. Closes: #250450
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 31 May 2004 10:36:35 +0200
+
+nbd (1:2.7-1) unstable; urgency=low
+
+  * New upstream release
+    - uses automake instead of home-grown Makefile.in; fix debian/rules to
+      accomodate.
+    - nbd-client moved to sbin, where it belongs; make sure we catch that.
+  * Drop CFLAGS usage, use the --enable-* parameters instead.
+  * Added catalan debconf translations. Thanks, Aleix Badia i Bosch;
+    closes: #248727.
+  * Bumped Standards-Version to 3.6.1; no changes applicable to nbd.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 17 May 2004 23:40:42 +0200
+
+nbd (1:2.6-4) unstable; urgency=low
+
+  * Fix and document -m option (Closes: #246544, #264537)
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 12 May 2004 08:29:17 +0200
+
+nbd (1:2.6-3) unstable; urgency=low
+
+  * The "There's more in this world than GNU/Linux" release.
+  * For all you FreeBSD/NetBSD/Hurd-using people pleasure, made sure the
+    package builds on non-Linux kernels, too. That's a two-line change to
+    debian/rules, and is so silly that it should perhaps actually be handled
+    in debhelper, but oh well.
+    Tested this on Debian GNU/KFreeBSD, and yes, it works. Have fun!
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 14 Jan 2004 20:42:40 +0100
+
+nbd (1:2.6-2) unstable; urgency=low
+
+  * nbd-server.postinst: create a temporary file outside of the loop that
+    writes to it. sigh.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri,  9 Jan 2004 14:22:20 +0100
+
+nbd (1:2.6-1) unstable; urgency=medium
+
+  * New "upstream" release. Not much more than some code cleanup, really,
+    but I'd just like to avoid "new upstream!" bugs before they happen.
+  * nbd.h usage logic reversed: use the local one first; if that doesn't
+    work, fall back to <linux/nbd.h>.
+  * Include a (fixed) nbd.h. The kernel header will probably be fixed in
+    2.6.1; as this is only a two-line fix (one for #ifdef and one for
+    #endif), we won't wait for that. Closes: #223194. That's an RC bug,
+    so raising the urgency a little.
+  * This happens to fix a long-outstanding issue with nbd that I never
+    had the will to fix: it now should compile nbd-server cleanly on
+    non-linux systems, too. Reflected that in nbd-server's Architecture:
+    line in debian/control
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 23 Dec 2003 21:44:08 +0100
+
+nbd (1:2.5-1) unstable; urgency=high
+
+  * New upstream release
+  * Bugfix: reset child_arraysize to zero when forking. When filed as a
+    debian bug, the right severity would be 'critical' (not doing the
+    child_arraysize reset can result in nbd-server sending SIGTERM to
+    _all_ processes on the system), so urgency=high.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 29 Sep 2003 20:33:55 +0200
+
+nbd (1:2.4-3) unstable; urgency=low
+
+  * Run db_stop in postinst, to make sure dpkg doesn't wait for nothing.
+  * Fixed a syntax error in nbd-server.1.sgml. Overlooked that.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 11 Sep 2003 18:53:42 +0200
+
+nbd (1:2.4-2) unstable; urgency=low
+
+  * Updated Brazilian Portuguese debconf translation. Thanks, Andre Luis
+    Lopez; Closes: #208033.
+  * Added '-l' option to nbd-server, to allow choosing a different name
+    for the .allow file at run time. Should fix the thing I broke with the
+    last upload, and adds the possibility to specify this file in the
+    initscript.
+  * fclose() the pid file after writing to it, so that start-stop-daemon
+    does not find an empty file.
+  * Some cosmetic change to nbd-server's initscript.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 11 Sep 2003 18:49:42 +0200
+
+nbd (1:2.4-1) unstable; urgency=low
+
+  * New upstream release:
+    - Keep track of our child PID's, and relay a SIGTERM to them if we
+      receive one
+    - Use daemon() before we do anything.
+    - Write our pid to /var/run/nbd-server.<port>.pid
+    This allows me to use start-stop-daemon, instead of having to do all
+    kinds of weird stuff in sh. And it also makes the postinst behave in
+    that it no longer hangs, waiting for something to happen which never
+    will. Woohoo!
+    It breaks one thing, though: nbd-server used to look in the 'current
+    directory' at the time it was started to find the 'nbd_server.allow'
+    file, a hosts.allow-style file containing machines that are allowed to
+    log on. Since the daemon() call requires to change the current
+    directory to the root-directory, it is now looked for at that
+    place. Will be fixed ASAP, but I wanted to get this out first.
+  * Actually changed to using start-stop-daemon.
+  * Updated nl.po. Closes: #204574.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 22 Aug 2003 10:24:49 +0200
+
+nbd (1:2.3-10) unstable; urgency=low
+
+  * Don't forget to write unchanged configurations to the options file;
+    also, make a backup of the configuration if we overwrite it. Closes:
+    #203352.
+  * Make sure NBD_SERVER_OPTS are being preserved.
+  * Make a backup of /etc/nbd-client, too.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun,  3 Aug 2003 20:13:33 +0200
+
+nbd (1:2.3-9) unstable; urgency=low
+
+  * Removed README.Debian; it was outdated, and no longer useful.
+  * Made sure the config script can handle being ran twice during the same
+    installation run. Closes: #198062.
+  * Made the templates in nbd-server and nbd-client about AUTO_GEN being
+    set more consistent. Closes: #198929.
+  * Added French debconf translation. Thanks, Christian Perrier;
+    Closes: #200363
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon,  7 Jul 2003 21:43:25 +0200
+
+nbd (1:2.3-8) unstable; urgency=low
+
+  * Revamped debconf stuff. It's now possible to configure multiple
+    devices at installation time, while configuration changes should be
+    preserved even if AUTO_GEN isn't set. Yay!
+    Note that this is a short changelog for a lot of work; I mostly
+    rewrote two .postinsts, redid two .configs from scratch, and had to
+    rethink some things. I hope I caught all bugs :-)
+  * /etc/nbd-client is now no longer a conffile. Since it's modified by
+    postinst, it never should've been one anyway.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 20 May 2003 23:41:03 +0200
+
+nbd (1:2.3-7) unstable; urgency=low
+
+  * Removed assignment error from macro OFFT_MAX. This resulted in a
+    warning on all architectures, and reduced the usefullness of
+    nbd-server to nothing on 64bit architectures. It also
+    Closes: #187435, #188079. libc guys: sorry for the noise -- and thanks
+    for pointing me at that little detail which I overlooked, and which
+    proved to be the key (nbd-server::size_autodetect).
+  * prepended the 'nbd-server' call with nohup, to make upgrades work
+    again.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 15 Apr 2003 03:31:18 +0200
+
+nbd (1:2.3-6) unstable; urgency=low
+
+  * Removed a little spelling error from one of the Debconf
+    descriptions. Closes: #186947.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 31 Mar 2003 20:22:19 +0200
+
+nbd (1:2.3-5) unstable; urgency=low
+
+  * Fixed starting of nbd-server so that it properly detaches from a
+    terminal. Closes: #179889
+  * Converted to po-debconf
+  * Bumped Standards-version from 3.5.2 to 3.5.9 (no changes
+    applicable to nbd)
+  * Made sure debian/nbd-server/bin exists before trying to copy files
+    there, if we're not using dh_movefiles. Closes: #186668.
+  * Added debconf translations from ddtp.debian.org
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 30 Mar 2003 15:45:20 +0200
+
+nbd (1:2.3-4) unstable; urgency=low
+
+  * Fixed syntax error in nbd-client's postinst.
+  * Removed duplicate update-rc.d commands (debhelper is nice, if it
+    actually works ;-)
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 26 Nov 2002 01:04:06 +0100
+
+nbd (1:2.3-3) unstable; urgency=low
+
+  * Fixed code in kernel-version sanity check in initscript so that it
+    actually works now.
+  * Rearranged start target of initscript so that it now just calls a
+    'connect' and an 'activate' target of itself.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 16 Nov 2002 21:24:28 +0100
+
+nbd (1:2.3-2) unstable; urgency=low
+
+  * Replaced call to write() by a call to send(), so that NBD (hopefully)
+    doesn't hang anymore. For those interested: For NBD to have Large File
+    Support, it is being compiled with the precompiler directive
+    _LARGEFILE_SOURCE set, and with the precompiler directive
+    _FILE_OFFSET_BITS set to 64. As a result, all file operation syscalls
+    are being replaced by their 64 bit counterparts. That's not a good
+    idea to do on a socket, I believe...
+  * Removed a bug that sometimes left /etc/nbd-server empty after
+    (re-)install.
+  * Rewrote warning in description about accessing the block device
+    simultaneously from different clients to better reflect the
+    truth. Sorry, ddtp ;-)
+  * Added a sanity check to nbd-client's initscript: if the version of the
+    kernel is < 2.4, disconnecting the client is not available, so
+    restart will fail horribly, which also impacts upgrades. To avoid this
+    problem, restart is made non-functional on kernels < 2.4.
+  * Added a (conditional, as in sysvinit's /etc/init.d/checkfs.sh)
+    spinner-option to the fsck in nbd-client's initscript.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 12 Nov 2002 23:45:00 +0100
+
+nbd (1:2.3-1) unstable; urgency=low
+
+  * New upstream release. This version brings you:
+    - Real Large File Support, coding by yours truly. This probably
+      Closes: #161292. Please reopen the bugreport if not.
+    - Auto-switching to read-only mode when serving a file from a
+      read-only medium. This is useful for floppies, CD-ROMs or other host
+      filesystems that can't be written on.
+    - Updated manpage for nbd-server, documenting the new '-a' option.
+  * Modified nbd-server's initscript to wait a second between sending
+    SIGTERM and SIGKILL when stopping.
+  * Added -DISSERVER to CFLAGS, which will cause debugging messages to
+    go to syslog instead of stderr.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 20 Oct 2002 16:13:14 +0200
+
+nbd (1:2.1-1) unstable; urgency=low
+
+  * New upstream version. This one brings you:
+    - Reap zombies as they appear. Closes: #160374
+    - Make error message that appears at the client's side when the
+      server can't open the exported file a bit more helpful.
+      Closes: #127098
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 11 Sep 2002 17:52:03 +0200
+
+nbd (1:2.0-6) unstable; urgency=low
+
+  * Modified architecture line to include sh3, sh3eb, sh4, and sh4eb
+    instead of just sh. Closes: #155523. See why there's #112325?
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon,  5 Aug 2002 23:33:10 +0200
+
+nbd (1:2.0-5) unstable; urgency=low
+
+  * There was still one issue for mips and mipsel. Not anymore
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 21 Jul 2002 23:04:37 +0200
+
+nbd (1:2.0-4) unstable; urgency=low
+
+  * Modified nbd-server.init.d to not kill itself, so that upgrading works
+    again. Closes: #151424
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 30 Jun 2002 16:24:56 +0200
+
+nbd (1:2.0-3) unstable; urgency=low
+
+  * Added CFLAGS to allow using >2GB files. Closes: #150871
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 24 Jun 2002 22:57:14 +0200
+
+nbd (1:2.0-2) unstable; urgency=low
+
+  * Reapplied build fix for mips and mipsel.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 27 May 2002 11:10:24 +0200
+
+nbd (1:2.0-1) unstable; urgency=low
+
+  * New upstream release. closes: #148092. Note that this was not a year
+    out-of-date as the bugreport claims; the previous Debian version was
+    pulled out of CVS at March 20th, 2002, at which time the new upstream
+    release was (at least) not yet in CVS.
+  * fixed nbd-server.postinst to 're'write /etc/nbd-server, even if it
+    does not exist yet. Grmbl. Closes: #148090.
+  * Modified manpages: fixed EXAMPLES, and a few other minor changes
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 25 May 2002 20:30:52 +0200
+
+nbd (1:1.2cvs20020320-3) unstable; urgency=low
+
+  * added 'chmod +x configure' to debian/rules before configure is called
+    (closes: #140436)
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 29 Mar 2002 16:08:39 +0100
+
+nbd (1:1.2cvs20020320-2) unstable; urgency=low
+
+  * Rebuilt with new unstable of the day, to fix the broken .diff.gz
+    (Closes: #140238).
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 27 Mar 2002 18:08:58 +0100
+
+nbd (1:1.2cvs20020320-1) unstable; urgency=low
+
+  * The "Cleaning up the mess" release
+  * Added a "connect" target to nbd-client's /etc/init.d script. Use this
+    to reconnect clients that have lost the connection to the server but
+    still have an nbd blockdevice in use. No data will be lost that way,
+    which is not the case if you use a "restart".
+  * Since upstream is not really doing any "releases" anymore (there's one
+    stable CVS branch which is only updated as bugs are fixed), use
+    "1.2-cvsYYYYMMDD" as upstream version now.
+  * New CVS change: using setsockopt() in nbd-server so that a stopped
+    server doesn't need to wait for a timeout before it can be restarted.
+  * This time really removed the duplicate output to /etc/nbd-server. I
+    tried to be smart, but not anymore ;-)
+  * Since my manpages are accepted by upstream and in upstream CVS,
+    removed them from the debian/ directory.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 24 Mar 2002 22:17:29 +0100
+
+nbd (1:1.2-13) unstable; urgency=low
+
+  * Made /dev-entry debconf-question a bit clearer (Closes: #127094)
+  * Explained the use of the nbd_server.allow file in nbd-server's manpage
+    (partially closes #127098)
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed,  2 Jan 2002 23:49:43 +0100
+
+nbd (1:1.2-12) unstable; urgency=low
+
+  * Corrected spelling errors in descriptions (Closes: #125167, #125168)
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 20 Dec 2001 00:40:13 +0100
+
+nbd (1:1.2-11) unstable; urgency=low
+
+  * Added an invocation of fsck to nbd-client's initscript. This should've
+    been done in 1:1.2-1. Really.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 31 Oct 2001 12:37:06 +0100
+
+nbd (1:1.2-10) unstable; urgency=low
+
+  * Applied patch from Branden Robinson for nbd-server's initscript
+    (partially closes #117045)
+  * Modified nbd-server's postinst so that it doesn't write it's
+    information twice to /etc/nbd-server (Closes: #117045).
+  * Changed shebang-line of all scripts that source the configfile to use
+    /bin/bash instead of /bin/sh. I thought it would be no problem if I
+    don't actually use the variable, but even the variable name isn't
+    POSIXly correct (Closes: #117303).
+  * Changed priority of AUTO_GEN debconf to low. You don't want to see
+    this during an installation, only during a reconfigure. Also, added a
+    similar note to nbd-server, since it now supports this variable too.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 28 Oct 2001 11:20:07 +0100
+
+nbd (1:1.2-9) unstable; urgency=low
+
+  * Fixed nbd-server's debconf configuration so that it actually works
+    now. Always interesting, huh?
+  * Added some upstream-suggested changes to nbd-server.c so that it
+    should build on mips and mipsel too, now (Closes: #115110). Added mips
+    and mipsel to Architecture line (I created that line with the output
+    of madison nearby. But since it never built on mips before... well...)
+  * Fixed some minor bugs in initscripts and postinsts.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 22 Oct 2001 16:47:05 +0200
+
+nbd (1:1.2-8) unstable; urgency=low
+
+  * removed a syntaxis fault from nbd-server's postrm. Dunno why I
+    didn't find this earlier...
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 18 Oct 2001 00:08:17 +0200
+
+nbd (1:1.2-7) unstable; urgency=low
+
+  * Since my TODO list is kinda complete now (Yeehaw!), remove the
+    reference to it from debian/control.
+  * Aestetical changes to initscript of nbd-server
+  * Uncommented things in nbd-client's initscript. It didn't work before,
+    but apparently it does now. I have no idea what was wrong; probably a
+    bug in another package (most likely, bash) that has been solved now
+    (it never looked wrong to me anyway). Please file a bug if I was
+    wrong... ;-)
+  * Now really modified nbd-client.postinst to do what it was supposed to
+    do in 1:1.2-6. Actually, in -6 I modified nbd-server.postinst, but
+    didn't touch nbd-client.postinst. I thus now modified
+    nbd-client.postinst to reflect changes made to nbd-server.postinst in
+    -6. Should've done that in the previous release, probably.
+  * Removed hurd-i386 from architecture, since it doesn't build there
+    after all.
+    There has been some effort to port NBD to the Hurd, though, so I'll
+    change the "Architecture:" line at some point in the future, when
+    everything compiles cleanly. Not now, though.
+  * Added pt_BR translations of both debconf templates. Thanks go to Andre
+    Luis Lopes <andrelop@ig.com.br> (Closes: #115617, 115621)
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 15 Oct 2001 00:18:13 +0200
+
+nbd (1:1.2-6) unstable; urgency=low
+
+  * Added german translation of debian/nbd-server.templates. Thanks go to
+    Sebastian Feltel <sebastian@feltel.de> (Closes: #113486).
+  * Minor changes to nbd-server manpage.
+  * Made debian/nbd-server.postinst a bit more portable so that it creates
+    good output, even if /bin/sh does not point to /bin/bash. Also, added
+    support for extra options to /etc/nbd-server; add an array called
+    NBD_SERVER_OPTS with the options you'd like (Closes: #113726). Since
+    these options are probably quite rarely needed, I didn't change the
+    debconf-configuration.
+  * Slightly modified nbd-client.postinst so that grep dumps
+    "NBD_DEVICE[0]" to /dev/null instead of stdout (Ah! So it was grep!
+    ;-)
+  * Made sure the "purge" target of nbd-server's postrm removes
+    /etc/nbd-server. Since /etc/nbd-server is created in postinst, it is
+    not part of any package or file, let alone it being a
+    conffile. Therefore, I have to remove it manually in the postrm.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 30 Sep 2001 23:19:13 +0200
+
+nbd (1:1.2-5) unstable; urgency=low
+
+  * Made sure /etc/nbd-server exists before trying to access it
+    (Closes: #113143)
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 22 Sep 2001 11:38:51 -0400
+
+nbd (1:1.2-4) unstable; urgency=low
+
+  * Changed debian/rules file a bit so that this package should build the
+    nbd-server on non-linux ports (currently only The
+    Hurd). Unfortunately, I have to sum up each and every linux-port to
+    achieve this. Have a look at #112325 to find out why. Since nbd-client
+    needs support from the kernel, and since this is a linux-only thing,
+    it makes no sense compiling nbd-client on other kernels. Hence, I
+    don't try.
+  * Created manpages for both nbd-client and nbd-server (Closes: #112049)
+  * Now created an initscript for nbd-server too. Works the same way as
+    the nbd-client initscript.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 20 Sep 2001 13:37:34 +0200
+
+nbd (1:1.2-3) unstable; urgency=low
+
+  * Removed bugs from postinst and /etc/init.d/nbd-client (closes:
+    #112117)
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 13 Sep 2001 02:16:40 +0200
+
+nbd (1:1.2-2) unstable; urgency=low
+
+  * Added debconf-configuration to install one nbd-client device. This
+    should work for most installations.
+  * Added information to /etc/nbd-client. See the file for details; it
+    allows for multiple clients to be ran and killed at boot
+    resp. shutdown.
+  * Changed init.d-script for nbd-client (the previous changelog-entry
+    fails to tell that the init.d-script is only for nbd-client too, BTW)
+    to reflect new situation.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 11 Sep 2001 00:26:39 +0200
+
+nbd (1:1.2-1) unstable; urgency=low
+
+  * Added init.d-script
+  * Added Build-Depends on kernel-headers, since #include "nbd.h" has
+    changed to #include <linux/nbd.h> in upstream sources
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 14 Jun 2001 22:23:38 +0200
+
+nbd (14-2) unstable; urgency=low
+
+  * Did some cleanup of debian/rules
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu,  7 Jun 2001 00:51:36 +0200
+
+nbd (14-1) unstable; urgency=low
+
+  * Initial Release. (Closes: 96728)
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat,  2 Jun 2001 12:44:24 +0200

@@ -20,7 +20,7 @@ nbd-tester-client
 nbd-client
 nbd-server
 doc
-nbd-server.config
+./nbd-server.config
 nbd-server.5
 nbd.h
 *.o

@@ -1,0 +1,76 @@
+# These templates have been reviewed by the debian-l10n-english
+# team
+#
+# If modifications/additions/rewording are needed, please ask
+# debian-l10n-english@lists.debian.org for advice.
+#
+# Even minor modifications require translation updates and such
+# changes should be coordinated with translators and reviewers.
+
+Template: nbd-server/number
+Type: string
+Default: 0
+_Description: Number of nbd-server instances to run:
+ Multiple nbd-server processes may run to export multiple files or
+ block devices. Please specify how many configurations for such servers you
+ want to generate.
+ .
+ Note that you can always add extra servers by adding them to
+ /etc/nbd-server/config, or by running "dpkg-reconfigure nbd-server".
+
+Template: nbd-server/port
+Type: string
+_Description: TCP Port for server number ${number}:
+ Please specify the TCP port this instance of nbd server will use for
+ listening. As NBD is likely to use more than one port, no dedicated
+ port has been assigned in IANA lists.
+ .
+ Therefore, NBD does not have a standard port number, which means you need
+ to provide one. You should make sure this port is not already in use.
+
+Template: nbd-server/filename
+Type: string
+_Description: File to export (server number ${number}):
+ Please specify a file name or block device that should be exported
+ over the network. You can export a real block device (for instance
+ "/dev/hda1"); a normal file (such as "/export/nbd/bl1"); or a
+ bunch of files all at once. For the third option, you can
+ use "%s" in the filename, which will be expanded to the
+ IP-address of the connecting client. An example would be
+ "/export/swaps/swp%s".
+ .
+ Note that it is possible to tune the way in which the IP address will
+ be substituted in the file name. See "man 5 nbd-server" for details.
+
+Template: nbd-server/autogen
+Type: error
+_Description: AUTO_GEN is set to "n" in /etc/nbd-server
+ The /etc/nbd-server file contains a line that sets the AUTO_GEN variable
+ to "n". The file will therefore not be regenerated automatically.
+ .
+ Note that the current version of the nbd-server package no longer uses
+ /etc/nbd-server. Instead it uses a new configuration file, read by
+ nbd-server itself (rather than the init script), which supports more
+ options. See "man 5 nbd-server" for details.
+ .
+ If you remove or comment out the AUTO_GEN line, a file
+ /etc/nbd-server/config in the new format may be generated based on the
+ current configuration. Until then, the nbd-server installation will be
+ broken.
+
+Template: nbd-server/convert
+Type: boolean
+Default: true
+_Description: Convert old-style nbd-server configuration file?
+ A pre-2.9 nbd-server configuration file has been found on this system.
+ The current nbd-server package no longer supports this file and will
+ not work if it is kept as is.
+ .
+ If you choose this
+ option, the system will generate a new style configuration file based
+ upon the old-style configuration file, which will be removed. Otherwise,
+ configuration questions will be asked and the system will generate a new configuration file.
+ .
+ If a new-style configuration file already exists and you choose this
+ option, you will shortly see a "modified configuration file" prompt, as
+ usual.

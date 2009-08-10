@@ -1,0 +1,381 @@
+# Copyright (C) 2009
+# This file is distributed under the same license as the nbd package.
+#
+# Esko Arajärvi <edu@iki.fi>, 2009.
+msgid ""
+msgstr ""
+"Project-Id-Version: nbd\n"
+"Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
+"POT-Creation-Date: 2009-05-17 09:02+0200\n"
+"PO-Revision-Date: 2009-06-16 20:16+0300\n"
+"Last-Translator: Esko Arajärvi <edu@iki.fi>\n"
+"Language-Team: Finnish <debian-l10n-finnish@lists.debian.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Lokalize 0.3\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:2001
+msgid "AUTO_GEN is set to \"n\" in /etc/nbd-client"
+msgstr "Asetuksen AUTO_GEN arvo on ”n” tiedostossa /etc/nbd-client"
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:2001
+msgid ""
+"The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
+"\"n\". The file will therefore not be regenerated automatically."
+msgstr ""
+"Tiedostossa /etc/nbd-client on rivi, jolla muuttujalle AUTO_GEN asetetaan "
+"arvo ”n”. Tästä syystä tiedostoa ei luoda automaattisesti uudelleen."
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:2001
+msgid ""
+"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+"afterwards."
+msgstr ""
+"Jos asetus on väärä, poista se ja aja sen jälkeen komento ”dpkg-reconfigure "
+"nbd-client”."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:3001
+msgid "Number of nbd-client connections to use:"
+msgstr "nbd-client-yhteyksien määrä:"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:3001
+msgid ""
+"nbd-client can handle multiple concurrent connections. Please specify the "
+"number of connections you'd like this configuration script to set up."
+msgstr ""
+"nbd-client voi hallita useampia yhtäaikaisia yhteyksiä. Anna haluttu "
+"yhteyksien määrä."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:3001
+msgid ""
+"Note that if something has already been specified in /etc/nbd-client, the "
+"current configuration will be used as defaults in these dialogs."
+msgstr ""
+"Jos tiedostossa /etc/nbd-client on jo asetettu jokin määrä, se annetaan "
+"oletusarvona tässä kentässä."
+
+#. Type: select
+#. Choices
+#: ../nbd-client.templates:4001
+msgid "swap, filesystem, raw"
+msgstr "näennäismuisti, tiedostojärjestelmä, raaka"
+
+#. Type: select
+#. Description
+#: ../nbd-client.templates:4002
+msgid "Intended use of the network block device number ${number}:"
+msgstr "Verkkolohkolaitteen numero ${number} tarkoitettu käyttötapa:"
+
+#. Type: select
+#. Description
+#: ../nbd-client.templates:4002
+msgid ""
+"The network block device can serve multiple purposes. One of the most "
+"interesting is to provide swap space over the network for diskless clients, "
+"but you can store a filesystem on it, or do other things with it for which a "
+"block device is interesting."
+msgstr ""
+"Verkkolohkolaitetta (Network block device) voidaan käyttää moneen "
+"tarkoitukseen. Yksi mielenkiintoisimmista on näennäismuistin tarjoaminen "
+"levyttömille asiakkaille verkon yli, mutta sille voidaan myös tallentaa "
+"tiedostojärjestelmä tai sitä voidaan käyttää muilla lohkolaitteille "
+"ominaisilla tavoilla."
+
+#. Type: select
+#. Description
+#: ../nbd-client.templates:4002
+msgid ""
+"If you intend to use the network block device as a swap device, choose \"swap"
+"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
+"it the option \"_netdev\" (else init will try to mount it before it's "
+"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
+"The only thing the nbd-client boot script will do then is start an nbd-"
+"client process; you will have to set it up manually."
+msgstr ""
+"Jos aiot käyttää verkkolohkolaitetta näennäismuistilaitteena, valitse "
+"”näennäismuisti”. Jos aiot käyttää sitä tiedostojärjestelmänä, lisää rivi "
+"tiedostoon /etc/fstab, lisää sille valitsin ”_netdev” (muuten init yrittää "
+"liittää sen ennen kuin se on käytettävissä) ja valitse ”tiedostojärjestelmä”."
+" Kaikissa muissa tilanteissa valitse ”raaka”. Tällöin nbd-clientin "
+"käynnistyskomentosarja käynnistää ainoastaan nbd-client-prosessin ja kaikki "
+"muu täytyy tehdä käsin."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:5001
+msgid "Hostname of the server (number: ${number})?"
+msgstr "Palvelimen numero ${number} verkkonimi:"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:5001
+msgid ""
+"Please enter the network name or IP address of the machine on which the nbd-"
+"server process is running."
+msgstr ""
+"Anna sen koneen verkkonimi tai IP-osoite, jolla nbd-server-prosessia ajetaan."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:6001
+msgid "Port on which the nbd-server is running (number: ${number})?"
+msgstr "Portti, jota nbd-server numero ${number} käyttää:"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:6001
+msgid "Please enter the TCP port number to access nbd-server."
+msgstr ""
+"Anna TCP-portin numero, jonka kautta nbd-serveriin voidaan ottaa yhteys."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:7001
+msgid "/dev entry for this nbd-client (number: ${number})?"
+msgstr "nbd-clientin numero ${number} /dev-tietue:"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:7001
+msgid ""
+"Every nbd-client process needs to be associated with a /dev entry with major "
+"mode 43. Please enter the name of the /dev entry you want to use for this "
+"nbd-client. Note that this needs to be the full path to that entry, not just "
+"the last part."
+msgstr ""
+"Jokaisen nbd-client-prosessin tulee liittyä /dev-tietueeseen, jonka "
+"ensisijainen numero on 43. Anna sen /dev-tietueen nimi, jota haluat käyttää "
+"tämän nbd-clientin kanssa. Syötä tietueen koko polku, ei vain viimeistä osaa."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:7001
+msgid ""
+"If the /dev entry specified does not exist, it will be created with minor "
+"number ${number}."
+msgstr ""
+"Jos annettua /dev-tietuetta ei ole olemassa, se luodaan toissijaisella "
+"numerolla ${number}."
+
+#. Type: boolean
+#. Description
+#: ../nbd-client.templates:8001
+msgid "Disconnect all NBD devices on \"stop\"?"
+msgstr "Irrotetaanko kaikki NBD-laitteet komennolla ”stop”?"
+
+#. Type: boolean
+#. Description
+#: ../nbd-client.templates:8001
+msgid ""
+"When the nbd-client init script is called to stop the nbd-client service, "
+"there are two things that can be done: either it can disconnect all nbd-"
+"client devices (which are assumed not to be in use), or it can disconnect "
+"only those nbd-client devices that it knows about in its config file."
+msgstr ""
+"Kun nbd-client-palvelu pysäytetään kutsumalla init-komentosarjaa ”nbd-"
+"client”, se voi toimia kahdella eri tavalla: se voi joko irrottaa kaikki "
+"nbd-client-laitteet (joiden oletetaan olevan poissa käytöstä) tai se voi "
+"irrottaa vain ne nbd-client-laitteet, jotka on mainittu sen "
+"asetustiedostossa."
+
+#. Type: boolean
+#. Description
+#: ../nbd-client.templates:8001
+msgid ""
+"The default (and the traditional behavior) is to disconnect all nbd-client "
+"devices. If the root device or other critical file systems are on NBD this "
+"will cause data loss and should not be accepted."
+msgstr ""
+"Oletus (ja perinteinen toimintatapa) on kaikkien nbd-client-laitteiden "
+"irrotus. Jos juurilaite tai jokin muu kriittinen tiedostojärjestelmä on "
+"liitetty NBD:n avulla, tämä aiheuttaa tietojen häviämistä, eikä tätä "
+"vaihtoehtoa tulisi valita."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:2001
+msgid "Number of nbd-server instances to run:"
+msgstr "Ajettavien nbd-server-instanssien lukumäärä:"
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:2001
+msgid ""
+"Multiple nbd-server processes may run to export multiple files or block "
+"devices. Please specify how many configurations for such servers you want to "
+"generate."
+msgstr ""
+"Useita tiedostoja tai lohkolaitteita voidaan laittaa saataville ajamalla "
+"useampia nbd-server-prosesseja. Valitse monenko palvelimen asetukset haluat "
+"luoda."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:2001
+msgid ""
+"Note that you can always add extra servers by adding them to /etc/nbd-server/"
+"config, or by running \"dpkg-reconfigure nbd-server\"."
+msgstr ""
+"Voit lisätä palvelimia lisäämällä ne tiedostoon /etc/nbd-server/config tai "
+"ajamalla komennon ”dpkg-reconfigure nbd-server”."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:3001
+msgid "TCP Port for server number ${number}:"
+msgstr "Palvelimen numero ${number} TCP-portti:"
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:3001
+msgid ""
+"Please specify the TCP port this instance of nbd server will use for "
+"listening. As NBD is likely to use more than one port, no dedicated port has "
+"been assigned in IANA lists."
+msgstr ""
+"Anna TCP-portti, jota tämä nbd-server kuuntelee. Koska NBD yleensä "
+"kuuntelee useampaa kuin yhtä porttia, sille ei ole varattu tiettyä porttia "
+"IANA-listoilta."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:3001
+msgid ""
+"Therefore, NBD does not have a standard port number, which means you need to "
+"provide one. You should make sure this port is not already in use."
+msgstr ""
+"Tästä syystä NBD:llä ei ole standardia porttinumeroa ja sinun tulee valita "
+"numero. Varmista, ettei valittu portti ole jo käytössä."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:4001
+msgid "File to export (server number ${number}):"
+msgstr "Tiedosto, jonka palvelin numero ${number} tarjoaa käyttöön:"
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:4001
+#, no-c-format
+msgid ""
+"Please specify a file name or block device that should be exported over the "
+"network. You can export a real block device (for instance \"/dev/hda1\"); a "
+"normal file (such as \"/export/nbd/bl1\"); or a bunch of files all at once. "
+"For the third option, you can use \"%s\" in the filename, which will be "
+"expanded to the IP-address of the connecting client. An example would be \"/"
+"export/swaps/swp%s\"."
+msgstr ""
+"Anna tiedostonimi tai lohkolaite, jonka haluat laittaa saataville verkon yli."
+" Voit jakaa todellisen lohkolaitteen (esimerkiksi ”/dev/hda1”), tavallisen "
+"tiedoston (kuten ”/export/nbd/bl1”) tai joukon tiedostoja kerralla. Kolmatta "
+"vaihtoehtoa varten voit käyttää tiedostonimessä merkkijonoa ”%s”, joka "
+"muutetaan yhteyden ottavan asiakkaan IP-osoitteeksi. Esimerkki tästä on "
+"”/export/swaps/swp%s”."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:4001
+msgid ""
+"Note that it is possible to tune the way in which the IP address will be "
+"substituted in the file name. See \"man 5 nbd-server\" for details."
+msgstr ""
+"Tapaa, jolla IP-osoite korvaa tiedostonimessä olevan merkkijonon voi muokata."
+" Lisätietoja löytyy man-ohjesivulta nbd-server(5)."
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+msgstr "Asetuksen AUTO_GEN arvo on ”n” tiedostossa /etc/nbd-server"
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid ""
+"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
+"\"n\". The file will therefore not be regenerated automatically."
+msgstr ""
+"Tiedostossa /etc/nbd-server on rivi, jolla muuttujalle AUTO_GEN asetetaan "
+"arvo ”n”. Tästä syystä tiedostoa ei luoda automaattisesti uudelleen."
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid ""
+"Note that the current version of the nbd-server package no longer uses /etc/"
+"nbd-server. Instead it uses a new configuration file, read by nbd-server "
+"itself (rather than the init script), which supports more options. See \"man "
+"5 nbd-server\" for details."
+msgstr ""
+"Paketin nbd-server nykyinen versio ei enää käytä tiedostoa /etc/nbd-server. "
+"Sen sijaan se käyttää uutta useampia valitsimia tukevaa asetustiedostoa, "
+"jonka nbd-server lukee itse (init-komentosarjan sijaan). Lisätietoja löytyy "
+"man-ohjesivulta nbd-server(5)."
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid ""
+"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+"config in the new format may be generated based on the current "
+"configuration. Until then, the nbd-server installation will be broken."
+msgstr ""
+"Jos poistat tai laitat kommentteihin AUTO_GEN-rivin, tiedosto "
+"/etc/nbd-server/config voidaan luoda uudessa muodossa nykyisten asetusten "
+"pohjalta. Tätä ennen nbd-server-asennus ei toimi."
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid "Convert old-style nbd-server configuration file?"
+msgstr "Muunnetaanko nbd-serverin vanhan muotoinen asetustiedosto?"
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid ""
+"A pre-2.9 nbd-server configuration file has been found on this system. The "
+"current nbd-server package no longer supports this file and will not work if "
+"it is kept as is."
+msgstr ""
+"Järjestelmästä löytyi paketin nbd-server versiota 2.9 vanhempi "
+"asetustiedosto. Nykyinen nbd-server-paketti ei enää tue tätä tiedostoa, "
+"eikä toimi, jos tilanne säilytetään nykyisellään."
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid ""
+"If you choose this option, the system will generate a new style "
+"configuration file based upon the old-style configuration file, which will "
+"be removed. Otherwise, configuration questions will be asked and the system "
+"will generate a new configuration file."
+msgstr ""
+"Jos valitset tämän vaihtoehdon, järjestelmään luodaan vanhan asetustiedoston "
+"pohjalta uusi asetustiedosto ja vanha poistetaan. Muussa tapauksessa uusi "
+"asetustiedosto luodaan myöhemmin esitettävien asetuskysymysten avulla."
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid ""
+"If a new-style configuration file already exists and you choose this option, "
+"you will shortly see a \"modified configuration file\" prompt, as usual."
+msgstr ""
+"Jos valitset tämän vaihtoehdon ja uuden muotoinen asetustiedosto on jo "
+"olemassa, näytetään asennusprosessin aikana normaali kysymys paikallisesti "
+"muokatusta asetustiedostosta."

@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# We don't have any prerequisites
+case $1 in
+prereqs)
+	exit 0
+	;;
+esac
+
+. /scripts/functions
+
+log_begin_msg "Setting up nbd-client"
+for x in $(cat /proc/cmdline); do
+	# We don't need to redo what all of what /init already did...
+	case $x in
+		nbdroot=*,*,*)
+			nbdroot="${x#nbdroot=}"
+			nbdsrv=$(echo "$nbdroot" | sed -e "s/,.*$//")
+			nbdport=$(echo "$nbdroot" | sed -e "s/,([^,]*),.*$/\1/")
+			nbdbasedev=$(echo "$nbdroot" | sed -e "s/^.*,//")
+			nbdrootdev=/dev/$nbdbasedev
+			;;
+		nbdroot=*,*)
+			nbdroot="${x#nbdroot=}"
+			nbdsrv=$(echo "$nbdroot" | sed -e "s/,[^,]*$//")
+			nbdport=$(echo "$nbdroot" | sed -e "s/^[^,]*,//")
+			;;
+		ip=*)
+			IPOPTS="${x#ip=}"
+			;;
+		root=/dev/nbd*)
+			nbdrootdev="${x#root=}"
+			nbdbasedev="${x#root=/dev/}"
+			;;
+	esac
+done
+
+nbdrootdev=${nbdrootdev%p*}
+nbdbasedev=${nbdbasedev%p*}
+
+if [ -z "$nbdport" -o -z "$nbdrootdev" ]
+then
+	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
+	exit 0
+fi
+
+DEVICE=eth0
+
+configure_networking
+
+if [ -z "$nbdsrv" ]
+then
+	nbdsrv=${ROOTSERVER}
+fi
+
+if [ -z "$nbdsrv" ]
+then
+	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
+	exit 0
+fi
+
+/sbin/nbd-client $nbdsrv $nbdport $nbdrootdev -persist
+# This should be removed once the cfq scheduler no longer deadlocks nbd
+# devices
+if grep '\[cfq\]' /sys/block/$nbdbasedev/queue/scheduler >/dev/null
+then
+	echo deadline > /sys/block/$nbdbasedev/queue/scheduler
+fi

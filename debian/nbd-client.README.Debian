@@ -1,0 +1,21 @@
+Starting with nbd-client 1:2.9.9-3, there's support for running root on
+an NBD filesystem. This support works as follows:
+
+- There's only support for initramfs for now. If you need something
+  else, patches are welcome...
+- Due to a bug in initramfs-tools (#460569), the nbd-client initramfs
+  scripts will only work if a working network is connected to eth0, and
+  the nbd-server is available through that network.
+- To boot the system, add the kernel command line parameter
+  "nbdroot=X.X.X.X,Y", with "X.X.X.X" being the IP address of the
+  server, and "Y" the port on which the server is running.
+- You will want to set "KILLALL=false" in /etc/nbd-client; this to
+  prevent the initscript from yanking the root filesystem from under
+  your nose during shutdown or upgrade of the nbd package.
+- DO NOT add configuration for the root filesystem to /etc/nbd-server.
+  The initramfs will set it up, and the initramfs should not know about
+  it (otherwise the above KILLALL configuration has no effect).
+- DO keep the initscript running; it will detect that you're running off
+  an NBD device and add the nbd-client initscript to
+  /lib/init/rw/sendsigs.omit.d, to prevent init from killing nbd-client
+  prematurely at shutdown.

@@ -1,0 +1,477 @@
+# nbd (debconf) translation to Catalan.
+# Copyright (C) 2004 Free Software Foundation, Inc.
+# Aleix Badia i Bosch <abadia@ica.es>, 2004
+#
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: nbd_1:2.6-3_templates\n"
+"Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
+"POT-Creation-Date: 2009-05-28 13:58+0200\n"
+"PO-Revision-Date: 2004-03-12 19:46GMT\n"
+"Last-Translator: Aleix Badia i Bosch <abadia@ica.es>\n"
+"Language-Team: Catalan <debian-l10n-catalan@lists.debian.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:2001
+#, fuzzy
+#| msgid "AUTO_GEN is set at \"n\" in /etc/nbd-client."
+msgid "AUTO_GEN is set to \"n\" in /etc/nbd-client"
+msgstr "L'AUTO_GEN està definit a \"n\" al fitxer /etc/nbd-client."
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:2001
+msgid ""
+"The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
+"\"n\". The file will therefore not be regenerated automatically."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:2001
+msgid ""
+"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+"afterwards."
+msgstr ""
+"Si és erroni suprimiu la línia i executeu l'ordre \"dpkg-reconfigure nbd-"
+"client\"."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:3001
+#, fuzzy
+#| msgid "How many nbd-client connections do you want to use?"
+msgid "Number of nbd-client connections to use:"
+msgstr "Quantes connexions de l'nbd-client voleu utilitzar?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:3001
+#, fuzzy
+#| msgid ""
+#| "nbd-client can handle multiple concurrent connections. Please state the "
+#| "number of connections you'd like this configuration script to set up."
+msgid ""
+"nbd-client can handle multiple concurrent connections. Please specify the "
+"number of connections you'd like this configuration script to set up."
+msgstr ""
+"L'nbd-client pot gestionar múltiples connexions concurrents. Especifiqueu el "
+"nombre de connexions que voleu que configuri la seqüència."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:3001
+msgid ""
+"Note that if something has already been specified in /etc/nbd-client, the "
+"current configuration will be used as defaults in these dialogs."
+msgstr ""
+"Recordeu que si ja s'ha definit alguna opció al fitxer /etc/nbd-client, els "
+"diàlegs utilitzaran la configuració actual com a predeterminada."
+
+#. Type: select
+#. Choices
+#: ../nbd-client.templates:4001
+msgid "swap, filesystem, raw"
+msgstr "swap, filesystem, raw"
+
+#. Type: select
+#. Description
+#: ../nbd-client.templates:4002
+#, fuzzy
+#| msgid ""
+#| "How do you intend to use the network block device (number: ${number})?"
+msgid "Intended use of the network block device number ${number}:"
+msgstr ""
+"Com preteneu utilitzar el dispositiu de blocs de la xarxa (nombre: "
+"${number})?"
+
+#. Type: select
+#. Description
+#: ../nbd-client.templates:4002
+#, fuzzy
+#| msgid ""
+#| "The network block device can serve multiple purposes. One of the most "
+#| "interesting is to provide swapspace over the network for diskless "
+#| "clients, but you can store a filesystem on it, or do other things with it "
+#| "for which a block device is interesting."
+msgid ""
+"The network block device can serve multiple purposes. One of the most "
+"interesting is to provide swap space over the network for diskless clients, "
+"but you can store a filesystem on it, or do other things with it for which a "
+"block device is interesting."
+msgstr ""
+"El dispositiu de blocs de la xarxa es pot utilitzar per a múltiples "
+"objectius. Un dels més interessants és proporcionar un espai d'intercanvi "
+"per a la xarxa pels dispositius sense disc, però també podeu desar-hi un "
+"sistema de fitxers o d'altres propostes."
+
+#. Type: select
+#. Description
+#: ../nbd-client.templates:4002
+#, fuzzy
+#| msgid ""
+#| "If you intend to use the network block device as a swapdevice, choose "
+#| "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
+#| "fstab, give it the option \"_netdev\" (else init will try to mount it "
+#| "before it's usable), and choose \"filesystem\". For all other purposes, "
+#| "choose \"raw\". The only thing the nbd-client bootscript will do then is "
+#| "start an nbd-client process; you will have to set it up manually."
+msgid ""
+"If you intend to use the network block device as a swap device, choose \"swap"
+"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
+"it the option \"_netdev\" (else init will try to mount it before it's "
+"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
+"The only thing the nbd-client boot script will do then is start an nbd-"
+"client process; you will have to set it up manually."
+msgstr ""
+"Escolliu \"swap\" si preteneu utilitzar el dispositiu de blocs de la xarxa "
+"com un dispositiu d'intercanvi. Si preteneu utilitzar-ho com un sistema de "
+"fitxers, afegiu una línia a l'/etc/fstab, definiu l'opció \"_netdev\" (si no "
+"ho feu intentarà muntar-lo abans de que es pugui utilitzar) i escolliu "
+"\"filesystem\". Per qualsevol altra intenció escolliu \"raw\". L'única cosa "
+"que farà la seqüència d'arrencada de l'nbd-client serà iniciar el procés de "
+"l'nbd-client; l'haureu de configurar manualment."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:5001
+msgid "Hostname of the server (number: ${number})?"
+msgstr "Quin és el nom de l'ordinador (number: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:5001
+msgid ""
+"Please enter the network name or IP address of the machine on which the nbd-"
+"server process is running."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:6001
+msgid "Port on which the nbd-server is running (number: ${number})?"
+msgstr "Quin és el port on es vincula l'nbd-server (number: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:6001
+msgid "Please enter the TCP port number to access nbd-server."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:7001
+msgid "/dev entry for this nbd-client (number: ${number})?"
+msgstr ""
+"Quina és l'entrada del /dev per a aquest nbd-client (nombre: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:7001
+#, fuzzy
+#| msgid ""
+#| "Every nbd-client process needs to be associated with a /dev entry with "
+#| "major mode 43. Please enter the name of the /dev entry you want to use "
+#| "for this nbd-client. Note that this needs to be the full path to that "
+#| "entry, not just the last part."
+msgid ""
+"Every nbd-client process needs to be associated with a /dev entry with major "
+"number 43. Please enter the name of the /dev entry you want to use for this "
+"nbd-client. Note that this needs to be the full path to that entry, not just "
+"the last part."
+msgstr ""
+"Cada procés de l'nbd-client ha d'estar associat a una entrada del /dev amb "
+"el nombre principal 43. Introduïu el nom de l'entrada del /dev que voleu "
+"utilitzar per a aquest nbd-client. Recordeu que ha de ser el camí complet de "
+"l'entrada, no només l'última part."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:7001
+#, fuzzy
+#| msgid ""
+#| "If an unexisting /dev entry is provided, it will be created with minor "
+#| "number ${number}"
+msgid ""
+"If the /dev entry specified does not exist, it will be created with minor "
+"number ${number}."
+msgstr ""
+"Si es proporciona una entrada del /dev que no existeix, es crearà amb nombre "
+"secundari ${number}"
+
+#. Type: boolean
+#. Description
+#: ../nbd-client.templates:8001
+msgid "Disconnect all NBD devices on \"stop\"?"
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-client.templates:8001
+msgid ""
+"When the nbd-client init script is called to stop the nbd-client service, "
+"there are two things that can be done: either it can disconnect all nbd-"
+"client devices (which are assumed not to be in use), or it can disconnect "
+"only those nbd-client devices that it knows about in its config file."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-client.templates:8001
+msgid ""
+"The default (and the traditional behavior) is to disconnect all nbd-client "
+"devices. If the root device or other critical file systems are on NBD this "
+"will cause data loss and should not be accepted."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:2001
+msgid "Number of nbd-server instances to run:"
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:2001
+#, fuzzy
+#| msgid ""
+#| "You can run multiple nbd-server processes, to export multiple files or "
+#| "block devices. Please specify how many nbd-server configurations you want "
+#| "this configuration script to generate."
+msgid ""
+"Multiple nbd-server processes may run to export multiple files or block "
+"devices. Please specify how many configurations for such servers you want to "
+"generate."
+msgstr ""
+"Podeu executar múltiples processos del nbd-server per exportar múltiples "
+"fitxers o dispositius de blocs. Especifiqueu quantes configuracions de l'nbd-"
+"server voleu que generi la seqüència de configuració."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:2001
+#, fuzzy
+#| msgid ""
+#| "Note that you can always add extra servers by adding them to /etc/nbd-"
+#| "server, or by running 'dpkg-reconfigure nbd-server'."
+msgid ""
+"Note that you can always add extra servers by adding them to /etc/nbd-server/"
+"config, or by running \"dpkg-reconfigure nbd-server\"."
+msgstr ""
+"Recordeu que sempre podeu afegir servidors extra afegint-los al fitxer /etc/"
+"nbd-server, o executant l'ordre 'dpkg-reconfigure nbd-server'."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:3001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "TCP Port for server number ${number}:"
+msgstr "Quin és el nom de l'ordinador (number: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:3001
+msgid ""
+"Please specify the TCP port this instance of nbd server will use for "
+"listening. As NBD is likely to use more than one port, no dedicated port has "
+"been assigned in IANA lists."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:3001
+#, fuzzy
+#| msgid ""
+#| "Therefore, NBD does not have a standard portnumber, which means you need "
+#| "to enter one. Make sure the portnumber being entered is not in use "
+#| "already."
+msgid ""
+"Therefore, NBD does not have a standard port number, which means you need to "
+"provide one. You should make sure this port is not already in use."
+msgstr ""
+"Per tant el NBD no té un nombre de port estàndard, per la qual cosa n'heu "
+"d'introduir un. Assegureu-vos que el nombre de port que introduïu no "
+"s'estigui utilitzant."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:4001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "File to export (server number ${number}):"
+msgstr "Quin és el nom de l'ordinador (number: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:4001
+#, fuzzy, no-c-format
+#| msgid ""
+#| "You need to enter a filename to a file or block device you want to export "
+#| "over the network. You can either export a real block device (e.g. \"/dev/"
+#| "hda1\"), export a normal file (e.g. \"/export/nbd/bl1\"), or export a "
+#| "bunch of files all at once; for the last option, you have the possibility "
+#| "to use \"%s\" in the filename, which will be expanded to the IP-address "
+#| "of the connecting client. An example would be \"/export/swaps/swp%s\"."
+msgid ""
+"Please specify a file name or block device that should be exported over the "
+"network. You can export a real block device (for instance \"/dev/hda1\"); a "
+"normal file (such as \"/export/nbd/bl1\"); or a bunch of files all at once. "
+"For the third option, you can use \"%s\" in the filename, which will be "
+"expanded to the IP-address of the connecting client. An example would be \"/"
+"export/swaps/swp%s\"."
+msgstr ""
+"Heu d'introduir el nom de l'enllaç al fitxer o dispositiu de blocs que voleu "
+"exportar a la xarxa. També podeu exportar un dispositiu de blocs real (ex \"/"
+"dev/hda1\"), exportar un fitxer normal (ex \"/export/nbd/bl1\"), o exportar "
+"un conjunt de fitxers de forma conjunta. L'última opció us permet utilitzar "
+"\"%\" en el nom de fitxer que s'expandirà a l'adeça d'IP del client que es "
+"connecta. Un exemple podria ser \"/export/swaps/swp%s\"."
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:4001
+msgid ""
+"Note that it is possible to tune the way in which the IP address will be "
+"substituted in the file name. See \"man 5 nbd-server\" for details."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+#, fuzzy
+#| msgid "AUTO_GEN is set at \"n\" in /etc/nbd-server"
+msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+msgstr "L'AUTO_GEN està definit a \"n\" al fitxer /etc/nbd-server"
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid ""
+"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
+"\"n\". The file will therefore not be regenerated automatically."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid ""
+"Note that the current version of the nbd-server package no longer uses /etc/"
+"nbd-server. Instead it uses a new configuration file, read by nbd-server "
+"itself (rather than the init script), which supports more options. See \"man "
+"5 nbd-server\" for details."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../nbd-server.templates:5001
+msgid ""
+"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+"config in the new format may be generated based on the current "
+"configuration. Until then, the nbd-server installation will be broken."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid "Convert old-style nbd-server configuration file?"
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid ""
+"A pre-2.9 nbd-server configuration file has been found on this system. The "
+"current nbd-server package no longer supports this file and will not work if "
+"it is kept as is."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid ""
+"If you choose this option, the system will generate a new style "
+"configuration file based upon the old-style configuration file, which will "
+"be removed. Otherwise, configuration questions will be asked and the system "
+"will generate a new configuration file."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:6001
+msgid ""
+"If a new-style configuration file already exists and you choose this option, "
+"you will shortly see a \"modified configuration file\" prompt, as usual."
+msgstr ""
+
+#~ msgid ""
+#~ "There's a line in /etc/nbd-client that reads \"AUTO_GEN=n\" -- or "
+#~ "something likewise in sh-syntaxis. This means you don't want me to "
+#~ "automatically regenerate that file."
+#~ msgstr ""
+#~ "El fitxer /etc/nbd-client conté una línia \"AUTO_GEN=n\" -- o alguna cosa "
+#~ "similar en la sintaxi sh. Indica que no voleu que regeneri automàticament "
+#~ "el fitxer."
+
+#~ msgid ""
+#~ "You need to fill in some name with which to resolve the machine on which "
+#~ "the nbd-server process is running. This can be its hostname (also known "
+#~ "to some as its \"network name\") or its IP-address."
+#~ msgstr ""
+#~ "Heu d'introduir la referència a l'ordinador on s'està executant el procés "
+#~ "de l'nbd-server. Pot ser el nom de l'ordinador o la seva adreça d'IP."
+
+#~ msgid ""
+#~ "You need to fill in the portnumber on which the nbd-server is running. "
+#~ "This could technically be any number between 1 and 65535, but for this to "
+#~ "work, it needs to be the one on which a server can be found on the "
+#~ "machine running nbd-server..."
+#~ msgstr ""
+#~ "Heu d'omplir el nombre del port on està vinculat l'nbd-server. Podria ser "
+#~ "un nombre entre el 1 i el 65535, però perquè funcioni ha de ser el que "
+#~ "s'hi pugui trobar vinculat l'nbd-server..."
+
+#~ msgid "How many nbd-servers do you want to run?"
+#~ msgstr "Quants nbd-server voleu executar?"
+
+#~ msgid "What port do you want to run the server on (number: ${number})?"
+#~ msgstr "A quin port voleu vincular el servidor (nombre: ${number})?"
+
+#~ msgid ""
+#~ "A port is a number in the TCP-header of a TCP/IP network package, that "
+#~ "defines which application should process the data being sent. For most "
+#~ "application-layer protocols, like FTP, HTTP, POP3 or SMTP, these numbers "
+#~ "have been well-defined by IANA, and can be found in /etc/services or STD "
+#~ "2; for NBD, however, this would not be appropriate since NBD works with a "
+#~ "separate port for each and every block device being used."
+#~ msgstr ""
+#~ "Un port é sun nombre en la capçalera TCP d'un paquet de xarxa de TCP/IP "
+#~ "que defineix quina aplicació hauria de processar les dades que s'envien. "
+#~ "Per a la majoria de protocols de la capa d'aplicació com l'FTP, l'HTTP, "
+#~ "el POP3 o l'SMTP, els nombres els defineix la IANA, i es poden trobar a /"
+#~ "etc/services o STD2. Pel NBD no seria necessari ja que s'executa en un "
+#~ "port diferent per a cada dispositiu de blocs que s'utilitza."
+
+#~ msgid "What file do you want to export (number: ${number})?"
+#~ msgstr "Quin fitxer voleu exportar (nombre: ${number})?"
+
+#~ msgid ""
+#~ "/etc/nbd-server contains a line \"AUTO_GEN=n\" -- or something equivalent "
+#~ "in bash-syntaxis. This means you don't want me to automatically "
+#~ "regenerate that file."
+#~ msgstr ""
+#~ "L'/etc/nbd-server conté una línia \"AUTO_GEN=n\" -- o alguna cosa similar "
+#~ "amb una sintaxi errònia. Indica que no voleu que regeneri automàticament "
+#~ "el fitxer."
+
+#~ msgid ""
+#~ "If that's wrong, remove or comment out the line and invoke \"dpkg-"
+#~ "reconfigure nbd-server\""
+#~ msgstr ""
+#~ "Si és erroni suprimiu o comenteu la línia i executeu l'ordre \"dpkg-"
+#~ "reconfigure nbd-server\""

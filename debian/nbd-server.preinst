@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# If upgrading from pre-2.9, move /etc/nbd-server away.
+
+if [ "$1" = "upgrade" ]
+then
+	if dpkg --compare-versions "$2" lt 2.9
+	then
+		mv /etc/nbd-server /etc/nbd-server.oldconf
+	fi
+fi
+
+#DEBHELPER#
