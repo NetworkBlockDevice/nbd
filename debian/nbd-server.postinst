@@ -94,7 +94,9 @@ case "$1" in
 	    done
 	    ucf $TMPFILE /etc/nbd-server/config
 	fi
-	adduser --system --group --home /etc/nbd-server --no-create-home nbd
+	if ! id nbd >/dev/null 2>&1; then
+	    adduser --system --group --home /etc/nbd-server --no-create-home nbd
+	fi
 	;;
     
     abort-upgrade|abort-remove|abort-deconfigure)

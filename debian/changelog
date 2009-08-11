@@ -1,3 +1,20 @@
+nbd (1:2.9.13-3) unstable; urgency=low
+
+  * nbd-client initscript: replace `expr $i + 1` by $(( $i + 1 )), since
+    expr is in /usr/bin which may not yet be mounted when we run this
+    initscript. Closes: #539873.
+  * nbd-server.postinst: call adduser only if 'nbd' user does not yet
+    exist. Closes: #540604.
+  * Convert to debhelper 7's "dh" mode.
+  * Replace ifeq() make constructs with debhelper's -s option in a
+    couple of overrides. Thanks to Joey Hess for pointing out that the
+    option already exists when I filed a wishlist bug asking for it...
+    grin.
+  * Add debian packaging to git repository, and publish on
+    alioth.debian.org, aka git.debian.org.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 10 Aug 2009 08:27:26 +0200
+
 nbd (1:2.9.13-2) unstable; urgency=low
 
   * The "Black Finger DebConf" release.

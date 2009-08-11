@@ -57,7 +57,7 @@ case "$1" in
 	  fi
 	  $DAEMON ${NBD_HOST[$i]} ${NBD_PORT[$i]} ${NBD_DEVICE[$i]}
 	  echo "connected ${NBD_DEVICE[$i]}"
-	  i=`expr $i + 1`
+	  i=$(($i + 1))
 	done
 	;;
     start)
@@ -123,7 +123,7 @@ case "$1" in
 		  echo "Error: NBD_TYPE[$i] contains unknown value ${NBD_TYPE[$i]}"
 		  ;;
 	  esac
-	  i=`expr $i + 1`
+	  i=$(( $i + 1 ))
 	done
 	echo "$NAME."
 	;;
