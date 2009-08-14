@@ -581,7 +581,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file.", f);
+		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file %s.", f);
 		g_key_file_free(cfile);
 		return retval;
 	}
