@@ -1626,26 +1626,25 @@ void serve_err(SERVER* serve, const char* msg) {
 void dousers(void) {
 	struct passwd *pw;
 	struct group *gr;
+	gchar* str;
 	if(rungroup) {
 		gr=getgrnam(rungroup);
 		if(!gr) {
-			g_message("Invalid group name: %s", rungroup);
-			exit(EXIT_FAILURE);
+			str = g_strdup_printf("Invalid group name: %s", rungroup);
+			err(str);
 		}
 		if(setgid(gr->gr_gid)<0) {
-			g_message("Could not set GID: %s", strerror(errno));
-			exit(EXIT_FAILURE);
+			err("Could not set GID: %m"); 
 		}
 	}
 	if(runuser) {
 		pw=getpwnam(runuser);
 		if(!pw) {
-			g_message("Invalid user name: %s", runuser);
-			exit(EXIT_FAILURE);
+			str = g_strdup_printf("Invalid user name: %s", runuser);
+			err(str);
 		}
 		if(setuid(pw->pw_uid)<0) {
-			g_message("Could not set UID: %s", strerror(errno));
-			exit(EXIT_FAILURE);
+			err("Could not set UID: %m");
 		}
 	}
 }
