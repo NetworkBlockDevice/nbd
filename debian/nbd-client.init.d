@@ -55,8 +55,13 @@ case "$1" in
 	  if grep '\[cfq\]' /sys/block/${NBD_DEVICE[$i]/\/dev\//}/queue/scheduler >/dev/null; then
 	  	echo deadline > /sys/block/${NBD_DEVICE[$i]/\/dev\//}/queue/scheduler
 	  fi
-	  $DAEMON ${NBD_HOST[$i]} ${NBD_PORT[$i]} ${NBD_DEVICE[$i]}
-	  echo "connected ${NBD_DEVICE[$i]}"
+	  if nbd-client -c ${NBD_DEVICE[$i]} >/dev/null
+	  then
+	  	echo "${NBD_DEVICE[$i]} already connected, skipping..."
+	  else
+	  	$DAEMON ${NBD_HOST[$i]} ${NBD_PORT[$i]} ${NBD_DEVICE[$i]}
+	  	echo "connected ${NBD_DEVICE[$i]}"
+	  fi
 	  i=$(($i + 1))
 	done
 	;;

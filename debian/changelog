@@ -1,8 +1,13 @@
 nbd (1:2.9.13-3) unstable; urgency=low
 
-  * nbd-client initscript: replace `expr $i + 1` by $(( $i + 1 )), since
-    expr is in /usr/bin which may not yet be mounted when we run this
-    initscript. Closes: #539873.
+  * nbd-client initscript:
+    - replace `expr $i + 1` by $(( $i + 1 )), since expr is in /usr/bin
+      which may not yet be mounted when we run this initscript. Closes:
+      #539873.
+    - check whether a device is connected at startup, and ignore those
+      that are. Since we don't use 'set -e', that makes us compliant
+      with the 'must exit successfully and not start the daemon again'
+      part of policy 3.8.1.
   * nbd-server.postinst: call adduser only if 'nbd' user does not yet
     exist. Closes: #540604.
   * Convert to debhelper 7's "dh" mode.
