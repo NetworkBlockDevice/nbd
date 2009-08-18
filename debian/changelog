@@ -12,6 +12,7 @@ nbd (1:2.9.13-3) unstable; urgency=low
     grin.
   * Add debian packaging to git repository, and publish on
     alioth.debian.org, aka git.debian.org.
+  * Add Vcs-Git header to debian/control.
 
  -- Wouter Verhelst <wouter@debian.org>  Mon, 10 Aug 2009 08:27:26 +0200
 

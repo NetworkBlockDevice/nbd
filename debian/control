@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Wouter Verhelst <wouter@debian.org>
 Build-Depends: debhelper (>> 7.2.2), libglib2.0-dev
 Standards-Version: 3.8.0
+Vcs-Git: git://git.debian.org/~wouter/nbd.git
 
 Package: nbd-server
 Architecture: any
