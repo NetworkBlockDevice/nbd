@@ -85,7 +85,7 @@ case "$1" in
         fi
 	db_stop
 	# Invoke initramfs trigger
-        if [ -f $(which update-initramfs) ]
+        if [ -f /$(which update-initramfs) ]
 	then
 		update-initramfs -u
 	fi

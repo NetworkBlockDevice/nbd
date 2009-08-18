@@ -1,3 +1,10 @@
+nbd (1:2.9.13-4) unstable; urgency=low
+
+  * Make test for update-initramfs work, so that installation without it
+    works.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 18 Aug 2009 22:26:13 +0200
+
 nbd (1:2.9.13-3) unstable; urgency=low
 
   * nbd-client initscript:
