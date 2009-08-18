@@ -196,9 +196,9 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Required; string.</para>
 	  <para>
-	    The name of the file that will be exported. This must be a
-	    fully-qualified path and filename; relative paths are not
-	    allowed.
+	    The name of the file (or block device) that will be
+	    exported. This must be a fully-qualified path and filename;
+	    relative paths are not allowed.
 	  </para>
 	  <para>
 	    Note that <command>nbd-server</command> will only try to

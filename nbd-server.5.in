@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "5" "18 July 2009" "" ""
+.TH "NBD-SERVER" "5" "18 August 2009" "" ""
 
 .SH NAME
 /etc/nbd-server/config \- configuration file for nbd-server
@@ -109,9 +109,9 @@ command line
 \fBexportname\fR
 Required; string.
 
-The name of the file that will be exported. This must be a
-fully-qualified path and filename; relative paths are not
-allowed.
+The name of the file (or block device) that will be
+exported. This must be a fully-qualified path and filename;
+relative paths are not allowed.
 
 Note that \fBnbd-server\fR will only try to
 find and open the exported file when a client actually
