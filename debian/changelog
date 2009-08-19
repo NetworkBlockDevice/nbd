@@ -2,8 +2,9 @@ nbd (1:2.9.13-4) unstable; urgency=low
 
   * Make test for update-initramfs work, so that installation without it
     works.
+  * Add Vcs-Browser and Homepage headers, too.
 
- -- Wouter Verhelst <wouter@debian.org>  Tue, 18 Aug 2009 22:26:13 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 19 Aug 2009 13:43:07 +0200
 
 nbd (1:2.9.13-3) unstable; urgency=low
 
