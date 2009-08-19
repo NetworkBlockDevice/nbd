@@ -193,19 +193,8 @@ void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
 
-/*
- * If anyone ever forward-patches this patch, I'll happily re-enable
- * this code. Until then...
-#ifndef SO_SWAPPING
 	if (swap)
-		err("You have to compile me on machine with swapping patch enabled in order to use it later.");
-#else
-	if (swap)
-		if (setsockopt(sock, SOL_SOCKET, SO_SWAPPING, &one, sizeof(int)) < 0)
-			err("Could not enable swapping: %m");
-#endif
-*/
-	mlockall(MCL_CURRENT | MCL_FUTURE);
+		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
 int main(int argc, char *argv[]) {
