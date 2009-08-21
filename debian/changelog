@@ -3,8 +3,10 @@ nbd (1:2.9.13-4) unstable; urgency=low
   * Make test for update-initramfs work, so that installation without it
     works.
   * Add Vcs-Browser and Homepage headers, too.
+  * Remove --sourcedir argument from dh_install. We don't run make
+    install ourselves, so this is a recipe for disaster.
 
- -- Wouter Verhelst <wouter@debian.org>  Wed, 19 Aug 2009 13:43:07 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 21 Aug 2009 09:49:15 +0200
 
 nbd (1:2.9.13-3) unstable; urgency=low
 
