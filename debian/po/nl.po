@@ -27,7 +27,6 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
-#, fuzzy
 #| msgid "AUTO_GEN is set at \"n\" in /etc/nbd-client."
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-client"
 msgstr "/etc/nbd-client heeft AUTO_GEN op \"n\" staan."
@@ -53,7 +52,6 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
 #| msgid "How many nbd-client connections do you want to use?"
 msgid "Number of nbd-client connections to use:"
 msgstr "Hoeveel nbd-client verbindingen wenst U te gebruiken?"
@@ -61,7 +59,6 @@ msgstr "Hoeveel nbd-client verbindingen wenst U te gebruiken?"
 #. Type: string
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
 #| msgid ""
 #| "nbd-client can handle multiple concurrent connections. Please state the "
 #| "number of connections you'd like this configuration script to set up."
@@ -92,7 +89,6 @@ msgstr "swap, bestandssysteem, geen configuratie"
 #. Type: select
 #. Description
 #: ../nbd-client.templates:4002
-#, fuzzy
 #| msgid ""
 #| "How do you intend to use the network block device (number: ${number})?"
 msgid "Intended use of the network block device number ${number}:"
@@ -102,7 +98,6 @@ msgstr ""
 #. Type: select
 #. Description
 #: ../nbd-client.templates:4002
-#, fuzzy
 #| msgid ""
 #| "The network block device can serve multiple purposes. One of the most "
 #| "interesting is to provide swapspace over the network for diskless "
@@ -123,7 +118,6 @@ msgstr ""
 #. Type: select
 #. Description
 #: ../nbd-client.templates:4002
-#, fuzzy
 #| msgid ""
 #| "If you intend to use the network block device as a swapdevice, choose "
 #| "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
@@ -197,7 +191,6 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
 #| msgid ""
 #| "If an unexisting /dev entry is provided, it will be created with minor "
 #| "number ${number}"
@@ -211,15 +204,13 @@ msgstr ""
 #. Type: boolean
 #. Description
 #: ../nbd-client.templates:8001
-#, fuzzy
 #| msgid "Kill all nbd devices on 'stop'?"
 msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "Alle nbd-apparaten afsluiten bij 'stop'?"
+msgstr "Alle nbd-verbindingen verbreken bij 'stop'?"
 
 #. Type: boolean
 #. Description
 #: ../nbd-client.templates:8001
-#, fuzzy
 #| msgid ""
 #| "When the nbd-client initscript is called to stop the nbd-client service, "
 #| "there are two things that can be done: either it can stop all nbd-client "
@@ -233,7 +224,7 @@ msgid ""
 msgstr ""
 "Wanneer het nbd-client initscript uitgevoerd wordt om de nbd-client service "
 "te stoppen, zijn er twee dingen die gedaan kunnen worden: ofwel kan het "
-"script alle nbd-client apparaten stoppen, ofwel kan het enkel die apparaten "
+"script alle nbd-client apparaten stoppen (waarbij er vanuit gegaan wordt dat ze niet in gebruik zijn), ofwel kan het enkel die apparaten "
 "stoppen waarvan het weet heeft via de configuratie."
 
 #. Type: boolean
@@ -243,18 +234,17 @@ msgid ""
 "The default (and the traditional behavior) is to disconnect all nbd-client "
 "devices. If the root device or other critical file systems are on NBD this "
 "will cause data loss and should not be accepted."
-msgstr ""
+msgstr "Het standaard (en historisch) gedrag is om alle nbd-client verbindingen te verbreken. Als het root-apparaat of een ander kritiek bestandssysteem zich op een NBD bevindt, dan zal dit verlies van gegevens tot gevolg hebben en dus moet deze optie dan niet geaccepteerd worden."
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:2001
 msgid "Number of nbd-server instances to run:"
-msgstr ""
+msgstr "Aantal te draaien nbd-server instanties:"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:2001
-#, fuzzy
 #| msgid ""
 #| "You can run multiple nbd-server processes, to export multiple files or "
 #| "block devices. Please specify how many nbd-server configurations you want "
@@ -271,7 +261,6 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-server.templates:2001
-#, fuzzy
 #| msgid ""
 #| "Note that you can always add extra servers by adding them to /etc/nbd-"
 #| "server/config, or by running 'dpkg-reconfigure nbd-server'."
@@ -286,10 +275,9 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
-#, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
 msgid "TCP Port for server number ${number}:"
-msgstr "Hostnaam van de server (nummer: ${number})?"
+msgstr "TCP poort voor de server (nummer: ${number})?"
 
 #. Type: string
 #. Description
@@ -298,12 +286,11 @@ msgid ""
 "Please specify the TCP port this instance of nbd server will use for "
 "listening. As NBD is likely to use more than one port, no dedicated port has "
 "been assigned in IANA lists."
-msgstr ""
+msgstr "Gelieve de TCP poort op te geven waarnaar deze instantie van nbd-server zal luisteren. Vermits NBD gemakkelijk meer dan één poort gebruikt, werd geen poort toegewezen in de IANA-lijsten."
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
-#, fuzzy
 #| msgid ""
 #| "Therefore, NBD does not have a standard portnumber, which means you need "
 #| "to enter one. Make sure the portnumber being entered is not in use "
@@ -319,15 +306,13 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
-#, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
 msgid "File to export (server number ${number}):"
-msgstr "Hostnaam van de server (nummer: ${number})?"
+msgstr "Te exporteren bestand (server nummer: ${number})?"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
-#, fuzzy, no-c-format
 #| msgid ""
 #| "You need to enter a filename to a file or block device you want to export "
 #| "over the network. You can either export a real block device (e.g. \"/dev/"
@@ -364,7 +349,6 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-server.templates:5001
-#, fuzzy
 #| msgid "AUTO_GEN is set at \"n\" in /etc/nbd-server"
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
 msgstr "AUTO_GEN staat op \"n\" in /etc/nbd-server"
@@ -375,12 +359,11 @@ msgstr "AUTO_GEN staat op \"n\" in /etc/nbd-server"
 msgid ""
 "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
 "\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
+msgstr "Het bestand /etc/nbd-server bevat een lijn dat de AUTO_GEN variabele op \"n\" zet. Dit bestand zal daarom niet automatisch geregenereerd worden."
 
 #. Type: error
 #. Description
 #: ../nbd-server.templates:5001
-#, fuzzy
 #| msgid ""
 #| "Note that the current version of the nbd-server package no longer uses /"
 #| "etc/nbd-server; rather, it uses a new configuration file that is read by "
@@ -401,7 +384,6 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-server.templates:5001
-#, fuzzy
 #| msgid ""
 #| "If you remove or uncomment the AUTO_GEN line, a file /etc/nbd-server/"
 #| "config in the new format may be generated based on your current "
@@ -418,7 +400,6 @@ msgstr ""
 #. Type: boolean
 #. Description
 #: ../nbd-server.templates:6001
-#, fuzzy
 #| msgid "Convert old style nbd-server configuration file?"
 msgid "Convert old-style nbd-server configuration file?"
 msgstr "Het oude-stijl nbd-server configuratiebestand converteren?"
@@ -430,7 +411,7 @@ msgid ""
 "A pre-2.9 nbd-server configuration file has been found on this system. The "
 "current nbd-server package no longer supports this file and will not work if "
 "it is kept as is."
-msgstr ""
+msgstr "Een configuratiebestand voor nbd-server van voor versie 2.9 werd op dit systeem gevonden. De huidige versie van het nbd-server pakket ondersteunt dit bestand niet meer en zal zonder wijzigingen niet werken."
 
 #. Type: boolean
 #. Description
@@ -440,12 +421,11 @@ msgid ""
 "configuration file based upon the old-style configuration file, which will "
 "be removed. Otherwise, configuration questions will be asked and the system "
 "will generate a new configuration file."
-msgstr ""
+msgstr "Indien u deze optie accepteert, dan zal het systeem een nieuwe-stijl configuratiebestand aanmaken gebaseerd op het oude-stijl configuratiebestand, dat vervolgens verwijderd zal worden. In het andere geval zullen configuratievragen gesteld worden en zal het systeem een nieuw configuratiebestand genereren."
 
 #. Type: boolean
 #. Description
 #: ../nbd-server.templates:6001
-#, fuzzy
 #| msgid ""
 #| "If you already have a new style configuration file and you accept this "
 #| "option, you will shortly see a \"modified configuration file\" prompt, as "

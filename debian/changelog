@@ -5,8 +5,10 @@ nbd (1:2.9.13-4) unstable; urgency=low
   * Add Vcs-Browser and Homepage headers, too.
   * Remove --sourcedir argument from dh_install. We don't run make
     install ourselves, so this is a recipe for disaster.
+  * Apparently I lost the Dutch debconf translation somehow, so do it
+    again.
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 21 Aug 2009 09:49:15 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 24 Aug 2009 17:25:54 +0200
 
 nbd (1:2.9.13-3) unstable; urgency=low
 
