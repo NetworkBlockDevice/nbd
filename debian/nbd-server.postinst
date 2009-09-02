@@ -92,7 +92,7 @@ case "$1" in
 		  echo "	port = $PORT"
 	      ) >> $TMPFILE
 	    done
-	    ucf $TMPFILE /etc/nbd-server/config
+	    ucf --debconf-ok $TMPFILE /etc/nbd-server/config
 	fi
 	if ! id nbd >/dev/null 2>&1; then
 	    adduser --system --group --home /etc/nbd-server --no-create-home nbd

@@ -1,3 +1,11 @@
+nbd (1:2.9.13-5) unstable; urgency=low
+
+  * nbd-server.postinst: Pass --debconf-ok parameter to ucf, to make it
+    stop yelling about not being able to use debconf (it was, and
+    db_stop wasn't called. This presumably was a bug, but whatever).
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 02 Sep 2009 16:00:23 +0200
+
 nbd (1:2.9.13-4) unstable; urgency=low
 
   * Make test for update-initramfs work, so that installation without it
