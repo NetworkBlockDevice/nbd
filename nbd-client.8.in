@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "26 May 2009" "" ""
+.TH "NBD-CLIENT" "8" "03 September 2009" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device

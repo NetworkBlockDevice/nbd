@@ -8,14 +8,19 @@ an NBD filesystem. This support works as follows:
   the nbd-server is available through that network.
 - To boot the system, add the kernel command line parameter
   "nbdroot=X.X.X.X,Y", with "X.X.X.X" being the IP address of the
-  server, and "Y" the port on which the server is running.
+  server, and "Y" the port on which the server is running. Starting with
+  nbd-client 1:2.9.11-4, you can also add a third argument to the
+  nbdroot parameter, to specify which NBD device to set up in case
+  you're running off RAID-on-NBD. If you do not specify the third
+  argument, then your root= parameter must contain the /dev/nbdX device
+  node that you're trying to boot off of.
 - You will want to set "KILLALL=false" in /etc/nbd-client; this to
   prevent the initscript from yanking the root filesystem from under
   your nose during shutdown or upgrade of the nbd package.
 - DO NOT add configuration for the root filesystem to /etc/nbd-server.
-  The initramfs will set it up, and the initramfs should not know about
+  The initramfs will set it up, and the initscript should not know about
   it (otherwise the above KILLALL configuration has no effect).
 - DO keep the initscript running; it will detect that you're running off
-  an NBD device and add the nbd-client initscript to
+  an NBD device and add the nbd-client PID number to
   /lib/init/rw/sendsigs.omit.d, to prevent init from killing nbd-client
   prematurely at shutdown.

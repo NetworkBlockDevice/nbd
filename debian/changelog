@@ -6,8 +6,9 @@ nbd (1:2.9.13-5) unstable; urgency=low
   * Remove overrides for dh_gencontrol and dh_builddeb, since debhelper
     7.4 no longer needs -s arguments. Bump required version of debhelper
     in build-depends to 7.4.0
+  * Some more clarification and fixes to nbd-client README.Debian
 
- -- Wouter Verhelst <wouter@debian.org>  Thu, 03 Sep 2009 13:01:30 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 04 Sep 2009 00:19:06 +0200
 
 nbd (1:2.9.13-4) unstable; urgency=low
 
