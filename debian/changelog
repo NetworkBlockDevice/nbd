@@ -7,8 +7,9 @@ nbd (1:2.9.13-5) unstable; urgency=low
     7.4 no longer needs -s arguments. Bump required version of debhelper
     in build-depends to 7.4.0
   * Some more clarification and fixes to nbd-client README.Debian
+  * Remove stray 'file' with diff output
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 04 Sep 2009 00:19:06 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 06 Sep 2009 20:27:44 +0200
 
 nbd (1:2.9.13-4) unstable; urgency=low
 
