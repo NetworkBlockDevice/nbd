@@ -10,8 +10,10 @@ nbd (1:2.9.13-5) unstable; urgency=low
   * Remove stray 'file' with diff output
   * Updated translation: Vietnamese, by Clytie Siddall. Closes: #548027.
   * Fix message at failed umount. Closes: #539766.
+  * Add lintian overrides for "missing-stop" on nbd-client.init.d. We
+    really do not wish to stop for runlevel 1.
 
- -- Wouter Verhelst <wouter@debian.org>  Thu, 24 Sep 2009 23:12:40 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 24 Sep 2009 23:21:25 +0200
 
 nbd (1:2.9.13-4) unstable; urgency=low
 

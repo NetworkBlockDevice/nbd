@@ -1,0 +1,2 @@
+# We really do not want to stop during runlevel 1
+nbd-client binary: init.d-script-possible-missing-stop /etc/init.d/nbd-client 1
