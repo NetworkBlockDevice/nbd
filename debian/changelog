@@ -9,8 +9,9 @@ nbd (1:2.9.13-5) unstable; urgency=low
   * Some more clarification and fixes to nbd-client README.Debian
   * Remove stray 'file' with diff output
   * Updated translation: Vietnamese, by Clytie Siddall. Closes: #548027.
+  * Fix message at failed umount. Closes: #539766.
 
- -- Wouter Verhelst <wouter@debian.org>  Thu, 24 Sep 2009 23:03:39 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 24 Sep 2009 23:12:40 +0200
 
 nbd (1:2.9.13-4) unstable; urgency=low
 

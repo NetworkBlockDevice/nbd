@@ -150,7 +150,7 @@ case "$1" in
 	    umount $dev 2>/dev/null
 	    if [ $? -eq 1 ]
 	    then
-	      echo -n "umount of $i failed! Data loss may occur! will continue in 10 seconds..."
+	      echo -n "umount of $dev failed! Data loss may occur! will continue in 10 seconds..."
 	      sleep 1
 	      for i in 9 8 7 6 5 4 3 2 1
 	      do
