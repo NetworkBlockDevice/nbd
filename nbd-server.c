@@ -344,7 +344,6 @@ void usage() {
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
-	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
@@ -413,7 +412,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-a:C:cl:mo:rp:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
