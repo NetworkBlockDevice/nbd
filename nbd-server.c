@@ -392,7 +392,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
 		{"authorize-file", required_argument, NULL, 'l'},
-		{"idle-time", required_argument, NULL, 'a'},
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
