@@ -312,17 +312,15 @@ int main(int argc, char *argv[]) {
 
 	/* Go daemon */
 	
-	daemon(0,0);
-	do {
 #ifndef NOFORK
-		if (!nofork) {
-			if (fork()) {
-				while(check_conn(nbddev, 0)) {
-					sleep(1);
-				}
-				open(nbddev, O_RDONLY);
-				exit(0);
+	if(!nofork) daemon(0,0);
+	do {
+		if (fork()) {
+			while(check_conn(nbddev, 0)) {
+				sleep(1);
 			}
+			open(nbddev, O_RDONLY);
+			exit(0);
 		}
 #endif
 
