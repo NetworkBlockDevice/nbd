@@ -1,3 +1,12 @@
+nbd (1:2.9.13-6) unstable; urgency=low
+
+  * Make the manual install invocations install stuff to debian/tmp
+    rather than debian/nbd-{client,server}, so that they don't break if
+    we're not building nbd-client and therefore the debian/nbd-client
+    doesn't exist. This should make the build work again on kfreebsd-*.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 27 Sep 2009 13:42:38 +0200
+
 nbd (1:2.9.13-5) unstable; urgency=low
 
   * nbd-server.postinst: Pass --debconf-ok parameter to ucf, to make it

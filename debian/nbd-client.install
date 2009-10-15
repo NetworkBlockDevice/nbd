@@ -1,2 +1,4 @@
 sbin/nbd-client
 usr/share/man/man8/nbd-client.8
+usr/share/nbd-client/nbd-client.cf
+usr/share/initramfs-tools
