@@ -316,6 +316,17 @@ int main(int argc, char *argv[]) {
 	if(!nofork) daemon(0,0);
 	do {
 		if (fork()) {
+			/* Due to a race, the kernel NBD driver cannot
+			 * call for a reread of the partition table
+			 * in the handling of the NBD_DO_IT ioctl().
+			 * Therefore, this is done in the first open()
+			 * of the device. We therefore make sure that
+			 * the device is opened at least once after the
+			 * connection was made. This has to be done in a
+			 * separate process, since the NBD_DO_IT ioctl()
+			 * does not return until the NBD device has
+			 * disconnected.
+			 */
 			while(check_conn(nbddev, 0)) {
 				sleep(1);
 			}
