@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "5" "03 January 2009" "" ""
+.TH "NBD-SERVER" "5" "18 August 2009" "" ""
 
 .SH NAME
 /etc/nbd-server/config \- configuration file for nbd-server
@@ -109,9 +109,9 @@ command line
 \fBexportname\fR
 Required; string.
 
-The name of the file that will be exported. This must be a
-fully-qualified path and filename; relative paths are not
-allowed.
+The name of the file (or block device) that will be
+exported. This must be a fully-qualified path and filename;
+relative paths are not allowed.
 
 Note that \fBnbd-server\fR will only try to
 find and open the exported file when a client actually
@@ -211,6 +211,20 @@ is found in a configuration file and
 \fBnbd-server\fR does not have support for SDP,
 then \fBnbd-server\fR will exit with an error
 message.
+.TP
+\fBsync\fR
+Optional; boolean.
+
+When this option is enabled,
+\fBnbd-server\fR will call an fsync() after every
+write to the backend storage. Calling fsync() increases
+reliability in case of an unclean shutdown of nbd-server; but,
+depending on the file system used on the nbd-server side, may
+degrade performance. The use of this option isn't always
+necessary; e.g., on ext3 filesystems, it is recommended that
+it is \fBnot\fR enabled, since it seriously
+reduces performance on ext3 filesystems while not
+importantly impacting reliability.
 .TP
 \fBsparse_cow\fR
 Optional; boolean.

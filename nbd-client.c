@@ -178,32 +178,23 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 }
 
 void set_timeout(int nbd, int timeout) {
-#ifdef NBD_SET_TIMEOUT
 	if (timeout) {
+#ifdef NBD_SET_TIMEOUT
 		if (ioctl(nbd, NBD_SET_TIMEOUT, (unsigned long)timeout) < 0)
 			err("Ioctl NBD_SET_TIMEOUT failed: %m\n");
 		fprintf(stderr, "timeout=%d\n", timeout);
-	}
+#else
+		err("Ioctl NBD_SET_TIMEOUT cannot be called when compiled on a system that does not support it\n");
 #endif
+	}
 }
 
 void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
 
-/*
- * If anyone ever forward-patches this patch, I'll happily re-enable
- * this code. Until then...
-#ifndef SO_SWAPPING
 	if (swap)
-		err("You have to compile me on machine with swapping patch enabled in order to use it later.");
-#else
-	if (swap)
-		if (setsockopt(sock, SOL_SOCKET, SO_SWAPPING, &one, sizeof(int)) < 0)
-			err("Could not enable swapping: %m");
-#endif
-*/
-	mlockall(MCL_CURRENT | MCL_FUTURE);
+		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
 int main(int argc, char *argv[]) {
@@ -321,17 +312,26 @@ int main(int argc, char *argv[]) {
 
 	/* Go daemon */
 	
-	daemon(0,0);
-	do {
 #ifndef NOFORK
-		if (!nofork) {
-			if (fork()) {
-				while(check_conn(nbddev, 0)) {
-					sleep(1);
-				}
-				open(nbddev, O_RDONLY);
-				exit(0);
+	if(!nofork) daemon(0,0);
+	do {
+		if (fork()) {
+			/* Due to a race, the kernel NBD driver cannot
+			 * call for a reread of the partition table
+			 * in the handling of the NBD_DO_IT ioctl().
+			 * Therefore, this is done in the first open()
+			 * of the device. We therefore make sure that
+			 * the device is opened at least once after the
+			 * connection was made. This has to be done in a
+			 * separate process, since the NBD_DO_IT ioctl()
+			 * does not return until the NBD device has
+			 * disconnected.
+			 */
+			while(check_conn(nbddev, 0)) {
+				sleep(1);
 			}
+			open(nbddev, O_RDONLY);
+			exit(0);
 		}
 #endif
 
