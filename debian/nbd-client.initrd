@@ -15,15 +15,16 @@ for x in $(cat /proc/cmdline); do
 	case $x in
 		nbdroot=*,*,*)
 			nbdroot="${x#nbdroot=}"
-			nbdsrv=$(echo "$nbdroot" | sed -e "s/,.*$//")
-			nbdport=$(echo "$nbdroot" | sed -e "s/,([^,]*),.*$/\1/")
-			nbdbasedev=$(echo "$nbdroot" | sed -e "s/^.*,//")
+			nbdsrv="${nbdroot%%,*}"
+			nbdport="${nbdroot%,*}"
+			nbdport="${nbdroot##*,}"
+			nbdbasedev="${nbdroot##*,}"
 			nbdrootdev=/dev/$nbdbasedev
 			;;
 		nbdroot=*,*)
 			nbdroot="${x#nbdroot=}"
-			nbdsrv=$(echo "$nbdroot" | sed -e "s/,[^,]*$//")
-			nbdport=$(echo "$nbdroot" | sed -e "s/^[^,]*,//")
+			nbdsrv="${nbdroot%,*}"
+			nbdport="${nbdroot#*,}"
 			;;
 		ip=*)
 			IP="${x#ip=}"
