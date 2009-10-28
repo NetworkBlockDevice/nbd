@@ -26,7 +26,7 @@ for x in $(cat /proc/cmdline); do
 			nbdport=$(echo "$nbdroot" | sed -e "s/^[^,]*,//")
 			;;
 		ip=*)
-			IPOPTS="${x#ip=}"
+			IP="${x#ip=}"
 			;;
 		root=/dev/nbd*)
 			nbdrootdev="${x#root=}"
@@ -44,7 +44,8 @@ then
 	exit 0
 fi
 
-DEVICE=eth0
+# fallback to old eth0 only behaviour
+[ -z "$IP" ] && IP="eth0"
 
 configure_networking
 
