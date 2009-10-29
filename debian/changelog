@@ -1,3 +1,15 @@
+nbd (1:2.9.14-2) unstable; urgency=low
+
+  * nbd-client initramfs script: No longer hardcode to eth0, since
+    initramfs now exports the necessary variables by itself. Thanks,
+    Niall Walsh; Closes: #553019.
+    - Update README.Debian to reflect that.
+  * Eliminate usage of sed in initramfs script, since sed is
+    incompatibly incomplete in several completely different
+    implementations. Sigh. Thanks, Niall Walsh; Closes: #553022.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 29 Oct 2009 11:56:48 +0100
+
 nbd (1:2.9.14-1) unstable; urgency=low
 
   * New upstream release. Closes: #550505

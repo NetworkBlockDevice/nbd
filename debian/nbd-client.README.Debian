@@ -3,9 +3,6 @@ an NBD filesystem. This support works as follows:
 
 - There's only support for initramfs for now. If you need something
   else, patches are welcome...
-- Due to a bug in initramfs-tools (#460569), the nbd-client initramfs
-  scripts will only work if a working network is connected to eth0, and
-  the nbd-server is available through that network.
 - To boot the system, add the kernel command line parameter
   "nbdroot=X.X.X.X,Y", with "X.X.X.X" being the IP address of the
   server, and "Y" the port on which the server is running. Starting with
