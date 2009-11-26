@@ -137,7 +137,7 @@ case "$1" in
 	echo "umounting all filesystems for nbd-blockdevices..."
 	if [ "$KILLALL" != "false" ]
 	then
-	  DEVICES=`mount | cut -d " " -f 1 | grep nb`
+	  DEVICES=`mount | cut -d " " -f 1 | grep /dev/nbd`
 	else
 	  DEVICES=${NBD_DEVICE[*]}
 	fi
