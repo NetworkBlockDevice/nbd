@@ -39,6 +39,10 @@
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
 
+#ifdef WITH_SDP
+#include <sdp_inet.h>
+#endif
+
 int check_conn(char* devname, int do_print) {
 	char buf[256];
 	int fd;

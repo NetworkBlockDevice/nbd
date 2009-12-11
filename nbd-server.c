@@ -92,6 +92,10 @@
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
 
+#ifdef WITH_SDP
+#include <sdp_inet.h>
+#endif
+
 /** Default position of the config file */
 #ifndef SYSCONFDIR
 #define SYSCONFDIR "/etc"
