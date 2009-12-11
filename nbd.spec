@@ -1,26 +1,25 @@
 %def_disable debug
 %def_enable syslog
 %def_enable lfs
-%def_disable sdp
+%def_enable sdp
 %def_with gznbd
 %def_with static_client
 
 %define Name NBD
 Name: nbd
-Version: 2.9.11
-Release: alt2
+Version: 2.9.12
+Release: alt1
 Summary: Tools for using the Network Block Device
 License: GPL
 Group: Networking/Other
 URL: http://%name.sourceforge.net/
-Source0: %name-%version.tar.bz2
+Source0: %name-%version.tar
 Source1: %name.init
-Patch0: %name-2.9.11-configure.patch
-Patch1: %name-2.9.11-types.patch
-Patch2: %name-2.9.11-alt-doc.patch
+Patch: %name-%version-%release.patch
 BuildRequires: glib2-devel >= 2.6.0
 %{?_with_gznbd:BuildRequires: zlib-devel}
 %{?_with_static_client:BuildRequires: dietlibc}
+%{?_enable_sdp:BuildRequires: libsdp-devel}
 
 %description
 %Name contains the tools needed to export a network block device and to
@@ -33,6 +32,7 @@ particularly useful for diskless workstations.
 %package doc
 Summary: %Name docs
 Group: Documentation
+BuildArch: noarch
 
 %description doc
 %Name docs.
@@ -72,23 +72,26 @@ This package contains static %name-client (can be used for initrd).
 
 %prep
 %setup
-%patch0 -p1
-%patch1 -p1
-%patch2 -p1
+%patch -p1
 
 
 %build
 %autoreconf
+%if_with static_client
 %configure \
     %{subst_enable debug} \
-    %{subst_enable syslog} \
     %{subst_enable lfs} \
-    %{subst_enable sdp}
-%if_with static_client
+    --disable-syslog \
+    --disable-sdp
 make CC="diet %__cc" CFLAGS="%optflags -Os" %name-client
 mv %name-client{,.static}
 %make_build clean
 %endif
+%configure \
+    %{subst_enable debug} \
+    %{subst_enable lfs} \
+    %{subst_enable syslog} \
+    %{subst_enable sdp}
 %make_build
 %{?_with_gznbd:%make_build -C gznbd CFLAGS="%optflags -DMY_NAME='\"gznbd\"'"}
 
@@ -135,6 +138,10 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
+* Fri Dec 11 2009 Led <led@altlinux.ru> 2.9.12-alt1
+- 2.9.12
+- enabled sdp
+
 * Tue Jun 10 2008 Led <led@altlinux.ru> 2.9.11-alt2
 - added:
   + %name-2.9.11-configure.patch

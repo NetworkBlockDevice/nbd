@@ -1,2 +1,3 @@
-tar.bz2: @version@:.
-copy: *.patch *.init
+tar: @version@:.
+diff: @version@:. @version@-alt:.
+copy: *.init
