@@ -95,7 +95,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: %s does not appear to be a valid size\n",argv[0],argv[3]);
       exit(1);
     }
-    printf("%s: file=%s, size=%Ld\n",argv[0],argv[2],size);
+    printf("%s: file=%s, size=%Ld\n", argv[0], argv[2], (unsigned long long)size);
   } else {
     char buffer[BLOCK];
     int result;
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     }
 
     if(result==0){
-      printf("size=%Ld\n",size);
+      printf("size=%Ld\n", (unsigned long long)size);
     } else {
       printf("failed\n");
       if(result<0){
@@ -195,7 +195,7 @@ int main(int argc, char **argv)
     from=ntohll(request.from);
 
 #ifdef TRACE
-fprintf(stderr,"%s: len=%d, from=%Ld\n",argv[0],len,from);
+fprintf(stderr, "%s: len=%d, from=%Ld\n", argv[0], len, (unsigned long long)from);
 #endif
 
     if(request.magic!=htonl(NBD_REQUEST_MAGIC)){
