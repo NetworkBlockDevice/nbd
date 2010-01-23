@@ -81,7 +81,11 @@ int check_conn(char* devname, int do_print) {
 	return 0;
 }
 
+#ifdef WITH_SDP
 int opennet(char *name, int port, int sdp) {
+#else
+int opennet(char *name, int port) {
+#endif
 	int sock;
 	struct sockaddr_in xaddrin;
 	int af;
@@ -90,14 +94,12 @@ int opennet(char *name, int port, int sdp) {
 	if (!hostn)
 		err("Gethostname failed: %h\n");
 
-	af = AF_INET;
-	if(sdp) {
 #ifdef WITH_SDP
-		af = AF_INET_SDP;
+	af = sdp ? AF_INET_SDP : AF_INET;
 #else
-		err("Can't do SDP: I was not compiled with SDP support!");
+	af = AF_INET;
 #endif
-	}
+
 	if ((sock = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		err("Socket failed: %m");
 
@@ -224,7 +226,9 @@ int main(int argc, char *argv[]) {
 	int swap=0;
 	int cont=0;
 	int timeout=0;
+#ifdef WITH_SDP
 	int sdp=0;
+#endif
 	int nofork=0;
 	u64 size64;
 	u32 flags;
@@ -314,8 +318,12 @@ int main(int argc, char *argv[]) {
 	}
 	if (argc) {
 		if(strcmp(argv[0], "-sdp")==0) {
+#ifdef WITH_SDP
 			sdp=1;
 			++argv;--argc;
+#else
+			err("Can't do SDP: I was not compiled with SDP support!");
+#endif
 		}
 	}
 	if (argc) {
@@ -325,7 +333,11 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	if(argc) goto errmsg;
+#ifdef WITH_SDP
 	sock = opennet(hostname, port, sdp);
+#else
+	sock = opennet(hostname, port);
+#endif
 	argv=NULL; argc=0; /* don't use it later suddenly */
 
 	negotiate(sock, &size64, &flags);
@@ -362,7 +374,11 @@ int main(int argc, char *argv[]) {
 
 					printerr(" Reconnecting\n");
 					close(sock); close(nbd);
+#ifdef WITH_SDP
 					sock = opennet(hostname, port, sdp);
+#else
+					sock = opennet(hostname, port);
+#endif
 					nbd = open(nbddev, O_RDWR);
 					negotiate(sock, &new_size, &new_flags);
 					if (size64 != new_size) {
