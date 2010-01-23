@@ -153,6 +153,7 @@ gchar* rungroup=NULL;
 #define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
 #define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
 #define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
+#define F_SYNC 64	  /**< Whether to fsync() after a write */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -306,10 +307,14 @@ inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
-		if ((res = read(f, buf, len)) <= 0)
-			err("Read failed: %m");
-		len -= res;
-		buf += res;
+		if ((res = read(f, buf, len)) <= 0) {
+			if(errno != EAGAIN) {
+				err("Read failed: %m");
+			}
+		} else {
+			len -= res;
+			buf += res;
+		}
 	}
 }
 
@@ -343,7 +348,6 @@ void usage() {
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
-	       "\t-a|--idle-time\t\tmaximum idle seconds; server terminates when\n\t\t\t\tidle time exceeded\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
@@ -392,7 +396,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
 		{"authorize-file", required_argument, NULL, 'l'},
-		{"idle-time", required_argument, NULL, 'a'},
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
@@ -412,7 +415,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-a:C:cl:mo:rp:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -554,6 +557,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
+		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
@@ -579,7 +583,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file.");
+		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file %s.", f);
 		g_key_file_free(cfile);
 		return retval;
 	}
@@ -600,8 +604,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[5].target=&(s.prerun);
 		lp[6].target=&(s.postrun);
 		lp[7].target=lp[8].target=lp[9].target=
-				lp[10].target=lp[11].target=&(s.flags);
-		lp[12].target=&(s.listenaddr);
+				lp[10].target=lp[11].target=
+				lp[12].target=&(s.flags);
+		lp[13].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -887,6 +892,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
+	ssize_t retval;
 
 	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
 		return -1;
@@ -896,7 +902,11 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG4("(WRITE to fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
-	return write(fhandle, buf, len);
+	retval = write(fhandle, buf, len);
+	if(client->server->flags & F_SYNC) {
+		fsync(fhandle);
+	}
+	return retval;
 }
 
 /**
@@ -1204,6 +1214,7 @@ void setupexport(CLIENT* client) {
 	for(i=0; ; i++) {
 		FILE_INFO fi;
 		gchar *tmpname;
+		gchar* error_string;
 		mode_t mode = (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR;
 
 		if(multifile) {
@@ -1228,7 +1239,10 @@ void setupexport(CLIENT* client) {
 		if(fi.fhandle == -1) {
 			if(multifile && i>0)
 				break;
-			err("Could not open exported file: %m");
+			error_string=g_strdup_printf(
+				"Could not open exported file %s: %%m",
+				tmpname);
+			err(error_string);
 		}
 		fi.startoff = laststartoff + lastsize;
 		g_array_append_val(client->export, fi);
@@ -1614,26 +1628,25 @@ void serve_err(SERVER* serve, const char* msg) {
 void dousers(void) {
 	struct passwd *pw;
 	struct group *gr;
+	gchar* str;
 	if(rungroup) {
 		gr=getgrnam(rungroup);
 		if(!gr) {
-			g_message("Invalid group name: %s", rungroup);
-			exit(EXIT_FAILURE);
+			str = g_strdup_printf("Invalid group name: %s", rungroup);
+			err(str);
 		}
 		if(setgid(gr->gr_gid)<0) {
-			g_message("Could not set GID: %s", strerror(errno));
-			exit(EXIT_FAILURE);
+			err("Could not set GID: %m"); 
 		}
 	}
 	if(runuser) {
 		pw=getpwnam(runuser);
 		if(!pw) {
-			g_message("Invalid user name: %s", runuser);
-			exit(EXIT_FAILURE);
+			str = g_strdup_printf("Invalid user name: %s", runuser);
+			err(str);
 		}
 		if(setuid(pw->pw_uid)<0) {
-			g_message("Could not set UID: %s", strerror(errno));
-			exit(EXIT_FAILURE);
+			err("Could not set UID: %m");
 		}
 	}
 }
@@ -1662,6 +1675,8 @@ void glib_message_syslog_redirect(const gchar *log_domain,
         break;
       case G_LOG_LEVEL_DEBUG:
         level=LOG_DEBUG;
+      default:
+        level=LOG_ERR;
     }
     syslog(level, message);
 }
