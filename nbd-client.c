@@ -43,40 +43,50 @@
 #include <sdp_inet.h>
 #endif
 
+static void printstr(const char *s)
+{
+	fputs(s, stdout);
+}
+
+static void printerr(const char *s)
+{
+	fputs(s, stderr);
+}
+
+static void printsize(u64 size, const char *suffix)
+{
+	printf("size = %lu%s", (unsigned long)size, suffix);
+}
+
 int check_conn(char* devname, int do_print) {
 	char buf[256];
 	char* p;
 	int fd;
-	int len;
+
 	if(!strncmp(devname, "/dev/", 5)) {
 		devname+=5;
 	}
-	if((p=strchr(devname, 'p'))) {
+	p=strchr(devname, 'p');
+	if(p) {
 		/* We can't do checks on partitions. */
 		*p='\0';
 	}
-	snprintf(buf, 256, "/sys/block/%s/pid", devname);
-	if((fd=open(buf, O_RDONLY))<0) {
-		if(errno==ENOENT) {
-			return 1;
-		} else {
-			return 2;
-		}
+	snprintf(buf, sizeof(buf), "/sys/block/%s/pid", devname);
+	fd=open(buf, O_RDONLY);
+	if(fd<0) {
+		return (errno==ENOENT) ? 1 : 2;
 	}
-	len=read(fd, buf, 256);
-	buf[len-1]='\0';
-	if(do_print) printf("%s\n", buf);
+	buf[read(fd, buf, sizeof(buf))-1]='\0';
+	if(do_print) puts(buf);
 	return 0;
 }
 
 int opennet(char *name, int port, int sdp) {
 	int sock;
 	struct sockaddr_in xaddrin;
-	int xaddrinlen = sizeof(xaddrin);
-	struct hostent *hostn;
 	int af;
+	struct hostent *hostn = gethostbyname(name);
 
-	hostn = gethostbyname(name);
 	if (!hostn)
 		err("Gethostname failed: %h\n");
 
@@ -94,7 +104,7 @@ int opennet(char *name, int port, int sdp) {
 	xaddrin.sin_family = af;
 	xaddrin.sin_port = htons(port);
 	xaddrin.sin_addr.s_addr = *((int *) hostn->h_addr);
-	if ((connect(sock, (struct sockaddr *) &xaddrin, xaddrinlen) < 0))
+	if ((connect(sock, (struct sockaddr *) &xaddrin, sizeof(xaddrin)) < 0))
 		err("Connect: %m");
 
 	setmysockopt(sock);
@@ -105,20 +115,20 @@ void negotiate(int sock, u64 *rsize64, u32 *flags) {
 	u64 magic, size64;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
 
-	printf("Negotiation: ");
+	printstr("Negotiation: ");
 	if (read(sock, buf, 8) < 0)
 		err("Failed/1: %m");
 	if (strlen(buf)==0)
 		err("Server closed connection");
 	if (strcmp(buf, INIT_PASSWD))
 		err("INIT_PASSWD bad");
-	printf(".");
+	putchar('.');
 	if (read(sock, &magic, sizeof(magic)) < 0)
 		err("Failed/2: %m");
 	magic = ntohll(magic);
 	if (magic != cliserv_magic)
 		err("Not enough cliserv_magic");
-	printf(".");
+	putchar('.');
 
 	if (read(sock, &size64, sizeof(size64)) < 0)
 		err("Failed/3: %m\n");
@@ -126,16 +136,16 @@ void negotiate(int sock, u64 *rsize64, u32 *flags) {
 
 #ifdef NBD_SET_SIZE_BLOCKS
 	if ((size64>>10) > (~0UL >> 1)) {
-		printf("size = %luMB", (unsigned long)(size64>>20));
+		printsize(size64>>20, "MB");
 		err("Exported device is too big for me. Get 64-bit machine :-(\n");
 	} else
-		printf("size = %luKB", (unsigned long)(size64>>10));
+		printsize(size64>>10, "KB");
 #else
 	if (size64 > (~0UL >> 1)) {
-		printf("size = %luKB", (unsigned long)(size64>>10));
+		printsize(size64>>10, "KB");
 		err("Exported device is too big. Get 64-bit machine or newer kernel :-(\n");
 	} else
-		printf("size = %lu", (unsigned long)(size64));
+		printsize(size64>>10, "");
 #endif
 
 	if (read(sock, flags, sizeof(*flags)) < 0)
@@ -144,34 +154,31 @@ void negotiate(int sock, u64 *rsize64, u32 *flags) {
 
 	if (read(sock, &buf, 124) < 0)
 		err("Failed/5: %m\n");
-	printf("\n");
+	putchar('\n');
 
 	*rsize64 = size64;
 }
 
 void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
-	unsigned long size;
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
 #ifdef NBD_SET_SIZE_BLOCKS
 	if (size64/blocksize > (~0UL >> 1))
 		err("Device too large.\n");
 	else {
-		int er;
+		unsigned long size;
 		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
 			err("Ioctl/1.1a failed: %m\n");
 		size = (unsigned long)(size64/blocksize);
-		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
+		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
 		fprintf(stderr, "bs=%d, sz=%lu\n", blocksize, size);
 	}
 #else
 	if (size64 > (~0UL >> 1)) {
 		err("Device too large.\n");
-	} else {
-		size = (unsigned long)size64;
-		if (ioctl(nbd, NBD_SET_SIZE, size) < 0)
-			err("Ioctl NBD_SET_SIZE failed: %m\n");
+	} else if (ioctl(nbd, NBD_SET_SIZE, (unsigned long)size64) < 0) {
+		err("Ioctl NBD_SET_SIZE failed: %m\n");
 	}
 #endif
 
@@ -226,14 +233,17 @@ int main(int argc, char *argv[]) {
 
 	if (argc < 3) {
 	errmsg:
-		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
-		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist] [-nofork]\n");
-		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
-		fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
-		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
-		fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
-		fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
-		fprintf(stderr, "blocksizes other than 1024 without patches\n");
+		printerr("nbd-client version " PACKAGE_VERSION "\n"
+		         "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist] [-nofork]\n"
+		         "Or   : nbd-client -d nbd_device\n"
+		         "Or   : nbd-client -c nbd_device\n"
+		         "Default value for blocksize is 1024 (recommended for ethernet)\n"
+		         "Allowed values for blocksize are 512,1024,2048,4096\n" /* will be checked in kernel :) */
+#if 0
+		         "Note, that kernel 2.4.2 and older ones do not work correctly with\n"
+		         "blocksizes other than 1024 without patches\n";
+#endif
+		         );
 		return 1;
 	}
 
@@ -243,21 +253,21 @@ int main(int argc, char *argv[]) {
 		nbd = open(argv[1], O_RDWR);
 		if (nbd < 0)
 			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-		printf("Disconnecting: que, ");
+		printstr("Disconnecting: que, ");
 		if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
 			err("Ioctl failed: %m\n");
-		printf("disconnect, ");
+		printstr("disconnect, ");
 #ifdef NBD_DISCONNECT
 		if (ioctl(nbd, NBD_DISCONNECT)<0)
 			err("Ioctl failed: %m\n");
-		printf("sock, ");
+		printstr("sock, ");
 #else
-		fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
-		exit(1);
+		printerr("Can't disconnect: I was not compiled with disconnect support!\n");
+		return 1;
 #endif
 		if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
 			err("Ioctl failed: %m\n");
-		printf("done\n");
+		puts("done");
 		return 0;
 	}
 	if(strcmp(argv[0], "-c")==0) {
@@ -291,25 +301,25 @@ int main(int argc, char *argv[]) {
 
 	if (argc>3) goto errmsg;
 	if (argc) {
-		if(strncmp(argv[0], "-swap", 5)==0) {
+		if(strcmp(argv[0], "-swap")==0) {
 			swap=1;
 			++argv;--argc;
 		}
 	}
 	if (argc) {
-		if(strncmp(argv[0], "-persist", 8)==0) {
+		if(strcmp(argv[0], "-persist")==0) {
 			cont=1;
 			++argv;--argc;
 		}
 	}
 	if (argc) {
-		if(strncmp(argv[0], "-sdp", 4)==0) {
+		if(strcmp(argv[0], "-sdp")==0) {
 			sdp=1;
 			++argv;--argc;
 		}
 	}
 	if (argc) {
-		if(strncmp(argv[0], "-nofork", 7)==0) {
+		if(strcmp(argv[0], "-nofork")==0) {
 			nofork=1;
 			++argv;--argc;
 		}
@@ -326,7 +336,7 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 	daemon(0,0);
-	do {
+	for (;;) {
 #ifndef NOFORK
 		if (!nofork) {
 			if (fork()) {
@@ -334,23 +344,23 @@ int main(int argc, char *argv[]) {
 					sleep(1);
 				}
 				open(nbddev, O_RDONLY);
-				exit(0);
+				return 0;
 			}
 		}
 #endif
 
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
-			fprintf(stderr, "Kernel call returned: %m");
+			printerr("Kernel call returned: %m");
 			if(errno==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
-				cont=0;
+				break;
 			} else {
 				if(cont) {
 					u64 new_size;
 					u32 new_flags;
 
-					fprintf(stderr, " Reconnecting\n");
+					printerr(" Reconnecting\n");
 					close(sock); close(nbd);
 					sock = opennet(hostname, port, sdp);
 					nbd = open(nbddev, O_RDWR);
@@ -369,14 +379,14 @@ int main(int argc, char *argv[]) {
 			/* We're on 2.4. It's not clearly defined what exactly
 			 * happened at this point. Probably best to quit, now
 			 */
-			fprintf(stderr, "Kernel call returned.");
-			cont=0;
+			printerr("Kernel call returned.");
+			break;
 		}
-	} while(cont);
-	printf("Closing: que, ");
+	}
+	printstr("Closing: que, ");
 	ioctl(nbd, NBD_CLEAR_QUE);
-	printf("sock, ");
+	printstr("sock, ");
 	ioctl(nbd, NBD_CLEAR_SOCK);
-	printf("done\n");
+	puts("done");
 	return 0;
 }
