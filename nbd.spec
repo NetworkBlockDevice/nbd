@@ -7,8 +7,8 @@
 
 %define Name NBD
 Name: nbd
-Version: 2.9.12
-Release: alt1
+Version: 2.9.13
+Release: tmc1
 Summary: Tools for using the Network Block Device
 License: GPL
 Group: Networking/Other
@@ -19,7 +19,7 @@ Patch: %name-%version-%release.patch
 BuildRequires: glib2-devel >= 2.6.0
 %{?_with_gznbd:BuildRequires: zlib-devel}
 %{?_with_static_client:BuildRequires: dietlibc}
-%{?_enable_sdp:BuildRequires: libsdp-devel}
+%{?_enable_sdp:BuildRequires: libsdp-devel >= 1.1.99-alt3}
 
 %description
 %Name contains the tools needed to export a network block device and to
@@ -83,7 +83,7 @@ This package contains static %name-client (can be used for initrd).
     %{subst_enable lfs} \
     --disable-syslog \
     --disable-sdp
-make CC="diet %__cc" CFLAGS="%optflags -Os" %name-client
+make CC="diet -Os %__cc" CFLAGS="%optflags -Os" LDADD="-lcompat" %name-client
 mv %name-client{,.static}
 %make_build clean
 %endif
@@ -138,6 +138,9 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
+* Sat Jan 23 2010 Led <led@altlinux.ru> 2.9.13-tmc1
+- 2.9.13
+
 * Fri Dec 11 2009 Led <led@altlinux.ru> 2.9.12-alt1
 - 2.9.12
 - enabled sdp

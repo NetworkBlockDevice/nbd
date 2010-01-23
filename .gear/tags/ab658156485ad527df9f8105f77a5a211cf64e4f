@@ -1,0 +1,6 @@
+object 29ae1ebb5d7e6e1721ff56e39f5ffd0d037ce0f0
+type commit
+tag git-2.9.13
+tagger Led <led@altlinux.org> 1264273784 +0200
+
+git-2.9.13
