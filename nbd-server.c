@@ -180,8 +180,6 @@ typedef struct {
 	unsigned int port;   /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
 	int flags;           /**< flags associated with this exported file */
-	unsigned int timeout;/**< how long a connection may be idle
-			       (0=forever) */
 	int socket;	     /**< The socket of this server. */
 	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
 	uint8_t cidrlen;     /**< The length of the mask when we use
@@ -339,7 +337,7 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-a timeout_sec] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -375,9 +373,6 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	}
 	if(serve->authname) {
 		printf("\tauthfile = %s\n", serve->authname);
-	}
-	if(serve->timeout) {
-		printf("\ttimeout = %d\n", serve->timeout);
 	}
 	exit(EXIT_SUCCESS);
 }
@@ -482,9 +477,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 			g_free(serve->authname);
 			serve->authname=g_strdup(optarg);
 			break;
-		case 'a': 
-			serve->timeout=strtol(optarg, NULL, 0);
-			break;
 		default:
 			usage();
 			exit(EXIT_FAILURE);
@@ -553,7 +545,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
 		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
 		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "timeout",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
 		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
@@ -604,14 +595,13 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		lp[0].target=&(s.exportname);
 		lp[1].target=&(s.port);
 		lp[2].target=&(s.authname);
-		lp[3].target=&(s.timeout);
-		lp[4].target=&(s.expected_size);
-		lp[5].target=&(virtstyle);
-		lp[6].target=&(s.prerun);
-		lp[7].target=&(s.postrun);
-		lp[8].target=lp[9].target=lp[10].target=
-				lp[11].target=lp[12].target=&(s.flags);
-		lp[13].target=&(s.listenaddr);
+		lp[3].target=&(s.expected_size);
+		lp[4].target=&(virtstyle);
+		lp[5].target=&(s.prerun);
+		lp[6].target=&(s.postrun);
+		lp[7].target=lp[8].target=lp[9].target=
+				lp[10].target=lp[11].target=&(s.flags);
+		lp[12].target=&(s.listenaddr);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -784,19 +774,18 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int fhandle) {
 	off_t es;
-	unsigned long sectors;
+	u64 bytes;
 	struct stat stat_buf;
 	int error;
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
-#ifdef BLKGETSIZE
-	DEBUG("looking for export size with ioctl BLKGETSIZE\n");
-	if (!ioctl(fhandle, BLKGETSIZE, &sectors) && sectors) {
-		es = (off_t)sectors * (off_t)512;
-		return es;
+#ifdef BLKGETSIZE64
+	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
+	if (!ioctl(fhandle, BLKGETSIZE64, bytes) && bytes) {
+		return (off_t)bytes;
 	}
-#endif /* BLKGETSIZE */
+#endif /* BLKGETSIZE64 */
 #endif /* HAVE_SYS_IOCTL_H */
 #endif /* HAVE_SYS_MOUNT_H */
 
@@ -1121,8 +1110,6 @@ int mainloop(CLIENT *client) {
 		i++;
 		printf("%d: ", i);
 #endif
-		if (client->server->timeout) 
-			alarm(client->server->timeout);
 		readit(client->net, &request, sizeof(request));
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
@@ -1651,6 +1638,35 @@ void dousers(void) {
 	}
 }
 
+#ifndef ISSERVER
+void glib_message_syslog_redirect(const gchar *log_domain,
+                                  GLogLevelFlags log_level,
+                                  const gchar *message,
+                                  gpointer user_data)
+{
+    int level=LOG_DEBUG;
+    
+    switch( log_level )
+    {
+      case G_LOG_FLAG_FATAL:
+      case G_LOG_LEVEL_CRITICAL:
+      case G_LOG_LEVEL_ERROR:    
+        level=LOG_ERR; 
+        break;
+      case G_LOG_LEVEL_WARNING:
+        level=LOG_WARNING;
+        break;
+      case G_LOG_LEVEL_MESSAGE:
+      case G_LOG_LEVEL_INFO:
+        level=LOG_INFO;
+        break;
+      case G_LOG_LEVEL_DEBUG:
+        level=LOG_DEBUG;
+    }
+    syslog(level, message);
+}
+#endif
+
 /**
  * Main entry point...
  **/
@@ -1670,10 +1686,7 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
-	if(!servers || !servers->len) {
-		g_warning("Could not parse config file: %s", 
-				err ? err->message : "Unknown error");
-	}
+	
 	if(serve) {
 		g_array_append_val(servers, *serve);
      
@@ -1688,6 +1701,7 @@ int main(int argc, char *argv[]) {
 			close(2);
 			open("/dev/null", O_WRONLY);
 			open("/dev/null", O_WRONLY);
+			g_log_set_default_handler( glib_message_syslog_redirect, NULL );
 #endif
 			client=g_malloc(sizeof(CLIENT));
 			client->server=serve;
@@ -1698,6 +1712,12 @@ int main(int argc, char *argv[]) {
 			return 0;
 		}
 	}
+    
+    if(!servers || !servers->len) {
+		g_warning("Could not parse config file: %s", 
+				err ? err->message : "Unknown error");
+	}
+    
 	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);

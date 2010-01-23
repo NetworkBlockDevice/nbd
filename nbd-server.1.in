@@ -3,13 +3,13 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "03 January 2009" "" ""
+.TH "NBD-SERVER" "1" "09 July 2009" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
 .SH SYNOPSIS
 
-\fBnbd-server \fR \fB\fI[ip:]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-a \fItimeout\fB\fR ] [ \fB-l \fIhost list filename\fB\fR ] [ \fB-o \fIsection name\fB\fR ] [ \fB-C \fIconfig file\fB\fR ]
+\fBnbd-server \fR \fB\fI[ip:]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-l \fIhost list filename\fB\fR ] [ \fB-o \fIsection name\fB\fR ] [ \fB-C \fIconfig file\fB\fR ]
 
 .SH "DESCRIPTION"
 .PP
@@ -99,12 +99,12 @@ specified on the command line. To disable the configuration
 file entirely, either move it away or use the -C option to
 point \fBnbd-server\fR(1) to a non-existing or
 empty configuration file.
-.TP
-\fBtimeout\fR
-Maximum number of idle seconds. If a connection is
-inactive for this amount of time, it is terminated; this is to
-avoid stale nbd-server processes staying in memory. Use of
-this option is strongly recommended.
+
+Also note that if an empty, incomplete, or invalid
+configuration file is specified, nbd-server will produce a
+warning about failure to parse the config file. If the
+command line contains a fully specified configuration, this
+warning is harmless and may be ignored.
 .TP
 \fBhost list filename\fR
 This argument should contain a list of IP-addresses

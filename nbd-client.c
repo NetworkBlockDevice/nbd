@@ -45,10 +45,15 @@
 
 int check_conn(char* devname, int do_print) {
 	char buf[256];
+	char* p;
 	int fd;
 	int len;
 	if(!strncmp(devname, "/dev/", 5)) {
 		devname+=5;
+	}
+	if((p=strchr(devname, 'p'))) {
+		/* We can't do checks on partitions. */
+		*p='\0';
 	}
 	snprintf(buf, 256, "/sys/block/%s/pid", devname);
 	if((fd=open(buf, O_RDONLY))<0) {
@@ -213,6 +218,7 @@ int main(int argc, char *argv[]) {
 	int cont=0;
 	int timeout=0;
 	int sdp=0;
+	int nofork=0;
 	u64 size64;
 	u32 flags;
 
@@ -221,7 +227,7 @@ int main(int argc, char *argv[]) {
 	if (argc < 3) {
 	errmsg:
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
-		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist]\n");
+		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist] [-nofork]\n");
 		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 		fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
@@ -236,7 +242,7 @@ int main(int argc, char *argv[]) {
 	if (strcmp(argv[0], "-d")==0) {
 		nbd = open(argv[1], O_RDWR);
 		if (nbd < 0)
-			err("Can not open NBD: %m");
+			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 		printf("Disconnecting: que, ");
 		if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
 			err("Ioctl failed: %m\n");
@@ -280,7 +286,7 @@ int main(int argc, char *argv[]) {
 	nbddev = argv[0];
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
-	  err("Can not open NBD: %m");
+	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 	++argv; --argc; /* skip device */
 
 	if (argc>3) goto errmsg;
@@ -302,6 +308,12 @@ int main(int argc, char *argv[]) {
 			++argv;--argc;
 		}
 	}
+	if (argc) {
+		if(strncmp(argv[0], "-nofork", 7)==0) {
+			nofork=1;
+			++argv;--argc;
+		}
+	}
 	if(argc) goto errmsg;
 	sock = opennet(hostname, port, sdp);
 	argv=NULL; argc=0; /* don't use it later suddenly */
@@ -313,15 +325,17 @@ int main(int argc, char *argv[]) {
 
 	/* Go daemon */
 	
-	chdir("/");
+	daemon(0,0);
 	do {
 #ifndef NOFORK
-		if (fork()) {
-			while(check_conn(nbddev, 0)) {
-				sleep(1);
+		if (!nofork) {
+			if (fork()) {
+				while(check_conn(nbddev, 0)) {
+					sleep(1);
+				}
+				open(nbddev, O_RDONLY);
+				exit(0);
 			}
-			open(nbddev, O_RDONLY);
-			exit(0);
 		}
 #endif
 
