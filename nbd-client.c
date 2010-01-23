@@ -31,10 +31,6 @@
 #include <sys/mman.h>
 #include <errno.h>
 
-#ifndef __GNUC__
-#error I need GCC to work
-#endif
-
 #include <linux/ioctl.h>
 #define MY_NAME "nbd_client"
 #include "cliserv.h"

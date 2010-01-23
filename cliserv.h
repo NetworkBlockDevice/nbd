@@ -90,10 +90,9 @@ void setmysockopt(int sock) {
 void err(const char *s) G_GNUC_NORETURN;
 
 void err(const char *s) {
-	const int maxlen = 150;
-	char s1[maxlen], *s2;
+	char s1[150], *s2;
 
-	strncpy(s1, s, maxlen);
+	strncpy(s1, s, sizeof(s1));
 	if ((s2 = strstr(s, "%m"))) {
 		strcpy(s1 + (s2 - s), strerror(errno));
 		s2 += 2;
@@ -108,7 +107,7 @@ void err(const char *s) {
 	}
 #endif
 
-	s1[maxlen-1] = '\0';
+	s1[sizeof(s1)-1] = '\0';
 #ifdef ISSERVER
 	syslog(LOG_ERR, "%s", s1);
 #endif
