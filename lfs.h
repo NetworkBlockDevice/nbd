@@ -2,7 +2,7 @@
 #define LFS_H
 
 #include "config.h"
-#ifdef NBD_LFS
+#if NBD_LFS
 #define _FILE_OFFSET_BITS 64
 #define _LARGEFILE_SOURCE
 #endif /* NBD_LFS */
