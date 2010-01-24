@@ -7,7 +7,7 @@
 
 %define Name NBD
 Name: nbd
-Version: 2.9.13
+Version: 2.9.14
 Release: tmc1
 Summary: Tools for using the Network Block Device
 License: GPL
@@ -138,6 +138,9 @@ install -D -m 0755 %SOURCE1 %buildroot%_initdir/%name
 
 
 %changelog
+* Sun Jan 24 2010 Led <led@altlinux.ru> 2.9.14-tmc1
+- 2.9.14 with postrelease fixes
+
 * Sat Jan 23 2010 Led <led@altlinux.ru> 2.9.13-tmc1
 - 2.9.13
 
