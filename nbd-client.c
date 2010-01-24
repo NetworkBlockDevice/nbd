@@ -335,7 +335,9 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 #ifndef NOFORK
-	if(!nofork) daemon(0,0);
+	if(!nofork)
+		if (daemon(0,0))
+			err("daemon");
 	for (;;) {
 		if (fork()) {
 			/* Due to a race, the kernel NBD driver cannot
@@ -394,7 +396,9 @@ int main(int argc, char *argv[]) {
 			printerr("Kernel call returned.");
 			break;
 		}
+#ifndef NOFORK
 	}
+#endif
 	printstr("Closing: que, ");
 	ioctl(nbd, NBD_CLEAR_QUE);
 	printstr("sock, ");

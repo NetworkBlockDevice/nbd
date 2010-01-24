@@ -779,9 +779,9 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int fhandle) {
 	off_t es;
-	u64 bytes;
 	struct stat stat_buf;
 	int error;
+	u64 bytes = 0;
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
