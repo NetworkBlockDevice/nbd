@@ -1502,6 +1502,7 @@ void setup_serve(SERVER *serve) {
 #else
 	char yes='1';
 #endif /* sun */
+	struct hostent* he;
 
 	af = AF_INET;
 #ifdef WITH_SDP
@@ -1536,8 +1537,9 @@ void setup_serve(SERVER *serve) {
 	}
 #endif
 	addrin.sin_port = htons(serve->port);
-	if(!inet_aton(serve->listenaddr, &(addrin.sin_addr)))
+	if(!(he = gethostbyname(serve->listenaddr)))
 		err("could not parse listen address");
+        addrin.sin_addr = he->h_addr_list[0];
 	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
 		err("bind: %m");
 	DEBUG("listen, ");
