@@ -11,7 +11,12 @@ esac
 
 log_begin_msg "Setting up nbd-client"
 for x in $(cat /proc/cmdline); do
-	# We don't need to redo what all of what /init already did...
+	# Support setting stuff using DHCP
+	case $x in
+		nbdroot=dhcp)
+			x="$ROOTPATH"
+			;;
+	esac
 	case $x in
 		nbdroot=*,*,*)
 			nbdroot="${x#nbdroot=}"
@@ -45,15 +50,7 @@ then
 	exit 0
 fi
 
-# fallback to old eth0 only behaviour
-[ -z "$IP" ] && IP="eth0"
-
 configure_networking
-
-if [ -z "$nbdsrv" ]
-then
-	nbdsrv=${ROOTSERVER}
-fi
 
 if [ -z "$nbdsrv" ]
 then

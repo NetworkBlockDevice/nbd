@@ -3,8 +3,20 @@ nbd (1:2.9.14-3) unstable; urgency=low
   * Be more careful about what we unmount. Closes: #534728.
   * Fix three-argument nbdroot= boot option parsing. Closes: #568221.
     Thanks, Vagrant Cascadian.
+  * nbd-client initramfs script: Remove default fallback to eth0. This
+    was necessary in the past when initramfs-utils' configure_networking
+    function could only be called from /init, but it was a hack and a
+    workaround and it broke expectations. And it was ugly. Since
+    configure_networking can now in fact be called from elsewhere, why
+    bother with setting broken defaults, anyway? Right. Closes: #567232.
+    Thanks again, Vagrant Cascadian.
+  * Support setting root-on-NBD through DHCP by abusing the ROOTPATH
+    variable. Closes: #568222. This supersedes the previous (broken)
+    support that used ROOTSERVER -- broken, because the latter only
+    supported setting the server, not the port, and obviously that's not
+    enough. Thanks yet again, Vagrant.
 
- -- Wouter Verhelst <wouter@debian.org>  Sat, 27 Feb 2010 22:24:38 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 27 Feb 2010 23:00:09 +0100
 
 nbd (1:2.9.14-2) unstable; urgency=low
 
