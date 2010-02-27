@@ -17,7 +17,7 @@ for x in $(cat /proc/cmdline); do
 			nbdroot="${x#nbdroot=}"
 			nbdsrv="${nbdroot%%,*}"
 			nbdport="${nbdroot%,*}"
-			nbdport="${nbdroot##*,}"
+			nbdport="${nbdport##*,}"
 			nbdbasedev="${nbdroot##*,}"
 			nbdrootdev=/dev/$nbdbasedev
 			;;

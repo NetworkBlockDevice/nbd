@@ -1,8 +1,10 @@
 nbd (1:2.9.14-3) unstable; urgency=low
 
   * Be more careful about what we unmount. Closes: #534728.
+  * Fix three-argument nbdroot= boot option parsing. Closes: #568221.
+    Thanks, Vagrant Cascadian.
 
- -- Wouter Verhelst <wouter@debian.org>  Thu, 26 Nov 2009 22:59:38 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 27 Feb 2010 22:24:38 +0100
 
 nbd (1:2.9.14-2) unstable; urgency=low
 
