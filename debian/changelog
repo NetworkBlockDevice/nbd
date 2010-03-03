@@ -15,8 +15,16 @@ nbd (1:2.9.14-3) unstable; urgency=low
     support that used ROOTSERVER -- broken, because the latter only
     supported setting the server, not the port, and obviously that's not
     enough. Thanks yet again, Vagrant.
+  * debian/control: declare conformance to policy 3.8.4 (no changes
+    applicable to nbd)
+  * Override init.d-script-missing-dependency-on-remote_fs lintian tag
+    for nbd-client. This is a false positive; we set $PATH to a sane
+    value so that any modifications would work, but we don't actually
+    use anything from /usr ourselves, and no, we really don't want to
+    depend on $remote_fs, since we might be providing something like
+    that ourselves, depending on setup.
 
- -- Wouter Verhelst <wouter@debian.org>  Sat, 27 Feb 2010 23:00:09 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 28 Feb 2010 00:37:02 +0100
 
 nbd (1:2.9.14-2) unstable; urgency=low
 
