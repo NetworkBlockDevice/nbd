@@ -1,3 +1,13 @@
+nbd (1:2.9.15-1) unstable; urgency=low
+
+  * New upstream release
+    - Adds IPv6 support; Closes: #382189. Thanks to Neutron Soutmun for
+      the patch.
+    - Allows for using hostnames as the listen address; Closes: #557810.
+    - nbd-server is now a bit more explicit when it exits. Closes: #571768.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 24 Mar 2010 22:06:16 +0100
+
 nbd (1:2.9.14-3) unstable; urgency=low
 
   * Be more careful about what we unmount. Closes: #534728.
