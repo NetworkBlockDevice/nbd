@@ -11,6 +11,10 @@
  * Version 2.1 - Check for disconnection before INIT_PASSWD is received
  * 	to make errormsg a bit more helpful in case the server can't
  * 	open the exported file.
+ * 16/03/2010 - Add IPv6 support.
+ * 	Kitt Tientanopajai <kitt@kitty.in.th>
+ *	Neutron Soutmun <neo.neutron@gmail.com>
+ *	Suriya Soutmun <darksolar@gmail.com>
  */
 
 #include "config.h"
@@ -21,8 +25,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
-#include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
-#include <netdb.h>		/* hostent, gethostby*, getservby* */
+#include <netinet/in.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <syslog.h>
@@ -67,33 +71,55 @@ int check_conn(char* devname, int do_print) {
 
 int opennet(char *name, int port, int sdp) {
 	int sock;
-	struct sockaddr_in xaddrin;
-	int xaddrinlen = sizeof(xaddrin);
-	struct hostent *hostn;
-	int af;
+	char portstr[6];
+	struct addrinfo hints;
+	struct addrinfo *ai = NULL;
+	struct addrinfo *rp = NULL;
+	int e;
 
-	hostn = gethostbyname(name);
-	if (!hostn)
-		err("Gethostname failed: %h\n");
+	snprintf(portstr, sizeof(portstr), "%d", port);
 
-	af = AF_INET;
+	memset(&hints,'\0',sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
+	hints.ai_protocol = IPPROTO_TCP;
+
+	e = getaddrinfo(name, portstr, &hints, &ai);
+
+	if(e != 0) {
+		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		freeaddrinfo(ai);
+		exit(EXIT_FAILURE);
+	}
+
 	if(sdp) {
 #ifdef WITH_SDP
-		af = AF_INET_SDP;
+		if (ai->ai_family == AF_INET)
+			ai->ai_family = AF_INET_SDP;
+		else (ai->ai_family == AF_INET6)
+			ai->ai_family = AF_INET6_SDP;
 #else
 		err("Can't do SDP: I was not compiled with SDP support!");
 #endif
 	}
-	if ((sock = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
+
+	for(rp = ai; rp != NULL; rp = rp->ai_next) {
+		sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+
+		if(sock == -1)
+			continue;	/* error */
+
+		if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
+			break;		/* success */
+	}
+
+	if (rp == NULL)
 		err("Socket failed: %m");
 
-	xaddrin.sin_family = af;
-	xaddrin.sin_port = htons(port);
-	xaddrin.sin_addr.s_addr = *((int *) hostn->h_addr);
-	if ((connect(sock, (struct sockaddr *) &xaddrin, xaddrinlen) < 0))
-		err("Connect: %m");
-
 	setmysockopt(sock);
+
+	freeaddrinfo(ai);
 	return sock;
 }
 

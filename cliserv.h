@@ -111,8 +111,9 @@ void err(const char *s) {
 	s1[maxlen-1] = '\0';
 #ifdef ISSERVER
 	syslog(LOG_ERR, "%s", s1);
+	syslog(LOG_ERR, "Exiting.");
 #endif
-	fprintf(stderr, "Error: %s\n", s1);
+	fprintf(stderr, "Error: %s\nExiting.\n", s1);
 	exit(1);
 }
 
