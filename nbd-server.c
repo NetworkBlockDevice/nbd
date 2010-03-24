@@ -49,6 +49,10 @@
  * 11/02/2004 - Doxygenified the source, modularized it a bit. Needs a 
  * 	lot more work, but this is a start. Wouter Verhelst
  * 	<wouter@debian.org>
+ * 16/03/2010 - Add IPv6 support.
+ *	Kitt Tientanopajai <kitt@kitty.in.th>
+ *	Neutron Soutmun <neo.neutron@gmail.com>
+ *	Suriya Soutmun <darksolar@gmail.com>
  */
 
 /* Includes LFS defines, which defines behaviours of some of the following
@@ -70,8 +74,8 @@
 #include <signal.h>		/* sigaction */
 #include <errno.h>
 #include <netinet/tcp.h>
-#include <netinet/in.h>		/* sockaddr_in, htons, in_addr */
-#include <netdb.h>		/* hostent, gethostby*, getservby* */
+#include <netinet/in.h>
+#include <netdb.h>
 #include <syslog.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -178,6 +182,7 @@ typedef struct {
 	char* authname;      /**< filename of the authorization file */
 	int flags;           /**< flags associated with this exported file */
 	int socket;	     /**< The socket of this server. */
+	int socket_family;   /**< family of the socket */
 	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
 	uint8_t cidrlen;     /**< The length of the mask when we use
 				  CIDR-style virtualization */
@@ -338,7 +343,7 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -417,12 +422,24 @@ SERVER* cmdline(int argc, char *argv[]) {
 			/* non-option argument */
 			switch(nonspecial++) {
 			case 0:
-				addr_port=g_strsplit(optarg, ":", 2);
+				if(strchr(optarg, ':') == strrchr(optarg, ':')) {
+					addr_port=g_strsplit(optarg, ":", 2);
+
+					/* Check for "@" - maybe user using this separator
+						 for IPv4 address */
+					if(!addr_port[1]) {
+						g_strfreev(addr_port);
+						addr_port=g_strsplit(optarg, "@", 2);
+					}
+				} else {
+					addr_port=g_strsplit(optarg, "@", 2);
+				}
+
 				if(addr_port[1]) {
 					serve->port=strtol(addr_port[1], NULL, 0);
 					serve->listenaddr=g_strdup(addr_port[0]);
 				} else {
-					serve->listenaddr=g_strdup("0.0.0.0");
+					serve->listenaddr=NULL;
 					serve->port=strtol(addr_port[0], NULL, 0);
 				}
 				g_strfreev(addr_port);
@@ -523,6 +540,112 @@ void remove_server(gpointer s) {
 	if(server->authname)
 		g_free(server->authname);
 	g_free(server);
+}
+
+/**
+ * duplicate server
+ * @param s the old server we want to duplicate
+ * @return new duplicated server
+ **/
+SERVER* dup_serve(SERVER *s) {
+	SERVER *serve = NULL;
+
+	serve=g_new0(SERVER, 1);
+	if (serve == NULL)
+		return NULL;
+
+	if (s->exportname)
+		serve->exportname = g_strdup(s->exportname);
+
+	serve->expected_size = s->expected_size;
+
+	if (s->listenaddr)
+		serve->listenaddr = g_strdup(s->listenaddr);
+
+	serve->port = s->port;
+
+	if (s->authname)
+		serve->authname = strdup(s->authname);
+
+	serve->flags = s->flags;
+	serve->socket = serve->socket;
+	serve->socket_family = serve->socket_family;
+	serve->cidrlen = s->cidrlen;
+
+	if (s->prerun)
+		serve->prerun = g_strdup(s->prerun);
+
+	if (s->postrun)
+		serve->postrun = g_strdup(s->postrun);
+
+	return serve;
+}
+
+/**
+ * append new server to array
+ * @param s server
+ * @param a server array
+ * @return 0 success, -1 error
+ */
+int append_serve(SERVER *s, GArray *a)
+{
+	SERVER *ns = NULL;
+	struct addrinfo hints;
+	struct addrinfo *ai = NULL;
+	struct addrinfo *rp = NULL;
+	char   host[NI_MAXHOST];
+	gchar  *port = NULL;
+	int e;
+	int ret;
+
+	if(!s) {
+		err("Invalid parsing server");
+		return -1;
+	}
+
+	port = g_strdup_printf("%d", s->port);
+
+	memset(&hints,'\0',sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
+	hints.ai_protocol = IPPROTO_TCP;
+
+	e = getaddrinfo(s->listenaddr, port, &hints, &ai);
+
+	if (port)
+		g_free(port);
+
+	if(e == 0) {
+		for (rp = ai; rp != NULL; rp = rp->ai_next) {
+			e = getnameinfo(rp->ai_addr, rp->ai_addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
+
+			if (e != 0) { // error
+				fprintf(stderr, "getnameinfo: %s\n", gai_strerror(e));
+				continue;
+			}
+
+			// duplicate server and set listenaddr to resolved IP address
+			ns = dup_serve (s);
+			if (ns) {
+				ns->listenaddr = g_strdup(host);
+				ns->socket_family = rp->ai_family;
+				g_array_append_val(a, *ns);
+				free(ns);
+				ns = NULL;
+			}
+		}
+
+		ret = 0;
+	} else {
+		fprintf(stderr, "getaddrinfo failed on listen host/address: %s (%s)\n", s->listenaddr ? s->listenaddr : "any", gai_strerror(e));
+		ret = -1;
+	}
+
+	if (ai)
+		freeaddrinfo(ai);
+
+	return ret;
 }
 
 /**
@@ -688,10 +811,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
 		if(i>0) {
-			if(!s.listenaddr) {
-				s.listenaddr = g_strdup("0.0.0.0");
-			}
-			g_array_append_val(retval, s);
+			s.socket_family = AF_UNSPEC;
+
+			append_serve(&s, retval);
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -1344,17 +1466,36 @@ void serveconnection(CLIENT *client) {
  * stored in client->clientname.
  **/
 void set_peername(int net, CLIENT *client) {
-	struct sockaddr_in addrin;
-	struct sockaddr_in netaddr;
+	struct sockaddr_storage addrin;
+	struct sockaddr_storage netaddr;
+	struct sockaddr_in  *netaddr4 = NULL;
+	struct sockaddr_in6 *netaddr6 = NULL;
 	size_t addrinlen = sizeof( addrin );
-	char *peername;
-	char *netname;
-	char *tmp;
+	struct addrinfo hints;
+	struct addrinfo *ai = NULL;
+	char peername[NI_MAXHOST];
+	char netname[NI_MAXHOST];
+	char *tmp = NULL;
 	int i;
+	int e;
+	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &addrin, (socklen_t *)&addrinlen) < 0)
 		err("getsockname failed: %m");
-	peername = g_strdup(inet_ntoa(addrin.sin_addr));
+
+	getnameinfo((struct sockaddr *)&addrin, (socklen_t)addrinlen,
+		peername, sizeof (peername), NULL, 0, NI_NUMERICHOST);
+
+	memset(&hints, '\0', sizeof (hints));
+	hints.ai_flags = AI_ADDRCONFIG;
+	e = getaddrinfo(peername, NULL, &hints, &ai);
+
+	if(e != 0) {
+		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		freeaddrinfo(ai);
+		return;
+	}
+
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
 			client->exportname=g_strdup(client->server->exportname);
@@ -1370,18 +1511,42 @@ void set_peername(int net, CLIENT *client) {
 			break;
 		case VIRT_CIDR:
 			memcpy(&netaddr, &addrin, addrinlen);
-			netaddr.sin_addr.s_addr>>=32-(client->server->cidrlen);
-			netaddr.sin_addr.s_addr<<=32-(client->server->cidrlen);
-			netname = inet_ntoa(netaddr.sin_addr);
-			tmp=g_strdup_printf("%s/%s", netname, peername);
-			client->exportname=g_strdup_printf(client->server->exportname, tmp);
+			if(ai->ai_family == AF_INET) {
+				netaddr4 = (struct sockaddr_in *)&netaddr;
+				(netaddr4->sin_addr).s_addr>>=32-(client->server->cidrlen);
+				(netaddr4->sin_addr).s_addr<<=32-(client->server->cidrlen);
+
+				getnameinfo((struct sockaddr *) netaddr4, (socklen_t) addrinlen,
+							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
+				tmp=g_strdup_printf("%s/%s", netname, peername);
+			}else if(ai->ai_family == AF_INET6) {
+				netaddr6 = (struct sockaddr_in6 *)&netaddr;
+
+				shift = 128-(client->server->cidrlen);
+				i = 3;
+				while(shift >= 32) {
+					((netaddr6->sin6_addr).s6_addr32[i])=0;
+					shift-=32;
+					i--;
+				}
+				(netaddr6->sin6_addr).s6_addr32[i]>>=shift;
+				(netaddr6->sin6_addr).s6_addr32[i]<<=shift;
+
+				getnameinfo((struct sockaddr *)netaddr6, (socklen_t)addrinlen,
+					    netname, sizeof(netname), NULL, 0, NI_NUMERICHOST);
+				tmp=g_strdup_printf("%s/%s", netname, peername);
+			}
+
+			if(tmp != NULL)
+			  client->exportname=g_strdup_printf(client->server->exportname, tmp);
+
 			break;
 	}
 
+	freeaddrinfo(ai);
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
 	client->clientname=g_strdup(peername);
-	g_free(peername);
 }
 
 /**
@@ -1396,7 +1561,7 @@ void destroy_pid_t(gpointer data) {
  * Loop through the available servers, and serve them. Never returns.
  **/
 int serveloop(GArray* servers) {
-	struct sockaddr_in addrin;
+	struct sockaddr_storage addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	SERVER *serve;
 	int i;
@@ -1492,25 +1657,52 @@ int serveloop(GArray* servers) {
  * @param serve the server we want to connect.
  **/
 void setup_serve(SERVER *serve) {
-	struct sockaddr_in addrin;
+	struct sockaddr_storage addrin;
+	struct addrinfo hints;
+	struct addrinfo *ai = NULL;
 	struct sigaction sa;
 	int addrinlen = sizeof(addrin);
 	int sock_flags;
-	int af;
 #ifndef sun
 	int yes=1;
 #else
 	char yes='1';
 #endif /* sun */
-	struct hostent* he;
+	gchar *port = NULL;
+	int e;
 
-	af = AF_INET;
+	memset(&hints,'\0',sizeof(hints));
+	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG | AI_NUMERICSERV;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = serve->socket_family;
+
+	port = g_strdup_printf ("%d", serve->port);
+	if (port == NULL)
+		return;
+
+	e = getaddrinfo(serve->listenaddr,port,&hints,&ai);
+
+	g_free(port);
+
+	if(e != 0) {
+		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		serve->socket = -1;
+		freeaddrinfo(ai);
+		exit(EXIT_FAILURE);
+	}
+
+	if(serve->socket_family == AF_UNSPEC)
+		serve->socket_family = ai->ai_family;
+
 #ifdef WITH_SDP
 	if ((serve->flags) && F_SDP) {
-		af = AF_INET_SDP;
+		if (ai->ai_family == AF_INET)
+			ai->ai_family = AF_INET_SDP;
+		else (ai->ai_family == AF_INET6)
+			ai->ai_family = AF_INET6_SDP;
 	}
 #endif
-	if ((serve->socket = socket(af, SOCK_STREAM, IPPROTO_TCP)) < 0)
+	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
 		err("socket: %m");
 
 	/* lose the pesky "Address already in use" error message */
@@ -1530,21 +1722,15 @@ void setup_serve(SERVER *serve) {
 	}
 
 	DEBUG("Waiting for connections... bind, ");
-	addrin.sin_family = AF_INET;
-#ifdef WITH_SDP
-	if(serve->flags & F_SDP) {
-		addrin.sin_family = AF_INET_SDP;
-	}
-#endif
-	addrin.sin_port = htons(serve->port);
-	if(!(he = gethostbyname(serve->listenaddr)))
-		err("could not parse listen address");
-        addrin.sin_addr = he->h_addr_list[0];
-	if (bind(serve->socket, (struct sockaddr *) &addrin, addrinlen) < 0)
+	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
+	if (e != 0 && errno != EADDRINUSE)
 		err("bind: %m");
 	DEBUG("listen, ");
 	if (listen(serve->socket, 1) < 0)
 		err("listen: %m");
+
+	freeaddrinfo (ai);
+
 	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;
@@ -1701,7 +1887,9 @@ int main(int argc, char *argv[]) {
 	servers = parse_cfile(config_file_pos, &err);
 	
 	if(serve) {
-		g_array_append_val(servers, *serve);
+		serve->socket_family = AF_UNSPEC;
+
+		append_serve(serve, servers);
      
 		if (!(serve->port)) {
 			CLIENT *client;
