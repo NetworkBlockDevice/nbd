@@ -1972,13 +1972,13 @@ void set_peername(int net, CLIENT *client) {
 
 				shift = 128-(client->server->cidrlen);
 				i = 3;
-				while(shift >= 32) {
-					((netaddr6->sin6_addr).s6_addr32[i])=0;
-					shift-=32;
+				while(shift >= 8) {
+					((netaddr6->sin6_addr).s6_addr[i])=0;
+					shift-=8;
 					i--;
 				}
-				(netaddr6->sin6_addr).s6_addr32[i]>>=shift;
-				(netaddr6->sin6_addr).s6_addr32[i]<<=shift;
+				(netaddr6->sin6_addr).s6_addr[i]>>=shift;
+				(netaddr6->sin6_addr).s6_addr[i]<<=shift;
 
 				getnameinfo((struct sockaddr *)netaddr6, (socklen_t)addrinlen,
 					    netname, sizeof(netname), NULL, 0, NI_NUMERICHOST);
