@@ -13,6 +13,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <netinet/in.h>
 #include <stdlib.h>
 
 #if SIZEOF_UNSIGNED_SHORT_INT==4
