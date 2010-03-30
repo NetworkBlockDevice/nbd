@@ -14,6 +14,7 @@ for x in $(cat /proc/cmdline); do
 	# Support setting stuff using DHCP
 	case $x in
 		nbdroot=dhcp)
+			configure_networking
 			x="$ROOTPATH"
 			;;
 	esac
@@ -49,8 +50,6 @@ then
 	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
 	exit 0
 fi
-
-configure_networking
 
 if [ -z "$nbdsrv" ]
 then

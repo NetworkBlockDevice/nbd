@@ -1,3 +1,10 @@
+nbd (1:2.9.15-2) unstable; urgency=low
+
+  * Add extra configure_networking call in case of nbdroot=dhcp. Oops.
+    Closes: #568222.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 30 Mar 2010 11:50:19 +0200
+
 nbd (1:2.9.15-1) unstable; urgency=low
 
   * New upstream release
