@@ -3,13 +3,13 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "1" "04 August 2009" "" ""
+.TH "NBD-SERVER" "1" "01 April 2010" "" ""
 
 .SH NAME
 nbd-server \- serve a file as a block device to other computers    running the GNU/Linux(tm) or GNU/Hurd Operating    System
 .SH SYNOPSIS
 
-\fBnbd-server \fR \fB\fI[ip:]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-l \fIhost list filename\fB\fR ] [ \fB-o \fIsection name\fB\fR ] [ \fB-C \fIconfig file\fB\fR ]
+\fBnbd-server \fR \fB\fI[ip@]port\fB\fR \fB\fIfilename\fB\fR [ \fB\fIsize\fB\fR ] [ \fB-r\fR ] [ \fB-m\fR ] [ \fB-c\fR ] [ \fB-l \fIhost list filename\fB\fR ] [ \fB-o \fIsection name\fB\fR ] [ \fB-C \fIconfig file\fB\fR ]
 
 .SH "DESCRIPTION"
 .PP
@@ -31,8 +31,19 @@ If the file is empty, no clients can connect.
 .SH "OPTIONS"
 .TP
 \fBip\fR
-The ip address the server should listen on. If
-omitted, 0.0.0.0 (aka "any address") is used.
+The ip address the server should listen on. This may
+be an IPv4 address, an IPv6 address, or a hostname. In the
+latter case, nbd-server will do a hostname lookup for the
+name specified, and will listen on the first address that is
+returned. For compatibility with past versions of
+nbd-server, if an IPv4 address is specified, the @ sign that
+serves as separator between the address and port may be
+replaced by a colon.
+
+If this parameter is not specified, nbd-server will
+listen on all local addresses on both IPv4 and IPv6. To
+limit to IPv4, specify the address as 0.0.0.0; to limit to
+IPv6, specify it as ::.
 .TP
 \fBport \fR
 The port the server should listen to. A valid port is

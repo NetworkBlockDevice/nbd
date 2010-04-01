@@ -57,7 +57,7 @@ manpage.1: manpage.sgml
     <cmdsynopsis>
       <command>&dhpackage; </command>
 
-      <arg choice=plain><replaceable>[ip:]port</replaceable</arg>
+      <arg choice=plain><replaceable>[ip@]port</replaceable</arg>
       <arg choice=plain><replaceable>filename</replaceable></arg>
       <arg><replaceable>size</replaceable></arg>
       <arg><option>-r</option></arg>
@@ -94,8 +94,18 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term>ip</term>
 	<listitem>
-	  <para>The ip address the server should listen on. If
-	  omitted, 0.0.0.0 (aka "any address") is used.</para>
+	  <para>The ip address the server should listen on. This may
+	  be an IPv4 address, an IPv6 address, or a hostname. In the
+	  latter case, nbd-server will do a hostname lookup for the
+	  name specified, and will listen on the first address that is
+	  returned. For compatibility with past versions of
+	  nbd-server, if an IPv4 address is specified, the @ sign that
+	  serves as separator between the address and port may be
+	  replaced by a colon.</para>
+	  <para>If this parameter is not specified, nbd-server will
+	  listen on all local addresses on both IPv4 and IPv6. To
+	  limit to IPv4, specify the address as 0.0.0.0; to limit to
+	  IPv6, specify it as ::.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

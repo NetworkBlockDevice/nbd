@@ -105,8 +105,9 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term><option>host</option></term>
 	<listitem>
-	  <para>The hostname of the machine running
-	    <command>nbd-server</command>.</para>
+	  <para>The hostname or IP address of the machine running
+	    <command>nbd-server</command>. Since 2.9.15, the NBD
+	    utilities support IPv6.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

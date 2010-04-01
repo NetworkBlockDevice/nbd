@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-SERVER" "5" "18 August 2009" "" ""
+.TH "NBD-SERVER" "5" "01 April 2010" "" ""
 
 .SH NAME
 /etc/nbd-server/config \- configuration file for nbd-server
@@ -143,10 +143,13 @@ third argument.
 Optional; string
 
 If this option is set, it should contain the local IP
-address (in "dotted-quad" notation) on which we should
-listen to \fBnbd-client\fR(8) connections. If
-it is not set, 0.0.0.0 is used (i.e., "listen on all local
-IP addresses")
+address on which we should listen to
+\fBnbd-client\fR(8) connections. If it is not
+set, \fBnbd-server\fR will listen to all
+local IPv4 and IPv6 addresses. To limit to IPv6, specify the
+address as "::". To limit to IPv4, specify as "0.0.0.0". It
+is not possible to specify more than one IP address
+here.
 .TP
 \fBmultifile\fR
 Optional; boolean.
@@ -156,8 +159,8 @@ If this option is set to true, then
 form
 \fIexportname\fR\&.\fIinteger\fR,
 with \fIexportname\fR being the
-filename that would otherwise have been used (after
-name transformation for virtualization, if any, has been
+filename that would otherwise have been used (after name
+transformation for virtualization, if any, has been
 performed) and \fIinteger\fR an
 integer number, starting with 0 and ending when no more
 files can be found.

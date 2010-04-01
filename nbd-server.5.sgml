@@ -238,10 +238,13 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Optional; string</para>
 	  <para>If this option is set, it should contain the local IP
-	  address (in "dotted-quad" notation) on which we should
-	  listen to <command>nbd-client</command>(8) connections. If
-	  it is not set, 0.0.0.0 is used (i.e., "listen on all local
-	  IP addresses")</para>
+	  address on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not
+	    set, <command>nbd-server</command> will listen to all
+	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
+	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
+	  is not possible to specify more than one IP address
+	  here.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -254,8 +257,8 @@ manpage.1: manpage.sgml
 	    form
 	    <replaceable>exportname</replaceable>.<replaceable>integer</replaceable>,
 	    with <replaceable>exportname</replaceable> being the
-	    filename that would otherwise have been used (after
-	    name transformation for virtualization, if any, has been
+	    filename that would otherwise have been used (after name
+	    transformation for virtualization, if any, has been
 	    performed) and <replaceable>integer</replaceable> an
 	    integer number, starting with 0 and ending when no more
 	    files can be found.

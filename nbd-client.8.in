@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "26 May 2009" "" ""
+.TH "NBD-CLIENT" "8" "01 April 2010" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device
@@ -38,8 +38,9 @@ Use a blocksize of "blocksize". Default is 1024;
 allowed values are either 512, 1024, 2048 or 4096
 .TP
 \fBhost\fR
-The hostname of the machine running
-\fBnbd-server\fR\&.
+The hostname or IP address of the machine running
+\fBnbd-server\fR\&. Since 2.9.15, the NBD
+utilities support IPv6.
 .TP
 \fBtimeout=\fIseconds\fB\fR
 Set the connection timeout to "seconds". For this to
