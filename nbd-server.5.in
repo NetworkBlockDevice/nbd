@@ -279,14 +279,14 @@ name.
 \fBnbd-server\fR will look for the
 literal string '%s' in the
 \fBexportname\fR, and replace it by the
-IP address of the connecting host in dotted-quad
-notation. The string that results from this
-transformation will be used as an absolute pathname
-that \fBnbd-server\fR will attempt to
-open. As an example, if a client connects from
-192.168.1.100 and \fBexportname\fR is
-specified as \fI/export/%s\fR, then
-nbd-server will attempt to serve
+address of the connecting host. The string that
+results from this transformation will be used as an
+absolute pathname that \fBnbd-server\fR
+will attempt to open. As an example, if a client
+connects from 192.168.1.100 and
+\fBexportname\fR is specified as
+\fI/export/%s\fR, then nbd-server
+will attempt to serve
 \fI/export/192.168.1.100\fR
 .TP
 \fBiphash\fR
@@ -296,6 +296,10 @@ in the IP address by forward slashes ('/'); in the
 same example, \fBnbd-server\fR would
 open \fI/export/192/168/1/100\fR
 instead.
+
+Since there are no dots in most IPv6 addresses, the
+effect of using this option when IPv6 is in use is
+indistinguishable from the ipliteral option.
 .TP
 \fBcidrhash\fR
 This option requires one to add a space and a number
@@ -310,6 +314,8 @@ if \fBvirtstyle\fR were specified as
 cidrhash 26, then
 \fBnbd-server\fR will try to open
 \fI/export/192.168.1.64/192.168.1.100\fR\&.
+
+This option works as expected for IPv6.
 .RE
 .TP
 \fBprerun\fR

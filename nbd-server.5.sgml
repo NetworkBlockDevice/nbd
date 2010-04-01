@@ -419,14 +419,14 @@ manpage.1: manpage.sgml
 		  <command>nbd-server</command> will look for the
 		  literal string '%s' in the
 		  <option>exportname</option>, and replace it by the
-		  IP address of the connecting host in dotted-quad
-		  notation. The string that results from this
-		  transformation will be used as an absolute pathname
-		  that <command>nbd-server</command> will attempt to
-		  open. As an example, if a client connects from
-		  192.168.1.100 and <option>exportname</option> is
-		  specified as <filename>/export/%s</filename>, then
-		  nbd-server will attempt to serve
+		  address of the connecting host. The string that
+		  results from this transformation will be used as an
+		  absolute pathname that <command>nbd-server</command>
+		  will attempt to open. As an example, if a client
+		  connects from 192.168.1.100 and
+		  <option>exportname</option> is specified as
+		  <filename>/export/%s</filename>, then nbd-server
+		  will attempt to serve
 		  <filename>/export/192.168.1.100</filename>
 		</para>
 	      </listitem>
@@ -441,6 +441,11 @@ manpage.1: manpage.sgml
 		  same example, <command>nbd-server</command> would
 		  open <filename>/export/192/168/1/100</filename>
 		  instead.
+		</para>
+		<para>
+		  Since there are no dots in most IPv6 addresses, the
+		  effect of using this option when IPv6 is in use is
+		  indistinguishable from the ipliteral option.
 		</para>
 	      </listitem>
 	    </varlistentry>
@@ -461,6 +466,7 @@ manpage.1: manpage.sgml
 		  <command>nbd-server</command> will try to open
 		  <filename>/export/192.168.1.64/192.168.1.100</filename>.
 		</para>
+		<para>This option works as expected for IPv6.</para>
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
