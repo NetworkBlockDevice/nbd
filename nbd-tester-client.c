@@ -210,6 +210,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 	int retval=0;
 	size_t tmp;
 	signed int do_write=TRUE;
+	pid_t mypid = getpid();
 
 	size=0;
 	if(!sock_is_open) {
@@ -248,7 +249,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 			memcpy(&(req.handle),&i,sizeof(i));
 			req.from=htonll(i);
 			write(sock, &req, sizeof(req));
-			printf("Requests(+): %d\n", ++requests);
+			printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
 		}
 		do {
 			FD_ZERO(&set);
@@ -263,7 +264,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 					retval=-1;
 					goto err_open;
 				}
-				printf("Requests(-): %d\n", --requests);
+				printf("%d: Requests(-): %d\n", (int)mypid, --requests);
 			}
 		} while FD_ISSET(sock, &set);
 		/* Now wait until we can write again or until a second have
@@ -291,7 +292,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 			/* Okay, there's something ready for
 			 * reading here */
 			read_packet_check_header(sock, 1024, i);
-			printf("Requests(-): %d\n", --requests);
+			printf("%d: Requests(-): %d\n", (int)mypid, --requests);
 		}
 	} while (requests);
 	if(gettimeofday(&stop, NULL)<0) {
@@ -299,7 +300,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
 		goto err_open;
 	}
-	timespan=stop.tv_sec-start.tv_sec+(stop.tv_usec-start.tv_usec)/1000000;
+	timespan=(float)(stop.tv_sec-start.tv_sec+(stop.tv_usec-start.tv_usec))/(float)1000000;
 	speed=(int)(size/timespan);
 	if(speed>1024) {
 		speed>>=10;
@@ -313,7 +314,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 		speed>>=10;
 		speedchar[0]='G';
 	}
-	g_message("Throughput test complete. Took %.3f seconds to complete, %d%sB/s",timespan,speed,speedchar);
+	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%sB/s", (int)getpid(), timespan,speed,speedchar);
 
 err_open:
 	if(close_sock) {
@@ -330,8 +331,8 @@ int main(int argc, char**argv) {
 	int sock=0;
 
 	if(argc<3) {
-		g_message("Not enough arguments");
-		g_message("Usage: %s <hostname> <port>", argv[0]);
+		g_message("%d: Not enough arguments", (int)getpid());
+		g_message("%d: Usage: %s <hostname> <port>", (int)getpid(), argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	logging();
