@@ -14,8 +14,8 @@
 #
 ### BEGIN INIT INFO 
 # Provides: nbd-server 
-# Required-Start: $remote_fs
-# Required-Stop: $remote_fs
+# Required-Start: $remote_fs $syslog
+# Required-Stop: $remote_fs $syslog
 # Should-Start: $network
 # Should-Stop: $network
 # Default-Start: 2 3 4 5 
