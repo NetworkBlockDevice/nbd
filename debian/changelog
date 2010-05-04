@@ -1,3 +1,10 @@
+nbd (1:2.9.15-3) unstable; urgency=low
+
+  * Apply patch from Petter Reinholdsen to make nbd-server depend on
+    $syslog. Closes: #579869.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 04 May 2010 10:26:23 +0200
+
 nbd (1:2.9.15-2) unstable; urgency=low
 
   * Add extra configure_networking call in case of nbdroot=dhcp. Oops.
