@@ -234,6 +234,7 @@ int main(int argc, char *argv[]) {
 	int nofork=0;
 	u64 size64;
 	u32 flags;
+	int i;
 
 	logging();
 
@@ -302,29 +303,31 @@ int main(int argc, char *argv[]) {
 	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 	++argv; --argc; /* skip device */
 
-	if (argc>3) goto errmsg;
-	if (argc) {
-		if(strncmp(argv[0], "-swap", 5)==0) {
-			swap=1;
-			++argv;--argc;
+	if (argc>4) goto errmsg;
+	for(i=0; i<4; i++) {
+		if (argc) {
+			if(strncmp(argv[0], "-swap", 5)==0) {
+				swap=1;
+				++argv;--argc;
+			}
 		}
-	}
-	if (argc) {
-		if(strncmp(argv[0], "-persist", 8)==0) {
-			cont=1;
-			++argv;--argc;
+		if (argc) {
+			if(strncmp(argv[0], "-persist", 8)==0) {
+				cont=1;
+				++argv;--argc;
+			}
 		}
-	}
-	if (argc) {
-		if(strncmp(argv[0], "-sdp", 4)==0) {
-			sdp=1;
-			++argv;--argc;
+		if (argc) {
+			if(strncmp(argv[0], "-sdp", 4)==0) {
+				sdp=1;
+				++argv;--argc;
+			}
 		}
-	}
-	if (argc) {
-		if(strncmp(argv[0], "-nofork", 7)==0) {
-			nofork=1;
-			++argv;--argc;
+		if (argc) {
+			if(strncmp(argv[0], "-nofork", 7)==0) {
+				nofork=1;
+				++argv;--argc;
+			}
 		}
 	}
 	if(argc) goto errmsg;
