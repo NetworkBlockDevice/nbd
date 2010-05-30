@@ -38,6 +38,57 @@ test -f /etc/nbd-client && . /etc/nbd-client
 
 test -x $DAEMON || exit 0
 
+get_devices() {
+    DEVICES=
+    i=0
+    while [ ! -z ${NBD_DEVICE[$i]} ]
+    do
+	if [ ${NBD_TYPE[$i]} == "$1" ]
+	then
+	    DEVICES="$DEVICES ${NBD_DEVICE[$i]}"
+	fi
+	i=$(($i + 1))
+    done
+}
+
+get_all_devices() {
+	if [ "$KILLALL" == "false" ]
+	then
+	    DEVICES=${NBD_DEVICE[*]}
+	else
+	    if [ -d /dev/nbd ]
+	    then
+		    DEVICES=/dev/nbd/*
+	    else
+		    DEVICES=/dev/nb*
+	    fi
+	fi
+}
+
+get_swap_devices() {
+	if [ "$KILLALL" == "false" ]
+	then
+	    get_devices s
+	else
+	    if [ -f /proc/swaps ]
+	    then
+		DEVICES=`grep '^/dev/nb' /proc/swaps | cut -d ' ' -f1`
+	    else
+		get_all_devices
+	    fi
+	fi
+}
+
+get_mount_devices() {
+	if [ "$KILLALL" == "false" ]
+	then
+	    get_devices f
+	else
+	    DEVICES=`mount | cut -d " " -f 1 | grep /dev/nbd`
+	fi
+}
+
+
 case "$1" in
     connect)
 	# I don't use start-stop-daemon: nbd-client only does some setup
@@ -134,19 +185,14 @@ case "$1" in
 	;;
     stop)
 	echo "Stopping $DESC: "
-	echo "umounting all filesystems for nbd-blockdevices..."
-	if [ "$KILLALL" != "false" ]
-	then
-	  DEVICES=`mount | cut -d " " -f 1 | grep /dev/nbd`
-	else
-	  DEVICES=${NBD_DEVICE[*]}
-	fi
+	get_mount_devices
 	for dev in $DEVICES
 	do
 	  # Ignore devices with _netdev option (sysvinit takes care of those)
 	  line=$(grep $dev /etc/fstab | grep "_netdev")
 	  if [ -z "$line" ]
 	  then
+	    echo "umounting filesystem from $dev..."
 	    umount $dev 2>/dev/null
 	    if [ $? -eq 1 ]
 	    then
@@ -162,20 +208,16 @@ case "$1" in
 	  fi
 	  echo $dev
 	done
-	if [ "$KILLALL" != "false" ]
-	then
-	    if [ -d /dev/nbd ]
+	get_swap_devices
+	if [ "$DEVICES" ]
 	    then
-		    DEVICES=/dev/nbd/*
-	    else
-		    DEVICES=/dev/nb*
-	    fi
+	    echo "Invoking swapoff on $DEVICES..."
+	    swapoff $DEVICES 2>/dev/null
 	fi
-	echo "Invoking swapoff on NBD devices..."
-	swapoff $DEVICES 2>/dev/null
-	echo "Disconnecting $DESCes..."
+	get_all_devices
 	for i in $DEVICES
-	  do
+	do
+	  echo "Disconnecting $i"
 	  $DAEMON -d $i 2>/dev/null >/dev/null
 	done
 	rmmod nbd
