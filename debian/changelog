@@ -3,8 +3,9 @@ nbd (1:2.9.15-4) unstable; urgency=low
   * Be a bit more peculiar about what we do to devices on stop, to avoid
     errors and (thus) delays on swapoff. Thanks, Toby Speight; Closes:
     #582891.
+  * Add Spanish Debconf translation. Thanks, Camaleón; Closes: #583536.
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 30 May 2010 19:30:01 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 30 May 2010 19:31:41 +0200
 
 nbd (1:2.9.15-3) unstable; urgency=low
 
