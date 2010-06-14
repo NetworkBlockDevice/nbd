@@ -3,7 +3,7 @@
 .\" <http://shell.ipoline.com/~elmert/comp/docbook2X/> 
 .\" Please send any bug reports, improvements, comments, patches, 
 .\" etc. to Steve Cheng <steve@ggi-project.org>.
-.TH "NBD-CLIENT" "8" "01 April 2010" "" ""
+.TH "NBD-CLIENT" "8" "14 June 2010" "" ""
 
 .SH NAME
 nbd-client \- connect to a server running nbd-server(1), to use its    exported block device
@@ -102,10 +102,10 @@ Some examples of nbd-client usage:
 \(bu
 To connect to a server running on port 2000 at host
 "server.domain.com", using the client's block special file
-"/dev/nb0":
+"/dev/nbd0":
 
 \fBnbd-client server.domain.com 2000
-/dev/nb0\fR
+/dev/nbd0\fR
 .TP 0.2i
 \(bu
 To connect to a server running on port 2001 at host
