@@ -1924,7 +1924,11 @@ int main(int argc, char *argv[]) {
 		g_warning("Could not parse config file: %s", 
 				err ? err->message : "Unknown error");
 	}
-    
+	if(serve) {
+		g_warning("Specifying an export on the command line is deprecated.");
+		g_warning("Please use a configuration file instead.");
+	}
+
 	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);

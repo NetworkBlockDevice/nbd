@@ -86,6 +86,11 @@ manpage.1: manpage.sgml
     This file must list the IP-addresses of clients that are allowed
     to connect. If it does not exist, all clients are able to connect.
     If the file is empty, no clients can connect.</para>
+
+    <para>Note that while the command line allows for specifying an
+    export, the use of this option is deprecated. It is preferred to
+    make use of a configuration file instead, the format of which is
+    defined in nbd-server(5).</para>
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
