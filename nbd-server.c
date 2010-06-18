@@ -1920,7 +1920,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
     
-    if(!servers || !servers->len) {
+	if(!servers || !servers->len) {
 		g_warning("Could not parse config file: %s", 
 				err ? err->message : "Unknown error");
 	}
