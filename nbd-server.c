@@ -274,7 +274,7 @@ int authorized_client(CLIENT *opts) {
 				return 0;
 			}
 			*(tmp++)=0;
-			if(inet_aton(line,&addr)) {
+			if(!inet_aton(line,&addr)) {
 				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
 			}
