@@ -343,7 +343,9 @@ int main(int argc, char *argv[]) {
 	
 #ifndef NOFORK
 	if(!nofork) daemon(0,0);
+#endif
 	do {
+#ifndef NOFORK
 		if (fork()) {
 			/* Due to a race, the kernel NBD driver cannot
 			 * call for a reread of the partition table
