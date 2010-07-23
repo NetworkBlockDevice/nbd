@@ -1,3 +1,10 @@
+nbd (1:2.9.15-5) unstable; urgency=low
+
+  * Replace nbd-client's Architecture: field by Architecture: any, which
+    is allowed by Policy 3.9. Whee!
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 24 Jul 2010 00:03:35 +0200
+
 nbd (1:2.9.15-4) unstable; urgency=low
 
   * Be a bit more peculiar about what we do to devices on stop, to avoid
