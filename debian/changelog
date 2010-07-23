@@ -4,8 +4,9 @@ nbd (1:2.9.15-4) unstable; urgency=low
     errors and (thus) delays on swapoff. Thanks, Toby Speight; Closes:
     #582891.
   * Add Spanish Debconf translation. Thanks, Camaleón; Closes: #583536.
+  * Bump Standards-Version to 3.9.0 (no changes applicable to nbd)
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 30 May 2010 19:31:41 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 23 Jul 2010 22:57:26 +0200
 
 nbd (1:2.9.15-3) unstable; urgency=low
 
