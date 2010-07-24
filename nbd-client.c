@@ -49,6 +49,7 @@ int check_conn(char* devname, int do_print) {
 	char* p;
 	int fd;
 	int len;
+
 	if(!strncmp(devname, "/dev/", 5)) {
 		devname+=5;
 	}
@@ -237,6 +238,7 @@ void usage(void) {
 
 void disconnect(char* device) {
 	int nbd = open(device, O_RDWR);
+
 	if (nbd < 0)
 		err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 	printf("Disconnecting: que, ");
