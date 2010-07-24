@@ -21,7 +21,6 @@ nbd-server
 doc
 nbd-server.config
 nbd-server.5
-nbd.h
 *.o
 nbd-client.8.in
 nbd-server.1.in
