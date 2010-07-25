@@ -227,9 +227,10 @@ void finish_sock(int sock, int nbd, int swap) {
 
 void usage(void) {
 	fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
-	fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-sdp] [-persist] [-nofork]\n");
+	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
+	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
