@@ -271,7 +271,7 @@ int main(int argc, char *argv[]) {
 	int nofork=0;
 	u64 size64;
 	u32 flags;
-	int i, c;
+	int c;
 	int nonspecial=0;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },

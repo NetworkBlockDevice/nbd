@@ -911,7 +911,7 @@ off_t size_autodetect(int fhandle) {
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE64
 	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
-	if (!ioctl(fhandle, BLKGETSIZE64, bytes) && bytes) {
+	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
 		return (off_t)bytes;
 	}
 #endif /* BLKGETSIZE64 */
@@ -1663,11 +1663,9 @@ int serveloop(GArray* servers) {
  * @param serve the server we want to connect.
  **/
 void setup_serve(SERVER *serve) {
-	struct sockaddr_storage addrin;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	struct sigaction sa;
-	int addrinlen = sizeof(addrin);
 	int sock_flags;
 #ifndef sun
 	int yes=1;
