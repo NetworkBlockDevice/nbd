@@ -284,6 +284,7 @@ int main(int argc, char *argv[]) {
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
 		{ "timeout", required_argument, NULL, 't' },
+		{ 0, 0, 0, 0 }, 
 	};
 
 	logging();
