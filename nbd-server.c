@@ -1284,11 +1284,12 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
 	if (!client->modern) {
-	flags = htonl(flags);
+		flags = htonl(flags);
 		if (write(client->net, &flags, 4) < 0)
 			err("Negotiation failed: %m");
 	} else {
 		smallflags = (uint16_t)(flags & ~((uint16_t)0));
+		smallflags = htons(smallflags);
 		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
 			err("Negotiation failed: %m");
 		}
