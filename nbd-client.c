@@ -358,12 +358,12 @@ int main(int argc, char *argv[]) {
 					break;
 				case 1:
 					// port
-					port = optarg;
 					if(!strtol(optarg, NULL, 0)) {
 						// not parseable as a number, assume it's the device and we have a name
 						nbddev = optarg;
 						nonspecial++;
 					} else {
+						port = optarg;
 						if(name) {
 							usage("port and name specified at the same time. This is not supported.");
 							exit(EXIT_FAILURE);

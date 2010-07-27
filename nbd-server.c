@@ -570,20 +570,20 @@ SERVER* dup_serve(SERVER *s) {
 	SERVER *serve = NULL;
 
 	serve=g_new0(SERVER, 1);
-	if (serve == NULL)
+	if(serve == NULL)
 		return NULL;
 
-	if (s->exportname)
+	if(s->exportname)
 		serve->exportname = g_strdup(s->exportname);
 
 	serve->expected_size = s->expected_size;
 
-	if (s->listenaddr)
+	if(s->listenaddr)
 		serve->listenaddr = g_strdup(s->listenaddr);
 
 	serve->port = s->port;
 
-	if (s->authname)
+	if(s->authname)
 		serve->authname = strdup(s->authname);
 
 	serve->flags = s->flags;
@@ -591,11 +591,14 @@ SERVER* dup_serve(SERVER *s) {
 	serve->socket_family = serve->socket_family;
 	serve->cidrlen = s->cidrlen;
 
-	if (s->prerun)
+	if(s->prerun)
 		serve->prerun = g_strdup(s->prerun);
 
-	if (s->postrun)
+	if(s->postrun)
 		serve->postrun = g_strdup(s->postrun);
+	
+	if(s->servename)
+		serve->servename = g_strdup(s->servename);
 
 	return serve;
 }
@@ -1262,7 +1265,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		namelen = ntohll(namelen);
 		name = malloc(namelen+1);
 		name[namelen+1]=0;
-		read(net, &name, namelen);
+		read(net, name, namelen);
 		for(i=0; i<servers->len; i++) {
 			SERVER* serve = &(g_array_index(servers, SERVER, i));
 			if(!strcmp(serve->servename, name)) {
@@ -1280,9 +1283,16 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		err("Negotiation failed: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
+	if (!client->modern) {
 	flags = htonl(flags);
-	if (write(client->net, &flags, 4) < 0)
-		err("Negotiation failed: %m");
+		if (write(client->net, &flags, 4) < 0)
+			err("Negotiation failed: %m");
+	} else {
+		smallflags = (uint16_t)(flags & ~((uint16_t)0));
+		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
+			err("Negotiation failed: %m");
+		}
+	}
 	if (write(client->net, zeros, 124) < 0)
 		err("Negotiation failed: %m");
 	return NULL;
@@ -1660,13 +1670,14 @@ int serveloop(GArray* servers) {
 	max=0;
 	FD_ZERO(&mset);
 	for(i=0;i<servers->len;i++) {
-		sock=(g_array_index(servers, SERVER, i)).socket;
-		FD_SET(sock, &mset);
-		max=sock>max?sock:max;
+		if((sock=(g_array_index(servers, SERVER, i)).socket)) {
+			FD_SET(sock, &mset);
+			max=sock>max?sock:max;
+		}
 	}
 	if(modernsock) {
 		FD_SET(modernsock, &mset);
-		max=modernsock>max?sock:max;
+		max=modernsock>max?modernsock:max;
 	}
 	for(;;) {
 		CLIENT *client = NULL;
