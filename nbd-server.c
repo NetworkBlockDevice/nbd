@@ -1218,6 +1218,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 	uint64_t size_host;
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
 	uint16_t smallflags = 0;
+	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
 	if(!client || !client->modern) {
@@ -1226,8 +1227,8 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 			if(client)
 				exit(EXIT_FAILURE);
 		}
-		cliserv_magic = htonll(cliserv_magic);
-		if (write(net, &cliserv_magic, sizeof(cliserv_magic)) < 0) {
+		magic = htonll(opts_magic);
+		if (write(net, &magic, sizeof(magic)) < 0) {
 			err_nonfatal("Negotiation failed: %m");
 			if(client)
 				exit(EXIT_FAILURE);
@@ -1235,7 +1236,6 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 	}
 	if(!client) {
 		uint64_t reserved;
-		uint64_t magic;
 		uint32_t opt;
 		uint64_t namelen;
 		char* name;

@@ -139,14 +139,14 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 	if (read(sock, &magic, sizeof(magic)) < 0)
 		err("Failed/2: %m");
 	magic = ntohll(magic);
-	if (magic != cliserv_magic)
-		err("Not enough cliserv_magic");
-	printf(".");
 	if(name) {
 		uint32_t opt;
 		uint64_t namesize;
 		uint64_t reserved = 0;
 
+		if (magic != opts_magic)
+			err("Not enough opts_magic");
+		printf(".");
 		if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
 			err("Failed reading flags: %m");
 		}
@@ -164,6 +164,10 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 		namesize = ntohll(namesize);
 		write(sock, &namesize, sizeof(namesize));
 		write(sock, name, strlen(name));
+	} else {
+		if (magic != cliserv_magic)
+			err("Not enough cliserv_magic");
+		printf(".");
 	}
 
 	if (read(sock, &size64, sizeof(size64)) < 0)
@@ -264,7 +268,7 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 	}
-	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
+	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-name|-N name]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
