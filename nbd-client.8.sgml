@@ -87,7 +87,9 @@ manpage.1: manpage.sgml
     either in the kernel, or as a module, you can connect to an NBD
     server and use its exported file through a block special file with
     major mode 43.</para>
-    
+
+    <para>Optionally, long options can also be specified with two
+      leading dashes.</para>
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
