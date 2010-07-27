@@ -109,6 +109,8 @@ gchar* config_file_pos;
 gchar* runuser=NULL;
 /** What group we're running as */
 gchar* rungroup=NULL;
+/** whether to export using the old negotiation protocol (port-based) */
+gboolean do_oldstyle=FALSE;
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -696,7 +698,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
-	int do_oldstyle;
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
@@ -1785,6 +1786,9 @@ int setup_serve(SERVER *serve) {
 	gchar *port = NULL;
 	int e;
 
+	if(!do_oldstyle) {
+		return serve->servename ? 1 : 0;
+	}
 	memset(&hints,'\0',sizeof(hints));
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG | AI_NUMERICSERV;
 	hints.ai_socktype = SOCK_STREAM;
