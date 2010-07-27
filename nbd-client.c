@@ -331,8 +331,7 @@ int main(int argc, char *argv[]) {
 			blocksize=(int)strtol(optarg, NULL, 0);
 			break;
 		case 'c':
-			check_conn(optarg, 1);
-			exit(EXIT_SUCCESS);
+			return check_conn(optarg, 1);
 		case 'd':
 			disconnect(optarg);
 			exit(EXIT_SUCCESS);
