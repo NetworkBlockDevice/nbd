@@ -141,8 +141,8 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 	magic = ntohll(magic);
 	if(name) {
 		uint32_t opt;
-		uint64_t namesize;
-		uint64_t reserved = 0;
+		uint32_t namesize;
+		uint32_t reserved = 0;
 
 		if (magic != opts_magic)
 			err("Not enough opts_magic");
@@ -156,12 +156,12 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 		write(sock, &reserved, sizeof(reserved));
 
 		/* Write the export name that we're after */
-		magic = ntohll(cliserv_magic);
+		magic = ntohll(opts_magic);
 		write(sock, &magic, sizeof(magic));
 		opt = ntohl(NBD_OPT_EXPORT_NAME);
 		write(sock, &opt, sizeof(opt));
-		namesize = (u64)strlen(name);
-		namesize = ntohll(namesize);
+		namesize = (u32)strlen(name);
+		namesize = ntohl(namesize);
 		write(sock, &namesize, sizeof(namesize));
 		write(sock, name, strlen(name));
 	} else {

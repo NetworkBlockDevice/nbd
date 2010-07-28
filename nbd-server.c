@@ -1239,9 +1239,9 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		}
 	}
 	if(!client) {
-		uint64_t reserved;
+		uint32_t reserved;
 		uint32_t opt;
-		uint64_t namelen;
+		uint32_t namelen;
 		char* name;
 		int i;
 
@@ -1251,7 +1251,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		read(net, &reserved, sizeof(reserved));
 		read(net, &magic, sizeof(magic));
 		magic = ntohll(magic);
-		if(magic != cliserv_magic) {
+		if(magic != opts_magic) {
 			close(net);
 			return NULL;
 		}
@@ -1262,7 +1262,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 			return NULL;
 		}
 		read(net, &namelen, sizeof(namelen));
-		namelen = ntohll(namelen);
+		namelen = ntohl(namelen);
 		name = malloc(namelen+1);
 		name[namelen+1]=0;
 		read(net, name, namelen);
