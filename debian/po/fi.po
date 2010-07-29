@@ -6,10 +6,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2009-05-17 09:02+0200\n"
+"POT-Creation-Date: 2010-07-28 22:19-0400\n"
 "PO-Revision-Date: 2009-06-16 20:16+0300\n"
 "Last-Translator: Esko Arajärvi <edu@iki.fi>\n"
 "Language-Team: Finnish <debian-l10n-finnish@lists.debian.org>\n"
+"Language: fi\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -109,10 +110,10 @@ msgstr ""
 "Jos aiot käyttää verkkolohkolaitetta näennäismuistilaitteena, valitse "
 "”näennäismuisti”. Jos aiot käyttää sitä tiedostojärjestelmänä, lisää rivi "
 "tiedostoon /etc/fstab, lisää sille valitsin ”_netdev” (muuten init yrittää "
-"liittää sen ennen kuin se on käytettävissä) ja valitse ”tiedostojärjestelmä”."
-" Kaikissa muissa tilanteissa valitse ”raaka”. Tällöin nbd-clientin "
-"käynnistyskomentosarja käynnistää ainoastaan nbd-client-prosessin ja kaikki "
-"muu täytyy tehdä käsin."
+"liittää sen ennen kuin se on käytettävissä) ja valitse "
+"”tiedostojärjestelmä”. Kaikissa muissa tilanteissa valitse ”raaka”. Tällöin "
+"nbd-clientin käynnistyskomentosarja käynnistää ainoastaan nbd-client-"
+"prosessin ja kaikki muu täytyy tehdä käsin."
 
 #. Type: string
 #. Description
@@ -151,9 +152,15 @@ msgstr "nbd-clientin numero ${number} /dev-tietue:"
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
+#, fuzzy
+#| msgid ""
+#| "Every nbd-client process needs to be associated with a /dev entry with "
+#| "major mode 43. Please enter the name of the /dev entry you want to use "
+#| "for this nbd-client. Note that this needs to be the full path to that "
+#| "entry, not just the last part."
 msgid ""
 "Every nbd-client process needs to be associated with a /dev entry with major "
-"mode 43. Please enter the name of the /dev entry you want to use for this "
+"number 43. Please enter the name of the /dev entry you want to use for this "
 "nbd-client. Note that this needs to be the full path to that entry, not just "
 "the last part."
 msgstr ""
@@ -187,8 +194,8 @@ msgid ""
 "only those nbd-client devices that it knows about in its config file."
 msgstr ""
 "Kun nbd-client-palvelu pysäytetään kutsumalla init-komentosarjaa ”nbd-"
-"client”, se voi toimia kahdella eri tavalla: se voi joko irrottaa kaikki "
-"nbd-client-laitteet (joiden oletetaan olevan poissa käytöstä) tai se voi "
+"client”, se voi toimia kahdella eri tavalla: se voi joko irrottaa kaikki nbd-"
+"client-laitteet (joiden oletetaan olevan poissa käytöstä) tai se voi "
 "irrottaa vain ne nbd-client-laitteet, jotka on mainittu sen "
 "asetustiedostossa."
 
@@ -204,6 +211,22 @@ msgstr ""
 "irrotus. Jos juurilaite tai jokin muu kriittinen tiedostojärjestelmä on "
 "liitetty NBD:n avulla, tämä aiheuttaa tietojen häviämistä, eikä tätä "
 "vaihtoehtoa tulisi valita."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "Extra parameters (number: ${number})"
+msgstr "Palvelimen numero ${number} verkkonimi:"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+msgid ""
+"If you wish to add any extra parameters to nbd-client, then please enter "
+"them here."
+msgstr ""
 
 #. Type: string
 #. Description
@@ -247,9 +270,9 @@ msgid ""
 "listening. As NBD is likely to use more than one port, no dedicated port has "
 "been assigned in IANA lists."
 msgstr ""
-"Anna TCP-portti, jota tämä nbd-server kuuntelee. Koska NBD yleensä "
-"kuuntelee useampaa kuin yhtä porttia, sille ei ole varattu tiettyä porttia "
-"IANA-listoilta."
+"Anna TCP-portti, jota tämä nbd-server kuuntelee. Koska NBD yleensä kuuntelee "
+"useampaa kuin yhtä porttia, sille ei ole varattu tiettyä porttia IANA-"
+"listoilta."
 
 #. Type: string
 #. Description
@@ -279,12 +302,12 @@ msgid ""
 "expanded to the IP-address of the connecting client. An example would be \"/"
 "export/swaps/swp%s\"."
 msgstr ""
-"Anna tiedostonimi tai lohkolaite, jonka haluat laittaa saataville verkon yli."
-" Voit jakaa todellisen lohkolaitteen (esimerkiksi ”/dev/hda1”), tavallisen "
-"tiedoston (kuten ”/export/nbd/bl1”) tai joukon tiedostoja kerralla. Kolmatta "
-"vaihtoehtoa varten voit käyttää tiedostonimessä merkkijonoa ”%s”, joka "
-"muutetaan yhteyden ottavan asiakkaan IP-osoitteeksi. Esimerkki tästä on "
-"”/export/swaps/swp%s”."
+"Anna tiedostonimi tai lohkolaite, jonka haluat laittaa saataville verkon "
+"yli. Voit jakaa todellisen lohkolaitteen (esimerkiksi ”/dev/hda1”), "
+"tavallisen tiedoston (kuten ”/export/nbd/bl1”) tai joukon tiedostoja "
+"kerralla. Kolmatta vaihtoehtoa varten voit käyttää tiedostonimessä "
+"merkkijonoa ”%s”, joka muutetaan yhteyden ottavan asiakkaan IP-osoitteeksi. "
+"Esimerkki tästä on ”/export/swaps/swp%s”."
 
 #. Type: string
 #. Description
@@ -293,8 +316,8 @@ msgid ""
 "Note that it is possible to tune the way in which the IP address will be "
 "substituted in the file name. See \"man 5 nbd-server\" for details."
 msgstr ""
-"Tapaa, jolla IP-osoite korvaa tiedostonimessä olevan merkkijonon voi muokata."
-" Lisätietoja löytyy man-ohjesivulta nbd-server(5)."
+"Tapaa, jolla IP-osoite korvaa tiedostonimessä olevan merkkijonon voi "
+"muokata. Lisätietoja löytyy man-ohjesivulta nbd-server(5)."
 
 #. Type: error
 #. Description
@@ -334,9 +357,9 @@ msgid ""
 "config in the new format may be generated based on the current "
 "configuration. Until then, the nbd-server installation will be broken."
 msgstr ""
-"Jos poistat tai laitat kommentteihin AUTO_GEN-rivin, tiedosto "
-"/etc/nbd-server/config voidaan luoda uudessa muodossa nykyisten asetusten "
-"pohjalta. Tätä ennen nbd-server-asennus ei toimi."
+"Jos poistat tai laitat kommentteihin AUTO_GEN-rivin, tiedosto /etc/nbd-"
+"server/config voidaan luoda uudessa muodossa nykyisten asetusten pohjalta. "
+"Tätä ennen nbd-server-asennus ei toimi."
 
 #. Type: boolean
 #. Description
@@ -353,8 +376,8 @@ msgid ""
 "it is kept as is."
 msgstr ""
 "Järjestelmästä löytyi paketin nbd-server versiota 2.9 vanhempi "
-"asetustiedosto. Nykyinen nbd-server-paketti ei enää tue tätä tiedostoa, "
-"eikä toimi, jos tilanne säilytetään nykyisellään."
+"asetustiedosto. Nykyinen nbd-server-paketti ei enää tue tätä tiedostoa, eikä "
+"toimi, jos tilanne säilytetään nykyisellään."
 
 #. Type: boolean
 #. Description

@@ -7,10 +7,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.11-5\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2009-05-28 06:38+0200\n"
+"POT-Creation-Date: 2010-07-28 22:19-0400\n"
 "PO-Revision-Date: 2009-05-31 15:13+0100\n"
 "Last-Translator: Américo Monteiro <a_monteiro@netcabo.pt>\n"
 "Language-Team: Portuguese <traduz@debianpt.org>\n"
+"Language: pt\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -78,7 +79,8 @@ msgstr "swap, sistema de ficheiros, raw"
 #. Description
 #: ../nbd-client.templates:4002
 msgid "Intended use of the network block device number ${number}:"
-msgstr "Utilização pretendida do número de dispositivo de bloco de rede ${number}:"
+msgstr ""
+"Utilização pretendida do número de dispositivo de bloco de rede ${number}:"
 
 #. Type: select
 #. Description
@@ -150,11 +152,6 @@ msgstr "Entrada /dev para este cliente nbd (número: ${number})?"
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#| msgid ""
-#| "Every nbd-client process needs to be associated with a /dev entry with "
-#| "major mode 43. Please enter the name of the /dev entry you want to use "
-#| "for this nbd-client. Note that this needs to be the full path to that "
-#| "entry, not just the last part."
 msgid ""
 "Every nbd-client process needs to be associated with a /dev entry with major "
 "number 43. Please enter the name of the /dev entry you want to use for this "
@@ -208,6 +205,22 @@ msgstr ""
 "dispositivos nbd-client. Se o dispositivo de raiz ou qualquer outro sistema "
 "de ficheiros crítico estão em NBD isto irá causar perdas de dados e não "
 "deverá ser aceite."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "Extra parameters (number: ${number})"
+msgstr "Nome da máquina do servidor (número: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+msgid ""
+"If you wish to add any extra parameters to nbd-client, then please enter "
+"them here."
+msgstr ""
 
 #. Type: string
 #. Description
@@ -385,4 +398,3 @@ msgstr ""
 "Se um ficheiro de configuração com novo estilo já existir e aceitar esta "
 "opção, você irá ver brevemente um aviso \"modified configuration file\", "
 "como é normal."
-

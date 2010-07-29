@@ -1,12 +1,20 @@
 nbd (1:2.9.16-1) unstable; urgency=low
 
   * New upstream release
+  * 2.9.16 reimplements command-line parsing so that order is less
+    significant; as such, add nbd-client/extra template (which is only
+    shown at low priority) and $NBD_EXTRA[] config file array to allow
+    people to specify random extra command-line options. Closes:
+    #539823.
+  * The above adds a template, so update Dutch translation. Christian
+    Perrier is going to hate me. I'll upload nbd for translations before
+    the release, promise!
   * Replace nbd-client's Architecture: field by Architecture: linux-any,
     which is allowed by Policy 3.9. Whee!
   * Fix nbd-client initrd script, *again*. Sigh. Thanks, Vagrant.
     Closes: #590749.
 
- -- Wouter Verhelst <wouter@debian.org>  Wed, 28 Jul 2010 22:03:24 -0400
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 28 Jul 2010 22:21:02 -0400
 
 nbd (1:2.9.15-4) unstable; urgency=low
 

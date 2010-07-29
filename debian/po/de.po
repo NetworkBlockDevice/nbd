@@ -7,10 +7,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.9-4\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2009-05-28 06:38+0200\n"
+"POT-Creation-Date: 2010-07-28 22:19-0400\n"
 "PO-Revision-Date: 2009-05-28 21:10+0100\n"
 "Last-Translator: Chris Leick <c.leick@vollbio.de>\n"
 "Language-Team: de <debian-l10n-german@lists.debian.org>\n"
+"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -113,12 +114,12 @@ msgid ""
 "client process; you will have to set it up manually."
 msgstr ""
 "Falls Sie das »Network Block Device« als Swap-Device nutzen möchten, wählen "
-"Sie »Swap«. Falls Sie es als Dateisystem nutzen möchten, fügen Sie eine Zeile "
-"zur /etc/fstab mit der Option »_netdev« hinzu (sonst versucht init, sie "
-"einzuhängen, bevor es benutzbar ist) und wählen hier »Dateisystem«. Für alle "
-"anderen Zwecke wählen Sie »unbearbeitet«. Dann wird das nbd-Client-Bootskript "
-"lediglich den nbd-Client-Prozess starten; Sie müssen die Einrichtung dann "
-"manuell durchführen."
+"Sie »Swap«. Falls Sie es als Dateisystem nutzen möchten, fügen Sie eine "
+"Zeile zur /etc/fstab mit der Option »_netdev« hinzu (sonst versucht init, "
+"sie einzuhängen, bevor es benutzbar ist) und wählen hier »Dateisystem«. Für "
+"alle anderen Zwecke wählen Sie »unbearbeitet«. Dann wird das nbd-Client-"
+"Bootskript lediglich den nbd-Client-Prozess starten; Sie müssen die "
+"Einrichtung dann manuell durchführen."
 
 #  Template: nbd-client/host
 #  ddtp-prioritize: 42
@@ -173,11 +174,10 @@ msgid ""
 "nbd-client. Note that this needs to be the full path to that entry, not just "
 "the last part."
 msgstr ""
-"Jeder nbd-Client-Prozess muss mit einem /dev-Eintrag mit der "
-"Major-Number 43 assoziiert sein. Bitte geben Sie den Namen des "
-"/dev-Eintrags, den Sie für diesen nbd-Client verwenden möchten, ein. "
-"Beachten Sie, dass der vollständige Pfad und nicht nur der letzte Teil zum "
-"Eintrag gebraucht wird."
+"Jeder nbd-Client-Prozess muss mit einem /dev-Eintrag mit der Major-Number 43 "
+"assoziiert sein. Bitte geben Sie den Namen des /dev-Eintrags, den Sie für "
+"diesen nbd-Client verwenden möchten, ein. Beachten Sie, dass der "
+"vollständige Pfad und nicht nur der letzte Teil zum Eintrag gebraucht wird."
 
 #. Type: string
 #. Description
@@ -222,6 +222,25 @@ msgstr ""
 "Client-Geräten zu trennen. Wenn das Wurzelgerät oder andere kritische "
 "Dateisysteme auf NBD liegen, wird dies zu Datenverlust führen und sollte "
 "nicht akzeptiert werden."
+
+#  Template: nbd-client/host
+#  ddtp-prioritize: 42
+#
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "Extra parameters (number: ${number})"
+msgstr "Rechnername des Servers (Nummer: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+msgid ""
+"If you wish to add any extra parameters to nbd-client, then please enter "
+"them here."
+msgstr ""
 
 #. Type: string
 #. Description

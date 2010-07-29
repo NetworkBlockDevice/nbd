@@ -7,15 +7,17 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.11-5\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2009-05-28 06:38+0200\n"
+"POT-Creation-Date: 2010-07-28 22:19-0400\n"
 "PO-Revision-Date: 2009-05-31 11:59+0400\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
+"Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: KBabel 1.11.4\n"
-"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #. Type: error
 #. Description
@@ -74,13 +76,15 @@ msgstr ""
 #. Choices
 #: ../nbd-client.templates:4001
 msgid "swap, filesystem, raw"
-msgstr "пространство подкачки, файловая система, неразмеченное устройство (raw)"
+msgstr ""
+"пространство подкачки, файловая система, неразмеченное устройство (raw)"
 
 #. Type: select
 #. Description
 #: ../nbd-client.templates:4002
 msgid "Intended use of the network block device number ${number}:"
-msgstr "Как будет использоваться сетевое блочное устройство под номером ${number}:"
+msgstr ""
+"Как будет использоваться сетевое блочное устройство под номером ${number}:"
 
 #. Type: select
 #. Description
@@ -154,11 +158,6 @@ msgstr "Элемент /dev для данного nbd-client (номер: ${numb
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#| msgid ""
-#| "Every nbd-client process needs to be associated with a /dev entry with "
-#| "major mode 43. Please enter the name of the /dev entry you want to use "
-#| "for this nbd-client. Note that this needs to be the full path to that "
-#| "entry, not just the last part."
 msgid ""
 "Every nbd-client process needs to be associated with a /dev entry with major "
 "number 43. Please enter the name of the /dev entry you want to use for this "
@@ -212,6 +211,22 @@ msgstr ""
 "По умолчанию (исторически сложилось) отключаются все устройства nbd-client. "
 "Если устройство с корневой или другой критически важной файловой системой "
 "расположено на NBD, то это приведёт к потере данных и неприемлемо."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "Extra parameters (number: ${number})"
+msgstr "Имя хоста сервера (номер: ${number})?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+msgid ""
+"If you wish to add any extra parameters to nbd-client, then please enter "
+"them here."
+msgstr ""
 
 #. Type: string
 #. Description
@@ -389,4 +404,3 @@ msgstr ""
 "Если файл настройки в новом формате уже существует и вы ответите "
 "утвердительно, то вскоре вы увидите обычный диалог \"изменяется файл "
 "настройки\"."
-

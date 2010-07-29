@@ -78,3 +78,9 @@ _Description: Disconnect all NBD devices on "stop"?
  The default (and the traditional behavior) is to disconnect all
  nbd-client devices. If the root device or other critical file systems
  are on NBD this will cause data loss and should not be accepted.
+
+Template: nbd-client/extra
+Type: string
+_Description: Extra parameters (number: ${number})
+ If you wish to add any extra parameters to nbd-client, then please
+ enter them here.

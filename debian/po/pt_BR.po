@@ -7,10 +7,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd_2.4-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2009-05-28 13:58+0200\n"
+"POT-Creation-Date: 2010-07-28 22:19-0400\n"
 "PO-Revision-Date: 2003-08-31 13:22-0300\n"
 "Last-Translator: André Luís Lopes <andrelop@debian.org>\n"
 "Language-Team: Debian-BR Project <debian-l10n-portuguese@lists.debian.org>\n"
+"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=ISO-8859-1\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -243,6 +244,25 @@ msgid ""
 "The default (and the traditional behavior) is to disconnect all nbd-client "
 "devices. If the root device or other critical file systems are on NBD this "
 "will cause data loss and should not be accepted."
+msgstr ""
+
+#  Template: nbd-client/host
+#  ddtp-prioritize: 42
+#
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "Extra parameters (number: ${number})"
+msgstr "Hostname do servidor (número: ${number}) ?"
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:9001
+msgid ""
+"If you wish to add any extra parameters to nbd-client, then please enter "
+"them here."
 msgstr ""
 
 #. Type: string
