@@ -21,6 +21,8 @@ NBD_HOST[0]=
 # The port on which this client needs to connect
 NBD_PORT[0]=
 #
+# Any extra parameters you would want to specify
+NBD_EXTRA[0]=
 # The second networked block device could look like:
 # NBD_DEVICE[1]=/dev/nbd1
 # NBD_TYPE[1]="f"
