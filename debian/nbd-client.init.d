@@ -110,7 +110,7 @@ case "$1" in
 	  then
 	  	echo "${NBD_DEVICE[$i]} already connected, skipping..."
 	  else
-	  	$DAEMON ${NBD_HOST[$i]} ${NBD_PORT[$i]} ${NBD_DEVICE[$i]}
+	  	$DAEMON ${NBD_HOST[$i]} ${NBD_PORT[$i]} ${NBD_DEVICE[$i]} ${NBD_EXTRA[$i]}
 	  	echo "connected ${NBD_DEVICE[$i]}"
 	  fi
 	  i=$(($i + 1))

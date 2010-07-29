@@ -77,6 +77,8 @@ case "$1" in
 			's/\(^NBD_EXTRA\['$i'\]=\).*/\1"'$extra'"/g' \
                          $TMPFILE
                     grep "NBD_TYPE\[$i\]=\""$type_ $TMPFILE >/dev/null || (echo "NBD_TYPE[$i]=\""$type_'"'; echo "NBD_DEVICE[$i]=\""$device'"'; echo "NBD_HOST[$i]=\""$host'"'; echo "NBD_PORT[$i]=\""$port'"'; echo "NBD_EXTRA[$i]=\""$extra'"') >> $TMPFILE
+		    # Needed for upgrades from before 2.9.16
+		    grep "NBD_EXTRA\[$i\]=\""$extra $TMPFILE >/dev/null || (echo "NBD_EXTRA[$i]=\""$extra'"') >> $TMPFILE
                 done
             fi
 	    [ -e /etc/nbd-client ] && mv /etc/nbd-client /etc/nbd-client.bak

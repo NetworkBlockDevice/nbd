@@ -1,3 +1,10 @@
+nbd (1:2.9.16-2) unstable; urgency=low
+
+  * Actually use the friggin' config file variable that we created in
+    the previous release. Oops.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 28 Jul 2010 22:59:13 -0400
+
 nbd (1:2.9.16-1) unstable; urgency=low
 
   * New upstream release
