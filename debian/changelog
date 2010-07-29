@@ -1,9 +1,11 @@
 nbd (1:2.9.15-5) unstable; urgency=low
 
-  * Replace nbd-client's Architecture: field by Architecture: any, which
-    is allowed by Policy 3.9. Whee!
+  * Replace nbd-client's Architecture: field by Architecture: linux-any,
+    which is allowed by Policy 3.9. Whee!
+  * Fix nbd-client initrd script, *again*. Sigh. Thanks, Vagrant.
+    Closes: #590749.
 
- -- Wouter Verhelst <wouter@debian.org>  Sat, 24 Jul 2010 00:03:35 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 28 Jul 2010 22:03:24 -0400
 
 nbd (1:2.9.15-4) unstable; urgency=low
 

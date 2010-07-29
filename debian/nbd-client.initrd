@@ -10,11 +10,13 @@ esac
 . /scripts/functions
 
 log_begin_msg "Setting up nbd-client"
+
+configure_networking
+
 for x in $(cat /proc/cmdline); do
 	# Support setting stuff using DHCP
 	case $x in
 		nbdroot=dhcp)
-			configure_networking
 			x="$ROOTPATH"
 			;;
 	esac
