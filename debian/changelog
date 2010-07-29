@@ -1,5 +1,6 @@
-nbd (1:2.9.15-5) unstable; urgency=low
+nbd (1:2.9.16-1) unstable; urgency=low
 
+  * New upstream release
   * Replace nbd-client's Architecture: field by Architecture: linux-any,
     which is allowed by Policy 3.9. Whee!
   * Fix nbd-client initrd script, *again*. Sigh. Thanks, Vagrant.

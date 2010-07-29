@@ -274,7 +274,7 @@ int authorized_client(CLIENT *opts) {
 				return 0;
 			}
 			*(tmp++)=0;
-			if(inet_aton(line,&addr)) {
+			if(!inet_aton(line,&addr)) {
 				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
 			}
@@ -539,6 +539,12 @@ void remove_server(gpointer s) {
 	g_free(server->exportname);
 	if(server->authname)
 		g_free(server->authname);
+	if(server->listenaddr)
+		g_free(server->listenaddr);
+	if(server->prerun)
+		g_free(server->prerun);
+	if(server->postrun)
+		g_free(server->postrun);
 	g_free(server);
 }
 
@@ -905,7 +911,7 @@ off_t size_autodetect(int fhandle) {
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE64
 	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
-	if (!ioctl(fhandle, BLKGETSIZE64, bytes) && bytes) {
+	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
 		return (off_t)bytes;
 	}
 #endif /* BLKGETSIZE64 */
@@ -1657,11 +1663,9 @@ int serveloop(GArray* servers) {
  * @param serve the server we want to connect.
  **/
 void setup_serve(SERVER *serve) {
-	struct sockaddr_storage addrin;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	struct sigaction sa;
-	int addrinlen = sizeof(addrin);
 	int sock_flags;
 #ifndef sun
 	int yes=1;
@@ -1914,11 +1918,15 @@ int main(int argc, char *argv[]) {
 		}
 	}
     
-    if(!servers || !servers->len) {
+	if(!servers || !servers->len) {
 		g_warning("Could not parse config file: %s", 
 				err ? err->message : "Unknown error");
 	}
-    
+	if(serve) {
+		g_warning("Specifying an export on the command line is deprecated.");
+		g_warning("Please use a configuration file instead.");
+	}
+
 	if((!serve) && (!servers||!servers->len)) {
 		g_message("Nothing to do! Bye!");
 		exit(EXIT_FAILURE);

@@ -34,6 +34,7 @@
 #include <sys/mount.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <getopt.h>
 
 #ifndef __GNUC__
 #error I need GCC to work
@@ -48,6 +49,7 @@ int check_conn(char* devname, int do_print) {
 	char* p;
 	int fd;
 	int len;
+
 	if(!strncmp(devname, "/dev/", 5)) {
 		devname+=5;
 	}
@@ -223,10 +225,45 @@ void finish_sock(int sock, int nbd, int swap) {
 		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
+void usage(void) {
+	fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
+	fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-sdp] [-persist] [-nofork]\n");
+	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
+	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
+	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
+	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
+	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
+	fprintf(stderr, "blocksizes other than 1024 without patches\n");
+}
+
+void disconnect(char* device) {
+	int nbd = open(device, O_RDWR);
+
+	if (nbd < 0)
+		err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
+	printf("Disconnecting: que, ");
+	if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
+		err("Ioctl failed: %m\n");
+	printf("disconnect, ");
+#ifdef NBD_DISCONNECT
+	if (ioctl(nbd, NBD_DISCONNECT)<0)
+		err("Ioctl failed: %m\n");
+	printf("sock, ");
+#else
+	fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
+	exit(1);
+#endif
+	if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
+		err("Ioctl failed: %m\n");
+	printf("done\n");
+}
+
 int main(int argc, char *argv[]) {
-	int port, sock, nbd;
+	int port=0;
+	int sock, nbd;
 	int blocksize=1024;
-	char *hostname, *nbddev;
+	char *hostname=NULL;
+	char *nbddev=NULL;
 	int swap=0;
 	int cont=0;
 	int timeout=0;
@@ -234,102 +271,105 @@ int main(int argc, char *argv[]) {
 	int nofork=0;
 	u64 size64;
 	u32 flags;
+	int c;
+	int nonspecial=0;
+	struct option long_options[] = {
+		{ "block-size", required_argument, NULL, 'b' },
+		{ "check", required_argument, NULL, 'c' },
+		{ "disconnect", required_argument, NULL, 'd' },
+		{ "help", no_argument, NULL, 'h' },
+		{ "nofork", no_argument, NULL, 'n' },
+		{ "persist", no_argument, NULL, 'p' },
+		{ "sdp", no_argument, NULL, 'S' },
+		{ "swap", no_argument, NULL, 's' },
+		{ "timeout", required_argument, NULL, 't' },
+	};
 
 	logging();
 
-	if (argc < 3) {
-	errmsg:
-		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
-		fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-persist] [-nofork]\n");
-		fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
-		fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
-		fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
-		fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
-		fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
-		fprintf(stderr, "blocksizes other than 1024 without patches\n");
-		return 1;
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hnpSst:", long_options, NULL))>=0) {
+		switch(c) {
+		case 1:
+			// non-option argument
+			if(strchr(optarg, '=')) {
+				// old-style 'bs=' or 'timeout='
+				// argument
+				fprintf(stderr, "WARNING: old-style command-line argument encountered. This is deprecated.\n");
+				if(!strncmp(optarg, "bs=", 3)) {
+					optarg+=3;
+					goto blocksize;
+				}
+				if(!strncmp(optarg, "timeout=", 8)) {
+					optarg+=8;
+					goto timeout;
+				}
+				fprintf(stderr, "ERROR: unknown option %s encountered\n", optarg);
+				exit(EXIT_FAILURE);
+			}
+			switch(nonspecial++) {
+				case 0:
+					// host
+					hostname=optarg;
+					break;
+				case 1:
+					// port
+					port = strtol(optarg, NULL, 0);
+					break;
+				case 2:
+					// device
+					nbddev = optarg;
+					break;
+				default:
+					fprintf(stderr, "ERROR: too many non-option arguments specified\n");
+					exit(EXIT_FAILURE);
+			}
+			break;
+		case 'b':
+		      blocksize:
+			blocksize=(int)strtol(optarg, NULL, 0);
+			break;
+		case 'c':
+			check_conn(optarg, 1);
+			exit(EXIT_SUCCESS);
+		case 'd':
+			disconnect(optarg);
+			exit(EXIT_SUCCESS);
+		case 'h':
+			usage();
+			exit(EXIT_SUCCESS);
+		case 'n':
+			nofork=1;
+			break;
+		case 'p':
+			cont=1;
+			break;
+		case 's':
+			swap=1;
+			break;
+		case 'S':
+			sdp=1;
+			break;
+		case 't':
+		      timeout:
+			timeout=strtol(optarg, NULL, 0);
+			break;
+		default:
+			fprintf(stderr, "E: option eaten by 42 mice\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
-	++argv; --argc; /* skip programname */
-
-	if (strcmp(argv[0], "-d")==0) {
-		nbd = open(argv[1], O_RDWR);
-		if (nbd < 0)
-			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-		printf("Disconnecting: que, ");
-		if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
-			err("Ioctl failed: %m\n");
-		printf("disconnect, ");
-#ifdef NBD_DISCONNECT
-		if (ioctl(nbd, NBD_DISCONNECT)<0)
-			err("Ioctl failed: %m\n");
-		printf("sock, ");
-#else
-		fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
-		exit(1);
-#endif
-		if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
-			err("Ioctl failed: %m\n");
-		printf("done\n");
-		return 0;
-	}
-	if(strcmp(argv[0], "-c")==0) {
-		return check_conn(argv[1], 1);
-	}
-	
-	if (strncmp(argv[0], "bs=", 3)==0) {
-		blocksize=atoi(argv[0]+3);
-		++argv; --argc; /* skip blocksize */
+	if(!port || !hostname || !nbddev) {
+		usage();
+		exit(EXIT_FAILURE);
 	}
 
-	if (strncmp(argv[0], "timeout=", 8)==0) {
-		timeout=atoi(argv[0]+8);
-		++argv; --argc; /* skip timeout */
-	}
-	
-	if (argc==0) goto errmsg;
-	hostname=argv[0];
-	++argv; --argc; /* skip hostname */
-
-	if (argc==0) goto errmsg;
-	port = atoi(argv[0]);
-	++argv; --argc; /* skip port */
-
-	if (argc==0) goto errmsg;
-	nbddev = argv[0];
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 	++argv; --argc; /* skip device */
 
-	if (argc>3) goto errmsg;
-	if (argc) {
-		if(strncmp(argv[0], "-swap", 5)==0) {
-			swap=1;
-			++argv;--argc;
-		}
-	}
-	if (argc) {
-		if(strncmp(argv[0], "-persist", 8)==0) {
-			cont=1;
-			++argv;--argc;
-		}
-	}
-	if (argc) {
-		if(strncmp(argv[0], "-sdp", 4)==0) {
-			sdp=1;
-			++argv;--argc;
-		}
-	}
-	if (argc) {
-		if(strncmp(argv[0], "-nofork", 7)==0) {
-			nofork=1;
-			++argv;--argc;
-		}
-	}
-	if(argc) goto errmsg;
 	sock = opennet(hostname, port, sdp);
-	argv=NULL; argc=0; /* don't use it later suddenly */
 
 	negotiate(sock, &size64, &flags);
 	setsizes(nbd, size64, blocksize, flags);
@@ -340,7 +380,9 @@ int main(int argc, char *argv[]) {
 	
 #ifndef NOFORK
 	if(!nofork) daemon(0,0);
+#endif
 	do {
+#ifndef NOFORK
 		if (fork()) {
 			/* Due to a race, the kernel NBD driver cannot
 			 * call for a reread of the partition table

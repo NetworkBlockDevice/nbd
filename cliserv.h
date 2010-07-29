@@ -35,21 +35,9 @@ typedef unsigned long long u64;
 #error I need at least some 64-bit type
 #endif
 
-#ifdef NBD_H_LOCAL
-/* 2.6.18 and above use __be* rather than u* */
 #define __be32 u32
 #define __be64 u64
 #include "nbd.h"
-#endif
-#ifdef NBD_H_LINUX
-# ifdef HAVE_LINUX_TYPES_H
-#  include <linux/types.h>
-# else
-#  define __be32 u32
-#  define __be64 u64
-# endif
-# include <linux/nbd.h>
-#endif
 
 #if NBD_LFS==1
 #define _LARGEFILE_SOURCE

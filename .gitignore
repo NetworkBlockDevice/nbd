@@ -4,8 +4,7 @@ autom4te.cache
 autoscan.log
 config.h
 *~
-config.log
-config.status
+config.*
 file
 nbd-client.8
 nbd-server.1
@@ -22,5 +21,14 @@ nbd-server
 doc
 ./nbd-server.config
 nbd-server.5
-nbd.h
 *.o
+nbd-client.8.in
+nbd-server.1.in
+nbd-server.5.in
+Makefile.in
+config.h.in
+aclocal.m4
+INSTALL
+depcomp
+install-sh
+configure

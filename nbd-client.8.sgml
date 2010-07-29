@@ -105,8 +105,9 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term><option>host</option></term>
 	<listitem>
-	  <para>The hostname of the machine running
-	    <command>nbd-server</command>.</para>
+	  <para>The hostname or IP address of the machine running
+	    <command>nbd-server</command>. Since 2.9.15, the NBD
+	    utilities support IPv6.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -197,9 +198,9 @@ manpage.1: manpage.sgml
       <listitem>
 	<para>To connect to a server running on port 2000 at host
 	  "server.domain.com", using the client's block special file
-	  "/dev/nb0":</para>
+	  "/dev/nbd0":</para>
 	<para><command>nbd-client server.domain.com 2000
-	  /dev/nb0</command></para>
+	  /dev/nbd0</command></para>
       </listitem>
       <listitem>
 	<para>To connect to a server running on port 2001 at host

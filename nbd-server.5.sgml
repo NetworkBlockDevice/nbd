@@ -238,10 +238,13 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Optional; string</para>
 	  <para>If this option is set, it should contain the local IP
-	  address (in "dotted-quad" notation) on which we should
-	  listen to <command>nbd-client</command>(8) connections. If
-	  it is not set, 0.0.0.0 is used (i.e., "listen on all local
-	  IP addresses")</para>
+	  address on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not
+	    set, <command>nbd-server</command> will listen to all
+	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
+	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
+	  is not possible to specify more than one IP address
+	  here.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -254,8 +257,8 @@ manpage.1: manpage.sgml
 	    form
 	    <replaceable>exportname</replaceable>.<replaceable>integer</replaceable>,
 	    with <replaceable>exportname</replaceable> being the
-	    filename that would otherwise have been used (after
-	    name transformation for virtualization, if any, has been
+	    filename that would otherwise have been used (after name
+	    transformation for virtualization, if any, has been
 	    performed) and <replaceable>integer</replaceable> an
 	    integer number, starting with 0 and ending when no more
 	    files can be found.
@@ -416,14 +419,14 @@ manpage.1: manpage.sgml
 		  <command>nbd-server</command> will look for the
 		  literal string '%s' in the
 		  <option>exportname</option>, and replace it by the
-		  IP address of the connecting host in dotted-quad
-		  notation. The string that results from this
-		  transformation will be used as an absolute pathname
-		  that <command>nbd-server</command> will attempt to
-		  open. As an example, if a client connects from
-		  192.168.1.100 and <option>exportname</option> is
-		  specified as <filename>/export/%s</filename>, then
-		  nbd-server will attempt to serve
+		  address of the connecting host. The string that
+		  results from this transformation will be used as an
+		  absolute pathname that <command>nbd-server</command>
+		  will attempt to open. As an example, if a client
+		  connects from 192.168.1.100 and
+		  <option>exportname</option> is specified as
+		  <filename>/export/%s</filename>, then nbd-server
+		  will attempt to serve
 		  <filename>/export/192.168.1.100</filename>
 		</para>
 	      </listitem>
@@ -438,6 +441,11 @@ manpage.1: manpage.sgml
 		  same example, <command>nbd-server</command> would
 		  open <filename>/export/192/168/1/100</filename>
 		  instead.
+		</para>
+		<para>
+		  Since there are no dots in most IPv6 addresses, the
+		  effect of using this option when IPv6 is in use is
+		  indistinguishable from the ipliteral option.
 		</para>
 	      </listitem>
 	    </varlistentry>
@@ -458,6 +466,7 @@ manpage.1: manpage.sgml
 		  <command>nbd-server</command> will try to open
 		  <filename>/export/192.168.1.64/192.168.1.100</filename>.
 		</para>
+		<para>This option works as expected for IPv6.</para>
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
