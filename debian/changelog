@@ -13,6 +13,7 @@ nbd (1:2.9.16-1) unstable; urgency=low
     which is allowed by Policy 3.9. Whee!
   * Fix nbd-client initrd script, *again*. Sigh. Thanks, Vagrant.
     Closes: #590749.
+  * silence the "grep KILLALL" call in nbd-client postinst
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 28 Jul 2010 22:21:02 -0400
 

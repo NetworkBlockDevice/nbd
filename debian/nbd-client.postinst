@@ -39,7 +39,7 @@ case "$1" in
             TMPFILE=`mktemp /tmp/nbd-client.XXXXXX`
             cat $CFTMPL > $TMPFILE
 	    sed -i -e "s/\(^KILLALL=\).*/\1\"$KILLALL\"/g" $TMPFILE
-	    grep "KILLALL" $TMPFILE || echo "KILLALL=\"$KILLALL\"" >> $TMPFILE
+	    grep "KILLALL" $TMPFILE >/dev/null || echo "KILLALL=\"$KILLALL\"" >> $TMPFILE
             if [ "$NUMBER" -gt 0 ]
             then
                 for i in $(seq 0 $(( $NUMBER - 1 )) )
