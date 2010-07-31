@@ -1,3 +1,10 @@
+nbd (1:2.9.16-3) unstable; urgency=low
+
+  * Updated translations:
+    - Portuguese, by Américo Monteiro; Closes: #591019.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 30 Jul 2010 20:31:23 -0400
+
 nbd (1:2.9.16-2) unstable; urgency=low
 
   * Actually use the friggin' config file variable that we created in
