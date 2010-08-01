@@ -38,6 +38,8 @@ msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
 "\"n\". The file will therefore not be regenerated automatically."
 msgstr ""
+"Het bestand /etc/nbd-client bevat een lijn die de variabele 'AUTO_GEN' op "
+"\"n\" zet. Het bestand zal daarom niet automatisch geregenereerd worden."
 
 #. Type: error
 #. Description
@@ -137,6 +139,8 @@ msgid ""
 "Please enter the network name or IP address of the machine on which the nbd-"
 "server process is running."
 msgstr ""
+"Gelieve de netwerknaam of het IP adres van de machine waarop de nbd-server "
+"draait, in te geven."
 
 #. Type: string
 #. Description
@@ -148,7 +152,7 @@ msgstr "Op welke poort draait de nbd-server (nummer: ${number})?"
 #. Description
 #: ../nbd-client.templates:6001
 msgid "Please enter the TCP port number to access nbd-server."
-msgstr ""
+msgstr "Gelieve de TCP poortnummer om nbd-server te benaderen, in te geven."
 
 #. Type: string
 #. Description

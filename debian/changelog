@@ -4,8 +4,10 @@ nbd (1:2.9.16-3) unstable; urgency=low
     - Portuguese, by Américo Monteiro; Closes: #591019.
     - French, by Christian Perrier; Closes: #591095.
     - Russian, by Yuri Kozlov; Closes: #591239.
+    - Dutch, by myself. Apparently I missed some strings last time
+      around.
 
- -- Wouter Verhelst <wouter@debian.org>  Sat, 31 Jul 2010 17:01:29 -0400
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 01 Aug 2010 12:46:21 -0400
 
 nbd (1:2.9.16-2) unstable; urgency=low
 
