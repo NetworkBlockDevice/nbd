@@ -7,42 +7,56 @@ prereqs)
 	;;
 esac
 
+for x in $(cat /proc/cmdline); do
+	case $x in
+		nbdroot*)
+			nbdroot="${x}"
+			;;
+		root=/dev/nbd*)
+			# be noisy if nbdroot is not also set
+			nbdrootdev="${x#root=}"
+			nbdbasedev="${x#root=/dev/}"
+			;;
+	esac
+done
+
+# if nbd root is not requested exit early and silently
+if [ -z "${nbdroot}" ]; then
+	exit 0
+fi
+
 . /scripts/functions
 
 log_begin_msg "Setting up nbd-client"
 
 configure_networking
 
-for x in $(cat /proc/cmdline); do
-	# Support setting stuff using DHCP
-	case $x in
-		nbdroot=dhcp)
-			x="$ROOTPATH"
-			;;
-	esac
-	case $x in
-		nbdroot=*,*,*)
-			nbdroot="${x#nbdroot=}"
-			nbdsrv="${nbdroot%%,*}"
-			nbdport="${nbdroot%,*}"
-			nbdport="${nbdport##*,}"
+x="$nbdroot"
+# Support setting stuff using DHCP
+case $x in
+	nbdroot=dhcp)
+		x="$ROOTPATH"
+		;;
+esac
+case $x in
+	nbdroot=*,*,*)
+		nbdroot="${x#nbdroot=}"
+		nbdsrv="${nbdroot%%,*}"
+		nbdport="${nbdroot%,*}"
+		nbdport="${nbdport##*,}"
+		# root= parameter overrides three-option nbdroot= parameter
+		if [ -z "$nbdrootdev" ]
+		then
 			nbdbasedev="${nbdroot##*,}"
 			nbdrootdev=/dev/$nbdbasedev
-			;;
-		nbdroot=*,*)
-			nbdroot="${x#nbdroot=}"
-			nbdsrv="${nbdroot%,*}"
-			nbdport="${nbdroot#*,}"
-			;;
-		ip=*)
-			IP="${x#ip=}"
-			;;
-		root=/dev/nbd*)
-			nbdrootdev="${x#root=}"
-			nbdbasedev="${x#root=/dev/}"
-			;;
-	esac
-done
+		fi
+		;;
+	nbdroot=*,*)
+		nbdroot="${x#nbdroot=}"
+		nbdsrv="${nbdroot%,*}"
+		nbdport="${nbdroot#*,}"
+		;;
+esac
 
 nbdrootdev=${nbdrootdev%p*}
 nbdbasedev=${nbdbasedev%p*}

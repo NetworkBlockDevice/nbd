@@ -6,8 +6,13 @@ nbd (1:2.9.16-3) unstable; urgency=low
     - Russian, by Yuri Kozlov; Closes: #591239.
     - Dutch, by myself. Apparently I missed some strings last time
       around.
+  * Make nbd-client initramfs script not try to do networking unless
+    root-on-NBD was actually requested; also, make "root" kernel command
+    line parameter override the NBD device of the 3-option version of
+    nbdroot, so that order no longer matters. Thanks, Niall Walsh;
+    Closes: #591275. initramfs scripts *suck*.
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 01 Aug 2010 12:46:21 -0400
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 01 Aug 2010 15:39:49 -0400
 
 nbd (1:2.9.16-2) unstable; urgency=low
 
