@@ -137,7 +137,7 @@ u64 ntohll(u64 a) {
 #define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */
 #define NBD_FLAG_READ_ONLY	(1 << 1)	/* Device is read-only */
 
-#define NBD_DEFAULT_PORT	"12345"	/* Port on which named exports are
+#define NBD_DEFAULT_PORT	"10809"	/* Port on which named exports are
 					 * served */
 
 /* Options that the client can select to the server */
