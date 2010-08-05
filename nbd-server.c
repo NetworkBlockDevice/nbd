@@ -515,6 +515,8 @@ SERVER* cmdline(int argc, char *argv[]) {
 	if(nonspecial<2) {
 		g_free(serve);
 		serve=NULL;
+	} else {
+		do_oldstyle = TRUE;
 	}
 	if(do_output) {
 		if(!serve) {
@@ -1231,7 +1233,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 			if(client)
 				exit(EXIT_FAILURE);
 		}
-		magic = htonll(opts_magic);
+		if(client && client->modern) {
+			magic = htonll(opts_magic);
+		} else {
+			magic = htonll(cliserv_magic);
+		}
 		if (write(net, &magic, sizeof(magic)) < 0) {
 			err_nonfatal("Negotiation failed: %m");
 			if(client)
