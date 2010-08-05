@@ -7,6 +7,7 @@ nbd (1:2.9.16-3) unstable; urgency=low
     - Dutch, by myself. Apparently I missed some strings last time
       around.
     - Swedish, by Martin Bagge; Closes: #591309.
+    - Czech, by Miroslav Kure; Closes: #591845.
   * Make nbd-client initramfs script not try to do networking unless
     root-on-NBD was actually requested; also, make "root" kernel command
     line parameter override the NBD device of the 3-option version of

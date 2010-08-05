@@ -16,7 +16,7 @@ msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2010-07-28 22:19-0400\n"
-"PO-Revision-Date: 2009-05-23 10:39+0200\n"
+"PO-Revision-Date: 2010-08-05 22:51+0200\n"
 "Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
 "Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
 "Language: cs\n"
@@ -158,7 +158,6 @@ msgstr "Záznam v /dev pro tohoto klienta (číslo ${number})?"
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
 #| msgid ""
 #| "Every nbd-client process needs to be associated with a /dev entry with "
 #| "major mode 43. Please enter the name of the /dev entry you want to use "
@@ -221,10 +220,9 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:9001
-#, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
 msgid "Extra parameters (number: ${number})"
-msgstr "Jméno serveru (číslo ${number})?"
+msgstr "Speciální parametry (číslo ${number})"
 
 #. Type: string
 #. Description
@@ -233,6 +231,7 @@ msgid ""
 "If you wish to add any extra parameters to nbd-client, then please enter "
 "them here."
 msgstr ""
+"Chcete-li si zadatf nbd-klientu dodatečné parametry, zadejte je prosím zde."
 
 #. Type: string
 #. Description
@@ -382,7 +381,7 @@ msgid ""
 "current nbd-server package no longer supports this file and will not work if "
 "it is kept as is."
 msgstr ""
-"V systému byl nalezen konfigurační soubor nbd-serveru < 2..9. Současný balík "
+"V systému byl nalezen konfigurační soubor nbd-serveru < 2...9. Současný balík "
 "nbd-server již tento soubor nepodporuje a pokud soubor nepřevedete na "
 "novější formát, nebude nbd-server fungovat."
 
@@ -429,7 +428,7 @@ msgstr ""
 #~ "počítače, nebo jeho IP adresu."
 
 #~ msgid ""
-#~ "You need to fill in the portnumber on which the nbd-server is running.. "
+#~ "You need to fill in the portnumber on which the nbd-server is running... "
 #~ "This could technically be any number between 1 and 65535, but for this to "
 #~ "work, it needs to be the one on which a server can be found on the "
 #~ "machine running nbd-server..."
@@ -482,7 +481,7 @@ msgstr ""
 #~ "ekvivalent. To znamená, že nechcete, abych soubor obnovoval automaticky."
 
 #~ msgid ""
-#~ "A pre-2.9 nbd-server configuration file has been found on your system.. "
+#~ "A pre-2.9 nbd-server configuration file has been found on your system... "
 #~ "The current nbd-server package no longer supports this file; if you "
 #~ "depend on it, your nbd-server no longer works. If you accept this option, "
 #~ "the system will generate a new style configuration file based upon your "
