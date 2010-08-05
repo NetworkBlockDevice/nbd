@@ -13,7 +13,6 @@ for x in $(cat /proc/cmdline); do
 			nbdroot="${x}"
 			;;
 		root=/dev/nbd*)
-			# be noisy if nbdroot is not also set
 			nbdrootdev="${x#root=}"
 			nbdbasedev="${x#root=/dev/}"
 			;;
