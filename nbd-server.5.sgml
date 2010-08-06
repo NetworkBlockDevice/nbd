@@ -161,6 +161,16 @@ manpage.1: manpage.sgml
 	    specified). The server will only export devices on the
 	    standard port.
 	  </para>
+	  <para>
+	    For upgrades from pre-2.9.17 versions of nbd, it may be
+	    appropriate to enable the oldstyle parameter until all
+	    clients have been converted to using name-based exports.
+	  </para>
+	  <para>
+	    Note that exports specified on the command line will
+	    always use the old handshake protocol and will not allow
+	    name-based exports.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>

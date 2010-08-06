@@ -834,6 +834,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				g_key_file_free(cfile);
 				return NULL;
 			}
+			if(s.port && !do_oldstyle) {
+				g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
+				g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
+			}
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
