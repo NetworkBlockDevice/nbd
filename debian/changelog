@@ -13,8 +13,11 @@ nbd (1:2.9.16-3) unstable; urgency=low
     line parameter override the NBD device of the 3-option version of
     nbdroot, so that order no longer matters. Thanks, Niall Walsh;
     Closes: #591275. initramfs scripts *suck*.
+  * Steal commit 02a1a143 from git HEAD: Return the right value on
+    nbd-client -c. This is necessary so that the scripts don't get
+    confused on what is connected and what isn't.
 
- -- Wouter Verhelst <wouter@debian.org>  Mon, 02 Aug 2010 14:41:22 -0400
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 06 Aug 2010 13:17:23 -0400
 
 nbd (1:2.9.16-2) unstable; urgency=low
 
