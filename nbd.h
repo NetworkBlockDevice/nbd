@@ -15,7 +15,7 @@
 #ifndef LINUX_NBD_H
 #define LINUX_NBD_H
 
-#include <linux/types.h>
+//#include <linux/types.h>
 
 #define NBD_SET_SOCK	_IO( 0xab, 0 )
 #define NBD_SET_BLKSIZE	_IO( 0xab, 1 )
