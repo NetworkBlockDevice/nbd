@@ -16,6 +16,7 @@ nbd (1:2.9.16-3) unstable; urgency=low
   * Steal commit 02a1a143 from git HEAD: Return the right value on
     nbd-client -c. This is necessary so that the scripts don't get
     confused on what is connected and what isn't.
+  * Update nbd.h so nbd-client -timeout works again.
 
  -- Wouter Verhelst <wouter@debian.org>  Fri, 06 Aug 2010 13:17:23 -0400
 
