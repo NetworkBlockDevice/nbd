@@ -1232,14 +1232,17 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 
 	memset(zeros, '\0', sizeof(zeros));
 	if(!client || !client->modern) {
+		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
 			err_nonfatal("Negotiation failed: %m");
 			if(client)
 				exit(EXIT_FAILURE);
 		}
-		if(client && client->modern) {
+		if(!client || client->modern) {
+			/* modern */
 			magic = htonll(opts_magic);
 		} else {
+			/* oldstyle */
 			magic = htonll(cliserv_magic);
 		}
 		if (write(net, &magic, sizeof(magic)) < 0) {
@@ -1249,6 +1252,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		}
 	}
 	if(!client) {
+		/* modern */
 		uint32_t reserved;
 		uint32_t opt;
 		uint32_t namelen;
@@ -1274,7 +1278,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		read(net, &namelen, sizeof(namelen));
 		namelen = ntohl(namelen);
 		name = malloc(namelen+1);
-		name[namelen+1]=0;
+		name[namelen]=0;
 		read(net, name, namelen);
 		for(i=0; i<servers->len; i++) {
 			SERVER* serve = &(g_array_index(servers, SERVER, i));
@@ -1287,23 +1291,28 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 				return client;
 			}
 		}
+		return NULL;
 	}
+	/* common */
 	size_host = htonll((u64)(client->exportsize));
 	if (write(net, &size_host, 8) < 0)
 		err("Negotiation failed: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
 	if (!client->modern) {
+		/* oldstyle */
 		flags = htonl(flags);
 		if (write(client->net, &flags, 4) < 0)
 			err("Negotiation failed: %m");
 	} else {
+		/* modern */
 		smallflags = (uint16_t)(flags & ~((uint16_t)0));
 		smallflags = htons(smallflags);
 		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
 			err("Negotiation failed: %m");
 		}
 	}
+	/* common */
 	if (write(client->net, zeros, 124) < 0)
 		err("Negotiation failed: %m");
 	return NULL;
@@ -1707,6 +1716,7 @@ int serveloop(GArray* servers) {
 				if(!client) {
 					err_nonfatal("negotiation failed");
 					close(net);
+					net=0;
 				}
 			}
 			for(i=0;i<servers->len && !net;i++) {

@@ -40,6 +40,8 @@
 static gchar errstr[1024];
 const static int errstr_len=1024;
 
+static uint64_t size;
+
 typedef enum {
 	CONNECTION_TYPE_NONE,
 	CONNECTION_TYPE_CONNECT,
@@ -69,12 +71,14 @@ inline int read_all(int f, void *buf, size_t len) {
 	return retval;
 }
 
-int setup_connection(gchar *hostname, int port, CONNECTION_TYPE ctype) {
+int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype) {
 	int sock;
 	struct hostent *host;
 	struct sockaddr_in addr;
 	char buf[256];
+	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
 	u64 tmp64;
+	uint32_t tmp32 = 0;
 
 	sock=0;
 	if(ctype<CONNECTION_TYPE_CONNECT)
@@ -118,20 +122,34 @@ int setup_connection(gchar *hostname, int port, CONNECTION_TYPE ctype) {
 		goto err_open;
 	}
 	tmp64=ntohll(tmp64);
-	if(tmp64 != cliserv_magic) {
-		strncpy(errstr, "cliserv_magic does not match", errstr_len);
+	if(tmp64 != mymagic) {
+		strncpy(errstr, "mymagic does not match", errstr_len);
 		goto err_open;
 	}
 	if(ctype<CONNECTION_TYPE_FULL)
 		goto end;
-	/* The information we get now contains information on sizes. If
-	 * we're here, that means we want a 'working' connection, but
-	 * we're not interested in the sizes. So, read them but throw
-	 * the values away. We need to read the size of the device (a
-	 * 64bit integer) plus the reserved fields (128 bytes; should
-	 * all be zeroes).
-	 */
-	read_all(sock, buf, sizeof(tmp64)+128);
+	if(!name) {
+		read_all(sock, &size, sizeof(size));
+		size=ntohll(size);
+		read_all(sock, buf, 128);
+		goto end;
+	}
+	/* flags */
+	read_all(sock, buf, sizeof(uint16_t));
+	/* reserved field */
+	write(sock, &tmp32, sizeof(tmp32));
+	/* magic */
+	tmp64 = htonll(opts_magic);
+	write(sock, &tmp64, sizeof(tmp64));
+	/* name */
+	tmp32 = htonl(NBD_OPT_EXPORT_NAME);
+	write(sock, &tmp32, sizeof(tmp32));
+	tmp32 = htonl((uint32_t)strlen(name));
+	write(sock, &tmp32, sizeof(tmp32));
+	write(sock, name, strlen(name));
+	read_all(sock, &size, sizeof(size));
+	size = ntohll(size);
+	read_all(sock, buf, sizeof(uint16_t)+124);
 	goto end;
 err_open:
 	close(sock);
@@ -194,11 +212,10 @@ end:
 	return retval;
 }
 
-int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char close_sock) {
+int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
 	long long int i;
 	char buf[1024];
 	struct nbd_request req;
-	u64 size;
 	int requests=0;
 	fd_set set;
 	struct timeval tv;
@@ -214,28 +231,12 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 
 	size=0;
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, CONNECTION_TYPE_CLISERV))<0) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
 		}
-	} else {
-		/* Assume the file is at least 4k in size. Not much of a test
-		 * this way, but, well. */
-		size=4096;
 	}
-	if((tmp=read_all(sock, &size, sizeof(u64)))<0) {
-		retval=-1;
-		snprintf(errstr, errstr_len, "Could not read from socket: %s", strerror(errno));
-		goto err_open;
-	}
-	if(tmp==0) {
-		retval=-1;
-		snprintf(errstr, errstr_len, "Server closed connection unexpectedly when trying to read size of device in throughput test");
-		goto err;
-	}
-	read_all(sock,&buf,128);
-	size=ntohll(size);
 	req.magic=htonl(NBD_REQUEST_MAGIC);
 	req.type=htonl(NBD_CMD_READ);
 	req.len=htonl(1024);
@@ -326,25 +327,32 @@ err:
 
 int main(int argc, char**argv) {
 	gchar *hostname;
-	long int p;
+	long int p = 0;
 	int port;
+	char* name = NULL;
 	int sock=0;
 
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
 		g_message("%d: Usage: %s <hostname> <port>", (int)getpid(), argv[0]);
+		g_message("%d: Or: %s <hostname> -N <exportname>", (int)getpid(), argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	logging();
 	hostname=g_strdup(argv[1]);
-	p=(strtol(argv[2], NULL, 0));
-	if(p==LONG_MIN||p==LONG_MAX) {
-		g_critical("Could not parse port number: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+	if(!strncmp(argv[2], "-N", 2)) {
+		name = g_strdup(argv[3]);
+		p = 10809;
+	} else {
+		p=(strtol(argv[2], NULL, 0));
+		if(p==LONG_MIN||p==LONG_MAX) {
+			g_critical("Could not parse port number: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 	}
 	port=(int)p;
 
-	if(throughput_test(hostname, port, sock, FALSE, TRUE)<0) {
+	if(throughput_test(hostname, port, name, sock, FALSE, TRUE)<0) {
 		g_warning("Could not run throughput test: %s", errstr);
 		exit(EXIT_FAILURE);
 	}

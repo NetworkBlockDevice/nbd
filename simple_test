@@ -3,6 +3,8 @@
 
 tmpnam=`mktemp`
 
+ulimit -c unlimited
+
 # Create a one-meg device
 dd if=/dev/zero of=$tmpnam bs=1024 count=1024
 
@@ -50,6 +52,7 @@ EOF
 	exportname = $tmpnam
 	port = 11114
 	readonly = true
+	listenaddr = 127.0.0.1
 EOF
 		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
 		PID=$!
@@ -65,7 +68,10 @@ EOF
 			else
 				kill $PID
 			fi
-			rm -f $tmpnam nbd-server.conf
+			if [ -z "$2" ]
+			then
+				rm -f $tmpnam nbd-server.conf
+			fi
 			exit $retval
 		fi
 		./nbd-tester-client localhost 11114
@@ -77,30 +83,11 @@ EOF
 [generic]
 [export1]
 	exportname = $tmpnam
-	copyonwrite = true
-	listenaddr = 127.0.0.1
-[export2]
-	exportname = $tmpnam
-	readonly = true
 EOF
 		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
 		PID=$!
 		sleep 1
 		./nbd-tester-client localhost -N export1
-		retval=$?
-		if [ $retval -ne 0 ]
-		then
-			if [ -f nbd-server.pid ]
-			then
-				kill `cat nbd-server.pid`
-				rm -f nbd-server.pid
-			else
-				kill $PID
-			fi
-			rm -f $tmpnam nbd-server.conf
-			exit $retval
-		fi
-		./nbd-tester-client localhost -N export2
 		retval=$?
 	;;
 	*)
@@ -115,8 +102,11 @@ then
 else
 	kill $PID
 fi
+if [ -z "$2" ]
+then
+	rm -f $tmpnam nbd-server.conf
+fi
 if [ $retval -ne 0 ]
 then
 	exit $retval
 fi
-rm -f $tmpnam nbd-server.conf

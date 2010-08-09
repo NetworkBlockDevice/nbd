@@ -1,7 +1,7 @@
 bin_PROGRAMS = nbd-server
 EXTRA_PROGRAMS = nbd-client knbd-client
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
-TESTS = cmd cfg1 cfgmulti
+TESTS = cmd cfg1 cfgmulti cfgnew
 check_PROGRAMS = nbd-tester-client
 knbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_client_SOURCES = nbd-client.c cliserv.h
@@ -28,3 +28,4 @@ dist-hook:
 cmd:
 cfg1:
 cfgmulti:
+cfgnew:
