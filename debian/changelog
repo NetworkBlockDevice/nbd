@@ -8,6 +8,7 @@ nbd (1:2.9.16-3) unstable; urgency=low
       around.
     - Swedish, by Martin Bagge; Closes: #591309.
     - Czech, by Miroslav Kure; Closes: #591845.
+    - German, by Chris Leick; Closes: #592352.
   * Make nbd-client initramfs script not try to do networking unless
     root-on-NBD was actually requested; also, make "root" kernel command
     line parameter override the NBD device of the 3-option version of
@@ -18,7 +19,7 @@ nbd (1:2.9.16-3) unstable; urgency=low
     confused on what is connected and what isn't.
   * Update nbd.h so nbd-client -timeout works again.
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 06 Aug 2010 13:17:23 -0400
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 09 Aug 2010 10:53:04 -0400
 
 nbd (1:2.9.16-2) unstable; urgency=low
 
