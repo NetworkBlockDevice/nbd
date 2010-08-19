@@ -76,9 +76,7 @@ void setmysockopt(int sock) {
 #endif
 #endif
 
-void err(const char *s) G_GNUC_NORETURN;
-
-void err(const char *s) {
+void err_nonfatal(const char *s) {
 	char s1[150], *s2;
 
 	strncpy(s1, s, sizeof(s1));
