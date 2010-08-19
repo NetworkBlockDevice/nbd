@@ -76,11 +76,12 @@ void setmysockopt(int sock) {
 #endif
 #endif
 
-void err_nonfatal(const char *s) {
-	const int maxlen = 150;
-	char s1[maxlen], *s2;
+void err(const char *s) G_GNUC_NORETURN;
 
-	strncpy(s1, s, maxlen);
+void err(const char *s) {
+	char s1[150], *s2;
+
+	strncpy(s1, s, sizeof(s1));
 	if ((s2 = strstr(s, "%m"))) {
 		strcpy(s1 + (s2 - s), strerror(errno));
 		s2 += 2;
@@ -95,7 +96,7 @@ void err_nonfatal(const char *s) {
 	}
 #endif
 
-	s1[maxlen-1] = '\0';
+	s1[sizeof(s1)-1] = '\0';
 #ifdef ISSERVER
 	syslog(LOG_ERR, "%s", s1);
 	syslog(LOG_ERR, "Exiting.");
