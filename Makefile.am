@@ -11,7 +11,7 @@ nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h
 nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.h
 nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
-nbd_server_LDADD = @GLIB_LIBS@
+nbd_server_LDADD = @GLIB_LIBS@ -ldl
 nbd_tester_client_LDADD = @GLIB_LIBS@
 EXTRA_DIST = gznbd simple_test
 dist-hook:

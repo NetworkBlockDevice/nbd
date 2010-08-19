@@ -89,6 +89,7 @@
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
+#include <dlfcn.h>
 
 #include <glib.h>
 
@@ -190,23 +191,26 @@ typedef struct server SERVER;
 typedef struct plugin PLUGIN;
 typedef struct file_info FILE_INFO;
 typedef struct param PARAM;
+
 /**
  * Variables associated with a plugin.
  **/
 struct plugin {
 	void* handle;
 	gchar* name;
-	int (*init_func)(struct plugin);
-	void (*setupexport)(CLIENT* client);
-	ssize_t (*rawexpread)(off_t a, char* buf, size_t len, CLIENT* client);
-	ssize_t (*rawexpwrite)(off_t a, char* buf, size_t len, CLIENT* client);
-	void (*finish)(CLIENT* client);
-	PARAM* params;
-	size_t param_size;
-	gboolean supports_cow;	/**< whether this plugin supports Copy-on-write */
-	gboolean supports_virt;	/**< whether this plugin supports virtualized filenames (virtstyle parameter in config file) */
-	gboolean supports_mult;	/**< whether this plugin supports the multi-file option */
+	int (*init_server)(SERVER* server);	/**< initialize the plugin for a config file section */
+	void (*setupexport)(CLIENT* client);	/**< initialize whatever needs to be initialized upon connection */
+	ssize_t (*rawexpread)(off_t a, char* buf, size_t len, CLIENT* client);	/**< read len bytes from offset a into buffer buf for client */
+	ssize_t (*rawexpwrite)(off_t a, char* buf, size_t len, CLIENT* client); /**< write len bytes onto permanent storage for client with offset a from buf */
+	void (*finish)(CLIENT* client);		/**< close files, clean up */
+	PARAM* params;				/**< any plugin-specific parameters go here */
+	size_t param_size;			/**< (sizeof(params) / sizeof(PARAM)) */
+	gboolean supports_cow;			/**< whether this plugin supports Copy-on-write */
+	gboolean supports_virt;			/**< whether this plugin supports virtualized filenames (virtstyle parameter in config file) */
+	gboolean supports_mult;			/**< whether this plugin supports the multi-file option. Note: this then needs to be implemented by the plugin! */
 };
+
+typedef gboolean(*nbd_plugin_init)(PLUGIN*, GError**);
 
 /**
  * Variables associated with a server.
@@ -230,6 +234,7 @@ struct server {
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
 	PLUGIN* plugin;	     /**< the plugin used to export this file */
+	void* plugin_data;   /**< plugin-specific data for this export. Opaque to nbd-server. */
 };
 
 /**
@@ -574,6 +579,8 @@ typedef enum {
 	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
 				     old-style export. */
 	PLUGIN_UNKNOWN,		/**< Unknown plugin name was encountered in a config file */
+	PLUGIN_LOADERR,		/**< An error was encountered while loading a plugin */
+	PLUGIN_ABIERR,		/**< A plugin was loaded that isn't ABI-compatible */
 } CFILE_ERRORS;
 
 /**
@@ -707,7 +714,7 @@ gboolean set_plugin(gchar* value, SERVER* server, GError** err) {
 	if((server->plugin = g_hash_table_lookup(plugins, value))) {
 		return TRUE;
 	} else {
-		g_set_error(err, errdomain, PLUGIN_UNKNOWN, "E: unknown plugin: %s !", value);
+		g_set_error(err, errdomain, PLUGIN_UNKNOWN, "Unknown plugin: %s !", value);
 		return FALSE;
 	}
 }
@@ -733,7 +740,46 @@ gboolean set_virtstyle(gchar* virtstyle, SERVER* s, GError** err) {
 }
 
 gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
+	gchar** plugins = g_strsplit(value, " ", 0);
+	int i;
 
+	if(!strlen(value)) {
+		g_set_error(err, errdomain, CFILE_VALUE_INVALID, "Must specify at least one plugin if using the plugin keyword");
+		return FALSE;
+	}
+	for(i=0; plugins[i]; i++) {
+		if(strlen(plugins[i])) {
+			PLUGIN* plugin = g_new0(PLUGIN, 1);
+			gchar* fname;
+			nbd_plugin_init initfunc;
+
+			plugin->name = g_strdup(plugins[i]);
+			fname = g_strdup_printf(LIBDIR "/nbd-server/%s.so", plugin->name);
+			plugin->handle = dlopen(fname, RTLD_LAZY | RTLD_LOCAL);
+			if(!plugin->handle) {
+				g_set_error(err, errdomain, PLUGIN_LOADERR, "Could not load plugin %s: %s", plugin->name, dlerror());
+				g_free(plugin->name);
+				g_free(plugin);
+				g_strfreev(plugins);
+				return FALSE;
+			}
+			if(!(initfunc = dlsym(plugin->handle, "nbd_plugin_init"))) {
+				g_set_error(err, errdomain, PLUGIN_ABIERR, "Could not initialize plugin %s: nbd_plugin_init function not found");
+				g_free(plugin->name);
+				g_free(plugin);
+				g_strfreev(plugins);
+				return FALSE;
+			}
+			if(!initfunc(plugin, err)) {
+				g_free(plugin->name);
+				g_free(plugin);
+				g_strfreev(plugins);
+				return FALSE;
+			}
+		}
+	}
+	g_strfreev(plugins);
+	return TRUE;
 }
 
 /**

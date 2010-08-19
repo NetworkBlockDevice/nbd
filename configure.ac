@@ -117,7 +117,7 @@ AM_PATH_GLIB_2_0(2.6.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
+nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"' -DLIBDIR='\"$libdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile Doxyfile man/Makefile man/nbd-client.8 man/nbd-server.5 man/nbd-server.1])
