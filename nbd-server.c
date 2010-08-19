@@ -107,14 +107,14 @@
 #define CFILE SYSCONFDIR "/nbd-server/config"
 
 /** Where our config file actually is */
-gchar* config_file_pos;
+static gchar* config_file_pos;
 
 /** What user we're running as */
-gchar* runuser=NULL;
+static gchar* runuser=NULL;
 /** What group we're running as */
-gchar* rungroup=NULL;
+static gchar* rungroup=NULL;
 /** whether to export using the old negotiation protocol (port-based) */
-gboolean do_oldstyle=FALSE;
+static gboolean do_oldstyle=FALSE;
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -160,17 +160,19 @@ gboolean do_oldstyle=FALSE;
 #define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
 #define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
 #define F_SYNC 64	  /**< Whether to fsync() after a write */
-GHashTable *children;
-char pidfname[256]; /**< name of our PID file */
-char pidftemplate[256]; /**< template to be used for the filename of the PID file */
-char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
+static GHashTable *children;
+static GHashTable *plugins;
+static char pidfname[256]; /**< name of our PID file */
+static char pidftemplate[256]; /**< template to be used for the filename of the PID file */
+static char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
-int modernsock=0;	  /**< Socket for the modern handler. Not used
+static int modernsock=0;  /**< Socket for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
 			       oldstyle is set to false (and then the
 			       command-line client isn't used, gna gna) */
-char* modern_listen;	  /**< listenaddr value for modernsock */
+static char* modern_listen;  /**< listenaddr value for modernsock */
+static GQuark errdomain;
 
 /**
  * Types of virtuatlization
@@ -183,10 +185,33 @@ typedef enum {
 	VIRT_CIDR,	/**< Every subnet in its own directory */
 } VIRT_STYLE;
 
+typedef struct client CLIENT;
+typedef struct server SERVER;
+typedef struct plugin PLUGIN;
+typedef struct file_info FILE_INFO;
+typedef struct param PARAM;
+/**
+ * Variables associated with a plugin.
+ **/
+struct plugin {
+	void* handle;
+	gchar* name;
+	int (*init_func)(struct plugin);
+	void (*setupexport)(CLIENT* client);
+	ssize_t (*rawexpread)(off_t a, char* buf, size_t len, CLIENT* client);
+	ssize_t (*rawexpwrite)(off_t a, char* buf, size_t len, CLIENT* client);
+	void (*finish)(CLIENT* client);
+	PARAM* params;
+	size_t param_size;
+	gboolean supports_cow;	/**< whether this plugin supports Copy-on-write */
+	gboolean supports_virt;	/**< whether this plugin supports virtualized filenames (virtstyle parameter in config file) */
+	gboolean supports_mult;	/**< whether this plugin supports the multi-file option */
+};
+
 /**
  * Variables associated with a server.
  **/
-typedef struct {
+struct server {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
@@ -204,17 +229,18 @@ typedef struct {
 	gchar* postrun;	     /**< command that will be ran after the client
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
-} SERVER;
+	PLUGIN* plugin;	     /**< the plugin used to export this file */
+};
 
 /**
  * Variables associated with a client socket.
  **/
-typedef struct {
+struct file_info {
 	int fhandle;      /**< file descriptor */
 	off_t startoff;   /**< starting offset of this file */
-} FILE_INFO;
+};
 
-typedef struct {
+struct client {
 	off_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer */
 	char *exportname;    /**< (processed) filename of the file we're exporting */
@@ -230,7 +256,7 @@ typedef struct {
 	u32 difffilelen;     /**< number of pages in difffile */
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
-} CLIENT;
+};
 
 /**
  * Type of configuration file values
@@ -244,7 +270,7 @@ typedef enum {
 /**
  * Configuration file values
  **/
-typedef struct {
+struct param {
 	gchar *paramname;	/**< Name of the parameter, as it appears in
 				  the config file */
 	gboolean required;	/**< Whether this is a required (as opposed to
@@ -256,7 +282,8 @@ typedef struct {
 				  overwritten. */
 	gint flagval;		/**< Flag mask for this parameter in case ptype
 				  is PARAM_BOOL. */
-} PARAM;
+	gboolean (*func)(gchar*, SERVER*, GError**); /**< If non-NULL, will be called to handle string option */
+};
 
 /**
  * Check whether a client is allowed to connect. Works with an authorization
@@ -546,6 +573,7 @@ typedef enum {
 				     define any exports */
 	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
 				     old-style export. */
+	PLUGIN_UNKNOWN,		/**< Unknown plugin name was encountered in a config file */
 } CFILE_ERRORS;
 
 /**
@@ -675,6 +703,39 @@ int append_serve(SERVER *s, GArray *a) {
 	return ret;
 }
 
+gboolean set_plugin(gchar* value, SERVER* server, GError** err) {
+	if((server->plugin = g_hash_table_lookup(plugins, value))) {
+		return TRUE;
+	} else {
+		g_set_error(err, errdomain, PLUGIN_UNKNOWN, "E: unknown plugin: %s !", value);
+		return FALSE;
+	}
+}
+
+gboolean set_virtstyle(gchar* virtstyle, SERVER* s, GError** err) {
+	if(!strncmp(virtstyle, "none", 4)) {
+		s->virtstyle=VIRT_NONE;
+	} else if(!strncmp(virtstyle, "ipliteral", 9)) {
+		s->virtstyle=VIRT_IPLIT;
+	} else if(!strncmp(virtstyle, "iphash", 6)) {
+		s->virtstyle=VIRT_IPHASH;
+	} else if(!strncmp(virtstyle, "cidrhash", 8)) {
+		s->virtstyle=VIRT_CIDR;
+		if(strlen(virtstyle)<10) {
+			g_set_error(err, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, s->servename);
+			return FALSE;
+		}
+		s->cidrlen=strtol(virtstyle+8, NULL, 0);
+	} else {
+		g_set_error(err, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, s->servename);
+		return FALSE;
+	}
+}
+
+gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
+
+}
+
 /**
  * Parse the config file.
  *
@@ -689,36 +750,36 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	SERVER s;
-	gchar *virtstyle=NULL;
 	PARAM lp[] = {
-		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
-		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
-		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
-		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "postrun",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
-		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
-		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
-		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
-		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
-		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
-		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
+		{ "plugin",	FALSE,	PARAM_STRING,	NULL, 0,		&set_plugin },
+		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0,		NULL },
+		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0,		NULL },
+		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0,		NULL },
+		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0,		NULL },
+		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0,		&set_virtstyle },
+		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0,		NULL },
+		{ "postrun",	FALSE,	PARAM_STRING,	NULL, 0,		NULL },
+		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY,	NULL },
+		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE,	NULL },
+		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE,	NULL },
+		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE,		NULL },
+		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP,		NULL },
+		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC,		NULL },
+		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0,		NULL },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
-		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
-		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
-		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
+		{ "user",	FALSE, PARAM_STRING,	&runuser,	0,	NULL },
+		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0,	NULL },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1,	NULL },
+		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0,	NULL },
+		{ "plugins",	FALSE, PARAM_STRING,	&plugins,	0,	&load_plugins },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
 	GKeyFile *cfile;
 	GError *err = NULL;
 	const char *err_msg=NULL;
-	GQuark errdomain;
 	GArray *retval=NULL;
 	gchar **groups;
 	gboolean value;
@@ -744,25 +805,27 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	groups = g_key_file_get_groups(cfile, NULL);
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
-		lp[0].target=&(s.exportname);
-		lp[1].target=&(s.port);
-		lp[2].target=&(s.authname);
-		lp[3].target=&(s.expected_size);
-		lp[4].target=&(virtstyle);
-		lp[5].target=&(s.prerun);
-		lp[6].target=&(s.postrun);
-		lp[7].target=lp[8].target=lp[9].target=
-				lp[10].target=lp[11].target=
-				lp[12].target=&(s.flags);
-		lp[13].target=&(s.listenaddr);
+		lp[1].target=&(s.exportname);
+		lp[2].target=&(s.port);
+		lp[3].target=&(s.authname);
+		lp[4].target=&(s.expected_size);
+		lp[6].target=&(s.prerun);
+		lp[7].target=&(s.postrun);
+		lp[8].target=lp[9].target=lp[10].target=
+				lp[11].target=lp[12].target=
+				lp[13].target=&(s.flags);
+		lp[14].target=&(s.listenaddr);
 
+		s.socket_family = AF_UNSPEC;
+		s.servename = groups[i];
+		s.virtstyle=VIRT_IPLIT;
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
 			p=lp;
 			p_size=lp_size;
 		} 
 		for(j=0;j<p_size;j++) {
-			g_assert(p[j].target != NULL);
+			g_assert(p[j].target != NULL || (p[j].func != NULL && p[j].ptype == PARAM_STRING));
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
 			switch(p[j].ptype) {
 				case PARAM_INT:
@@ -773,11 +836,27 @@ GArray* parse_cfile(gchar* f, GError** e) {
 								&err);
 					break;
 				case PARAM_STRING:
-					*((gchar**)p[j].target) =
-						g_key_file_get_string(cfile,
+					if(p[j].func) {
+						gchar* val = g_key_file_get_string(cfile,
 								groups[i],
 								p[j].paramname,
 								&err);
+						if(!err) {
+							if(!(p[j].func)(val, &s, &err)) {
+								g_array_free(retval, TRUE);
+								g_key_file_free(cfile);
+								return NULL;
+							}
+						}
+					} else {
+						if(p[j].target) {
+							*((gchar**)p[j].target) =
+								g_key_file_get_string(cfile,
+										groups[i],
+										p[j].paramname,
+										&err);
+						}
+					}
 					break;
 				case PARAM_BOOL:
 					value = g_key_file_get_boolean(cfile,
@@ -816,42 +895,12 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				return NULL;
 			}
 		}
-		if(virtstyle) {
-			if(!strncmp(virtstyle, "none", 4)) {
-				s.virtstyle=VIRT_NONE;
-			} else if(!strncmp(virtstyle, "ipliteral", 9)) {
-				s.virtstyle=VIRT_IPLIT;
-			} else if(!strncmp(virtstyle, "iphash", 6)) {
-				s.virtstyle=VIRT_IPHASH;
-			} else if(!strncmp(virtstyle, "cidrhash", 8)) {
-				s.virtstyle=VIRT_CIDR;
-				if(strlen(virtstyle)<10) {
-					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
-					g_array_free(retval, TRUE);
-					g_key_file_free(cfile);
-					return NULL;
-				}
-				s.cidrlen=strtol(virtstyle+8, NULL, 0);
-			} else {
-				g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
-				g_array_free(retval, TRUE);
-				g_key_file_free(cfile);
-				return NULL;
-			}
-			if(s.port && !do_oldstyle) {
-				g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
-				g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
-			}
-		} else {
-			s.virtstyle=VIRT_IPLIT;
+		if(s.port && !do_oldstyle) {
+			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
+			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
 		}
-		/* Don't need to free this, it's not our string */
-		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
 		if(i>0) {
-			s.socket_family = AF_UNSPEC;
-			s.servename = groups[i];
-
 			append_serve(&s, retval);
 		} else {
 			if(!do_oldstyle) {
