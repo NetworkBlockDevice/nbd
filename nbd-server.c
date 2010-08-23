@@ -764,7 +764,7 @@ gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
 				return FALSE;
 			}
 			if(!(initfunc = dlsym(plugin->handle, "nbd_plugin_init"))) {
-				g_set_error(err, errdomain, PLUGIN_ABIERR, "Could not initialize plugin %s: nbd_plugin_init function not found");
+				g_set_error(err, errdomain, PLUGIN_ABIERR, "Could not initialize plugin %s: nbd_plugin_init function not found", plugin->name);
 				g_free(plugin->name);
 				g_free(plugin);
 				g_strfreev(plugins);
