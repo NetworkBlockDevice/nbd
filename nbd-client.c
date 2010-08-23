@@ -153,17 +153,22 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 		*flags = ((u32)ntohs(tmp)) << 16;
 
 		/* reserved for future use*/
-		write(sock, &reserved, sizeof(reserved));
+		if (write(sock, &reserved, sizeof(reserved)) < 0)
+			err("Failed/2.1: %m");
 
 		/* Write the export name that we're after */
 		magic = ntohll(opts_magic);
-		write(sock, &magic, sizeof(magic));
+		if (write(sock, &magic, sizeof(magic)) < 0)
+			err("Failed/2.2: %m");
 		opt = ntohl(NBD_OPT_EXPORT_NAME);
-		write(sock, &opt, sizeof(opt));
+		if (write(sock, &opt, sizeof(opt)) < 0)
+			err("Failed/2.3: %m");
 		namesize = (u32)strlen(name);
 		namesize = ntohl(namesize);
-		write(sock, &namesize, sizeof(namesize));
-		write(sock, name, strlen(name));
+		if (write(sock, &namesize, sizeof(namesize)) < 0)
+			err("Failed/2.4: %m");
+		if (write(sock, name, strlen(name)) < 0)
+			err("Failed/2.4: %m");
 	} else {
 		if (magic != cliserv_magic)
 			err("Not enough cliserv_magic");
@@ -441,7 +446,10 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 #ifndef NOFORK
-	if(!nofork) daemon(0,0);
+	if(!nofork) {
+		if (daemon(0,0) < 0)
+			err("Cannot detach from terminal");
+	}
 #endif
 	do {
 #ifndef NOFORK

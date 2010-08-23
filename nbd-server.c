@@ -1265,25 +1265,31 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 
 		if(!servers)
 			err("programmer error");
-		write(net, &smallflags, sizeof(uint16_t));
-		read(net, &reserved, sizeof(reserved));
-		read(net, &magic, sizeof(magic));
+		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
+			err("Negotiation failed: %m");
+		if (read(net, &reserved, sizeof(reserved)) < 0)
+			err("Negotiation failed: %m");
+		if (read(net, &magic, sizeof(magic)) < 0)
+			err("Negotiation failed: %m");
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			close(net);
 			return NULL;
 		}
-		read(net, &opt, sizeof(opt));
+		if (read(net, &opt, sizeof(opt)) < 0)
+			err("Negotiation failed: %m");
 		opt = ntohl(opt);
 		if(opt != NBD_OPT_EXPORT_NAME) {
 			close(net);
 			return NULL;
 		}
-		read(net, &namelen, sizeof(namelen));
+		if (read(net, &namelen, sizeof(namelen)) < 0)
+			err("Negotiation failed: %m");
 		namelen = ntohl(namelen);
 		name = malloc(namelen+1);
 		name[namelen]=0;
-		read(net, name, namelen);
+		if (read(net, name, namelen) < 0)
+			err("Negotiation failed: %m");
 		for(i=0; i<servers->len; i++) {
 			SERVER* serve = &(g_array_index(servers, SERVER, i));
 			if(!strcmp(serve->servename, name)) {
@@ -2044,7 +2050,7 @@ void glib_message_syslog_redirect(const gchar *log_domain,
       default:
         level=LOG_ERR;
     }
-    syslog(level, message);
+    syslog(level, "%s", message);
 }
 #endif
 
