@@ -9,7 +9,7 @@ KILLALL=true
 # if you set things in a dynamical way (e.g., through a database)
 #
 # Name of the first used nbd /dev-entry:
-NBD_DEVICE[0]=/dev/nbd0
+NBD_DEVICE[0]=
 #
 # Type; s=swap, f=filesystem (with entry in /etc/fstab), r=raw (no other setup
 # than to run the client)

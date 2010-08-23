@@ -41,7 +41,7 @@ test -x $DAEMON || exit 0
 get_devices() {
     DEVICES=
     i=0
-    while [ ! -z ${NBD_DEVICE[$i]} ]
+    while [ ! -z ${NBD_TYPE[$i]} ]
     do
 	if [ ${NBD_TYPE[$i]} == "$1" ]
 	then
@@ -97,7 +97,7 @@ case "$1" in
 	modprobe nbd
 	echo -n 'Connecting...'
 	i=0
-	while [ ! -z ${NBD_DEVICE[$i]} ]
+	while [ ! -z ${NBD_TYPE[$i]} ]
 	  do
 	  # cfq deadlocks NBD devices, so switch to something else if cfq is
 	  # selected by default
@@ -144,7 +144,7 @@ case "$1" in
     activate)
 	echo 'Activating...'
 	i=0
-	while [ ! -z ${NBD_DEVICE[$i]} ]
+	while [ ! -z ${NBD_TYPE[$i]} ]
 	do
 	  case ${NBD_TYPE[$i]} in
 	      "s")
