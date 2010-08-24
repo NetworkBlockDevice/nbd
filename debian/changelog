@@ -5,6 +5,8 @@ nbd (1:2.9.16-4) unstable; urgency=low
     nothing is configured there isn't actually anything in the file.
   * nbd-client.init.d: check for non-zeroness of ${NBD_TYPE[$i]} rather
     than ${NBD_DEVICE[$i]}, in light of the above. Closes: 592905.
+  * Steal commit 29e70dc9 from git HEAD to make nbd-server somewhat less
+    scary upon bootup if no exports are configured. Closes: #594140.
 
  -- Wouter Verhelst <wouter@debian.org>  Mon, 23 Aug 2010 15:27:00 +0200
 
