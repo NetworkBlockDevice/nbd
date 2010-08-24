@@ -1919,8 +1919,11 @@ int main(int argc, char *argv[]) {
 	}
     
 	if(!servers || !servers->len) {
-		g_warning("Could not parse config file: %s", 
-				err ? err->message : "Unknown error");
+		if(err && !(err->domain == g_quark_from_string("parse_cfile")
+				&& err->code == CFILE_NOTFOUND)) {
+			g_warning("Could not parse config file: %s", 
+					err ? err->message : "Unknown error");
+		}
 	}
 	if(serve) {
 		g_warning("Specifying an export on the command line is deprecated.");
@@ -1928,7 +1931,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if((!serve) && (!servers||!servers->len)) {
-		g_message("Nothing to do! Bye!");
+		g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
 	daemonize(serve);
