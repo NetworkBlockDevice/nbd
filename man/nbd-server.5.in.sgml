@@ -20,7 +20,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhemail     "<email>wouter@debian.org</email>">
   <!ENTITY dhusername  "Wouter Verhelst">
   <!ENTITY dhucpackage "<refentrytitle>NBD-SERVER</refentrytitle>">
-  <!ENTITY dhpackage   "/etc/nbd-server/config">
+  <!ENTITY dhpackage   "@sysconfdir@/nbd-server/config">
 
   <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
   <!ENTITY gnu         "<acronym>GNU</acronym>">
@@ -646,9 +646,9 @@ manpage.1: manpage.sgml
       [export]
           exportname = /export/blkdev
           port = 12345
-          authfile = /etc/nbd-server/allow
+          authfile = @sysconfdir@/nbd-server/allow
     </programlisting>
-    <para>With /etc/nbd-server/allow containing the following:</para>
+    <para>With @sysconfdir@/nbd-server/allow containing the following:</para>
     <programlisting>
       127.0.0.1
       192.168.0.0/8
