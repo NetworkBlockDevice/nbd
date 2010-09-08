@@ -1,3 +1,10 @@
+nbd (1:2.9.16-5) unstable; urgency=low
+
+  * Updated translations:
+    - Spanish, by Camaleón; Closes: #595730.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 08 Sep 2010 15:21:30 +0200
+
 nbd (1:2.9.16-4) unstable; urgency=low
 
   * nbd-client.postrm: remove /etc/nbd-client on purge. Closes: #593783.
