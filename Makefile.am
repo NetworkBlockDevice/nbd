@@ -1,5 +1,6 @@
 SUBDIRS = man
-bin_PROGRAMS = nbd-server @NBD_CLIENT_NAME@
+bin_PROGRAMS = nbd-server
+sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client knbd-client
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
 TESTS = cmd cfg1 cfgmulti cfgnew
