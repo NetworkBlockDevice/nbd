@@ -352,27 +352,6 @@ inline void writeit(int f, void *buf, size_t len) {
 	}
 }
 
-/**
- * Print out a message about how to use nbd-server. Split out to a separate
- * function so that we can call it from multiple places
- */
-void usage() {
-	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
-	       "\t-r|--read-only\t\tread only\n"
-	       "\t-m|--multi-file\t\tmultiple file\n"
-	       "\t-c|--copy-on-write\tcopy on write\n"
-	       "\t-C|--config-file\tspecify an alternate configuration file\n"
-	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
-	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
-	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
-	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
-	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
-	       "\t\taddress of the machine trying to connect\n" 
-	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
-	printf("Using configuration file %s\n", CFILE);
-}
-
 /* Dumps a config file section of the given SERVER*, and exits. */
 void dump_section(SERVER* serve, gchar* section_header) {
 	printf("[%s]\n", section_header);
@@ -404,130 +383,156 @@ void dump_section(SERVER* serve, gchar* section_header) {
  * @param argv the argv argument to main()
  **/
 SERVER* cmdline(int argc, char *argv[]) {
-	int i=0;
-	int nonspecial=0;
-	int c;
-	struct option long_options[] = {
-		{"read-only", no_argument, NULL, 'r'},
-		{"multi-file", no_argument, NULL, 'm'},
-		{"copy-on-write", no_argument, NULL, 'c'},
-		{"authorize-file", required_argument, NULL, 'l'},
-		{"config-file", required_argument, NULL, 'C'},
-		{"pid-file", required_argument, NULL, 'p'},
-		{"output-config", required_argument, NULL, 'o'},
-		{0,0,0,0}
+	GOptionContext *ctx;
+	GError *err = NULL;
+	gboolean readonly = FALSE;
+	gboolean multifile = FALSE;
+	gboolean copyonwrite = FALSE;
+	gchar *authname = NULL;
+	gchar *configfile = NULL;
+	gchar *pidfile = NULL;
+	gchar *outputconfig = NULL;
+	GOptionEntry entries[] = {
+		{ "read-only", 'r', 0, G_OPTION_ARG_NONE,
+		  &readonly, "read only", NULL },
+		{ "multi-file", 'm', 0, G_OPTION_ARG_NONE,
+		  &multifile, "multiple file", NULL },
+		{ "copy-on-write", 'c', 0, G_OPTION_ARG_NONE,
+		  &copyonwrite, "copy on write", NULL },
+		{ "authorize-file", 'l', 0, G_OPTION_ARG_FILENAME,
+		  &authname, "file with list of hosts that are "
+		  "allowed to connect",NULL },
+		{ "config-file", 'C', 0, G_OPTION_ARG_FILENAME,
+		  &configfile, "specify an alternate configuration file",
+		  NULL },
+		{ "pid-file", 'p', 0, G_OPTION_ARG_FILENAME,
+		  &pidfile, "specify a filename to write our PID to",
+		  NULL },
+		{ "output-config", 'o', 0, G_OPTION_ARG_FILENAME,
+		  &outputconfig, "output a config file section for what you "
+		  "specified on the command line, with the specified section "
+		  "name",
+		  NULL },
+		{ NULL }
 	};
 	SERVER *serve;
 	off_t es;
 	size_t last;
 	char suffix;
-	gboolean do_output=FALSE;
-	gchar* section_header="";
 	gchar** addr_port;
 
-	if(argc==1) {
-		return NULL;
-	}
-	serve=g_new0(SERVER, 1);
-	serve->authname = g_strdup(default_authname);
-	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
-		switch (c) {
-		case 1:
-			/* non-option argument */
-			switch(nonspecial++) {
-			case 0:
-				if(strchr(optarg, ':') == strrchr(optarg, ':')) {
-					addr_port=g_strsplit(optarg, ":", 2);
+	ctx = g_option_context_new ("[ip:|ip6@]port file_to_export [size][kKmM]");
+	g_option_context_set_description(ctx,
+	"if port is set to 0, stdin is used (for running from inetd)\n"
+	"if file_to_export contains '%s', it is substituted with the IP "
+	"address of the machine trying to connect\n" 
+	"if ip is set, it contains the local IP address on which we're "
+	"listening.\nif not, the server will listen on all local IP addresses\n"
+	"Using configuration file " CFILE "\n");
 
-					/* Check for "@" - maybe user using this separator
-						 for IPv4 address */
-					if(!addr_port[1]) {
-						g_strfreev(addr_port);
-						addr_port=g_strsplit(optarg, "@", 2);
-					}
-				} else {
-					addr_port=g_strsplit(optarg, "@", 2);
-				}
-
-				if(addr_port[1]) {
-					serve->port=strtol(addr_port[1], NULL, 0);
-					serve->listenaddr=g_strdup(addr_port[0]);
-				} else {
-					serve->listenaddr=NULL;
-					serve->port=strtol(addr_port[0], NULL, 0);
-				}
-				g_strfreev(addr_port);
-				break;
-			case 1:
-				serve->exportname = g_strdup(optarg);
-				if(serve->exportname[0] != '/') {
-					fprintf(stderr, "E: The to be exported file needs to be an absolute filename!\n");
-					exit(EXIT_FAILURE);
-				}
-				break;
-			case 2:
-				last=strlen(optarg)-1;
-				suffix=optarg[last];
-				if (suffix == 'k' || suffix == 'K' ||
-				    suffix == 'm' || suffix == 'M')
-					optarg[last] = '\0';
-				es = (off_t)atoll(optarg);
-				switch (suffix) {
-					case 'm':
-					case 'M':  es <<= 10;
-					case 'k':
-					case 'K':  es <<= 10;
-					default :  break;
-				}
-				serve->expected_size = es;
-				break;
-			}
-			break;
-		case 'r':
-			serve->flags |= F_READONLY;
-			break;
-		case 'm':
-			serve->flags |= F_MULTIFILE;
-			break;
-		case 'o':
-			do_output = TRUE;
-			section_header = g_strdup(optarg);
-			break;
-		case 'p':
-			strncpy(pidftemplate, optarg, 256);
-			break;
-		case 'c': 
-			serve->flags |=F_COPYONWRITE;
-		        break;
-		case 'C':
-			g_free(config_file_pos);
-			config_file_pos=g_strdup(optarg);
-			break;
-		case 'l':
-			g_free(serve->authname);
-			serve->authname=g_strdup(optarg);
-			break;
-		default:
-			usage();
-			exit(EXIT_FAILURE);
-			break;
-		}
+        g_option_context_add_main_entries (ctx, entries, NULL);
+	
+	if (!g_option_context_parse (ctx, &argc, &argv, &err)) {
+		g_print ("Failed to initialize: %s\n", err->message);
+		g_error_free (err);
+                return NULL;
 	}
+	g_option_context_free(ctx);
+
+	serve = g_new0(SERVER, 1);
+	serve->virtstyle = VIRT_IPLIT;
+
+	if (readonly) {
+		serve->flags |= F_READONLY;
+	}
+	if (multifile) {
+		serve->flags |= F_MULTIFILE;
+	}
+	if (copyonwrite) {
+		serve->flags |= F_COPYONWRITE;
+	}
+	if (pidfile) {
+		strncpy(pidftemplate, pidfile, 256);
+	}
+	if (configfile) {
+		g_free(config_file_pos);
+		config_file_pos = g_strdup(configfile);
+	}
+	if (authname) {
+		serve->authname = g_strdup(authname);
+	} else {
+		serve->authname = g_strdup(default_authname);
+	}
+
 	/* What's left: the port to export, the name of the to be exported
 	 * file, and, optionally, the size of the file, in that order. */
-	if(nonspecial<2) {
+
+	if (argc < 3) {
 		g_free(serve);
-		serve=NULL;
-	} else {
-		do_oldstyle = TRUE;
-	}
-	if(do_output) {
-		if(!serve) {
-			g_critical("Need a complete configuration on the command line to output a config file section!");
+		if (outputconfig) {
+			g_critical("Need a complete configuration on the "
+				   "command line to output a config file "
+				   "section!");
 			exit(EXIT_FAILURE);
 		}
-		dump_section(serve, section_header);
+		return NULL;
+	}
+
+	/* port */
+
+	if (strchr(argv[1], ':') == strrchr(argv[1], ':')) {
+		addr_port = g_strsplit(argv[1], ":", 2);
+
+		/* Check for "@" - maybe user using this separator
+		   for IPv4 address */
+		if (!addr_port[1]) {
+			g_strfreev(addr_port);
+			addr_port = g_strsplit(argv[1], "@", 2);
+		}
+	} else {
+		addr_port = g_strsplit(argv[1], "@", 2);
+	}
+
+	if (addr_port[1]) {
+		serve->port = strtol(addr_port[1], NULL, 0);
+		serve->listenaddr = g_strdup(addr_port[0]);
+	} else {
+		serve->listenaddr = NULL;
+		serve->port = strtol(addr_port[0], NULL, 0);
+	}
+	g_strfreev(addr_port);
+
+	/* file */
+
+	serve->exportname = g_strdup(argv[2]);
+	if (serve->exportname[0] != '/') {
+		g_critical("The to be exported file needs to be an absolute filename!");
+		exit(EXIT_FAILURE);
+	}
+
+	/* size */
+
+	if (argc > 3) {
+		last = strlen(argv[3])-1;
+		suffix = argv[3][last];
+		if (suffix == 'k' || suffix == 'K' ||
+		    suffix == 'm' || suffix == 'M')
+			argv[3][last] = '\0';
+		es = (off_t)atoll(argv[3]);
+		switch (suffix) {
+			case 'm':
+			case 'M':  es <<= 10;
+			case 'k':
+			case 'K':  es <<= 10;
+			default :  break;
+		}
+		serve->expected_size = es;
+	}
+
+	do_oldstyle = TRUE;
+
+	if(outputconfig) {
+		dump_section(serve, outputconfig);
 	}
 	return serve;
 }
