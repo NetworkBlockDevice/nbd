@@ -92,6 +92,7 @@
 #include <dlfcn.h>
 
 #include <glib.h>
+#include <gmodule.h>
 
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
@@ -196,7 +197,7 @@ typedef struct param PARAM;
  * Variables associated with a plugin.
  **/
 struct plugin {
-	void* handle;
+	GModule* handle;
 	gchar* name;
 	int (*init_server)(SERVER* server);	/**< initialize the plugin for a config file section */
 	void (*setupexport)(CLIENT* client);	/**< initialize whatever needs to be initialized upon connection */
@@ -581,6 +582,7 @@ typedef enum {
 	PLUGIN_UNKNOWN,		/**< Unknown plugin name was encountered in a config file */
 	PLUGIN_LOADERR,		/**< An error was encountered while loading a plugin */
 	PLUGIN_ABIERR,		/**< A plugin was loaded that isn't ABI-compatible */
+	PLUGIN_UNSUP,		/**< Plugins are not supported on the current platform */
 } CFILE_ERRORS;
 
 /**
@@ -743,6 +745,10 @@ gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
 	gchar** plugins = g_strsplit(value, " ", 0);
 	int i;
 
+	if(G_UNLIKELY(!g_module_supported())) {
+		g_set_error(err, errdomain, PLUGIN_UNSUP, "Plugins not supported on this platform");
+		return FALSE;
+	}
 	if(!strlen(value)) {
 		g_set_error(err, errdomain, CFILE_VALUE_INVALID, "Must specify at least one plugin if using the plugin keyword");
 		return FALSE;
@@ -754,8 +760,9 @@ gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
 			nbd_plugin_init initfunc;
 
 			plugin->name = g_strdup(plugins[i]);
-			fname = g_strdup_printf(LIBDIR "/nbd-server/%s.so", plugin->name);
-			plugin->handle = dlopen(fname, RTLD_LAZY | RTLD_LOCAL);
+			fname = g_module_build_path(PKGLIBDIR, plugin->name);
+			plugin->handle = g_module_open(fname, G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL);
+			g_free(fname);
 			if(!plugin->handle) {
 				g_set_error(err, errdomain, PLUGIN_LOADERR, "Could not load plugin %s: %s", plugin->name, dlerror());
 				g_free(plugin->name);
@@ -763,7 +770,7 @@ gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
 				g_strfreev(plugins);
 				return FALSE;
 			}
-			if(!(initfunc = dlsym(plugin->handle, "nbd_plugin_init"))) {
+			if(!(g_module_symbol(plugin->handle, "nbd_plugin_init", &initfunc))) {
 				g_set_error(err, errdomain, PLUGIN_ABIERR, "Could not initialize plugin %s: nbd_plugin_init function not found", plugin->name);
 				g_free(plugin->name);
 				g_free(plugin);
