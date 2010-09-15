@@ -32,3 +32,4 @@ INSTALL
 depcomp
 install-sh
 configure
+libtool
