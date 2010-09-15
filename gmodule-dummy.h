@@ -26,7 +26,6 @@ static inline gboolean g_module_close(handle) {
 	return FALSE;
 }
 
-static inline gboolean g_module_supported(void) G_GNUC_CONST;
 static inline gboolean g_module_supported(void) {
 	return FALSE;
 }
