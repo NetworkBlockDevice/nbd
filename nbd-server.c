@@ -181,7 +181,7 @@ static char* modern_listen;  /**< listenaddr value for modernsock */
 static GQuark errdomain;
 
 /**
- * Types of virtuatlization
+ * Types of virtualization
  **/
 typedef enum {
 	VIRT_NONE=0,	/**< No virtualization */
