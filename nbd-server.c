@@ -92,7 +92,11 @@
 #include <dlfcn.h>
 
 #include <glib.h>
+#if WITH_PLUGINS
 #include <gmodule.h>
+#else
+#include "gmodule-dummy.h"
+#endif
 
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
@@ -739,6 +743,7 @@ gboolean set_virtstyle(gchar* virtstyle, SERVER* s, GError** err) {
 		g_set_error(err, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, s->servename);
 		return FALSE;
 	}
+	return TRUE;
 }
 
 gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
@@ -764,13 +769,13 @@ gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
 			plugin->handle = g_module_open(fname, G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL);
 			g_free(fname);
 			if(!plugin->handle) {
-				g_set_error(err, errdomain, PLUGIN_LOADERR, "Could not load plugin %s: %s", plugin->name, dlerror());
+				g_set_error(err, errdomain, PLUGIN_LOADERR, "Could not load plugin %s: %s", plugin->name, g_module_error());
 				g_free(plugin->name);
 				g_free(plugin);
 				g_strfreev(plugins);
 				return FALSE;
 			}
-			if(!(g_module_symbol(plugin->handle, "nbd_plugin_init", &initfunc))) {
+			if(!(g_module_symbol(plugin->handle, "nbd_plugin_init", (gpointer*)&initfunc))) {
 				g_set_error(err, errdomain, PLUGIN_ABIERR, "Could not initialize plugin %s: nbd_plugin_init function not found", plugin->name);
 				g_free(plugin->name);
 				g_free(plugin);

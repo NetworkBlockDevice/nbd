@@ -86,7 +86,6 @@ AC_ARG_ENABLE(
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
-AC_PROG_LIBTOOL
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
@@ -115,11 +114,34 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h])
-AM_PATH_GLIB_2_0(2.6.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+PKG_CHECK_MODULES(GLIB, "glib-2.0",, AC_MSG_ERROR("Missing glib"))
+AC_MSG_CHECKING([whether plugins should be enabled])
+AC_ARG_ENABLE(plugins, 
+	AS_HELP_STRING([--disable-plugins], 
+		[disable support for loadable plugins in nbd-server (default on)]),
+	[PLUGINS="$enableval"; HAVE_GMODULE=no],
+	[PLUGINS=yes])
+AC_MSG_RESULT($PLUGINS)
+
+if test "$PLUGINS" = "yes"
+then
+	PKG_CHECK_MODULES(GMODULE, "gmodule-no-export-2.0", [HAVE_GMODULE=yes], [HAVE_GMODULE=no])
+fi
+
+AM_CONDITIONAL(WITH_PLUGINS, [test "$HAVE_GMODULE" = "yes"])
+case "$HAVE_GMODULE" in
+	yes)
+		AC_DEFINE(WITH_PLUGINS, 1, "Enable loadable plugins for nbd-server")
+		;;
+	no)
+		AC_DEFINE(WITH_PLUGINS, 0)
+		;;
+esac
+
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"' -DLIBDIR='\"$libdir\"'"
+nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"' -DPKGLIBDIR='\"$libdir/nbd-server\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile Doxyfile man/Makefile man/nbd-client.8 man/nbd-server.5 man/nbd-server.1])
