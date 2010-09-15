@@ -2,6 +2,7 @@ dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],[2.9.18],[wouter@debian.org])
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -85,6 +86,7 @@ AC_ARG_ENABLE(
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
+AC_PROG_LIBTOOL
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
