@@ -197,6 +197,13 @@ typedef struct plugin PLUGIN;
 typedef struct file_info FILE_INFO;
 typedef struct param PARAM;
 
+static PLUGIN* default_functions;
+
+typedef ssize_t (*bot_read)(int fhandle, void* buf, size_t len);
+typedef ssize_t (*bot_write)(int fhandle, const void* buf, size_t len);
+typedef int (*top_read)(int socket, off_t a, char* buf, size_t len, CLIENT* client);
+typedef int (*top_write)(int socket, off_t a, char* buf, size_t len, CLIENT* client);
+
 /**
  * Variables associated with a plugin.
  **/
@@ -205,14 +212,18 @@ struct plugin {
 	gchar* name;
 	int (*init_server)(SERVER* server);	/**< initialize the plugin for a config file section */
 	void (*setupexport)(CLIENT* client);	/**< initialize whatever needs to be initialized upon connection */
-	ssize_t (*rawexpread)(off_t a, char* buf, size_t len, CLIENT* client);	/**< read len bytes from offset a into buffer buf for client */
-	ssize_t (*rawexpwrite)(off_t a, char* buf, size_t len, CLIENT* client); /**< write len bytes onto permanent storage for client with offset a from buf */
-	void (*finish)(CLIENT* client);		/**< close files, clean up */
+	ssize_t (*bot_read)(int fhandle, void* buf, size_t len);	/**< default read(). Called by med_read(). */
+	ssize_t (*bot_write)(int fhandle, const void* buf, size_t len);	/**< default write(). Called by med_write(). */
+	ssize_t (*med_read)(off_t a, char* buf, size_t len, CLIENT* client);	/**< Figure out a file handle, and call bot_read. The defaults implement the multiple-file option here. */
+	ssize_t (*med_write)(off_t a, char* buf, size_t len, CLIENT* client); 	/**< Figure out a file handle, and call bot_write. The defaults implement the multiple-file option here. */
+	int (*top_read)(off_t a, char* buf, size_t len, CLIENT* client);	/**< Figure out whether we want to read from our permanent storage, or from 'something else', and call med_read. The defaults implement copy on write here. */
+	int (*top_write)(off_t a, char* buf, size_t len, CLIENT* client);	/**< Figure out whether we want to write to our permanent storage, or to 'something else', and call med_write. The defaults implement copy on write here. */
+	void (*finish)(CLIENT* client);		/**< Clean up after connection. Optional. */
 	PARAM* params;				/**< any plugin-specific parameters go here */
 	size_t param_size;			/**< (sizeof(params) / sizeof(PARAM)) */
-	gboolean supports_cow;			/**< whether this plugin supports Copy-on-write */
+	gboolean supports_cow;			/**< whether this plugin supports copy-on-write */
 	gboolean supports_virt;			/**< whether this plugin supports virtualized filenames (virtstyle parameter in config file) */
-	gboolean supports_mult;			/**< whether this plugin supports the multi-file option. Note: this then needs to be implemented by the plugin! */
+	gboolean supports_mult;			/**< whether this plugin supports the multi-file option. */
 };
 
 typedef gboolean(*nbd_plugin_init)(PLUGIN*, GError**);
@@ -467,6 +478,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	}
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
+	serve->plugin = default_functions;
 	serve->virtstyle=VIRT_IPLIT;
 	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
 		switch (c) {
@@ -750,8 +762,8 @@ gboolean load_plugins(gchar* value, SERVER* server, GError** err) {
 	gchar** plugins = g_strsplit(value, " ", 0);
 	int i;
 
-	if(G_UNLIKELY(!g_module_supported())) {
-		g_set_error(err, errdomain, PLUGIN_UNSUP, "Plugins not supported on this platform");
+	if(!g_module_supported()) {
+		g_set_error(err, errdomain, PLUGIN_UNSUP, "Plugins not supported on this platform, or nbd-server was compiled without support for plugins, yet they are being loaded.");
 		return FALSE;
 	}
 	if(!strlen(value)) {
@@ -1170,7 +1182,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG4("(WRITE to fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
-	retval = write(fhandle, buf, len);
+	retval = client->server->plugin->bot_write(fhandle, buf, len);
 	if(client->server->flags & F_SYNC) {
 		fsync(fhandle);
 	}
@@ -1184,7 +1196,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
 	ssize_t ret=0;
 
-	while(len > 0 && (ret=rawexpwrite(a, buf, len, client)) > 0 ) {
+	while(len > 0 && (ret=client->server->plugin->med_write(a, buf, len, client)) > 0 ) {
 		a += ret;
 		buf += ret;
 		len -= ret;
@@ -1216,7 +1228,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG4("(READ from fd %d offset %llu len %u), ", fhandle, foffset, len);
 
 	myseek(fhandle, foffset);
-	return read(fhandle, buf, len);
+	return client->server->plugin->bot_read(fhandle, buf, len);
 }
 
 /**
@@ -1226,7 +1238,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
 	ssize_t ret=0;
 
-	while(len > 0 && (ret=rawexpread(a, buf, len, client)) > 0 ) {
+	while(len > 0 && (ret=client->server->plugin->med_read(a, buf, len, client)) > 0 ) {
 		a += ret;
 		buf += ret;
 		len -= ret;
@@ -1516,7 +1528,7 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, EPERM);
 				continue;
 			}
-			if (expwrite(request.from, buf, len, client)) {
+			if (client->server->plugin->top_write(request.from, buf, len, client)) {
 				DEBUG("Write failed: %m" );
 				ERROR(client, reply, errno);
 				continue;
@@ -1528,7 +1540,7 @@ int mainloop(CLIENT *client) {
 		/* READ */
 
 		DEBUG("exp->buf, ");
-		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
+		if (client->server->plugin->top_read(request.from, buf + sizeof(struct nbd_reply), len, client)) {
 			DEBUG("Read failed: %m");
 			ERROR(client, reply, errno);
 			continue;
@@ -2162,6 +2174,24 @@ void glib_message_syslog_redirect(const gchar *log_domain,
 #endif
 
 /**
+ * Initialize our plugin system
+ **/
+void init_plugins() {
+	default_functions = g_new0(PLUGIN, 1);
+	default_functions->name = "builtin";
+	default_functions->setupexport = setupexport;
+	default_functions->bot_read = read;
+	default_functions->bot_write = (bot_write)write;
+	default_functions->med_read = rawexpread;
+	default_functions->med_write = rawexpwrite;
+	default_functions->top_read = expread;
+	default_functions->top_write = expwrite;
+	default_functions->supports_cow = TRUE;
+	default_functions->supports_virt = TRUE;
+	default_functions->supports_mult = TRUE;
+}
+
+/**
  * Main entry point...
  **/
 int main(int argc, char *argv[]) {
@@ -2177,6 +2207,8 @@ int main(int argc, char *argv[]) {
 	memset(pidftemplate, '\0', 256);
 
 	logging();
+
+	init_plugins();
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 	servers = parse_cfile(config_file_pos, &err);
