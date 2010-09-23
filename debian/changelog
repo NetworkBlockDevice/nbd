@@ -1,3 +1,9 @@
+nbd (1:2.9.16-6) unstable; urgency=low
+
+  * Remove cruft from source package.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 23 Sep 2010 20:10:31 +0200
+
 nbd (1:2.9.16-5) unstable; urgency=low
 
   * Updated translations:
