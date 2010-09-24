@@ -197,12 +197,22 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	rep.magic=ntohl(rep.magic);
 	rep.error=ntohl(rep.error);
 	if(rep.magic!=NBD_REPLY_MAGIC) {
-		snprintf(errstr, errstr_len, "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX", curhandle, curhandle, *((u64*)rep.handle), *((u64*)rep.handle), (long unsigned int)rep.magic, (long unsigned int)NBD_REPLY_MAGIC);
+		snprintf(errstr, errstr_len, "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX",
+			(long long int) curhandle,
+			curhandle,
+			(long long int)(*((u64*)rep.handle)),
+			(long long int)(*((u64*)rep.handle)),
+			(long unsigned int)rep.magic,
+			(long unsigned int)NBD_REPLY_MAGIC);
 		retval=-1;
 		goto end;
 	}
 	if(rep.error) {
-		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", (long int)rep.error, (long unsigned int)rep.error, (long long int)(*((u64*)rep.handle)), *((u64*)rep.handle));
+		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).",
+			(long int)rep.error,
+			(long unsigned int)rep.error,
+			(long long int)(*((u64*)rep.handle)),
+			(long long unsigned int)(*((u64*)rep.handle)));
 		retval=-1;
 		goto end;
 	}
@@ -214,7 +224,6 @@ end:
 
 int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
 	long long int i;
-	char buf[1024];
 	struct nbd_request req;
 	int requests=0;
 	fd_set set;
@@ -225,7 +234,6 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 	int speed;
 	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
-	size_t tmp;
 	signed int do_write=TRUE;
 	pid_t mypid = getpid();
 
