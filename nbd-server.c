@@ -204,6 +204,7 @@ typedef struct {
 	gchar* postrun;	     /**< command that will be ran after the client
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
+	int max_connections; /**< maximum number of opened connections */
 } SERVER;
 
 /**
@@ -358,14 +359,15 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
-	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
+	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
+	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -415,6 +417,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
+		{"max-connection", required_argument, NULL, 'M'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -431,7 +434,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:M:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -507,6 +510,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'l':
 			g_free(serve->authname);
 			serve->authname=g_strdup(optarg);
+			break;
+		case 'M':
+			serve->max_connections = strtol(optarg, NULL, 0);
 			break;
 		default:
 			usage();
@@ -605,6 +611,8 @@ SERVER* dup_serve(SERVER *s) {
 	
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
+
+	serve->max_connections = s->max_connections;
 
 	return serve;
 }
@@ -705,6 +713,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
+		{ "maxconnections", FALSE, PARAM_INT,	NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
@@ -755,6 +764,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				lp[10].target=lp[11].target=
 				lp[12].target=&(s.flags);
 		lp[13].target=&(s.listenaddr);
+		lp[14].target=&(s.max_connections);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -1739,6 +1749,12 @@ int serveloop(GArray* servers) {
 			if(net) {
 				int sock_flags;
 
+				if(serve->max_connections > 0 &&
+				   g_hash_table_size(children) >= serve->max_connections) {
+					msg2(LOG_INFO, "Max connections reached");
+					close(net);
+					continue;
+				}
 				if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
 					err("fcntl F_GETFL");
 				}

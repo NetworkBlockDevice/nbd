@@ -66,6 +66,7 @@ manpage.1: manpage.sgml
       <arg><option>-l <replaceable>host list filename</replaceable></option></arg>
       <arg><option>-o <replaceable>section name</replaceable></option></arg>
       <arg><option>-C <replaceable>config file</replaceable></option></arg>
+      <arg><option>-M <replaceable>max connections</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -205,6 +206,13 @@ manpage.1: manpage.sgml
 	    warning about failure to parse the config file. If the
 	    command line contains a fully specified configuration, this
 	    warning is harmless and may be ignored.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-M</option></term>
+	<listitem>
+	  <para>Specify the maximum number of opened connections. If this
+	  parameter is not specified, no limit is set.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

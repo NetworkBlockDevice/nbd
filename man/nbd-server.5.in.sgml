@@ -596,6 +596,16 @@ manpage.1: manpage.sgml
 	  </para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>maxconnections</option></term>
+	<listitem>
+	  <para>Optional; integer</para>
+	  <para>
+	    If specified, then it limits the number of opened connections for
+	    this export.
+	  </para>
+	</listitem>
+      </varlistentry>
     </variablelist>
     
   </refsect1>
