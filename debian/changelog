@@ -1,3 +1,10 @@
+nbd (1:2.9.16-7) unstable; urgency=low
+
+  * Updated translations:
+    - Vietnamese, by Clytie Siddall; Closes: #598561.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 30 Sep 2010 10:35:12 +0200
+
 nbd (1:2.9.16-6) unstable; urgency=low
 
   * Remove cruft from source package.
