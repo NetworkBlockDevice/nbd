@@ -45,6 +45,7 @@ typedef unsigned long long u64;
 #endif
 
 u64 cliserv_magic = 0x00420281861253LL;
+u64 opts_magic = 0x49484156454F5054LL;
 #define INIT_PASSWD "NBDMAGIC"
 
 #define INFO(a) do { } while(0)
@@ -75,9 +76,7 @@ void setmysockopt(int sock) {
 #endif
 #endif
 
-void err(const char *s) G_GNUC_NORETURN;
-
-void err(const char *s) {
+void err_nonfatal(const char *s) {
 	const int maxlen = 150;
 	char s1[maxlen], *s2;
 
@@ -102,7 +101,13 @@ void err(const char *s) {
 	syslog(LOG_ERR, "Exiting.");
 #endif
 	fprintf(stderr, "Error: %s\nExiting.\n", s1);
-	exit(1);
+}
+
+void err(const char *s) G_GNUC_NORETURN;
+
+void err(const char *s) {
+	err_nonfatal(s);
+	exit(EXIT_FAILURE);
 }
 
 void logging(void) {
@@ -131,3 +136,9 @@ u64 ntohll(u64 a) {
 /* Flags used between the client and server */
 #define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */
 #define NBD_FLAG_READ_ONLY	(1 << 1)	/* Device is read-only */
+
+#define NBD_DEFAULT_PORT	"10809"	/* Port on which named exports are
+					 * served */
+
+/* Options that the client can select to the server */
+#define NBD_OPT_EXPORT_NAME	(1 << 0)	/* Client wants to select a named export (is followed by length and name of export) */

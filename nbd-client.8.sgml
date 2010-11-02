@@ -1,4 +1,4 @@
-<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.5//EN" [
 
 <!-- Process this file with docbook-to-man to generate an nroff manual
      page: `docbook-to-man manpage.sgml > manpage.1'.  You may view
@@ -55,15 +55,16 @@ manpage.1: manpage.sgml
   <refsynopsisdiv>
     <cmdsynopsis>
       <command>&dhpackage;</command>
-      <arg><option>bs=<replaceable>blocksize</replaceable></option></arg>
-      <arg><option>timeout=<replaceable>seconds</replaceable></option></arg>
-      <arg choice=plain><option><replaceable>host</replaceable></option></arg>
-      <arg choice=plain><option><replaceable>port</replaceable></option></arg>
-      <arg choice=plain><option><replaceable>nbd-device</replaceable></option></arg>
-      <arg><option>-sdp</option></arg>
-      <arg><option>-swap</option></arg>
-      <arg><option>-persist</option></arg>
-      <arg><option>-nofork</option></arg>
+      <arg choice=plain><replaceable>host</replaceable></arg>
+      <arg><replaceable>port</replaceable></arg>
+      <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-sdp</arg>
+      <arg>-swap</arg>
+      <arg>-persist</arg>
+      <arg>-nofork</arg>
+      <arg>-block-size <replaceable>block size</replaceable></arg>
+      <arg>-timeout <replaceable>seconds</replaceable></arg>
+      <arg>-name <replaceable>name</replaceable></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
@@ -87,7 +88,9 @@ manpage.1: manpage.sgml
     either in the kernel, or as a module, you can connect to an NBD
     server and use its exported file through a block special file with
     major mode 43.</para>
-    
+
+    <para>Optionally, long options can also be specified with two
+      leading dashes.</para>
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
@@ -96,9 +99,10 @@ manpage.1: manpage.sgml
 
     <variablelist>
       <varlistentry>
-	<term><option>bs=<replaceable>blocksize</replaceable></option></term>
+	<term><option>-block-size <replaceable>block size</replaceable></option></term>
+	<term><option>-b</option></term>
 	<listitem>
-	  <para>Use a blocksize of "blocksize". Default is 1024;
+	  <para>Use a blocksize of "block size". Default is 1024;
 	    allowed values are either 512, 1024, 2048 or 4096</para>
 	</listitem>
       </varlistentry>
@@ -111,7 +115,9 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>timeout=<replaceable>seconds</replaceable></option></term>
+	<term><option>-timeout
+	<replaceable>seconds</replaceable></option></term>
+	<term><option>-t</option></term>
 	<listitem>
 	  <para>Set the connection timeout to "seconds". For this to
 	  work, you need a kernel with support for the NBD_SET_TIMEOUT
@@ -124,6 +130,8 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The TCP port on which <command>nbd-server</command> is
 	    running at the server.</para>
+	  <para>This option is required, unless the -N option is
+	    specified, in which case it is not allowed.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -134,7 +142,8 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term>-c</term>
+	<term><option>-check</option></term>
+	<term><option>-c</option></term>
 	<listitem>
 	  <para>Check whether the specified nbd device is
 	  connected.</para>
@@ -150,14 +159,16 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term>-d</term>
+	<term><option>-disconnect</option></term>
+	<term><option>-d</option></term>
 	<listitem>
 	  <para>Disconnect the specified nbd device from the
 	  server</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term>-persist</term>
+	<term><option>-persist</option></term>
+	<term><option>-p</option></term>
 	<listitem>
 	  <para>When this option is specified, &dhpackage; will
 	    immediately try to reconnect an nbd device if the
@@ -167,6 +178,7 @@ manpage.1: manpage.sgml
       </varlistentry>
       <varlistentry>
         <term><option>-sdp</option></term>
+	<term><option>-S</option></term>
 	<listitem>
 	  <para>Connect to the server using the Socket Direct Protocol
 	    (SDP), rather than IP. See nbd-server(1) for details.
@@ -175,6 +187,7 @@ manpage.1: manpage.sgml
       </varlistentry>
       <varlistentry>
 	<term><option>-swap</option></term>
+	<term><option>-s</option></term>
 	<listitem>
 	  <para>Specifies that this NBD device will be used as
 	  swapspace. This option attempts to prevent deadlocks by
@@ -184,9 +197,21 @@ manpage.1: manpage.sgml
       </varlistentry>
       <varlistentry>
         <term><option>-nofork</option></term>
+	<term><option>-n</option></term>
 	<listitem>
 	  <para>Specifies that the NBD client should not detach and
 	  daemonize itself. This is mostly useful for debugging.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-name</option></term>
+	<term><option>-N</option></term>
+	<listitem>
+	  <para>
+	    Specifies the name of the export that we want to use. Required if
+	    the port is not specified, not allowed in the other case.
+	  </para>
+	</listitem>
       </varlistentry>
     </variablelist>
   </refsect1>

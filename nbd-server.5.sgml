@@ -98,9 +98,9 @@ manpage.1: manpage.sgml
       followed by an equals sign ("="), followed by the option
       value. An option can be of type string, of type integer, or of
       type boolean. The value of a boolean option can be denoted with
-      either true or false (so not yes, no, on, off, 1, or 0); all
-      booleans default to false unless specified otherwise; no value
-      may be quoted (always enter it directly); for a string option,
+      either true or false (so not yes, no, on, off, 1, or 0). All
+      booleans default to false unless specified otherwise. No value
+      may be quoted (always enter it directly). For a string option,
       leading whitespace is stripped (but trailing whitespace is not).
     </para>
 
@@ -143,6 +143,52 @@ manpage.1: manpage.sgml
 	  </para>
         </listitem>
       </varlistentry>
+      <varlistentry>
+        <term><option>oldstyle</option></term>
+	<listitem>
+	  <para>
+	    Optional; boolean
+	  </para>
+	  <para>
+	    If this option is set to true, nbd-server will export all
+	    exports on a separate port with the old (pre-2.9.17)
+	    handshake protocol. In that case, the 'port' option for
+	    individual exports is mandatory.
+	  </para>
+	  <para>
+	    If the option is set to false, the 'port' option for
+	    individual exports is optional (and will be ignored if
+	    specified). The server will only export devices on the
+	    standard port.
+	  </para>
+	  <para>
+	    For upgrades from pre-2.9.17 versions of nbd, it may be
+	    appropriate to enable the oldstyle parameter until all
+	    clients have been converted to using name-based exports.
+	  </para>
+	  <para>
+	    Note that exports specified on the command line will
+	    always use the old handshake protocol and will not allow
+	    name-based exports.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>listenaddr</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain the local IP
+	  address on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not
+	    set, <command>nbd-server</command> will listen to all
+	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
+	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
+	  is not possible to specify more than one IP address
+	  here.</para>
+	</listitem>
+      </varlistentry
     </variablelist>
   </refsect1>
   <refsect1>
@@ -236,15 +282,15 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term>listenaddr</term>
 	<listitem>
-	  <para>Optional; string</para>
-	  <para>If this option is set, it should contain the local IP
-	  address on which we should listen to
-	  <command>nbd-client</command>(8) connections. If it is not
-	    set, <command>nbd-server</command> will listen to all
-	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
-	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
-	  is not possible to specify more than one IP address
-	  here.</para>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>
+	    If the 'oldstyle' global parameter is specified, works
+	    similarly to the global listenaddr parameter, but for the
+	    individual port of this particular export. If the 'oldstyle'
+	    parameter is not set, this parameter is ignored.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -278,7 +324,7 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term><option>port</option></term>
 	<listitem>
-	  <para>Required; integer.</para>
+	  <para>Required if 'oldstyle' global parameter is set; integer.</para>
 	  <para>
 	    The port on which this export is to be served. Currently
 	    it is not possible to export multiple block devices on the
