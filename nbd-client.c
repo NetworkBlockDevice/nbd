@@ -180,11 +180,11 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 	size64 = ntohll(size64);
 
 #ifdef NBD_SET_SIZE_BLOCKS
-	if ((size64>>10) > (~0UL >> 1)) {
+	if ((size64>>12) > (uint64_t)~0UL) {
 		printf("size = %luMB", (unsigned long)(size64>>20));
 		err("Exported device is too big for me. Get 64-bit machine :-(\n");
 	} else
-		printf("size = %luKB", (unsigned long)(size64>>10));
+		printf("size = %luMB", (unsigned long)(size64>>20));
 #else
 	if (size64 > (~0UL >> 1)) {
 		printf("size = %luKB", (unsigned long)(size64>>10));
@@ -215,16 +215,18 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
 #ifdef NBD_SET_SIZE_BLOCKS
-	if (size64/blocksize > (~0UL >> 1))
+	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
 		int er;
-		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
 			err("Ioctl/1.1a failed: %m\n");
-		size = (unsigned long)(size64/blocksize);
+		size = (unsigned long)(size64>>12);
 		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
 			err("Ioctl/1.1b failed: %m\n");
-		fprintf(stderr, "bs=%d, sz=%lu\n", blocksize, size);
+		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+			err("Ioctl/1.1c failed: %m\n");
+		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, 4096ULL*size);
 	}
 #else
 	if (size64 > (~0UL >> 1)) {
