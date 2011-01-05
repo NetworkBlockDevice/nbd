@@ -9,6 +9,8 @@ nbd (1:2.9.18-1) experimental; urgency=low
     configuration; update in light of name-based exports
   * debian/rules: make debian/po/templates.pot a dependency of
     override_dh_auto_configure, so that it is always up-to-date.
+  * debian/control: update Standards-Version header to what we're
+    actually already using (forgot to update in 1:2.9.16-1)
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 18:41:29 +0100
 
