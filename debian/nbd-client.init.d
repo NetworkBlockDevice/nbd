@@ -25,9 +25,6 @@
 ### END INIT INFO
 #
 # Version:	@(#)skeleton  1.8  03-Mar-1998  miquels@cistron.nl
-#TODO: find a better way to figure out what nbd-devices need to be
-#disconnected (the for-loop works, but the kernel does
-#printk("NBD_DISCONNECT") after each request).
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON="/sbin/nbd-client"
