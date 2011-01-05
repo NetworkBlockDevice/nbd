@@ -1,9 +1,11 @@
-nbd (1:2.9.18-1) unstable; urgency=low
+nbd (1:2.9.18-1) experimental; urgency=low
 
   * New upstream release
     - Implements name-based exports.
+  * Implement support for name-based exports in nbd-client's debconf scripts,
+    in light of the above
 
- -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 17:08:17 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 17:32:56 +0100
 
 nbd (1:2.9.16-7) unstable; urgency=low
 
