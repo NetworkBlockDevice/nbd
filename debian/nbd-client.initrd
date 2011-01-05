@@ -66,6 +66,13 @@ then
 	exit 0
 fi
 
+nondigits=$(echo $nbdport | sed -e 's/[0-9]//g')
+if [ ! -z "$nondigits" ]
+then
+	# non-numeric characters, assume a name rather than a port
+	nbdport="-N $nbdport"
+fi
+
 if [ -z "$nbdsrv" ]
 then
 	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
