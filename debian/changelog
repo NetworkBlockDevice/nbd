@@ -2,14 +2,14 @@ nbd (1:2.9.18-1) experimental; urgency=low
 
   * New upstream release
     - Implements name-based exports.
-  * Implement support for name-based exports in nbd-client's debconf scripts,
-    in light of the above
+  * Implement support for name-based exports in nbd-client's debconf and init
+    scripts, in light of the above
   * Same for nbd-server
   * debian/nbd-client.initrd: same.
   * debian/nbd-client.README.Debian: Mention possibility of using DHCP for
     configuration; update in light of name-based exports
 
- -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 17:32:56 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 18:41:29 +0100
 
 nbd (1:2.9.16-7) unstable; urgency=low
 
