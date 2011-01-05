@@ -4,6 +4,7 @@ nbd (1:2.9.18-1) experimental; urgency=low
     - Implements name-based exports.
   * Implement support for name-based exports in nbd-client's debconf scripts,
     in light of the above
+  * Same for nbd-server
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 17:32:56 +0100
 
