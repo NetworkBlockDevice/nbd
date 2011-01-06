@@ -99,6 +99,7 @@ case "$1" in
 		  echo "	exportname = $FN"
 	      ) >> $TMPFILE
 	      if [ $DOPORTS ]
+	      then
 		  echo "	port = $PORT" >> $TMPFILE
 	      fi
 	    done
