@@ -11,8 +11,13 @@ nbd (1:2.9.18-1) experimental; urgency=low
     override_dh_auto_configure, so that it is always up-to-date.
   * debian/control: update Standards-Version header to what we're
     actually already using (forgot to update in 1:2.9.16-1)
+  * debian/nbd-client.initrd: support netbooting through reading the
+    server's IP address from ROOTSERVER, but everything else from the
+    kernel command line. This to support inflexible setups where it is
+    possible to boot with PXE, but where it is not possible to set
+    random arguments, like, say root-path. Netbooting is a can of worms. 
 
- -- Wouter Verhelst <wouter@debian.org>  Wed, 05 Jan 2011 18:41:29 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 06 Jan 2011 02:02:14 +0100
 
 nbd (1:2.9.16-7) unstable; urgency=low
 
