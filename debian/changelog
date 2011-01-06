@@ -1,4 +1,4 @@
-nbd (1:2.9.18-1) experimental; urgency=low
+nbd (1:2.9.18-1~1) experimental; urgency=low
 
   * New upstream release
     - Implements name-based exports.
