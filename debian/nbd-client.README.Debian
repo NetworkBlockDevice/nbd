@@ -21,19 +21,34 @@ variable in DHCP, for example (with ISC DHCP):
 
 option root-path "X.X.X.X,Y,nbdZ";
 
-If the port name contains any non-digit characters, the script will
-assume that it is a name-based export and add the -N parameter, as is
-required for doing so.
+A third (and final) option is to specify 
+
+nbdroot=dhcp,Y
+
+or
+
+nbdroot=dhcp,Y,nbdZ
+
+Doing so will take the IP address of the server from DHCP configuration,
+but take everything else from the kernel command line. This is useful to
+override the to be used export, or could also be used with inflexible
+DHCP setups where it is not possible to set the root path.
+
+If the specified port number contains any non-digit characters, the
+script will assume that it is a name-based export and add the -N
+parameter, as is required for doing so.
 
 You will want to set "KILLALL=false" in /etc/nbd-client; this to prevent
 the initscript from yanking the root filesystem from under your nose
 during shutdown or upgrade of the nbd package.
 
-DO NOT add configuration for the root filesystem to /etc/nbd-server.
-The initramfs will set it up, and the initscript should not know about
-it (otherwise the above KILLALL configuration has no effect).
+DO NOT add configuration for the root filesystem to /etc/nbd-client.
+The initramfs will connect the device, and the initscript should not
+know about it (otherwise the above KILLALL configuration has no effect).
 
-DO keep the initscript running; it will detect that you're running off
-an NBD device and add the nbd-client PID number to
+DO keep the initscript running and the nbd-client package installed on
+every client that boots off an NBD device, even if no other NBD devices
+are configured; this is required because the initscript will detect that
+you're running off an NBD device and add the nbd-client PID number to
 /lib/init/rw/sendsigs.omit.d, to prevent init from killing nbd-client
 prematurely at shutdown.
