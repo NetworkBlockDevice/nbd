@@ -3,3 +3,5 @@ nbd-client binary: init.d-script-possible-missing-stop /etc/init.d/nbd-client 1
 # This is a false positive: we set PATH to a sane value including /usr
 # paths, but we don't actually use anything from those paths ourselves.
 nbd-client: init.d-script-missing-dependency-on-remote_fs
+# The format is different, but still policy-compliant.
+nbd-client: copyright-without-copyright-notice

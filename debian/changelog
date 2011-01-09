@@ -16,6 +16,9 @@ nbd (1:2.9.18-1~1) experimental; urgency=low
     kernel command line. This to support inflexible setups where it is
     possible to boot with PXE, but where it is not possible to set
     random arguments, like, say root-path. Netbooting is a can of worms. 
+  * debian/*.lintian-overrides: override
+    copyright-without-copyright-notice (we do list all authors, but in a
+    format that Lintian doesn't know about).
 
  -- Wouter Verhelst <wouter@debian.org>  Thu, 06 Jan 2011 02:02:14 +0100
 
