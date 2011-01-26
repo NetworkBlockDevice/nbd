@@ -612,8 +612,8 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>nbd-server (1), nbd-client (8),
-      http://nbd.sourceforge.net/roadmap.html</para>
+    <para>nbd-server (1), nbd-client (8)</para>
+      
 
   </refsect1>
   <refsect1>
