@@ -1,3 +1,10 @@
+nbd (1:2.9.19-1~1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes old minor bugs in documentation (LP: #290076)
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 26 Jan 2011 15:59:24 +0100
+
 nbd (1:2.9.16-7.1) unstable; urgency=low
 
   * Non-maintainer upload.
