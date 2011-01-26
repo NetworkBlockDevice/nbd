@@ -1,3 +1,10 @@
+nbd (1:2.9.16-7.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fix encoding of German debconf translation.
+
+ -- Christian Perrier <bubulle@debian.org>  Wed, 12 Jan 2011 19:52:48 +0100
+
 nbd (1:2.9.18-1~1) experimental; urgency=low
 
   * New upstream release
