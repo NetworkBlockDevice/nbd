@@ -150,7 +150,7 @@ gboolean do_oldstyle=FALSE;
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			       authorization file (yuck) */
-#define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
+#define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
@@ -1389,7 +1389,7 @@ int mainloop(CLIENT *client) {
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE + sizeof(struct nbd_reply))
+		if (len > BUFSIZE - sizeof(struct nbd_reply))
 			err("Request too big!");
 #ifdef DODBG
 		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
