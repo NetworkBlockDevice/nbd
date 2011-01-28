@@ -1364,7 +1364,10 @@ int mainloop(CLIENT *client) {
 	reply.error = 0;
 	while (go_on) {
 		char buf[BUFSIZE];
+		char* p;
 		size_t len;
+		size_t currlen;
+		size_t writelen;
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
@@ -1389,8 +1392,12 @@ int mainloop(CLIENT *client) {
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE - sizeof(struct nbd_reply))
-			err("Request too big!");
+		if (len > BUFSIZE - sizeof(struct nbd_reply)) {
+			currlen = BUFSIZE - sizeof(struct nbd_reply);
+			msg("INFO: oversized request (this is not a problem)");
+		} else {
+			currlen = len;
+		}
 #ifdef DODBG
 		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
 				"READ", (unsigned long long)request.from,
@@ -1411,35 +1418,47 @@ int mainloop(CLIENT *client) {
 
 		if (request.type==NBD_CMD_WRITE) {
 			DEBUG("wr: net->buf, ");
-			readit(client->net, buf, len);
-			DEBUG("buf->exp, ");
-			if ((client->server->flags & F_READONLY) ||
-			    (client->server->flags & F_AUTOREADONLY)) {
-				DEBUG("[WRITE to READONLY!]");
-				ERROR(client, reply, EPERM);
-				continue;
+			while(len > 0) {
+				readit(client->net, buf, currlen);
+				DEBUG("buf->exp, ");
+				if ((client->server->flags & F_READONLY) ||
+				    (client->server->flags & F_AUTOREADONLY)) {
+					DEBUG("[WRITE to READONLY!]");
+					ERROR(client, reply, EPERM);
+					continue;
+				}
+				if (expwrite(request.from, buf, len, client)) {
+					DEBUG("Write failed: %m" );
+					ERROR(client, reply, errno);
+					continue;
+				}
+				SEND(client->net, reply);
+				DEBUG("OK!\n");
+				len -= currlen;
+				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
-			if (expwrite(request.from, buf, len, client)) {
-				DEBUG("Write failed: %m" );
-				ERROR(client, reply, errno);
-				continue;
-			}
-			SEND(client->net, reply);
-			DEBUG("OK!\n");
 			continue;
 		}
 		/* READ */
 
 		DEBUG("exp->buf, ");
-		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
-			DEBUG("Read failed: %m");
-			ERROR(client, reply, errno);
-			continue;
-		}
-
-		DEBUG("buf->net, ");
 		memcpy(buf, &reply, sizeof(struct nbd_reply));
-		writeit(client->net, buf, len + sizeof(struct nbd_reply));
+		p = buf + sizeof(struct nbd_reply);
+		writelen = currlen + sizeof(struct nbd_reply);
+		while(len > 0) {
+			if (expread(request.from, p, currlen, client)) {
+				DEBUG("Read failed: %m");
+				ERROR(client, reply, errno);
+				continue;
+			}
+
+			DEBUG("buf->net, ");
+			writeit(client->net, buf, writelen);
+			len -= currlen;
+			currlen = (len < BUFSIZE) ? len : BUFSIZE;
+			p = buf;
+			writelen = currlen;
+		}
 		DEBUG("OK!\n");
 	}
 	return 0;
