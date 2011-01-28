@@ -37,13 +37,13 @@
 #include <getopt.h>
 #include <stdarg.h>
 
-#ifndef __GNUC__
-#error I need GCC to work
-#endif
-
 #include <linux/ioctl.h>
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
+
+#ifdef WITH_SDP
+#include <sdp_inet.h>
+#endif
 
 int check_conn(char* devname, int do_print) {
 	char buf[256];
@@ -153,17 +153,22 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 		*flags = ((u32)ntohs(tmp)) << 16;
 
 		/* reserved for future use*/
-		write(sock, &reserved, sizeof(reserved));
+		if (write(sock, &reserved, sizeof(reserved)) < 0)
+			err("Failed/2.1: %m");
 
 		/* Write the export name that we're after */
 		magic = ntohll(opts_magic);
-		write(sock, &magic, sizeof(magic));
+		if (write(sock, &magic, sizeof(magic)) < 0)
+			err("Failed/2.2: %m");
 		opt = ntohl(NBD_OPT_EXPORT_NAME);
-		write(sock, &opt, sizeof(opt));
+		if (write(sock, &opt, sizeof(opt)) < 0)
+			err("Failed/2.3: %m");
 		namesize = (u32)strlen(name);
 		namesize = ntohl(namesize);
-		write(sock, &namesize, sizeof(namesize));
-		write(sock, name, strlen(name));
+		if (write(sock, &namesize, sizeof(namesize)) < 0)
+			err("Failed/2.4: %m");
+		if (write(sock, name, strlen(name)) < 0)
+			err("Failed/2.4: %m");
 	} else {
 		if (magic != cliserv_magic)
 			err("Not enough cliserv_magic");
@@ -175,11 +180,11 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 	size64 = ntohll(size64);
 
 #ifdef NBD_SET_SIZE_BLOCKS
-	if ((size64>>10) > (~0UL >> 1)) {
+	if ((size64>>12) > (uint64_t)~0UL) {
 		printf("size = %luMB", (unsigned long)(size64>>20));
 		err("Exported device is too big for me. Get 64-bit machine :-(\n");
 	} else
-		printf("size = %luKB", (unsigned long)(size64>>10));
+		printf("size = %luMB", (unsigned long)(size64>>20));
 #else
 	if (size64 > (~0UL >> 1)) {
 		printf("size = %luKB", (unsigned long)(size64>>10));
@@ -210,16 +215,18 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
 #ifdef NBD_SET_SIZE_BLOCKS
-	if (size64/blocksize > (~0UL >> 1))
+	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
 		int er;
-		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
 			err("Ioctl/1.1a failed: %m\n");
-		size = (unsigned long)(size64/blocksize);
+		size = (unsigned long)(size64>>12);
 		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
 			err("Ioctl/1.1b failed: %m\n");
-		fprintf(stderr, "bs=%d, sz=%lu\n", blocksize, size);
+		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+			err("Ioctl/1.1c failed: %m\n");
+		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, 4096ULL*size);
 	}
 #else
 	if (size64 > (~0UL >> 1)) {
@@ -441,7 +448,10 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 #ifndef NOFORK
-	if(!nofork) daemon(0,0);
+	if(!nofork) {
+		if (daemon(0,0) < 0)
+			err("Cannot detach from terminal");
+	}
 #endif
 	do {
 #ifndef NOFORK

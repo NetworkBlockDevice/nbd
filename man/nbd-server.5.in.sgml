@@ -20,7 +20,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhemail     "<email>wouter@debian.org</email>">
   <!ENTITY dhusername  "Wouter Verhelst">
   <!ENTITY dhucpackage "<refentrytitle>NBD-SERVER</refentrytitle>">
-  <!ENTITY dhpackage   "/etc/nbd-server/config">
+  <!ENTITY dhpackage   "@sysconfdir@/nbd-server/config">
 
   <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
   <!ENTITY gnu         "<acronym>GNU</acronym>">
@@ -83,9 +83,9 @@ manpage.1: manpage.sgml
       present, even if it holds no options. Every other section
       defines one export; the names of these sections are not
       important, except that you should take care to make sure that
-      each section name is unique (future versions of
-      <command>nbd-server</command> may use the section name to refer
-      to an export)
+      each section name is unique. The section name is used as the name
+      for the export in case the client connects with a name rather than
+      a port to specify an export, and must therefore be unique.
     </para>
     <para>
       A comment line is a line that starts with optional whitespace,
@@ -100,7 +100,7 @@ manpage.1: manpage.sgml
       type boolean. The value of a boolean option can be denoted with
       either true or false (so not yes, no, on, off, 1, or 0). All
       booleans default to false unless specified otherwise. No value
-      may be quoted (always enter it directly). For a string option,
+      may be quoted; always enter it directly. For a string option,
       leading whitespace is stripped (but trailing whitespace is not).
     </para>
 
@@ -144,7 +144,7 @@ manpage.1: manpage.sgml
         </listitem>
       </varlistentry>
       <varlistentry>
-        <term><option>oldstyle</option></term>
+	<term><option>oldstyle</option></term>
 	<listitem>
 	  <para>
 	    Optional; boolean
@@ -171,10 +171,18 @@ manpage.1: manpage.sgml
 	    always use the old handshake protocol and will not allow
 	    name-based exports.
 	  </para>
+	  <para>
+	    Also note that even if this parameter is set to true, all
+	    exports will also be made available using the new handshake
+	    protocol; it is not possible to switch that off. The reason
+	    for this is that the old style protocol will eventually be
+	    deprecated, and this option is only available to allow for
+	    smooth upgrades.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
-        <term><option>listenaddr</option></term>
+	<term><option>listenaddr</option></term>
 	<listitem>
 	  <para>
 	    Optional; string
@@ -230,8 +238,8 @@ manpage.1: manpage.sgml
 	    writes to this export will not be written to the master
 	    file, but to a separate file which will be removed upon
 	    disconnect. The result of using this option is that
-	    nbd-server will be slower, and that any writes will be
-	    lost upon disconnect.
+	    nbd-server will be somewhat slower, and that any writes will
+	    be lost upon disconnect.
 	  </para>
 	  <para>Corresponds to the <option>-c</option> option on the
 	    command line</para>
@@ -312,8 +320,7 @@ manpage.1: manpage.sgml
 	  <para>
 	    The size of the individual files will be autodetected,
 	    <emphasis>even</emphasis> if the <option>filesize</option>
-	    option has been specified. See the documentation for the
-	    <option>multifile</option> for details.
+	    option has been specified.
 	  </para>
 	  <para>
 	    Corresponds to the <option>-m</option> option on the
@@ -326,11 +333,20 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Required if 'oldstyle' global parameter is set; integer.</para>
 	  <para>
-	    The port on which this export is to be served. Currently
-	    it is not possible to export multiple block devices on the
-	    same port unless virtualization is used; future versions
-	    of <command>nbd-server</command> may add this
-	    functionality.
+	    The port on which this export is to be served using the
+	    old-style handshake protocol.
+	  </para>
+	  <para>
+	    This parameter only makes sense when the 'oldstyle'
+	    parameter is set to true in the 'generic' section. If that
+	    parameter is not set, but this parameter is found in an
+	    export section, then nbd-server will issue a warning upon
+	    startup but should otherwise continue to function correctly.
+	  </para>
+	  <para>
+	    It is not possible to combine multiple exports on the same
+	    port using the old style handshake. Please use the new style
+	    handshake for that purpose.
 	  </para>
 	  <para>
 	    When specified on the command line, this should be the
@@ -356,7 +372,7 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-        <term><option>sdp</option></term>
+	<term><option>sdp</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>
 	  <para>
@@ -444,8 +460,16 @@ manpage.1: manpage.sgml
 	    Defines the style of virtualization. Virtualization allows
 	    one to create one export that will serve a different file
 	    depending on the IP address that is connecting. When
-	    virtualization is There are three types of virtualization
-	    that <command>nbd-server</command> supports:
+	    virtualization is active, the
+	    <replaceable>exportname</replaceable> parameter needs to
+	    contain the string '%s'; this will then be replaced by the
+	    IP address of the client connecting, in accordance with the
+	    option selected here. The result of this transformation is
+	    then used as the filename to be opened.
+	  </para>
+	  <para>
+	    There are four types of virtualization that
+	    <command>nbd-server</command> supports:
 	  </para>
 	  <variablelist>
 	    <varlistentry>
@@ -462,18 +486,20 @@ manpage.1: manpage.sgml
 	      <term><option>ipliteral</option></term>
 	      <listitem>
 		<para>
-		  <command>nbd-server</command> will look for the
-		  literal string '%s' in the
-		  <option>exportname</option>, and replace it by the
-		  address of the connecting host. The string that
-		  results from this transformation will be used as an
-		  absolute pathname that <command>nbd-server</command>
-		  will attempt to open. As an example, if a client
-		  connects from 192.168.1.100 and
-		  <option>exportname</option> is specified as
-		  <filename>/export/%s</filename>, then nbd-server
-		  will attempt to serve
-		  <filename>/export/192.168.1.100</filename>
+		  The %s is replaced by the IP address of the connecting
+		  host is used as-is.  For IPv4, this is done in
+		  dotted-quad notation; for IPv6, in hexadecimal form
+		  with leading zeros omitted.
+		</para>
+		<para>
+		  As an example, if a client connects from 192.168.1.100
+		  and <option>exportname</option> is specified as
+		  <filename>/export/%s</filename>, then nbd-server will
+		  attempt to serve
+		  <filename>/export/192.168.1.100</filename>. For IPv6,
+		  with a client connecting from 2001:6f8:32f::39, the
+		  filename would be
+		  <filename>/export/2001:6f8:32f:0:0:0:0:39</filename>
 		</para>
 	      </listitem>
 	    </varlistentry>
@@ -491,7 +517,9 @@ manpage.1: manpage.sgml
 		<para>
 		  Since there are no dots in most IPv6 addresses, the
 		  effect of using this option when IPv6 is in use is
-		  indistinguishable from the ipliteral option.
+		  indistinguishable from the ipliteral option. It was
+		  thought that having to create an eight-deep directory
+		  structure would not be as useful.
 		</para>
 	      </listitem>
 	    </varlistentry>
@@ -512,7 +540,10 @@ manpage.1: manpage.sgml
 		  <command>nbd-server</command> will try to open
 		  <filename>/export/192.168.1.64/192.168.1.100</filename>.
 		</para>
-		<para>This option works as expected for IPv6.</para>
+		<para>For IPv6, in the above example, with
+		<constant>cidrhash 42</constant>, the filename would
+		be
+		<filename>/export/2001:32f:6c0:0:0:0:0:0/2001:32f:6f8:0:0:0:0:39</filename>.</para>
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
@@ -565,14 +596,24 @@ manpage.1: manpage.sgml
 	  </para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>maxconnections</option></term>
+	<listitem>
+	  <para>Optional; integer</para>
+	  <para>
+	    If specified, then it limits the number of opened connections for
+	    this export.
+	  </para>
+	</listitem>
+      </varlistentry>
     </variablelist>
     
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>nbd-server (1), nbd-client (8),
-      http://nbd.sourceforge.net/roadmap.html</para>
+    <para>nbd-server (1), nbd-client (8)</para>
+      
 
   </refsect1>
   <refsect1>
@@ -615,9 +656,9 @@ manpage.1: manpage.sgml
       [export]
           exportname = /export/blkdev
           port = 12345
-          authfile = /etc/nbd-server/allow
+          authfile = @sysconfdir@/nbd-server/allow
     </programlisting>
-    <para>With /etc/nbd-server/allow containing the following:</para>
+    <para>With @sysconfdir@/nbd-server/allow containing the following:</para>
     <programlisting>
       127.0.0.1
       192.168.0.0/8

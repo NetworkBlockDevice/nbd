@@ -201,6 +201,11 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Specifies that the NBD client should not detach and
 	  daemonize itself. This is mostly useful for debugging.</para>
+	  <para>
+	    Note that nbd-client will still fork once to trigger an
+	    update to the device node's partition table. It is not
+	    possible to disable this.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -230,14 +235,14 @@ manpage.1: manpage.sgml
       <listitem>
 	<para>To connect to a server running on port 2001 at host
 	  "swapserver.domain.com", using the client's block special
-	  file "/dev/nb1", for swap purposes:</para>
-	<para><command>nbd-client swapserver.domain.com 2001 /dev/nb1
+	  file "/dev/nbd1", for swap purposes:</para>
+	<para><command>nbd-client swapserver.domain.com 2001 /dev/nbd1
 	  -swap</command></para>
       </listitem>
       <listitem>
 	<para>To disconnect the above connection again (after making
 	  sure the block special file is not in use anymore):</para>
-	<para><command>nbd-client -d /dev/nb1</command></para>
+	<para><command>nbd-client -d /dev/nbd1</command></para>
       </listitem>
     </itemizedlist>
   </refsect1>
@@ -264,20 +269,3 @@ manpage.1: manpage.sgml
 
   </refsect1>
 </refentry>
-
-<!-- Keep this comment at the end of the file
-Local variables:
-mode: sgml
-sgml-omittag:t
-sgml-shorttag:t
-sgml-minimize-attributes:nil
-sgml-always-quote-attributes:t
-sgml-indent-step:2
-sgml-indent-data:t
-sgml-parent-document:nil
-sgml-default-dtd-file:nil
-sgml-exposed-tags:nil
-sgml-local-catalogs:nil
-sgml-local-ecat-files:nil
-End:
--->

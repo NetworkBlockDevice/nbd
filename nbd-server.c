@@ -96,6 +96,10 @@
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
 
+#ifdef WITH_SDP
+#include <sdp_inet.h>
+#endif
+
 /** Default position of the config file */
 #ifndef SYSCONFDIR
 #define SYSCONFDIR "/etc"
@@ -146,7 +150,7 @@ gboolean do_oldstyle=FALSE;
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			       authorization file (yuck) */
-#define BUFSIZE (1024*1024) /**< Size of buffer that can hold requests */
+#define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
@@ -200,6 +204,7 @@ typedef struct {
 	gchar* postrun;	     /**< command that will be ran after the client
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
+	int max_connections; /**< maximum number of opened connections */
 } SERVER;
 
 /**
@@ -354,14 +359,15 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
-	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
+	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
+	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -411,6 +417,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
+		{"max-connection", required_argument, NULL, 'M'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -427,7 +434,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:M:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -503,6 +510,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'l':
 			g_free(serve->authname);
 			serve->authname=g_strdup(optarg);
+			break;
+		case 'M':
+			serve->max_connections = strtol(optarg, NULL, 0);
 			break;
 		default:
 			usage();
@@ -601,6 +611,8 @@ SERVER* dup_serve(SERVER *s) {
 	
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
+
+	serve->max_connections = s->max_connections;
 
 	return serve;
 }
@@ -701,6 +713,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
+		{ "maxconnections", FALSE, PARAM_INT,	NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
@@ -751,6 +764,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				lp[10].target=lp[11].target=
 				lp[12].target=&(s.flags);
 		lp[13].target=&(s.listenaddr);
+		lp[14].target=&(s.max_connections);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -1261,25 +1275,31 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 
 		if(!servers)
 			err("programmer error");
-		write(net, &smallflags, sizeof(uint16_t));
-		read(net, &reserved, sizeof(reserved));
-		read(net, &magic, sizeof(magic));
+		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
+			err("Negotiation failed: %m");
+		if (read(net, &reserved, sizeof(reserved)) < 0)
+			err("Negotiation failed: %m");
+		if (read(net, &magic, sizeof(magic)) < 0)
+			err("Negotiation failed: %m");
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			close(net);
 			return NULL;
 		}
-		read(net, &opt, sizeof(opt));
+		if (read(net, &opt, sizeof(opt)) < 0)
+			err("Negotiation failed: %m");
 		opt = ntohl(opt);
 		if(opt != NBD_OPT_EXPORT_NAME) {
 			close(net);
 			return NULL;
 		}
-		read(net, &namelen, sizeof(namelen));
+		if (read(net, &namelen, sizeof(namelen)) < 0)
+			err("Negotiation failed: %m");
 		namelen = ntohl(namelen);
 		name = malloc(namelen+1);
 		name[namelen]=0;
-		read(net, name, namelen);
+		if (read(net, name, namelen) < 0)
+			err("Negotiation failed: %m");
 		for(i=0; i<servers->len; i++) {
 			SERVER* serve = &(g_array_index(servers, SERVER, i));
 			if(!strcmp(serve->servename, name)) {
@@ -1344,7 +1364,10 @@ int mainloop(CLIENT *client) {
 	reply.error = 0;
 	while (go_on) {
 		char buf[BUFSIZE];
+		char* p;
 		size_t len;
+		size_t currlen;
+		size_t writelen;
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
@@ -1369,8 +1392,12 @@ int mainloop(CLIENT *client) {
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE + sizeof(struct nbd_reply))
-			err("Request too big!");
+		if (len > BUFSIZE - sizeof(struct nbd_reply)) {
+			currlen = BUFSIZE - sizeof(struct nbd_reply);
+			msg2(LOG_INFO, "oversized request (this is not a problem)");
+		} else {
+			currlen = len;
+		}
 #ifdef DODBG
 		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
 				"READ", (unsigned long long)request.from,
@@ -1391,35 +1418,47 @@ int mainloop(CLIENT *client) {
 
 		if (request.type==NBD_CMD_WRITE) {
 			DEBUG("wr: net->buf, ");
-			readit(client->net, buf, len);
-			DEBUG("buf->exp, ");
-			if ((client->server->flags & F_READONLY) ||
-			    (client->server->flags & F_AUTOREADONLY)) {
-				DEBUG("[WRITE to READONLY!]");
-				ERROR(client, reply, EPERM);
-				continue;
+			while(len > 0) {
+				readit(client->net, buf, currlen);
+				DEBUG("buf->exp, ");
+				if ((client->server->flags & F_READONLY) ||
+				    (client->server->flags & F_AUTOREADONLY)) {
+					DEBUG("[WRITE to READONLY!]");
+					ERROR(client, reply, EPERM);
+					continue;
+				}
+				if (expwrite(request.from, buf, len, client)) {
+					DEBUG("Write failed: %m" );
+					ERROR(client, reply, errno);
+					continue;
+				}
+				SEND(client->net, reply);
+				DEBUG("OK!\n");
+				len -= currlen;
+				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
-			if (expwrite(request.from, buf, len, client)) {
-				DEBUG("Write failed: %m" );
-				ERROR(client, reply, errno);
-				continue;
-			}
-			SEND(client->net, reply);
-			DEBUG("OK!\n");
 			continue;
 		}
 		/* READ */
 
 		DEBUG("exp->buf, ");
-		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
-			DEBUG("Read failed: %m");
-			ERROR(client, reply, errno);
-			continue;
-		}
-
-		DEBUG("buf->net, ");
 		memcpy(buf, &reply, sizeof(struct nbd_reply));
-		writeit(client->net, buf, len + sizeof(struct nbd_reply));
+		p = buf + sizeof(struct nbd_reply);
+		writelen = currlen + sizeof(struct nbd_reply);
+		while(len > 0) {
+			if (expread(request.from, p, currlen, client)) {
+				DEBUG("Read failed: %m");
+				ERROR(client, reply, errno);
+				continue;
+			}
+
+			DEBUG("buf->net, ");
+			writeit(client->net, buf, writelen);
+			len -= currlen;
+			currlen = (len < BUFSIZE) ? len : BUFSIZE;
+			p = buf;
+			writelen = currlen;
+		}
 		DEBUG("OK!\n");
 	}
 	return 0;
@@ -1729,6 +1768,12 @@ int serveloop(GArray* servers) {
 			if(net) {
 				int sock_flags;
 
+				if(serve->max_connections > 0 &&
+				   g_hash_table_size(children) >= serve->max_connections) {
+					msg2(LOG_INFO, "Max connections reached");
+					close(net);
+					continue;
+				}
 				if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
 					err("fcntl F_GETFL");
 				}
@@ -2040,7 +2085,7 @@ void glib_message_syslog_redirect(const gchar *log_domain,
       default:
         level=LOG_ERR;
     }
-    syslog(level, message);
+    syslog(level, "%s", message);
 }
 #endif
 

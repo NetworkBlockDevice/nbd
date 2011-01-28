@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.18],[wouter@debian.org])
+AC_INIT([nbd],[2.9.20],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -98,11 +98,14 @@ AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 case $host_os in
-     linux*) sbin_PROGRAMS="$sbin_PROGRAMS nbd-client"
-	      AC_MSG_RESULT(yes)
-              ;;
-     *) AC_MSG_RESULT(no) ;;
+	linux*) NBD_CLIENT_NAME="nbd-client"
+		AC_MSG_RESULT(yes)
+		;;
+	*)	NBD_CLIENT_NAME=""
+		AC_MSG_RESULT(no)
+		;;
 esac
+AC_SUBST(NBD_CLIENT_NAME)
 AC_SEARCH_LIBS(bind, socket,, AC_MSG_ERROR([Could not find an implementation of the bind() system call]))
 AC_SEARCH_LIBS(inet_ntoa, nsl,, AC_MSG_ERROR([Could not find an implementation of the inet_ntoa() system call]))
 AC_SEARCH_LIBS(daemon, resolv,, AC_MSG_ERROR([Could not find an implementation of the daemon() system call]))
@@ -114,10 +117,9 @@ AM_PATH_GLIB_2_0(2.6.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-AC_SUBST(sbin_PROGRAMS)
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile Doxyfile nbd-server.1 nbd-server.5 nbd-client.8])
+AC_CONFIG_FILES([Makefile Doxyfile man/Makefile man/nbd-client.8 man/nbd-server.5 man/nbd-server.1])
 AC_OUTPUT
 
