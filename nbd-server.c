@@ -1394,7 +1394,7 @@ int mainloop(CLIENT *client) {
 			err("Not enough magic.");
 		if (len > BUFSIZE - sizeof(struct nbd_reply)) {
 			currlen = BUFSIZE - sizeof(struct nbd_reply);
-			msg("INFO: oversized request (this is not a problem)");
+			msg2(LOG_INFO, "oversized request (this is not a problem)");
 		} else {
 			currlen = len;
 		}

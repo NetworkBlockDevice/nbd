@@ -6,7 +6,7 @@ tmpnam=`mktemp`
 ulimit -c unlimited
 
 # Create a one-meg device
-dd if=/dev/zero of=$tmpnam bs=1024 count=1024
+dd if=/dev/zero of=$tmpnam bs=1024 count=4096
 
 echo $1
 
@@ -21,7 +21,16 @@ case $1 in
 		./nbd-tester-client 127.0.0.1 11111
 		retval=$?
 	;;
-
+	*/cfgsize)
+		# Test oversized requests
+		./nbd-server -C /dev/null -p `pwd`/nbd-server.pid 11111 $tmpnam &
+		# -p only works if nbd-server wasn't compiled with -DNOFORK or
+		# -DNODAEMON, which I sometimes do for testing and debugging.
+		PID=$!
+		sleep 1
+		./nbd-tester-client 127.0.0.1 11111 -o
+		retval=$?
+	;;
 	*/cfg1)
 		# Test with export specified in config file
 		cat > nbd-server.conf <<EOF

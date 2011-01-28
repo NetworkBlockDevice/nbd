@@ -23,6 +23,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -212,6 +213,74 @@ end:
 	return retval;
 }
 
+int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
+	int retval=0;
+	struct nbd_request req;
+	struct nbd_reply rep;
+	int request=0;
+	int i=0;
+	pid_t mypid = getpid();
+	char buf[((1024*1024)+sizeof(struct nbd_request)/2)<<1];
+	bool got_err;
+
+	/* This should work */
+	if(!sock_is_open) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
+			g_warning("Could not open socket: %s", errstr);
+			retval=-1;
+			goto err;
+		}
+	}
+	req.magic=htonl(NBD_REQUEST_MAGIC);
+	req.type=htonl(NBD_CMD_READ);
+	req.len=htonl(1024*1024);
+	memcpy(&(req.handle),&i,sizeof(i));
+	req.from=htonll(i);
+	write(sock, &req, sizeof(req));
+	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
+	read_all(sock, &rep, sizeof(struct nbd_reply));
+	read_all(sock, &buf, ntohl(req.len));
+	if(rep.error) {
+		printf("Received unexpected error\n");
+		retval=-1;
+		goto err;
+	} else {
+		printf("OK\n");
+	}
+	/* This probably should not work */
+	i++; req.from=htonll(i);
+	req.len = htonl(ntohl(req.len) + sizeof(struct nbd_request) / 2);
+	write(sock, &req, sizeof(req));
+	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
+	read_all(sock, &rep, sizeof(struct nbd_reply));
+	read_all(sock, &buf, ntohl(req.len));
+	if(rep.error) {
+		printf("Received expected error\n");
+		got_err=true;
+	} else {
+		printf("OK\n");
+		got_err=false;
+	}
+	/* ... unless this works, too */
+	i++; req.from=htonll(i);
+	req.len = htonl(ntohl(req.len) << 1);
+	write(sock, &req, sizeof(req));
+	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
+	read_all(sock, &rep, sizeof(struct nbd_reply));
+	read_all(sock, &buf, ntohl(req.len));
+	if(rep.error) {
+		printf("error\n");
+	} else {
+		printf("OK\n");
+	}
+	if((rep.error && !got_err) || (!rep.error && got_err)) {
+		printf("Received unexpected error\n");
+		retval=-1;
+	}
+  err:
+	return retval;
+}
+
 int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
 	long long int i;
 	char buf[1024];
@@ -315,7 +384,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		speed>>=10;
 		speedchar[0]='G';
 	}
-	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%sB/s", (int)getpid(), timespan,speed,speedchar);
+	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%siB/s", (int)getpid(), timespan,speed,speedchar);
 
 err_open:
 	if(close_sock) {
@@ -325,12 +394,17 @@ err:
 	return retval;
 }
 
+typedef int (*testfunc)(gchar*, int, char*, int, char, char);
+
 int main(int argc, char**argv) {
 	gchar *hostname;
 	long int p = 0;
-	int port;
 	char* name = NULL;
 	int sock=0;
+	char c;
+	bool want_port = TRUE;
+	int nonopt=0;
+	testfunc test = throughput_test;
 
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
@@ -339,21 +413,37 @@ int main(int argc, char**argv) {
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	hostname=g_strdup(argv[1]);
-	if(!strncmp(argv[2], "-N", 2)) {
-		name = g_strdup(argv[3]);
-		p = 10809;
-	} else {
-		p=(strtol(argv[2], NULL, 0));
-		if(p==LONG_MIN||p==LONG_MAX) {
-			g_critical("Could not parse port number: %s", strerror(errno));
-			exit(EXIT_FAILURE);
+	while((c=getopt(argc, argv, "-N:o"))>=0) {
+		switch(c) {
+			case 1:
+				switch(nonopt) {
+					case 0:
+						hostname=g_strdup(optarg);
+						nonopt++;
+						break;
+					case 1:
+						if(want_port)
+						p=(strtol(argv[2], NULL, 0));
+						if(p==LONG_MIN||p==LONG_MAX) {
+							g_critical("Could not parse port number: %s", strerror(errno));
+							exit(EXIT_FAILURE);
+						}
+						break;
+				}
+				break;
+			case 'N':
+				name=g_strdup(optarg);
+				p = 10809;
+				want_port = false;
+				break;
+			case 'o':
+				test=oversize_test;
+				break;
 		}
 	}
-	port=(int)p;
 
-	if(throughput_test(hostname, port, name, sock, FALSE, TRUE)<0) {
-		g_warning("Could not run throughput test: %s", errstr);
+	if(test(hostname, (int)p, name, sock, FALSE, TRUE)<0) {
+		g_warning("Could not run test: %s", errstr);
 		exit(EXIT_FAILURE);
 	}
 
