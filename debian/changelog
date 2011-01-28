@@ -1,3 +1,11 @@
+nbd (1:2.9.16-8) unstable; urgency=high
+
+  * Cherry-pick 3ef52043861ab16352d49af89e048ba6339d6df8 from git HEAD
+    to fix oversized requests again. This Closes: #611187, which is a
+    re-introduction of CVE-2005-3534, hence urgency=high
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 28 Jan 2011 14:06:48 +0100
+
 nbd (1:2.9.16-7.1) unstable; urgency=low
 
   * Non-maintainer upload.
