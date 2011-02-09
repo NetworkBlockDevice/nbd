@@ -2,22 +2,22 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the nbd package.
 #
-# Yuri Kozlov <yuray@komyakino.ru>, 2009, 2010.
+# Yuri Kozlov <yuray@komyakino.ru>, 2009, 2010, 2011.
 msgid ""
 msgstr ""
-"Project-Id-Version: nbd 1:2.9.16-2\n"
+"Project-Id-Version: nbd 1:2.9.20-1~1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2011-01-05 18:59+0100\n"
-"PO-Revision-Date: 2010-08-01 16:59+0400\n"
+"PO-Revision-Date: 2011-02-04 13:11+0300\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
-"Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: ru\n"
 "X-Generator: Lokalize 1.0\n"
-"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
-"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #. Type: error
 #. Description
@@ -140,20 +140,20 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-#, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
 msgid "Port or name for nbd export (number: ${number})?"
-msgstr "Имя узла сервера (номер: ${number})?"
+msgstr "Порт или имя для экспорта nbd (номер: ${number})?"
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-#, fuzzy
 #| msgid "Please enter the TCP port number to access nbd-server."
 msgid ""
 "Please enter the TCP port number or NBD export name needed to access nbd-"
 "server."
-msgstr "Укажите номер порта TCP, по которому доступен nbd-server."
+msgstr ""
+"Укажите номер порта TCP или имя экспорта NBD, необходимое для доступа к "
+"nbd-server."
 
 #. Type: string
 #. Description
@@ -164,6 +164,9 @@ msgid ""
 "enter the TCP port number here, and should make sure not to enter any non-"
 "numeric characters in the field."
 msgstr ""
+"Версии nbd-server 2.9.16 или старее не поддерживают задание имён для "
+"экспорта NBD. Если ваш сервер NBD старой версии, то вы должны ввести номер "
+"порта TCP, и убедиться, что в поле не указано ничего кроме цифр."
 
 #. Type: string
 #. Description
@@ -174,6 +177,10 @@ msgid ""
 "this configuration system will accept that as a name and provide it to nbd-"
 "client as a name-based export rather than a port-based one."
 msgstr ""
+"В более новых версиях nbd-server есть поддержка имён для экспорта. "
+"Если в этом поле указана хоть одна не цифра, то тогда введённое "
+"значение будет считаться именем и предоставляться nbd-client как "
+"экспорт по имени, а не по порту."
 
 #. Type: string
 #. Description
@@ -291,7 +298,6 @@ msgstr "TCP порт для сервера номер ${number}:"
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
-#, fuzzy
 #| msgid ""
 #| "Please specify the TCP port this instance of nbd server will use for "
 #| "listening. As NBD is likely to use more than one port, no dedicated port "
@@ -300,23 +306,22 @@ msgid ""
 "Please specify the TCP port this instance of nbd server will use for "
 "backwards compatibility with older clients."
 msgstr ""
-"Укажите порт TCP данного экземпляра сервера nbd для приёма запросов. Обычно "
-"NBD использует более одного порта, в таблицах IANA не было выделено какого-"
-"то определённого номера."
+"Укажите порт TCP данного экземпляра сервера nbd, который будет "
+"использоваться "
+"для совместимости со старыми клиентами."
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
-#, fuzzy
 #| msgid "File to export (server number ${number}):"
 msgid "Name of export ${number}:"
-msgstr "Экспортируемый файл (сервер номер ${number}):"
+msgstr "Имя экспорта ${number}:"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
 msgid "Please specify a name for this export."
-msgstr ""
+msgstr "Укажите имя для данного экспорта."
 
 #. Type: string
 #. Description
@@ -443,7 +448,7 @@ msgstr ""
 #. Description
 #: ../nbd-server.templates:8001
 msgid "Support port-based exports?"
-msgstr ""
+msgstr "Поддерживать экспорт на основе портов?"
 
 #. Type: boolean
 #. Description
@@ -455,6 +460,13 @@ msgid ""
 "a lot of trouble to update your older configurations in order to migrate to "
 "name-based exports. In either of those cases, you should accept this option."
 msgstr ""
+"Начиная с версии 2.9.18, nbd-server поддерживает экспорт на основе имён, а "
+"не портов. "
+"Хотя это предпочтительный способ, вам может требоваться поддерживать "
+"системы со старыми версиями nbd-client, или вы не можете обновить старые "
+"настройки "
+"для перехода на экспорт на основе имён. В любом из этих случаев ответьте "
+"утвердительно."
 
 #. Type: boolean
 #. Description
@@ -463,6 +475,8 @@ msgid ""
 "Everyone else should leave the option at the default setting, which will "
 "cause nbd-server to only support name-based exports."
 msgstr ""
+"Во всех остальных случаях оставьте настройку по умолчанию, при которой "
+"nbd-server поддерживает только экспорт на основе имён."
 
 #~ msgid "Port on which the nbd-server is running (number: ${number})?"
 #~ msgstr "Порт, на котором работает nbd-server (номер: ${number})?"

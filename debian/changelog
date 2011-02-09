@@ -5,6 +5,7 @@ nbd (1:2.9.20-2) unstable; urgency=low
     unstable instead. Hence, consider that one to be -1 and this one to
     be -2, even though it wasn't.
   * Updated translations:
+    - Russian, by Yuri Kozlov; Closes: #611978.
     - French, by Christian Perrier; Closes: #612388.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 09 Feb 2011 13:49:08 +0100
