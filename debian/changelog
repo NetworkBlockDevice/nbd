@@ -1,4 +1,4 @@
-nbd (1:2.9.20-2) unstable; urgency=low
+nbd (1:2.9.20-2) UNRELEASED; urgency=low
 
   * Upload as 2.9.20-2 rather than -1; the previous release was supposed
     to be uploaded to experimental, but was accidentally uploaded to
@@ -8,6 +8,8 @@ nbd (1:2.9.20-2) unstable; urgency=low
     - Portuguese, by Américo Monteiro; Closes: #611836.
     - Russian, by Yuri Kozlov; Closes: #611978.
     - French, by Christian Perrier; Closes: #612388.
+
+    TODO: fix test suite to not fill up diskspace.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 09 Feb 2011 13:49:08 +0100
 
