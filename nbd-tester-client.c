@@ -23,6 +23,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -39,6 +40,8 @@
 
 static gchar errstr[1024];
 const static int errstr_len=1024;
+
+static uint64_t size;
 
 typedef enum {
 	CONNECTION_TYPE_NONE,
@@ -69,12 +72,14 @@ inline int read_all(int f, void *buf, size_t len) {
 	return retval;
 }
 
-int setup_connection(gchar *hostname, int port, CONNECTION_TYPE ctype) {
+int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype) {
 	int sock;
 	struct hostent *host;
 	struct sockaddr_in addr;
 	char buf[256];
+	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
 	u64 tmp64;
+	uint32_t tmp32 = 0;
 
 	sock=0;
 	if(ctype<CONNECTION_TYPE_CONNECT)
@@ -118,20 +123,34 @@ int setup_connection(gchar *hostname, int port, CONNECTION_TYPE ctype) {
 		goto err_open;
 	}
 	tmp64=ntohll(tmp64);
-	if(tmp64 != cliserv_magic) {
-		strncpy(errstr, "cliserv_magic does not match", errstr_len);
+	if(tmp64 != mymagic) {
+		strncpy(errstr, "mymagic does not match", errstr_len);
 		goto err_open;
 	}
 	if(ctype<CONNECTION_TYPE_FULL)
 		goto end;
-	/* The information we get now contains information on sizes. If
-	 * we're here, that means we want a 'working' connection, but
-	 * we're not interested in the sizes. So, read them but throw
-	 * the values away. We need to read the size of the device (a
-	 * 64bit integer) plus the reserved fields (128 bytes; should
-	 * all be zeroes).
-	 */
-	read_all(sock, buf, sizeof(tmp64)+128);
+	if(!name) {
+		read_all(sock, &size, sizeof(size));
+		size=ntohll(size);
+		read_all(sock, buf, 128);
+		goto end;
+	}
+	/* flags */
+	read_all(sock, buf, sizeof(uint16_t));
+	/* reserved field */
+	write(sock, &tmp32, sizeof(tmp32));
+	/* magic */
+	tmp64 = htonll(opts_magic);
+	write(sock, &tmp64, sizeof(tmp64));
+	/* name */
+	tmp32 = htonl(NBD_OPT_EXPORT_NAME);
+	write(sock, &tmp32, sizeof(tmp32));
+	tmp32 = htonl((uint32_t)strlen(name));
+	write(sock, &tmp32, sizeof(tmp32));
+	write(sock, name, strlen(name));
+	read_all(sock, &size, sizeof(size));
+	size = ntohll(size);
+	read_all(sock, buf, sizeof(uint16_t)+124);
 	goto end;
 err_open:
 	close(sock);
@@ -194,11 +213,78 @@ end:
 	return retval;
 }
 
-int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char close_sock) {
+int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
+	int retval=0;
+	struct nbd_request req;
+	struct nbd_reply rep;
+	int request=0;
+	int i=0;
+	pid_t mypid = getpid();
+	char buf[((1024*1024)+sizeof(struct nbd_request)/2)<<1];
+	bool got_err;
+
+	/* This should work */
+	if(!sock_is_open) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
+			g_warning("Could not open socket: %s", errstr);
+			retval=-1;
+			goto err;
+		}
+	}
+	req.magic=htonl(NBD_REQUEST_MAGIC);
+	req.type=htonl(NBD_CMD_READ);
+	req.len=htonl(1024*1024);
+	memcpy(&(req.handle),&i,sizeof(i));
+	req.from=htonll(i);
+	write(sock, &req, sizeof(req));
+	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
+	read_all(sock, &rep, sizeof(struct nbd_reply));
+	read_all(sock, &buf, ntohl(req.len));
+	if(rep.error) {
+		printf("Received unexpected error\n");
+		retval=-1;
+		goto err;
+	} else {
+		printf("OK\n");
+	}
+	/* This probably should not work */
+	i++; req.from=htonll(i);
+	req.len = htonl(ntohl(req.len) + sizeof(struct nbd_request) / 2);
+	write(sock, &req, sizeof(req));
+	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
+	read_all(sock, &rep, sizeof(struct nbd_reply));
+	read_all(sock, &buf, ntohl(req.len));
+	if(rep.error) {
+		printf("Received expected error\n");
+		got_err=true;
+	} else {
+		printf("OK\n");
+		got_err=false;
+	}
+	/* ... unless this works, too */
+	i++; req.from=htonll(i);
+	req.len = htonl(ntohl(req.len) << 1);
+	write(sock, &req, sizeof(req));
+	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
+	read_all(sock, &rep, sizeof(struct nbd_reply));
+	read_all(sock, &buf, ntohl(req.len));
+	if(rep.error) {
+		printf("error\n");
+	} else {
+		printf("OK\n");
+	}
+	if((rep.error && !got_err) || (!rep.error && got_err)) {
+		printf("Received unexpected error\n");
+		retval=-1;
+	}
+  err:
+	return retval;
+}
+
+int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
 	long long int i;
 	char buf[1024];
 	struct nbd_request req;
-	u64 size;
 	int requests=0;
 	fd_set set;
 	struct timeval tv;
@@ -214,28 +300,12 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 
 	size=0;
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, CONNECTION_TYPE_CLISERV))<0) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
 		}
-	} else {
-		/* Assume the file is at least 4k in size. Not much of a test
-		 * this way, but, well. */
-		size=4096;
 	}
-	if((tmp=read_all(sock, &size, sizeof(u64)))<0) {
-		retval=-1;
-		snprintf(errstr, errstr_len, "Could not read from socket: %s", strerror(errno));
-		goto err_open;
-	}
-	if(tmp==0) {
-		retval=-1;
-		snprintf(errstr, errstr_len, "Server closed connection unexpectedly when trying to read size of device in throughput test");
-		goto err;
-	}
-	read_all(sock,&buf,128);
-	size=ntohll(size);
 	req.magic=htonl(NBD_REQUEST_MAGIC);
 	req.type=htonl(NBD_CMD_READ);
 	req.len=htonl(1024);
@@ -314,7 +384,7 @@ int throughput_test(gchar* hostname, int port, int sock, char sock_is_open, char
 		speed>>=10;
 		speedchar[0]='G';
 	}
-	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%sB/s", (int)getpid(), timespan,speed,speedchar);
+	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%siB/s", (int)getpid(), timespan,speed,speedchar);
 
 err_open:
 	if(close_sock) {
@@ -324,28 +394,56 @@ err:
 	return retval;
 }
 
+typedef int (*testfunc)(gchar*, int, char*, int, char, char);
+
 int main(int argc, char**argv) {
 	gchar *hostname;
-	long int p;
-	int port;
+	long int p = 0;
+	char* name = NULL;
 	int sock=0;
+	char c;
+	bool want_port = TRUE;
+	int nonopt=0;
+	testfunc test = throughput_test;
 
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
 		g_message("%d: Usage: %s <hostname> <port>", (int)getpid(), argv[0]);
+		g_message("%d: Or: %s <hostname> -N <exportname>", (int)getpid(), argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	hostname=g_strdup(argv[1]);
-	p=(strtol(argv[2], NULL, 0));
-	if(p==LONG_MIN||p==LONG_MAX) {
-		g_critical("Could not parse port number: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+	while((c=getopt(argc, argv, "-N:o"))>=0) {
+		switch(c) {
+			case 1:
+				switch(nonopt) {
+					case 0:
+						hostname=g_strdup(optarg);
+						nonopt++;
+						break;
+					case 1:
+						if(want_port)
+						p=(strtol(argv[2], NULL, 0));
+						if(p==LONG_MIN||p==LONG_MAX) {
+							g_critical("Could not parse port number: %s", strerror(errno));
+							exit(EXIT_FAILURE);
+						}
+						break;
+				}
+				break;
+			case 'N':
+				name=g_strdup(optarg);
+				p = 10809;
+				want_port = false;
+				break;
+			case 'o':
+				test=oversize_test;
+				break;
+		}
 	}
-	port=(int)p;
 
-	if(throughput_test(hostname, port, sock, FALSE, TRUE)<0) {
-		g_warning("Could not run throughput test: %s", errstr);
+	if(test(hostname, (int)p, name, sock, FALSE, TRUE)<0) {
+		g_warning("Could not run test: %s", errstr);
 		exit(EXIT_FAILURE);
 	}
 

@@ -3,8 +3,10 @@
 
 tmpnam=`mktemp`
 
+ulimit -c unlimited
+
 # Create a one-meg device
-dd if=/dev/zero of=$tmpnam bs=1024 count=1024
+dd if=/dev/zero of=$tmpnam bs=1024 count=4096
 
 echo $1
 
@@ -19,11 +21,21 @@ case $1 in
 		./nbd-tester-client 127.0.0.1 11111
 		retval=$?
 	;;
-
+	*/cfgsize)
+		# Test oversized requests
+		./nbd-server -C /dev/null -p `pwd`/nbd-server.pid 11111 $tmpnam &
+		# -p only works if nbd-server wasn't compiled with -DNOFORK or
+		# -DNODAEMON, which I sometimes do for testing and debugging.
+		PID=$!
+		sleep 1
+		./nbd-tester-client 127.0.0.1 11111 -o
+		retval=$?
+	;;
 	*/cfg1)
 		# Test with export specified in config file
 		cat > nbd-server.conf <<EOF
 [generic]
+	oldstyle = true
 [export]
 	exportname = $tmpnam
 	port = 11112
@@ -39,6 +51,7 @@ EOF
 		# testing more options too
 		cat >nbd-server.conf <<EOF
 [generic]
+	oldstyle = true
 [export1]
 	exportname = $tmpnam
 	port = 11113
@@ -48,6 +61,7 @@ EOF
 	exportname = $tmpnam
 	port = 11114
 	readonly = true
+	listenaddr = 127.0.0.1
 EOF
 		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
 		PID=$!
@@ -63,10 +77,26 @@ EOF
 			else
 				kill $PID
 			fi
-			rm -f $tmpnam nbd-server.conf
+			if [ -z "$2" ]
+			then
+				rm -f $tmpnam nbd-server.conf
+			fi
 			exit $retval
 		fi
 		./nbd-tester-client localhost 11114
+		retval=$?
+	;;
+	*/cfgnew)
+		# Test new-style exports
+		cat >nbd-server.conf <<EOF
+[generic]
+[export1]
+	exportname = $tmpnam
+EOF
+		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		PID=$!
+		sleep 1
+		./nbd-tester-client localhost -N export1
 		retval=$?
 	;;
 	*)
@@ -81,8 +111,11 @@ then
 else
 	kill $PID
 fi
+if [ -z "$2" ]
+then
+	rm -f $tmpnam nbd-server.conf
+fi
 if [ $retval -ne 0 ]
 then
 	exit $retval
 fi
-rm -f $tmpnam nbd-server.conf

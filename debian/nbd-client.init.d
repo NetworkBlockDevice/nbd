@@ -25,9 +25,6 @@
 ### END INIT INFO
 #
 # Version:	@(#)skeleton  1.8  03-Mar-1998  miquels@cistron.nl
-#TODO: find a better way to figure out what nbd-devices need to be
-#disconnected (the for-loop works, but the kernel does
-#printk("NBD_DISCONNECT") after each request).
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON="/sbin/nbd-client"
@@ -110,7 +107,13 @@ case "$1" in
 	  then
 	  	echo "${NBD_DEVICE[$i]} already connected, skipping..."
 	  else
-	  	$DAEMON ${NBD_HOST[$i]} ${NBD_PORT[$i]} ${NBD_DEVICE[$i]} ${NBD_EXTRA[$i]}
+	  	if [ ! -z ${NBD_NAME[$i]} ]
+		then
+			name="-N ${NBD_NAME[$i]}"
+		else
+			name=""
+		fi
+	  	$DAEMON ${NBD_HOST[$i]} $name ${NBD_PORT[$i]} ${NBD_DEVICE[$i]} ${NBD_EXTRA[$i]}
 	  	echo "connected ${NBD_DEVICE[$i]}"
 	  fi
 	  i=$(($i + 1))

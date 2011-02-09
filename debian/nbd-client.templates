@@ -51,8 +51,20 @@ _Description: Hostname of the server (number: ${number})?
 
 Template: nbd-client/port
 Type: string
-_Description: Port on which the nbd-server is running (number: ${number})?
- Please enter the TCP port number to access nbd-server.
+_Description: Port or name for nbd export (number: ${number})?
+ Please enter the TCP port number or NBD export name needed to access
+ nbd-server.
+ .
+ Versions of nbd-server of 2.9.16 or lower did not support specifying a
+ name for the NBD export. If your NBD server is of an older version, you
+ should enter the TCP port number here, and should make sure not to
+ enter any non-numeric characters in the field.
+ .
+ More recent versions of nbd-server support providing a name for an
+ export. If the data entered in this field contains any non-numeric
+ characters, then this configuration system will accept that as a name
+ and provide it to nbd-client as a name-based export rather than a
+ port-based one.
 
 Template: nbd-client/device
 Type: string

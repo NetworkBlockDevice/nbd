@@ -15,7 +15,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2010-07-28 22:19-0400\n"
+"POT-Creation-Date: 2011-01-05 18:59+0100\n"
 "PO-Revision-Date: 2010-08-05 22:51+0200\n"
 "Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
 "Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
@@ -140,14 +140,40 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-msgid "Port on which the nbd-server is running (number: ${number})?"
-msgstr "Port, na kterém běží nbd-server (číslo ${number})?"
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "Port or name for nbd export (number: ${number})?"
+msgstr "Jméno serveru (číslo ${number})?"
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-msgid "Please enter the TCP port number to access nbd-server."
+#, fuzzy
+#| msgid "Please enter the TCP port number to access nbd-server."
+msgid ""
+"Please enter the TCP port number or NBD export name needed to access nbd-"
+"server."
 msgstr "Zadejte číslo TCP portu, které se použije pro přístup k nbd-serveru."
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:6001
+msgid ""
+"Versions of nbd-server of 2.9.16 or lower did not support specifying a name "
+"for the NBD export. If your NBD server is of an older version, you should "
+"enter the TCP port number here, and should make sure not to enter any non-"
+"numeric characters in the field."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:6001
+msgid ""
+"More recent versions of nbd-server support providing a name for an export. "
+"If the data entered in this field contains any non-numeric characters, then "
+"this configuration system will accept that as a name and provide it to nbd-"
+"client as a name-based export rather than a port-based one."
+msgstr ""
 
 #. Type: string
 #. Description
@@ -158,11 +184,6 @@ msgstr "Záznam v /dev pro tohoto klienta (číslo ${number})?"
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#| msgid ""
-#| "Every nbd-client process needs to be associated with a /dev entry with "
-#| "major mode 43. Please enter the name of the /dev entry you want to use "
-#| "for this nbd-client. Note that this needs to be the full path to that "
-#| "entry, not just the last part."
 msgid ""
 "Every nbd-client process needs to be associated with a /dev entry with major "
 "number 43. Please enter the name of the /dev entry you want to use for this "
@@ -220,7 +241,6 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:9001
-#| msgid "Hostname of the server (number: ${number})?"
 msgid "Extra parameters (number: ${number})"
 msgstr "Speciální parametry (číslo ${number})"
 
@@ -270,10 +290,14 @@ msgstr "TCP port serveru číslo ${number}:"
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
+#, fuzzy
+#| msgid ""
+#| "Please specify the TCP port this instance of nbd server will use for "
+#| "listening. As NBD is likely to use more than one port, no dedicated port "
+#| "has been assigned in IANA lists."
 msgid ""
 "Please specify the TCP port this instance of nbd server will use for "
-"listening. As NBD is likely to use more than one port, no dedicated port has "
-"been assigned in IANA lists."
+"backwards compatibility with older clients."
 msgstr ""
 "Zadejte TCP port, na kterém bude tato instance nbd-serveru naslouchat "
 "příchozím požadavkům. Protože je pravděpodobné, že bude NBD používat více "
@@ -281,23 +305,27 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-server.templates:3001
-msgid ""
-"Therefore, NBD does not have a standard port number, which means you need to "
-"provide one. You should make sure this port is not already in use."
-msgstr ""
-"NBD tedy nemá standardní číslo portu, což znamená, že nějaké musíte zadat. "
-"Ujistěte se, že zadané číslo portu již není využíváno jinou aplikací."
-
-#. Type: string
-#. Description
 #: ../nbd-server.templates:4001
-msgid "File to export (server number ${number}):"
+#, fuzzy
+#| msgid "File to export (server number ${number}):"
+msgid "Name of export ${number}:"
 msgstr "Soubor, který se má exportovat (server číslo ${number}):"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
+msgid "Please specify a name for this export."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:5001
+msgid "File to export (server number ${number}):"
+msgstr "Soubor, který se má exportovat (server číslo ${number}):"
+
+#. Type: string
+#. Description
+#: ../nbd-server.templates:5001
 #, no-c-format
 msgid ""
 "Please specify a file name or block device that should be exported over the "
@@ -316,7 +344,7 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-server.templates:4001
+#: ../nbd-server.templates:5001
 msgid ""
 "Note that it is possible to tune the way in which the IP address will be "
 "substituted in the file name. See \"man 5 nbd-server\" for details."
@@ -326,13 +354,13 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:6001
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
 msgstr "Volba AUTO_GEN je v /etc/nbd-server nastavena na „n“"
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:6001
 msgid ""
 "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
 "\"n\". The file will therefore not be regenerated automatically."
@@ -343,7 +371,7 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:6001
 msgid ""
 "Note that the current version of the nbd-server package no longer uses /etc/"
 "nbd-server. Instead it uses a new configuration file, read by nbd-server "
@@ -357,7 +385,7 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:6001
 msgid ""
 "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
 "config in the new format may be generated based on the current "
@@ -369,25 +397,25 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:7001
 msgid "Convert old-style nbd-server configuration file?"
 msgstr "Převést starý konfigurační soubor nbd-serveru?"
 
 #. Type: boolean
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:7001
 msgid ""
 "A pre-2.9 nbd-server configuration file has been found on this system. The "
 "current nbd-server package no longer supports this file and will not work if "
 "it is kept as is."
 msgstr ""
-"V systému byl nalezen konfigurační soubor nbd-serveru < 2...9. Současný balík "
-"nbd-server již tento soubor nepodporuje a pokud soubor nepřevedete na "
+"V systému byl nalezen konfigurační soubor nbd-serveru < 2...9. Současný "
+"balík nbd-server již tento soubor nepodporuje a pokud soubor nepřevedete na "
 "novější formát, nebude nbd-server fungovat."
 
 #. Type: boolean
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:7001
 msgid ""
 "If you choose this option, the system will generate a new style "
 "configuration file based upon the old-style configuration file, which will "
@@ -401,13 +429,49 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:7001
 msgid ""
 "If a new-style configuration file already exists and you choose this option, "
 "you will shortly see a \"modified configuration file\" prompt, as usual."
 msgstr ""
 "Pokud již nový konfigurační soubor existuje a na tuto otázku povolíte "
 "kladně, zobrazí se klasická výzva „změněný konfigurační soubor“."
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:8001
+msgid "Support port-based exports?"
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:8001
+msgid ""
+"Since version 2.9.18, nbd-server supports name-based exports, rather than "
+"port-based ones. While this is generally preferable, you may have to support "
+"systems running an older version of nbd-client, or might need to go through "
+"a lot of trouble to update your older configurations in order to migrate to "
+"name-based exports. In either of those cases, you should accept this option."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../nbd-server.templates:8001
+msgid ""
+"Everyone else should leave the option at the default setting, which will "
+"cause nbd-server to only support name-based exports."
+msgstr ""
+
+#~ msgid "Port on which the nbd-server is running (number: ${number})?"
+#~ msgstr "Port, na kterém běží nbd-server (číslo ${number})?"
+
+#~ msgid ""
+#~ "Therefore, NBD does not have a standard port number, which means you need "
+#~ "to provide one. You should make sure this port is not already in use."
+#~ msgstr ""
+#~ "NBD tedy nemá standardní číslo portu, což znamená, že nějaké musíte "
+#~ "zadat. Ujistěte se, že zadané číslo portu již není využíváno jinou "
+#~ "aplikací."
 
 #~ msgid ""
 #~ "There's a line in /etc/nbd-client that reads \"AUTO_GEN=n\" -- or "

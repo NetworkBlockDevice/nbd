@@ -35,14 +35,15 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <getopt.h>
-
-#ifndef __GNUC__
-#error I need GCC to work
-#endif
+#include <stdarg.h>
 
 #include <linux/ioctl.h>
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
+
+#ifdef WITH_SDP
+#include <sdp_inet.h>
+#endif
 
 int check_conn(char* devname, int do_print) {
 	char buf[256];
@@ -71,15 +72,12 @@ int check_conn(char* devname, int do_print) {
 	return 0;
 }
 
-int opennet(char *name, int port, int sdp) {
+int opennet(char *name, char* portstr, int sdp) {
 	int sock;
-	char portstr[6];
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	struct addrinfo *rp = NULL;
 	int e;
-
-	snprintf(portstr, sizeof(portstr), "%d", port);
 
 	memset(&hints,'\0',sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -125,8 +123,9 @@ int opennet(char *name, int port, int sdp) {
 	return sock;
 }
 
-void negotiate(int sock, u64 *rsize64, u32 *flags) {
+void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 	u64 magic, size64;
+	uint16_t tmp;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
 
 	printf("Negotiation: ");
@@ -140,20 +139,52 @@ void negotiate(int sock, u64 *rsize64, u32 *flags) {
 	if (read(sock, &magic, sizeof(magic)) < 0)
 		err("Failed/2: %m");
 	magic = ntohll(magic);
-	if (magic != cliserv_magic)
-		err("Not enough cliserv_magic");
-	printf(".");
+	if(name) {
+		uint32_t opt;
+		uint32_t namesize;
+		uint32_t reserved = 0;
+
+		if (magic != opts_magic)
+			err("Not enough opts_magic");
+		printf(".");
+		if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
+			err("Failed reading flags: %m");
+		}
+		*flags = ((u32)ntohs(tmp)) << 16;
+
+		/* reserved for future use*/
+		if (write(sock, &reserved, sizeof(reserved)) < 0)
+			err("Failed/2.1: %m");
+
+		/* Write the export name that we're after */
+		magic = ntohll(opts_magic);
+		if (write(sock, &magic, sizeof(magic)) < 0)
+			err("Failed/2.2: %m");
+		opt = ntohl(NBD_OPT_EXPORT_NAME);
+		if (write(sock, &opt, sizeof(opt)) < 0)
+			err("Failed/2.3: %m");
+		namesize = (u32)strlen(name);
+		namesize = ntohl(namesize);
+		if (write(sock, &namesize, sizeof(namesize)) < 0)
+			err("Failed/2.4: %m");
+		if (write(sock, name, strlen(name)) < 0)
+			err("Failed/2.4: %m");
+	} else {
+		if (magic != cliserv_magic)
+			err("Not enough cliserv_magic");
+		printf(".");
+	}
 
 	if (read(sock, &size64, sizeof(size64)) < 0)
 		err("Failed/3: %m\n");
 	size64 = ntohll(size64);
 
 #ifdef NBD_SET_SIZE_BLOCKS
-	if ((size64>>10) > (~0UL >> 1)) {
+	if ((size64>>12) > (uint64_t)~0UL) {
 		printf("size = %luMB", (unsigned long)(size64>>20));
 		err("Exported device is too big for me. Get 64-bit machine :-(\n");
 	} else
-		printf("size = %luKB", (unsigned long)(size64>>10));
+		printf("size = %luMB", (unsigned long)(size64>>20));
 #else
 	if (size64 > (~0UL >> 1)) {
 		printf("size = %luKB", (unsigned long)(size64>>10));
@@ -162,9 +193,15 @@ void negotiate(int sock, u64 *rsize64, u32 *flags) {
 		printf("size = %lu", (unsigned long)(size64));
 #endif
 
-	if (read(sock, flags, sizeof(*flags)) < 0)
-		err("Failed/4: %m\n");
-	*flags = ntohl(*flags);
+	if(!name) {
+		if (read(sock, flags, sizeof(*flags)) < 0)
+			err("Failed/4: %m\n");
+		*flags = ntohl(*flags);
+	} else {
+		if(read(sock, &tmp, sizeof(tmp)) < 0)
+			err("Failed/4: %m\n");
+		*flags |= (uint32_t)ntohs(tmp);
+	}
 
 	if (read(sock, &buf, 124) < 0)
 		err("Failed/5: %m\n");
@@ -178,16 +215,18 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
 #ifdef NBD_SET_SIZE_BLOCKS
-	if (size64/blocksize > (~0UL >> 1))
+	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
 		int er;
-		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
 			err("Ioctl/1.1a failed: %m\n");
-		size = (unsigned long)(size64/blocksize);
+		size = (unsigned long)(size64>>12);
 		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
 			err("Ioctl/1.1b failed: %m\n");
-		fprintf(stderr, "bs=%d, sz=%lu\n", blocksize, size);
+		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
+			err("Ioctl/1.1c failed: %m\n");
+		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, 4096ULL*size);
 	}
 #else
 	if (size64 > (~0UL >> 1)) {
@@ -225,11 +264,21 @@ void finish_sock(int sock, int nbd, int swap) {
 		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
-void usage(void) {
-	fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
-	fprintf(stderr, "Usage: nbd-client [bs=blocksize] [timeout=sec] host port nbd_device [-swap] [-sdp] [-persist] [-nofork]\n");
+void usage(char* errmsg, ...) {
+	if(errmsg) {
+		char tmp[256];
+		va_list ap;
+		va_start(ap, errmsg);
+		snprintf(tmp, 256, "ERROR: %s\n\n", errmsg);
+		vfprintf(stderr, errmsg, ap);
+		va_end(ap);
+	} else {
+		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
+	}
+	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-name|-N name]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
+	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
@@ -259,7 +308,7 @@ void disconnect(char* device) {
 }
 
 int main(int argc, char *argv[]) {
-	int port=0;
+	char* port=NULL;
 	int sock, nbd;
 	int blocksize=1024;
 	char *hostname=NULL;
@@ -273,21 +322,24 @@ int main(int argc, char *argv[]) {
 	u32 flags;
 	int c;
 	int nonspecial=0;
+	char* name=NULL;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
 		{ "disconnect", required_argument, NULL, 'd' },
 		{ "help", no_argument, NULL, 'h' },
+		{ "name", required_argument, NULL, 'N' },
 		{ "nofork", no_argument, NULL, 'n' },
 		{ "persist", no_argument, NULL, 'p' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
 		{ "timeout", required_argument, NULL, 't' },
+		{ 0, 0, 0, 0 }, 
 	};
 
 	logging();
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hnpSst:", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hnN:pSst:", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -303,7 +355,7 @@ int main(int argc, char *argv[]) {
 					optarg+=8;
 					goto timeout;
 				}
-				fprintf(stderr, "ERROR: unknown option %s encountered\n", optarg);
+				usage("unknown option %s encountered", optarg);
 				exit(EXIT_FAILURE);
 			}
 			switch(nonspecial++) {
@@ -313,14 +365,24 @@ int main(int argc, char *argv[]) {
 					break;
 				case 1:
 					// port
-					port = strtol(optarg, NULL, 0);
+					if(!strtol(optarg, NULL, 0)) {
+						// not parseable as a number, assume it's the device and we have a name
+						nbddev = optarg;
+						nonspecial++;
+					} else {
+						port = optarg;
+						if(name) {
+							usage("port and name specified at the same time. This is not supported.");
+							exit(EXIT_FAILURE);
+						}
+					}
 					break;
 				case 2:
 					// device
 					nbddev = optarg;
 					break;
 				default:
-					fprintf(stderr, "ERROR: too many non-option arguments specified\n");
+					usage("too many non-option arguments specified");
 					exit(EXIT_FAILURE);
 			}
 			break;
@@ -334,10 +396,18 @@ int main(int argc, char *argv[]) {
 			disconnect(optarg);
 			exit(EXIT_SUCCESS);
 		case 'h':
-			usage();
+			usage(NULL);
 			exit(EXIT_SUCCESS);
 		case 'n':
 			nofork=1;
+			break;
+		case 'N':
+			name=optarg;
+			if(port) {
+				usage("port and name specified at the same time. This is not supported.");
+				exit(EXIT_FAILURE);
+			}
+			port = NBD_DEFAULT_PORT;
 			break;
 		case 'p':
 			cont=1;
@@ -358,8 +428,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if(!port || !hostname || !nbddev) {
-		usage();
+	if((!port && !name) || !hostname || !nbddev) {
+		usage("not enough information specified");
 		exit(EXIT_FAILURE);
 	}
 
@@ -370,7 +440,7 @@ int main(int argc, char *argv[]) {
 
 	sock = opennet(hostname, port, sdp);
 
-	negotiate(sock, &size64, &flags);
+	negotiate(sock, &size64, &flags, name);
 	setsizes(nbd, size64, blocksize, flags);
 	set_timeout(nbd, timeout);
 	finish_sock(sock, nbd, swap);
@@ -378,7 +448,10 @@ int main(int argc, char *argv[]) {
 	/* Go daemon */
 	
 #ifndef NOFORK
-	if(!nofork) daemon(0,0);
+	if(!nofork) {
+		if (daemon(0,0) < 0)
+			err("Cannot detach from terminal");
+	}
 #endif
 	do {
 #ifndef NOFORK
@@ -417,7 +490,7 @@ int main(int argc, char *argv[]) {
 					close(sock); close(nbd);
 					sock = opennet(hostname, port, sdp);
 					nbd = open(nbddev, O_RDWR);
-					negotiate(sock, &new_size, &new_flags);
+					negotiate(sock, &new_size, &new_flags, name);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}

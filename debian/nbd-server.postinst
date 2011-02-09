@@ -71,10 +71,17 @@ case "$1" in
 	fi
 	db_get nbd-server/number
 	NUMBER=${RET:-0}
+	umask 066
 	if [ "$NUMBER" -gt 0 ]
 	then
 	    TMPFILE=`mktemp /tmp/nbd-server.XXXXXX`
 	    cat /usr/share/nbd-server/nbd-server.conf.tmpl > $TMPFILE
+	    db_get nbd-server/useports
+	    DOPORTS="$RET"
+	    if [ "$DOPORTS" ]
+	    then
+	      echo "	oldstyle = true" >> $TMPFILE
+	    fi
 	    for i in $(seq 0 $(( $NUMBER - 1 )) )
 	    do
 	      # stay downward compatible
@@ -84,13 +91,17 @@ case "$1" in
 	      fi
 	      db_get nbd-server/port$i
 	      PORT=$RET
+	      db_get nbd-server/name$i
+	      NAME=$RET
 	      db_get nbd-server/filename$i
 	      FN=$RET
-	      umask 066
-	      (   echo "[export$i]"
+	      (   echo "[$NAME]"
 		  echo "	exportname = $FN"
-		  echo "	port = $PORT"
 	      ) >> $TMPFILE
+	      if [ $DOPORTS ]
+	      then
+		  echo "	port = $PORT" >> $TMPFILE
+	      fi
 	    done
 	    ucf --debconf-ok $TMPFILE /etc/nbd-server/config
 	fi

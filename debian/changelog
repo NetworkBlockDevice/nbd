@@ -1,3 +1,11 @@
+nbd (1:2.9.20-1~1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes old minor bugs in documentation (LP: #290076)
+    - Fixes handling of oversized requests (Closes: #611187)
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 26 Jan 2011 15:59:24 +0100
+
 nbd (1:2.9.16-8) unstable; urgency=high
 
   * Cherry-pick 3ef52043861ab16352d49af89e048ba6339d6df8 from git HEAD
@@ -12,6 +20,30 @@ nbd (1:2.9.16-7.1) unstable; urgency=low
   * Fix encoding of German debconf translation.
 
  -- Christian Perrier <bubulle@debian.org>  Wed, 12 Jan 2011 19:52:48 +0100
+
+nbd (1:2.9.18-1~1) experimental; urgency=low
+
+  * New upstream release
+    - Implements name-based exports.
+  * Implement support for name-based exports in nbd-client's debconf,
+    initramfs, and init scripts, in light of the above
+  * Same for nbd-server
+  * debian/nbd-client.README.Debian: Mention possibility of using DHCP for
+    configuration; update in light of name-based exports
+  * debian/rules: make debian/po/templates.pot a dependency of
+    override_dh_auto_configure, so that it is always up-to-date.
+  * debian/control: update Standards-Version header to what we're
+    actually already using (forgot to update in 1:2.9.16-1)
+  * debian/nbd-client.initrd: support netbooting through reading the
+    server's IP address from ROOTSERVER, but everything else from the
+    kernel command line. This to support inflexible setups where it is
+    possible to boot with PXE, but where it is not possible to set
+    random arguments, like, say root-path. Netbooting is a can of worms. 
+  * debian/*.lintian-overrides: override
+    copyright-without-copyright-notice (we do list all authors, but in a
+    format that Lintian doesn't know about).
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 06 Jan 2011 02:02:14 +0100
 
 nbd (1:2.9.16-7) unstable; urgency=low
 

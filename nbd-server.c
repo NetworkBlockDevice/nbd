@@ -96,6 +96,10 @@
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
 
+#ifdef WITH_SDP
+#include <sdp_inet.h>
+#endif
+
 /** Default position of the config file */
 #ifndef SYSCONFDIR
 #define SYSCONFDIR "/etc"
@@ -109,6 +113,8 @@ gchar* config_file_pos;
 gchar* runuser=NULL;
 /** What group we're running as */
 gchar* rungroup=NULL;
+/** whether to export using the old negotiation protocol (port-based) */
+gboolean do_oldstyle=FALSE;
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
@@ -159,6 +165,13 @@ char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
+int modernsock=0;	  /**< Socket for the modern handler. Not used
+			       if a client was only specified on the
+			       command line; only port used if
+			       oldstyle is set to false (and then the
+			       command-line client isn't used, gna gna) */
+char* modern_listen;	  /**< listenaddr value for modernsock */
+
 /**
  * Types of virtuatlization
  **/
@@ -190,6 +203,8 @@ typedef struct {
 				  but before starting to serve */
 	gchar* postrun;	     /**< command that will be ran after the client
 				  disconnects */
+	gchar* servename;    /**< name of the export as selected by nbd-client */
+	int max_connections; /**< maximum number of opened connections */
 } SERVER;
 
 /**
@@ -215,6 +230,7 @@ typedef struct {
 			       make -m and -c mutually exclusive */
 	u32 difffilelen;     /**< number of pages in difffile */
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
+	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 } CLIENT;
 
 /**
@@ -343,14 +359,15 @@ inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
-	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n\n"
+	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
+	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -400,6 +417,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
+		{"max-connection", required_argument, NULL, 'M'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -416,7 +434,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:M:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -493,6 +511,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 			g_free(serve->authname);
 			serve->authname=g_strdup(optarg);
 			break;
+		case 'M':
+			serve->max_connections = strtol(optarg, NULL, 0);
+			break;
 		default:
 			usage();
 			exit(EXIT_FAILURE);
@@ -504,6 +525,8 @@ SERVER* cmdline(int argc, char *argv[]) {
 	if(nonspecial<2) {
 		g_free(serve);
 		serve=NULL;
+	} else {
+		do_oldstyle = TRUE;
 	}
 	if(do_output) {
 		if(!serve) {
@@ -525,8 +548,10 @@ typedef enum {
 	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
 	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
 	CFILE_PROGERR,		/**< Programmer error */
-	CFILE_NO_EXPORTS	/**< A config file was specified that does not
+	CFILE_NO_EXPORTS,	/**< A config file was specified that does not
 				     define any exports */
+	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
+				     old-style export. */
 } CFILE_ERRORS;
 
 /**
@@ -557,20 +582,20 @@ SERVER* dup_serve(SERVER *s) {
 	SERVER *serve = NULL;
 
 	serve=g_new0(SERVER, 1);
-	if (serve == NULL)
+	if(serve == NULL)
 		return NULL;
 
-	if (s->exportname)
+	if(s->exportname)
 		serve->exportname = g_strdup(s->exportname);
 
 	serve->expected_size = s->expected_size;
 
-	if (s->listenaddr)
+	if(s->listenaddr)
 		serve->listenaddr = g_strdup(s->listenaddr);
 
 	serve->port = s->port;
 
-	if (s->authname)
+	if(s->authname)
 		serve->authname = strdup(s->authname);
 
 	serve->flags = s->flags;
@@ -578,11 +603,16 @@ SERVER* dup_serve(SERVER *s) {
 	serve->socket_family = serve->socket_family;
 	serve->cidrlen = s->cidrlen;
 
-	if (s->prerun)
+	if(s->prerun)
 		serve->prerun = g_strdup(s->prerun);
 
-	if (s->postrun)
+	if(s->postrun)
 		serve->postrun = g_strdup(s->postrun);
+	
+	if(s->servename)
+		serve->servename = g_strdup(s->servename);
+
+	serve->max_connections = s->max_connections;
 
 	return serve;
 }
@@ -593,8 +623,7 @@ SERVER* dup_serve(SERVER *s) {
  * @param a server array
  * @return 0 success, -1 error
  */
-int append_serve(SERVER *s, GArray *a)
-{
+int append_serve(SERVER *s, GArray *a) {
 	SERVER *ns = NULL;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -684,11 +713,14 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
 		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
 		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
+		{ "maxconnections", FALSE, PARAM_INT,	NULL, 0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
+		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -732,6 +764,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				lp[10].target=lp[11].target=
 				lp[12].target=&(s.flags);
 		lp[13].target=&(s.listenaddr);
+		lp[14].target=&(s.max_connections);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -768,6 +801,11 @@ GArray* parse_cfile(gchar* f, GError** e) {
 						}
 					}
 					break;
+			}
+			if(!strcmp(p[j].paramname, "port") && !strcmp(p[j].target, NBD_DEFAULT_PORT)) {
+				g_set_error(e, errdomain, CFILE_INCORRECT_PORT, "Config file specifies default port for oldstyle export");
+				g_key_file_free(cfile);
+				return NULL;
 			}
 			if(err) {
 				if(err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
@@ -810,6 +848,10 @@ GArray* parse_cfile(gchar* f, GError** e) {
 				g_key_file_free(cfile);
 				return NULL;
 			}
+			if(s.port && !do_oldstyle) {
+				g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
+				g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
+			}
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
@@ -818,8 +860,13 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		/* Don't append values for the [generic] group */
 		if(i>0) {
 			s.socket_family = AF_UNSPEC;
+			s.servename = groups[i];
 
 			append_serve(&s, retval);
+		} else {
+			if(!do_oldstyle) {
+				lp[1].required = 0;
+			}
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -1190,27 +1237,105 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  *
  * @param client The client we're negotiating with.
  **/
-void negotiate(CLIENT *client) {
+CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 	char zeros[128];
-	u64 size_host;
-	u32 flags = NBD_FLAG_HAS_FLAGS;
+	uint64_t size_host;
+	uint32_t flags = NBD_FLAG_HAS_FLAGS;
+	uint16_t smallflags = 0;
+	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
-	if (write(client->net, INIT_PASSWD, 8) < 0)
-		err("Negotiation failed: %m");
-	cliserv_magic = htonll(cliserv_magic);
-	if (write(client->net, &cliserv_magic, sizeof(cliserv_magic)) < 0)
-		err("Negotiation failed: %m");
+	if(!client || !client->modern) {
+		/* common */
+		if (write(net, INIT_PASSWD, 8) < 0) {
+			err_nonfatal("Negotiation failed: %m");
+			if(client)
+				exit(EXIT_FAILURE);
+		}
+		if(!client || client->modern) {
+			/* modern */
+			magic = htonll(opts_magic);
+		} else {
+			/* oldstyle */
+			magic = htonll(cliserv_magic);
+		}
+		if (write(net, &magic, sizeof(magic)) < 0) {
+			err_nonfatal("Negotiation failed: %m");
+			if(client)
+				exit(EXIT_FAILURE);
+		}
+	}
+	if(!client) {
+		/* modern */
+		uint32_t reserved;
+		uint32_t opt;
+		uint32_t namelen;
+		char* name;
+		int i;
+
+		if(!servers)
+			err("programmer error");
+		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
+			err("Negotiation failed: %m");
+		if (read(net, &reserved, sizeof(reserved)) < 0)
+			err("Negotiation failed: %m");
+		if (read(net, &magic, sizeof(magic)) < 0)
+			err("Negotiation failed: %m");
+		magic = ntohll(magic);
+		if(magic != opts_magic) {
+			close(net);
+			return NULL;
+		}
+		if (read(net, &opt, sizeof(opt)) < 0)
+			err("Negotiation failed: %m");
+		opt = ntohl(opt);
+		if(opt != NBD_OPT_EXPORT_NAME) {
+			close(net);
+			return NULL;
+		}
+		if (read(net, &namelen, sizeof(namelen)) < 0)
+			err("Negotiation failed: %m");
+		namelen = ntohl(namelen);
+		name = malloc(namelen+1);
+		name[namelen]=0;
+		if (read(net, name, namelen) < 0)
+			err("Negotiation failed: %m");
+		for(i=0; i<servers->len; i++) {
+			SERVER* serve = &(g_array_index(servers, SERVER, i));
+			if(!strcmp(serve->servename, name)) {
+				CLIENT* client = g_new0(CLIENT, 1);
+				client->server = serve;
+				client->exportsize = OFFT_MAX;
+				client->net = net;
+				client->modern = TRUE;
+				return client;
+			}
+		}
+		return NULL;
+	}
+	/* common */
 	size_host = htonll((u64)(client->exportsize));
-	if (write(client->net, &size_host, 8) < 0)
+	if (write(net, &size_host, 8) < 0)
 		err("Negotiation failed: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
-	flags = htonl(flags);
-	if (write(client->net, &flags, 4) < 0)
-		err("Negotiation failed: %m");
+	if (!client->modern) {
+		/* oldstyle */
+		flags = htonl(flags);
+		if (write(client->net, &flags, 4) < 0)
+			err("Negotiation failed: %m");
+	} else {
+		/* modern */
+		smallflags = (uint16_t)(flags & ~((uint16_t)0));
+		smallflags = htons(smallflags);
+		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
+			err("Negotiation failed: %m");
+		}
+	}
+	/* common */
 	if (write(client->net, zeros, 124) < 0)
 		err("Negotiation failed: %m");
+	return NULL;
 }
 
 /** sending macro. */
@@ -1233,13 +1358,16 @@ int mainloop(CLIENT *client) {
 #ifdef DODBG
 	int i = 0;
 #endif
-	negotiate(client);
+	negotiate(client->net, client, NULL);
 	DEBUG("Entering request loop!\n");
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
 	while (go_on) {
 		char buf[BUFSIZE];
+		char* p;
 		size_t len;
+		size_t currlen;
+		size_t writelen;
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
@@ -1264,8 +1392,12 @@ int mainloop(CLIENT *client) {
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE - sizeof(struct nbd_reply))
-			err("Request too big!");
+		if (len > BUFSIZE - sizeof(struct nbd_reply)) {
+			currlen = BUFSIZE - sizeof(struct nbd_reply);
+			msg2(LOG_INFO, "oversized request (this is not a problem)");
+		} else {
+			currlen = len;
+		}
 #ifdef DODBG
 		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
 				"READ", (unsigned long long)request.from,
@@ -1286,35 +1418,47 @@ int mainloop(CLIENT *client) {
 
 		if (request.type==NBD_CMD_WRITE) {
 			DEBUG("wr: net->buf, ");
-			readit(client->net, buf, len);
-			DEBUG("buf->exp, ");
-			if ((client->server->flags & F_READONLY) ||
-			    (client->server->flags & F_AUTOREADONLY)) {
-				DEBUG("[WRITE to READONLY!]");
-				ERROR(client, reply, EPERM);
-				continue;
+			while(len > 0) {
+				readit(client->net, buf, currlen);
+				DEBUG("buf->exp, ");
+				if ((client->server->flags & F_READONLY) ||
+				    (client->server->flags & F_AUTOREADONLY)) {
+					DEBUG("[WRITE to READONLY!]");
+					ERROR(client, reply, EPERM);
+					continue;
+				}
+				if (expwrite(request.from, buf, len, client)) {
+					DEBUG("Write failed: %m" );
+					ERROR(client, reply, errno);
+					continue;
+				}
+				SEND(client->net, reply);
+				DEBUG("OK!\n");
+				len -= currlen;
+				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
-			if (expwrite(request.from, buf, len, client)) {
-				DEBUG("Write failed: %m" );
-				ERROR(client, reply, errno);
-				continue;
-			}
-			SEND(client->net, reply);
-			DEBUG("OK!\n");
 			continue;
 		}
 		/* READ */
 
 		DEBUG("exp->buf, ");
-		if (expread(request.from, buf + sizeof(struct nbd_reply), len, client)) {
-			DEBUG("Read failed: %m");
-			ERROR(client, reply, errno);
-			continue;
-		}
-
-		DEBUG("buf->net, ");
 		memcpy(buf, &reply, sizeof(struct nbd_reply));
-		writeit(client->net, buf, len + sizeof(struct nbd_reply));
+		p = buf + sizeof(struct nbd_reply);
+		writelen = currlen + sizeof(struct nbd_reply);
+		while(len > 0) {
+			if (expread(request.from, p, currlen, client)) {
+				DEBUG("Read failed: %m");
+				ERROR(client, reply, errno);
+				continue;
+			}
+
+			DEBUG("buf->net, ");
+			writeit(client->net, buf, writelen);
+			len -= currlen;
+			currlen = (len < BUFSIZE) ? len : BUFSIZE;
+			p = buf;
+			writelen = currlen;
+		}
 		DEBUG("OK!\n");
 	}
 	return 0;
@@ -1569,7 +1713,6 @@ void destroy_pid_t(gpointer data) {
 int serveloop(GArray* servers) {
 	struct sockaddr_storage addrin;
 	socklen_t addrinlen=sizeof(addrin);
-	SERVER *serve;
 	int i;
 	int max;
 	int sock;
@@ -1586,74 +1729,126 @@ int serveloop(GArray* servers) {
 	max=0;
 	FD_ZERO(&mset);
 	for(i=0;i<servers->len;i++) {
-		sock=(g_array_index(servers, SERVER, i)).socket;
-		FD_SET(sock, &mset);
-		max=sock>max?sock:max;
+		if((sock=(g_array_index(servers, SERVER, i)).socket)) {
+			FD_SET(sock, &mset);
+			max=sock>max?sock:max;
+		}
+	}
+	if(modernsock) {
+		FD_SET(modernsock, &mset);
+		max=modernsock>max?modernsock:max;
 	}
 	for(;;) {
-		CLIENT *client;
-		int net;
+		CLIENT *client = NULL;
 		pid_t *pid;
 
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
+			int net = 0;
+			SERVER* serve;
+
 			DEBUG("accept, ");
-			for(i=0;i<servers->len;i++) {
+			if(FD_ISSET(modernsock, &rset)) {
+				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
+					err("accept: %m");
+				client = negotiate(net, NULL, servers);
+				if(!client) {
+					err_nonfatal("negotiation failed");
+					close(net);
+					net=0;
+				}
+			}
+			for(i=0;i<servers->len && !net;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
-					int sock_flags;
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 						err("accept: %m");
+				}
+			}
+			if(net) {
+				int sock_flags;
 
-					if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
-						err("fcntl F_GETFL");
-					}
-					if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
-						err("fcntl F_SETFL ~O_NONBLOCK");
-					}
-					client = g_malloc(sizeof(CLIENT));
+				if(serve->max_connections > 0 &&
+				   g_hash_table_size(children) >= serve->max_connections) {
+					msg2(LOG_INFO, "Max connections reached");
+					close(net);
+					continue;
+				}
+				if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
+					err("fcntl F_GETFL");
+				}
+				if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
+					err("fcntl F_SETFL ~O_NONBLOCK");
+				}
+				if(!client) {
+					client = g_new0(CLIENT, 1);
 					client->server=serve;
 					client->exportsize=OFFT_MAX;
 					client->net=net;
-					set_peername(net, client);
-					if (!authorized_client(client)) {
-						msg2(LOG_INFO,"Unauthorized client") ;
-						close(net);
-						continue;
-					}
-					msg2(LOG_INFO,"Authorized client") ;
-					pid=g_malloc(sizeof(pid_t));
-#ifndef NOFORK
-					if ((*pid=fork())<0) {
-						msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-						close(net);
-						continue;
-					}
-					if (*pid>0) { /* parent */
-						close(net);
-						g_hash_table_insert(children, pid, pid);
-						continue;
-					}
-					/* child */
-					g_hash_table_destroy(children);
-					for(i=0;i<servers->len;i++) {
-						serve=&g_array_index(servers, SERVER, i);
-						close(serve->socket);
-					}
-					/* FALSE does not free the
-					actual data. This is required,
-					because the client has a
-					direct reference into that
-					data, and otherwise we get a
-					segfault... */
-					g_array_free(servers, FALSE);
-#endif // NOFORK
-					msg2(LOG_INFO,"Starting to serve");
-					serveconnection(client);
-					exit(EXIT_SUCCESS);
 				}
+				set_peername(net, client);
+				if (!authorized_client(client)) {
+					msg2(LOG_INFO,"Unauthorized client") ;
+					close(net);
+					continue;
+				}
+				msg2(LOG_INFO,"Authorized client") ;
+				pid=g_malloc(sizeof(pid_t));
+#ifndef NOFORK
+				if ((*pid=fork())<0) {
+					msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+					close(net);
+					continue;
+				}
+				if (*pid>0) { /* parent */
+					close(net);
+					g_hash_table_insert(children, pid, pid);
+					continue;
+				}
+				/* child */
+				g_hash_table_destroy(children);
+				for(i=0;i<servers->len;i++) {
+					serve=&g_array_index(servers, SERVER, i);
+					close(serve->socket);
+				}
+				/* FALSE does not free the
+				actual data. This is required,
+				because the client has a
+				direct reference into that
+				data, and otherwise we get a
+				segfault... */
+				g_array_free(servers, FALSE);
+#endif // NOFORK
+				msg2(LOG_INFO,"Starting to serve");
+				serveconnection(client);
+				exit(EXIT_SUCCESS);
 			}
 		}
+	}
+}
+
+void dosockopts(int socket) {
+#ifndef sun
+	int yes=1;
+#else
+	char yes='1';
+#endif /* sun */
+	int sock_flags;
+
+	/* lose the pesky "Address already in use" error message */
+	if (setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
+	        err("setsockopt SO_REUSEADDR");
+	}
+	if (setsockopt(socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
+		err("setsockopt SO_KEEPALIVE");
+	}
+
+	/* make the listening socket non-blocking */
+	if ((sock_flags = fcntl(socket, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	if (fcntl(socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
+		err("fcntl F_SETFL O_NONBLOCK");
 	}
 }
 
@@ -1662,19 +1857,15 @@ int serveloop(GArray* servers) {
  *
  * @param serve the server we want to connect.
  **/
-void setup_serve(SERVER *serve) {
+int setup_serve(SERVER *serve) {
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
-	struct sigaction sa;
-	int sock_flags;
-#ifndef sun
-	int yes=1;
-#else
-	char yes='1';
-#endif /* sun */
 	gchar *port = NULL;
 	int e;
 
+	if(!do_oldstyle) {
+		return serve->servename ? 1 : 0;
+	}
 	memset(&hints,'\0',sizeof(hints));
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG | AI_NUMERICSERV;
 	hints.ai_socktype = SOCK_STREAM;
@@ -1682,7 +1873,7 @@ void setup_serve(SERVER *serve) {
 
 	port = g_strdup_printf ("%d", serve->port);
 	if (port == NULL)
-		return;
+		return 0;
 
 	e = getaddrinfo(serve->listenaddr,port,&hints,&ai);
 
@@ -1709,21 +1900,7 @@ void setup_serve(SERVER *serve) {
 	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
 		err("socket: %m");
 
-	/* lose the pesky "Address already in use" error message */
-	if (setsockopt(serve->socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-	        err("setsockopt SO_REUSEADDR");
-	}
-	if (setsockopt(serve->socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
-		err("setsockopt SO_KEEPALIVE");
-	}
-
-	/* make the listening socket non-blocking */
-	if ((sock_flags = fcntl(serve->socket, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	if (fcntl(serve->socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
-		err("fcntl F_SETFL O_NONBLOCK");
-	}
+	dosockopts(serve->socket);
 
 	DEBUG("Waiting for connections... bind, ");
 	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
@@ -1734,6 +1911,60 @@ void setup_serve(SERVER *serve) {
 		err("listen: %m");
 
 	freeaddrinfo (ai);
+	if(serve->servename) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+void open_modern(void) {
+	struct addrinfo hints;
+	struct addrinfo* ai = NULL;
+	struct sock_flags;
+	int e;
+
+	memset(&hints, '\0', sizeof(hints));
+	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_protocol = IPPROTO_TCP;
+	e = getaddrinfo(modern_listen, NBD_DEFAULT_PORT, &hints, &ai);
+	if(e != 0) {
+		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		exit(EXIT_FAILURE);
+	}
+	if((modernsock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
+		err("socket: %m");
+	}
+
+	dosockopts(modernsock);
+
+	if(bind(modernsock, ai->ai_addr, ai->ai_addrlen)) {
+		err("bind: %m");
+	}
+	if(listen(modernsock, 10) <0) {
+		err("listen: %m");
+	}
+
+	freeaddrinfo(ai);
+}
+
+/**
+ * Connect our servers.
+ **/
+void setup_servers(GArray* servers) {
+	int i;
+	struct sigaction sa;
+	int want_modern=0;
+
+	for(i=0;i<servers->len;i++) {
+		want_modern |= setup_serve(&(g_array_index(servers, SERVER, i)));
+	}
+	if(want_modern) {
+		open_modern();
+	}
+	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 
 	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
@@ -1745,18 +1976,6 @@ void setup_serve(SERVER *serve) {
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
 		err("sigaction: %m");
-}
-
-/**
- * Connect our servers.
- **/
-void setup_servers(GArray* servers) {
-	int i;
-
-	for(i=0;i<servers->len;i++) {
-		setup_serve(&(g_array_index(servers, SERVER, i)));
-	}
-	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 }
 
 /**
@@ -1866,7 +2085,7 @@ void glib_message_syslog_redirect(const gchar *log_domain,
       default:
         level=LOG_ERR;
     }
-    syslog(level, message);
+    syslog(level, "%s", message);
 }
 #endif
 

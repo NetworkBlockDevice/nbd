@@ -31,12 +31,13 @@ log_begin_msg "Setting up nbd-client"
 configure_networking
 
 x="$nbdroot"
-# Support setting stuff using DHCP
+# Support setting stuff using DHCP by overloading 'option root-path'
 case $x in
 	nbdroot=dhcp)
 		x="$ROOTPATH"
 		;;
 esac
+
 case $x in
 	nbdroot=*,*,*)
 		nbdroot="${x#nbdroot=}"
@@ -64,6 +65,23 @@ if [ -z "$nbdport" -o -z "$nbdrootdev" ]
 then
 	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
 	exit 0
+fi
+
+nondigits=$(echo $nbdport | sed -e 's/[0-9]//g')
+if [ ! -z "$nondigits" ]
+then
+	# non-numeric characters, assume a name rather than a port
+	nbdport="-N $nbdport"
+fi
+
+# Support setting the server's IP address by overloading 'option
+# root-server'. This is separate from the "ROOTPATH" grabbing above, in
+# that here we only specify the server's IP address through DHCP, but
+# expect everything else to be set through the kernel's command line.
+# Netbooting is a can of worms.
+if [ "$nbdsrv" = "dhcp" ]
+then
+	nbdsrv=$ROOTSERVER
 fi
 
 if [ -z "$nbdsrv" ]

@@ -52,6 +52,14 @@ case "$1" in
                     host=$RET
                     db_get nbd-client/port$i
                     port=$RET
+		    nondigits=$(echo $port | sed -e 's/[0-9[:space:]]//g')
+		    if [ ! -z $nondigits ]
+		    then
+			name=$port
+		    	unset port
+		    else
+		    	unset name
+		    fi
                     db_get nbd-client/device$i
                     device=$RET
 		    db_get nbd-client/extra$i
@@ -74,9 +82,10 @@ case "$1" in
                         's/\(^NBD_TYPE\['$i'\]=\).*/\1"'$type_'"/g' -e \
                         's/\(^NBD_HOST\['$i'\]=\).*/\1"'$host'"/g'  -e \
                         's/\(^NBD_PORT\['$i'\]=\).*/\1"'$port'"/g' -e \
+			's/\(^NBD_NAME\['$i'\]=\).*/\1"'$name'"/g' -e \
 			's/\(^NBD_EXTRA\['$i'\]=\).*/\1"'$extra'"/g' \
                          $TMPFILE
-                    grep "NBD_TYPE\[$i\]=\""$type_ $TMPFILE >/dev/null || (echo "NBD_TYPE[$i]=\""$type_'"'; echo "NBD_DEVICE[$i]=\""$device'"'; echo "NBD_HOST[$i]=\""$host'"'; echo "NBD_PORT[$i]=\""$port'"'; echo "NBD_EXTRA[$i]=\""$extra'"') >> $TMPFILE
+                    grep "NBD_TYPE\[$i\]=\""$type_ $TMPFILE >/dev/null || (echo "NBD_TYPE[$i]=\""$type_'"'; echo "NBD_DEVICE[$i]=\""$device'"'; echo "NBD_HOST[$i]=\""$host'"'; echo "NBD_PORT[$i]=\""$port'"'; echo "NBD_NAME[$i]=\""$name'"'; echo "NBD_EXTRA[$i]=\""$extra'"') >> $TMPFILE
 		    # Needed for upgrades from before 2.9.16
 		    grep "NBD_EXTRA\[$i\]=\""$extra $TMPFILE >/dev/null || (echo "NBD_EXTRA[$i]=\""$extra'"') >> $TMPFILE
                 done
