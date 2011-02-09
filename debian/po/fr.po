@@ -3,13 +3,13 @@
 # This file is distributed under the same license as the nbd package.
 #
 # Translators:
-# Christian Perrier <bubulle@debian.org>, 2007, 2009, 2010.
+# Christian Perrier <bubulle@debian.org>, 2007, 2009, 2010, 2011.
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2011-01-05 18:59+0100\n"
-"PO-Revision-Date: 2010-07-31 16:47-0400\n"
+"PO-Revision-Date: 2011-02-02 22:18+0100\n"
 "Last-Translator: Christian Perrier <bubulle@debian.org>\n"
 "Language-Team: French <debian-l10n-french@lists.debian.org>\n"
 "Language: fr\n"
@@ -116,7 +116,7 @@ msgstr ""
 "souhaitez y placer un système de fichiers, ajoutez une ligne au fichier /etc/"
 "fstab avec l'option « _netdev » (sinon les scripts d'initialisation du "
 "système chercheront à monter le système de fichiers avant qu'il ne soit "
-"utilisable) et choisissez « système de fichiers ». Pour toutes les autres "
+"utilisable) et choisissez « système de fichiers ».. Pour toutes les autres "
 "utilisations, choisissez « données brutes » : la seule action du script de "
 "démarrage de nbd-client sera alors de lancer un processus nbd-client, la "
 "configuration du périphérique restant alors à votre charge."
@@ -140,20 +140,20 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-#, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
 msgid "Port or name for nbd export (number: ${number})?"
-msgstr "Nom du serveur (numéro : ${number}) :"
+msgstr "Port ou n° de l'export nbd (numéro : ${number}) :"
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-#, fuzzy
 #| msgid "Please enter the TCP port number to access nbd-server."
 msgid ""
 "Please enter the TCP port number or NBD export name needed to access nbd-"
 "server."
-msgstr "Veuillez indiquer le port TCP d'écoute du serveur NBD."
+msgstr ""
+"Veuillez indiquer le port TCP ou le nom de l'export NBD qui permettra "
+"d'accéder à nbd-server."
 
 #. Type: string
 #. Description
@@ -164,6 +164,10 @@ msgid ""
 "enter the TCP port number here, and should make sure not to enter any non-"
 "numeric characters in the field."
 msgstr ""
+"Jusqu'à la version 2.9.16 de nbd-server, l'utilisation d'un nom pour l'accès "
+"à un export NBD n'était pas gérée. Si la version du serveur NBD est "
+"antérieure, vous devez indiquer le port TCP en n'utilisant que des "
+"caractères numériques."
 
 #. Type: string
 #. Description
@@ -174,6 +178,10 @@ msgid ""
 "this configuration system will accept that as a name and provide it to nbd-"
 "client as a name-based export rather than a port-based one."
 msgstr ""
+"Les versions plus récentes permettent d'utiliser un nom pour un export. Si "
+"ce champ contient des caractères non numériques, le système de configuration "
+"configurera le client NBD pour utiliser un nom d'export à la place d'un "
+"numéro de port."
 
 #. Type: string
 #. Description
@@ -293,7 +301,6 @@ msgstr "Port TCP du serveur numéro ${number} :"
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
-#, fuzzy
 #| msgid ""
 #| "Please specify the TCP port this instance of nbd server will use for "
 #| "listening. As NBD is likely to use more than one port, no dedicated port "
@@ -303,22 +310,20 @@ msgid ""
 "backwards compatibility with older clients."
 msgstr ""
 "Veuillez indiquer le port TCP où cette instance du serveur NBD sera à "
-"l'écoute. Comme NBD utilise souvent plus d'un port, aucun numéro de port "
-"dédié n'a été réservé par l'IANA."
+"l'écoute, pour compatibilité avec des clients plus anciens."
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
-#, fuzzy
 #| msgid "File to export (server number ${number}):"
 msgid "Name of export ${number}:"
-msgstr "Fichier à exporter (serveur numéro ${number}) :"
+msgstr "Nom de l'export ${number} :"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
 msgid "Please specify a name for this export."
-msgstr ""
+msgstr "Veuillez indiquer un nom pour cet export."
 
 #. Type: string
 #. Description
@@ -447,7 +452,7 @@ msgstr ""
 #. Description
 #: ../nbd-server.templates:8001
 msgid "Support port-based exports?"
-msgstr ""
+msgstr "Faut-il gérer les exports avec numéros de ports ?"
 
 #. Type: boolean
 #. Description
@@ -459,6 +464,13 @@ msgid ""
 "a lot of trouble to update your older configurations in order to migrate to "
 "name-based exports. In either of those cases, you should accept this option."
 msgstr ""
+"Depuis la version 2.9.18, nbd-server gère les exports nommés à la place des "
+"exports basés sur des numéros de ports. Bien que l'utilisation d'exports "
+"nommés soit préférable, vous pouvez avoir besoin de compatibilité avec des "
+"systèmes plus anciens qui utilisent une version de nbd-client qui ne les "
+"gère pas. Vous pouvez également préférer ne pas avoir à mettre à jour les "
+"configurations plus anciennes afin de migrer vers des exports nommés. Dans "
+"ces cas, vous devriez alors choisir cette option."
 
 #. Type: boolean
 #. Description
@@ -467,6 +479,7 @@ msgid ""
 "Everyone else should leave the option at the default setting, which will "
 "cause nbd-server to only support name-based exports."
 msgstr ""
+"Dans le cas contraire, il sera suffisant de ne gérer que les exports nommés (ce qui est le mode de fonctionnement par défaut)."
 
 #~ msgid "Port on which the nbd-server is running (number: ${number})?"
 #~ msgstr "Port d'écoute de nbd-server (numéro : ${number}) :"
@@ -494,10 +507,10 @@ msgstr ""
 #~ "to some as its \"network name\") or its IP-address."
 #~ msgstr ""
 #~ "Veuillez indiquer le nom d'une machine où le processus nbd-server "
-#~ "fonctionne. Cela peut être son nom réseau ou son adresse IP.."
+#~ "fonctionne. Cela peut être son nom réseau ou son adresse IP..."
 
 #~ msgid ""
-#~ "You need to fill in the portnumber on which the nbd-server is running. "
+#~ "You need to fill in the portnumber on which the nbd-server is running.. "
 #~ "This could technically be any number between 1 and 65535, but for this to "
 #~ "work, it needs to be the one on which a server can be found on the "
 #~ "machine running nbd-server..."
@@ -555,7 +568,7 @@ msgstr ""
 #~ "que ce fichier soit modifié par cet outil de configuration."
 
 #~ msgid ""
-#~ "A pre-2.9 nbd-server configuration file has been found on your system. "
+#~ "A pre-2.9 nbd-server configuration file has been found on your system.. "
 #~ "The current nbd-server package no longer supports this file; if you "
 #~ "depend on it, your nbd-server no longer works. If you accept this option, "
 #~ "the system will generate a new style configuration file based upon your "
