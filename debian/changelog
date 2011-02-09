@@ -1,3 +1,12 @@
+nbd (1:2.9.20-2) unstable; urgency=low
+
+  * Upload as 2.9.20-2 rather than -1; the previous release was supposed
+    to be uploaded to experimental, but was accidentally uploaded to
+    unstable instead. Hence, consider that one to be -1 and this one to
+    be -2, even though it wasn't.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 09 Feb 2011 13:49:08 +0100
+
 nbd (1:2.9.20-1~1) unstable; urgency=low
 
   * New upstream release
