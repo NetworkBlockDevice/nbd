@@ -56,7 +56,7 @@ typedef enum {
 	CONNECTION_CLOSE_FAST,
 } CLOSE_TYPE;
 
-inline int read_all(int f, void *buf, size_t len) {
+static inline int read_all(int f, void *buf, size_t len) {
 	ssize_t res;
 	size_t retval=0;
 
@@ -71,6 +71,9 @@ inline int read_all(int f, void *buf, size_t len) {
 	}
 	return retval;
 }
+
+#define READ_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((read_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
+#define READ_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((read_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
 int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype) {
 	int sock;
@@ -102,11 +105,7 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	}
 	if(ctype<CONNECTION_TYPE_INIT_PASSWD)
 		goto end;
-	if(read_all(sock, buf, strlen(INIT_PASSWD))<0) {
-		snprintf(errstr, errstr_len, "Could not read INIT_PASSWD: %s",
-				strerror(errno));
-		goto err_open;
-	}
+	READ_ALL_ERRCHK(sock, buf, strlen(INIT_PASSWD), err_open, "Could not read INIT_PASSWD: %s", strerror(errno));
 	if(strlen(buf)==0) {
 		snprintf(errstr, errstr_len, "Server closed connection");
 		goto err_open;
@@ -117,11 +116,7 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	}
 	if(ctype<CONNECTION_TYPE_CLISERV)
 		goto end;
-	if(read_all(sock, &tmp64, sizeof(tmp64))<0) {
-		snprintf(errstr, errstr_len, "Could not read cliserv_magic: %s",
-				strerror(errno));
-		goto err_open;
-	}
+	READ_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err_open, "Could not read cliserv_magic: %s", strerror(errno));
 	tmp64=ntohll(tmp64);
 	if(tmp64 != mymagic) {
 		strncpy(errstr, "mymagic does not match", errstr_len);
@@ -130,13 +125,13 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	if(ctype<CONNECTION_TYPE_FULL)
 		goto end;
 	if(!name) {
-		read_all(sock, &size, sizeof(size));
+		READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
 		size=ntohll(size);
-		read_all(sock, buf, 128);
+		READ_ALL_ERRCHK(sock, buf, 128, err_open, "Could not read data: %s", strerror(errno));
 		goto end;
 	}
 	/* flags */
-	read_all(sock, buf, sizeof(uint16_t));
+	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
 	/* reserved field */
 	write(sock, &tmp32, sizeof(tmp32));
 	/* magic */
@@ -148,9 +143,9 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	tmp32 = htonl((uint32_t)strlen(name));
 	write(sock, &tmp32, sizeof(tmp32));
 	write(sock, name, strlen(name));
-	read_all(sock, &size, sizeof(size));
+	READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
 	size = ntohll(size);
-	read_all(sock, buf, sizeof(uint16_t)+124);
+	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t)+124, err_open, "Could not read reserved zeroes: %s", strerror(errno));
 	goto end;
 err_open:
 	close(sock);
@@ -194,7 +189,7 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	int retval=0;
 	char buf[datasize];
 
-	read_all(sock, &rep, sizeof(rep));
+	READ_ALL_ERR_RT(sock, &rep, sizeof(rep), end, -1, "Could not read reply header: %s", strerror(errno));
 	rep.magic=ntohl(rep.magic);
 	rep.error=ntohl(rep.error);
 	if(rep.magic!=NBD_REPLY_MAGIC) {
@@ -207,7 +202,7 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 		retval=-1;
 		goto end;
 	}
-	read_all(sock, &buf, datasize);
+	READ_ALL_ERR_RT(sock, &buf, datasize, end, -1, "Could not read data: %s", strerror(errno));
 
 end:
 	return retval;
@@ -238,10 +233,10 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	req.from=htonll(i);
 	write(sock, &req, sizeof(req));
 	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
-	read_all(sock, &rep, sizeof(struct nbd_reply));
-	read_all(sock, &buf, ntohl(req.len));
+	READ_ALL_ERR_RT(sock, &rep, sizeof(struct nbd_reply), err, -1, "Could not read reply header: %s", strerror(errno));
+	READ_ALL_ERR_RT(sock, &buf, ntohl(req.len), err, -1, "Could not read data: %s", strerror(errno));
 	if(rep.error) {
-		printf("Received unexpected error\n");
+		snprintf(errstr, errstr_len, "Received unexpected error: %d", rep.error);
 		retval=-1;
 		goto err;
 	} else {
@@ -252,8 +247,8 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	req.len = htonl(ntohl(req.len) + sizeof(struct nbd_request) / 2);
 	write(sock, &req, sizeof(req));
 	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
-	read_all(sock, &rep, sizeof(struct nbd_reply));
-	read_all(sock, &buf, ntohl(req.len));
+	READ_ALL_ERR_RT(sock, &rep, sizeof(struct nbd_reply), err, -1, "Could not read reply header: %s", strerror(errno));
+	READ_ALL_ERR_RT(sock, &buf, ntohl(req.len), err, -1, "Could not read data: %s", strerror(errno));
 	if(rep.error) {
 		printf("Received expected error\n");
 		got_err=true;
@@ -266,8 +261,8 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	req.len = htonl(ntohl(req.len) << 1);
 	write(sock, &req, sizeof(req));
 	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
-	read_all(sock, &rep, sizeof(struct nbd_reply));
-	read_all(sock, &buf, ntohl(req.len));
+	READ_ALL_ERR_RT(sock, &rep, sizeof(struct nbd_reply), err, -1, "Could not read reply header: %s", strerror(errno));
+	READ_ALL_ERR_RT(sock, &buf, ntohl(req.len), err, -1, "Could not read data: %s", strerror(errno));
 	if(rep.error) {
 		printf("error\n");
 	} else {
