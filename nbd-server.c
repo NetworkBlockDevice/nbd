@@ -1745,7 +1745,7 @@ int serveloop(GArray* servers) {
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
 			int net = 0;
-			SERVER* serve;
+			SERVER* serve=NULL;
 
 			DEBUG("accept, ");
 			if(FD_ISSET(modernsock, &rset)) {
@@ -1757,6 +1757,7 @@ int serveloop(GArray* servers) {
 					close(net);
 					net=0;
 				}
+				serve = client->server;
 			}
 			for(i=0;i<servers->len && !net;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
