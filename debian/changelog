@@ -1,15 +1,17 @@
-nbd (1:2.9.20-2) UNRELEASED; urgency=low
+nbd (1:2.9.20-2) unstable; urgency=low
 
   * Upload as 2.9.20-2 rather than -1; the previous release was supposed
     to be uploaded to experimental, but was accidentally uploaded to
     unstable instead. Hence, consider that one to be -1 and this one to
     be -2, even though it wasn't.
+  * Steal two commits from git HEAD to fix handling of maxclients value
+    in modern protocol version (which causes a segfault in nbd-server on
+    some architectures), and to fix handling of an unexpected death of
+    the server in nbd-tester-client; Closes: #611722.
   * Updated translations:
     - Portuguese, by Américo Monteiro; Closes: #611836.
     - Russian, by Yuri Kozlov; Closes: #611978.
     - French, by Christian Perrier; Closes: #612388.
-
-    TODO: fix test suite to not fill up diskspace.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 09 Feb 2011 13:49:08 +0100
 
