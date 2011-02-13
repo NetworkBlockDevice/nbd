@@ -396,7 +396,7 @@ int main(int argc, char**argv) {
 	long int p = 0;
 	char* name = NULL;
 	int sock=0;
-	char c;
+	int c;
 	bool want_port = TRUE;
 	int nonopt=0;
 	testfunc test = throughput_test;
