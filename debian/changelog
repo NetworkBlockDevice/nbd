@@ -1,3 +1,11 @@
+nbd (1:2.9.20-3) unstable; urgency=low
+
+  * Fix incorrect getopt() usage (getopt returns an int, not a char, which
+    resulted in infinite loops on architectures that have unsigned chars by
+    default). Really Closes: #611722.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 13 Feb 2011 11:19:27 +0100
+
 nbd (1:2.9.20-2) unstable; urgency=low
 
   * Upload as 2.9.20-2 rather than -1; the previous release was supposed
