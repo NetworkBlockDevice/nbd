@@ -5,8 +5,9 @@ nbd (1:2.9.20-3) unstable; urgency=low
     default). Really Closes: #611722.
   * Updated translations:
     - German, by Chris Leick; Closes: #613712.
+    - Spanish, by Camaleón; Closes: #614199. 
 
- -- Wouter Verhelst <wouter@debian.org>  Tue, 22 Feb 2011 00:04:39 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 22 Feb 2011 00:05:40 +0100
 
 nbd (1:2.9.20-2) unstable; urgency=low
 
