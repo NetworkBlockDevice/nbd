@@ -3,8 +3,10 @@ nbd (1:2.9.20-3) unstable; urgency=low
   * Fix incorrect getopt() usage (getopt returns an int, not a char, which
     resulted in infinite loops on architectures that have unsigned chars by
     default). Really Closes: #611722.
+  * Updated translations:
+    - German, by Chris Leick; Closes: #613712.
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 13 Feb 2011 11:19:27 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 22 Feb 2011 00:04:39 +0100
 
 nbd (1:2.9.20-2) unstable; urgency=low
 
