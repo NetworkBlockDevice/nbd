@@ -2,7 +2,11 @@ nbd (1:2.9.20-3) unstable; urgency=low
 
   * Fix incorrect getopt() usage (getopt returns an int, not a char, which
     resulted in infinite loops on architectures that have unsigned chars by
-    default). Really Closes: #611722.
+    default). This is the actual fix for what was originally reported as
+    #611722, but then another issue popped up there and I got confused.
+    I should have cloned the bug rather than think I fixed it with the
+    upload, but then this new bugreport was opened, so let's not do that
+    and rename the old. Oh, and this Closes: 613938.
   * Updated translations:
     - German, by Chris Leick; Closes: #613712.
     - Spanish, by Camaleón; Closes: #614199. 
