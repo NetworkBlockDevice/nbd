@@ -320,7 +320,7 @@ int authorized_client(CLIENT *opts) {
  * @param buf a buffer
  * @param len the number of bytes to be read
  **/
-inline void readit(int f, void *buf, size_t len) {
+static inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
@@ -342,7 +342,7 @@ inline void readit(int f, void *buf, size_t len) {
  * @param buf a buffer containing data
  * @param len the number of bytes to be written
  **/
-inline void writeit(int f, void *buf, size_t len) {
+static inline void writeit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");
