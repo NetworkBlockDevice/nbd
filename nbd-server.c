@@ -1308,9 +1308,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 				client->exportsize = OFFT_MAX;
 				client->net = net;
 				client->modern = TRUE;
+				free(name);
 				return client;
 			}
 		}
+		free(name);
 		return NULL;
 	}
 	/* common */
