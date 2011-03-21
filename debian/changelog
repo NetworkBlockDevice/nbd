@@ -10,8 +10,9 @@ nbd (1:2.9.20-3) unstable; urgency=low
   * Updated translations:
     - German, by Chris Leick; Closes: #613712.
     - Spanish, by Camaleón; Closes: #614199. 
+  * install modprobe.d file for nbd-client-udeb, too
 
- -- Wouter Verhelst <wouter@debian.org>  Tue, 22 Feb 2011 00:05:40 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 09 Mar 2011 21:57:05 +0100
 
 nbd (1:2.9.20-2) unstable; urgency=low
 
