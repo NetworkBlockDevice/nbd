@@ -599,8 +599,9 @@ SERVER* dup_serve(SERVER *s) {
 		serve->authname = strdup(s->authname);
 
 	serve->flags = s->flags;
-	serve->socket = serve->socket;
-	serve->socket_family = serve->socket_family;
+	serve->socket = s->socket;
+	serve->socket_family = s->socket_family;
+	serve->virtstyle = s->virtstyle;
 	serve->cidrlen = s->cidrlen;
 
 	if(s->prerun)
