@@ -83,7 +83,7 @@ manpage.1: manpage.sgml
     were a local filesystem.</para>
 
     <para><command>&dhpackage;</command> implements some security
-    through a file called "@sysconfdir@/nbd-server/allow" (by default; a
+    through a file called "$sysconfdir/nbd-server/allow" (by default; a
     different file can be chosen with the '-l' option or through a
     config file specification). This file must list the IP-addresses or
     network masks of clients that are allowed to connect. If it does not
@@ -194,7 +194,7 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Specify configuration file. The default configuration
 	    file, if this parameter is not specified, is
-	    <filename>@sysconfdir@/nbd-server/config</filename>.</para>
+	    <filename>$sysconfdir/nbd-server/config</filename>.</para>
 	  <para>Note that the configuration file is always parsed and
 	    the entries in the file used, even if an extra server is
 	    specified on the command line. To disable the configuration
