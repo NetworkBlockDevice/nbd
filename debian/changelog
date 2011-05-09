@@ -1,3 +1,10 @@
+nbd (1:2.9.21-1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes a number of crashing bugs
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 09 May 2011 20:15:01 +0200
+
 nbd (1:2.9.20-3) unstable; urgency=low
 
   * Fix incorrect getopt() usage (getopt returns an int, not a char, which
