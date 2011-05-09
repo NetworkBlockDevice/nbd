@@ -1,0 +1,138 @@
+The NBD protocol
+================
+
+The NBD protocol has two phases: the handshake (in which the connection
+is established, an exported NBD device is negotiated between the client
+and the server, and protocol options are negotiated), and the data
+pushing phase (in which the client and server are communicating between
+eachother).
+
+On the client side under Linux, the handshake is implemented in
+userspace, while the data pushing phase is implemented in kernel space.
+To get from the handshake to the data pushing phase, the client performs
+
+ioctl(nbd, NBD_SET_SOCK, sock)
+ioctl(nbd, NBD_DO_IT)
+
+with 'nbd' in the above ioctl being a file descriptor for an open
+/dev/nbdX device node, and 'sock' being the socket to the server. The
+second of the two above ioctls does not return until the client
+disconnects.
+
+Note that there are other ioctls available, that are used by the client
+to communicate the options to the kernel which were negotiated with the
+server during the handshake.
+
+There are two message types in the data pushing phase: the request, and
+the response.
+
+There are three request types in the data pushing phase: NBD_CMD_READ,
+NBD_CMD_WRITE, and NBD_CMD_DISC (disconnect).
+
+The request is sent by the client; the response by the server. A request
+header consists a 32 bit magic number (magic), a 32 bit field denoting
+the request type (see below; 'type'), a 64 bit handle ('handle'), a 64
+bit data offset ('from'), and a 32 bit length ('len'). In case of a
+write request, the header is immediately followed by 'len' bytes of
+data.
+
+The reply contains three fields: a 32 bit magic number ('magic'), a 32
+bit error code ('error'; 0, unless an error occurred in which case it is
+the errno of the error on the server side), and the same 64 bit handle
+that the corresponding request had in its 'handle' field. In case the
+reply is sent in response to a read request and the error field is 0
+(zero), the reply header is immediately followed by request.len bytes of
+data.
+
+In case of a disconnect request, the server will immediately close the
+connection. Requests are currently handled synchronously; when (not if)
+we change that to asynchronous handling, handling the disconnect request
+will probably be postponed until there are no other outstanding
+requests.
+
+There are two versions of the negotiation: the 'old' style (nbd <=
+2.9.16) and the 'new' style (nbd >= 2.9.17, though due to a bug it does
+not work with anything below 2.9.18). What follows is a description of
+both cases (in the below description, the label 'C:' is used for
+messages sent by the client, whereas 'S:' is used for messages sent by
+the server). "quoted text" is for literal character data, '0xdeadbeaf'
+is used for literal hex numbers (which are always sent in network byte
+order), and (brackets) are used for comments. Anything else is a
+description of the data that is sent.
+
+'old' style handshake
+---------------------
+S: "NBDMAGIC" (the INIT_PASSWD in the code)
+S: 0x00420281861253 (cliserv_magic, a magic number)
+S: size of the export in bytes, 64 bit unsigned int
+S: flags, 4 bytes (may have the NBD_FLAG_READ_ONLY flag set if the
+   export is read-only; the rest is reserved)
+S: 124 bytes of zeroes (registered for future use, yes this is
+   excessive).
+
+As can be seen, this isn't exactly a negotiation; it's just the server
+sending a bunch of data to the client. If the client is unhappy with
+what he receives, he's supposed to disconnect and not look back.
+
+The fact that the size of the export was specified before the flags were
+sent, made it impossible for the protocol to be changed in a
+backwards-compatible manner to allow for named exports without ugliness.
+As a result, the old style negotiation is now no longer developed, and
+only still supported for backwards compatibility.
+
+'new' style handshake
+---------------------
+
+A client who wants to use the new style negotiation MUST connect on the
+IANA-reserved port for NBD, 10809. The server may listen on other ports
+as well, but it will use the old style handshake on those. The server
+will refuse to allow old-style negotiations on the new-style port.
+
+S: "NBDMAGIC" (as in the old style handshake)
+S: 0x49484156454F5054 (note different magic number)
+S: 16 bits of zero (reserved for future use)
+C: 32 bits of zero (reserved for future use)
+
+This completes the initial phase of negotiation; the client and server
+now both know they understand the first version of the new-style
+handshake, with no options. What follows is a repeating group of
+options. Currently only one option can be set (the name of the export to
+be used), and it is not optional; but future protocol extensions may add
+other options that may or may not be optional. Once extra protocol
+options have been added, the order in which these options are set will
+not be significant.
+
+The generic format of setting an option is as follows:
+
+C: 0x49484156454F5054 (note same new-style handshake's magic number)
+C: 32 bits denoting the chosen option (NBD_OPT_EXPORT_NAME is the only
+   possible value currently)
+C: (any data needed for the chosen option)
+S: (any response as needed and defined by the chosen option; currently
+   this does not happen).
+
+The data needed for the NBD_OPT_EXPORT_NAME option is:
+
+C: unsigned 32 bit length (denotes the length of the name used, not
+   including any terminating NUL byte)
+C: name of the export (character string of length as specified,
+   not terminated by any NUL bytes or similar)
+
+Once all options are set, the server replies with information about the
+used export:
+
+S: size of the export in bytes, 64 bit unsigned int
+S: flags (16 bits unsigned int, may contain NBD_FLAG_READ_ONLY if the
+   export is read-only)
+S: 124 bytes of zeroes (forgot to remove that, oops)
+
+The reason that the flags field is 16 bits large and not 32 as in the
+old style of the protocol is that there are now 16 bits of per-export
+flags, and 16 bits of per-server flags. Concatenated together, this
+results in 32 bits, which allows for using a common set of macros for
+both; indeed, the code masks away the upper or lower bits of a 32 bit
+"flags" field when performing the new-style handshake. If we ever run
+out of flags, the server will set the most significant flag bit,
+signalling that an extra flag field will follow, to which the client
+will have to reply with a flag field of its own before the extra flags
+are sent. This is not yet implemented.

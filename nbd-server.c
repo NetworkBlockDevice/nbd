@@ -320,7 +320,7 @@ int authorized_client(CLIENT *opts) {
  * @param buf a buffer
  * @param len the number of bytes to be read
  **/
-inline void readit(int f, void *buf, size_t len) {
+static inline void readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
@@ -342,7 +342,7 @@ inline void readit(int f, void *buf, size_t len) {
  * @param buf a buffer containing data
  * @param len the number of bytes to be written
  **/
-inline void writeit(int f, void *buf, size_t len) {
+static inline void writeit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");
@@ -599,8 +599,9 @@ SERVER* dup_serve(SERVER *s) {
 		serve->authname = strdup(s->authname);
 
 	serve->flags = s->flags;
-	serve->socket = serve->socket;
-	serve->socket_family = serve->socket_family;
+	serve->socket = s->socket;
+	serve->socket_family = s->socket_family;
+	serve->virtstyle = s->virtstyle;
 	serve->cidrlen = s->cidrlen;
 
 	if(s->prerun)
@@ -1308,9 +1309,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 				client->exportsize = OFFT_MAX;
 				client->net = net;
 				client->modern = TRUE;
+				free(name);
 				return client;
 			}
 		}
+		free(name);
 		return NULL;
 	}
 	/* common */

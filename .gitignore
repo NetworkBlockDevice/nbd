@@ -19,7 +19,7 @@ nbd-tester-client
 nbd-client
 nbd-server
 doc
-./nbd-server.config
+nbd-server.config
 nbd-server.5
 *.o
 nbd-client.8.in
@@ -32,3 +32,5 @@ INSTALL
 depcomp
 install-sh
 configure
+man/*.sh
+man/*.sh.in
