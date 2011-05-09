@@ -1,14 +1,14 @@
 man_MANS = nbd-server.1 nbd-server.5 nbd-client.8
 CLEANFILES = manpage.links manpage.refs
 MAINTAINERCLEANFILES = nbd-server.1 nbd-client.8 nbd-server.5
-EXTRA_DIST = nbd-server.1.in.sgml nbd-client.8.in.sgml nbd-server.5.in.sgml nbd-server.1.sh.in nbd-server.5.sh.in nbd-server.8.sh.in
+EXTRA_DIST = nbd-server.1.in.sgml nbd-client.8.in.sgml nbd-server.5.in.sgml nbd-server.1.sh.in nbd-server.5.sh.in nbd-client.8.sh.in
 
 nbd-server.1: nbd-server.1.sh
 	sh nbd-server.1.sh > nbd-server.1
 nbd-server.5: nbd-server.5.sh
 	sh nbd-server.5.sh > nbd-server.5
 nbd-client.8: nbd-client.8.sh
-	sh nbd-client.8.sh > nbd-server.8
+	sh nbd-client.8.sh > nbd-client.8
 nbd-server.1.sh.in: nbd-server.1.in.sgml sh.tmpl
 	LC_ALL=C docbook2man nbd-server.1.in.sgml
 	cat sh.tmpl > nbd-server.1.sh.in
