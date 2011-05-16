@@ -107,14 +107,17 @@ The generic format of setting an option is as follows:
 C: 0x49484156454F5054 (note same new-style handshake's magic number)
 C: 32 bits denoting the chosen option (NBD_OPT_EXPORT_NAME is the only
    possible value currently)
+C: unsigned 32 bit length of option data
 C: (any data needed for the chosen option)
 S: (any response as needed and defined by the chosen option; currently
    this does not happen).
 
+The presence of the option length in every option allows the server
+to skip any options presented by the client that it does not
+understand.
+
 The data needed for the NBD_OPT_EXPORT_NAME option is:
 
-C: unsigned 32 bit length (denotes the length of the name used, not
-   including any terminating NUL byte)
 C: name of the export (character string of length as specified,
    not terminated by any NUL bytes or similar)
 
