@@ -1747,6 +1747,7 @@ int serveloop(GArray* servers) {
 					err_nonfatal("negotiation failed");
 					close(net);
 					net=0;
+					continue;
 				}
 				serve = client->server;
 			}
