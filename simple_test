@@ -6,7 +6,7 @@ tmpnam=`mktemp`
 ulimit -c unlimited
 
 # Create a one-meg device
-dd if=/dev/zero of=$tmpnam bs=1024 count=4096
+dd if=/dev/zero of=$tmpnam bs=1024 count=4096 >/dev/null 2>&1
 
 echo $1
 

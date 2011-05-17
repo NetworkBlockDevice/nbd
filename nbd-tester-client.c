@@ -56,6 +56,32 @@ typedef enum {
 	CONNECTION_CLOSE_FAST,
 } CLOSE_TYPE;
 
+int timeval_subtract (struct timeval *result, struct timeval *x,
+		      struct timeval *y) {
+	if (x->tv_usec < y->tv_usec) {
+		int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+		y->tv_usec -= 1000000 * nsec;
+		y->tv_sec += nsec;
+	}
+	
+	if (x->tv_usec - y->tv_usec > 1000000) {
+		int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+		y->tv_usec += 1000000 * nsec;
+		y->tv_sec -= nsec;
+	}
+	
+	result->tv_sec = x->tv_sec - y->tv_sec;
+	result->tv_usec = x->tv_usec - y->tv_usec;
+	
+	return x->tv_sec < y->tv_sec;
+}
+
+double timeval_diff_to_double (struct timeval * x, struct timeval * y) {
+	struct timeval r;
+	timeval_subtract(&r, x, y);
+	return r.tv_sec * 1.0 + r.tv_usec/1000000.0;
+}
+
 static inline int read_all(int f, void *buf, size_t len) {
 	ssize_t res;
 	size_t retval=0;
@@ -311,8 +337,8 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	struct timeval tv;
 	struct timeval start;
 	struct timeval stop;
-	float timespan;
-	int speed;
+	double timespan;
+	double speed;
 	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
 	size_t tmp;
@@ -401,21 +427,21 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
 		goto err_open;
 	}
-	timespan=(float)(stop.tv_sec-start.tv_sec+(stop.tv_usec-start.tv_usec))/(float)1000000;
-	speed=(int)(size/timespan);
+	timespan=timeval_diff_to_double(&stop, &start);
+	speed=size/timespan;
 	if(speed>1024) {
-		speed>>=10;
+		speed=speed/1024.0;
 		speedchar[0]='K';
 	}
 	if(speed>1024) {
-		speed>>=10;
+		speed=speed/1024.0;
 		speedchar[0]='M';
 	}
 	if(speed>1024) {
-		speed>>=10;
+		speed=speed/1024.0;
 		speedchar[0]='G';
 	}
-	g_message("%d: Throughput %s test complete. Took %.3f seconds to complete, %d%siB/s", (int)getpid(), write?"write":"read", timespan, speed, speedchar);
+	g_message("%d: Throughput %s test complete. Took %.3f seconds to complete, %.3f%sib/s", (int)getpid(), write?"write":"read", timespan, speed, speedchar);
 
 err_open:
 	if(close_sock) {
