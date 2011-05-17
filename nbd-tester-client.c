@@ -194,7 +194,7 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
 	size = ntohll(size);
 	uint16_t flags;
-	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
+	READ_ALL_ERRCHK(sock, &flags, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
 	flags = ntohs(flags);
 	*serverflags = flags;
 	g_warning("Server flags are: %08x", flags);
