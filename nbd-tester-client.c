@@ -123,7 +123,7 @@ static inline int write_all(int f, void *buf, size_t len) {
 #define WRITE_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
 #define WRITE_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
-int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype) {
+int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
 	int sock;
 	struct hostent *host;
 	struct sockaddr_in addr;
@@ -196,6 +196,8 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	uint16_t flags;
 	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
 	flags = ntohs(flags);
+	*serverflags = flags;
+	g_warning("Server flags are: %08x", flags);
 	READ_ALL_ERRCHK(sock, buf, 124, err_open, "Could not read reserved zeroes: %s", strerror(errno));
 	goto end;
 err_open:
@@ -267,13 +269,14 @@ int oversize_test(gchar* hostname, int port, char* name, int sock,
 	struct nbd_reply rep;
 	int request=0;
 	int i=0;
+	int serverflags = 0;
 	pid_t mypid = getpid();
 	char buf[((1024*1024)+sizeof(struct nbd_request)/2)<<1];
 	bool got_err;
 
 	/* This should work */
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
@@ -344,21 +347,31 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	double speed;
 	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
+	int serverflags = 0;
 	size_t tmp;
 	signed int do_write=TRUE;
 	pid_t mypid = getpid();
 
+
+	if (!(testflags & TEST_WRITE))
+		testflags &= ~TEST_FLUSH;
+
 	memset (writebuf, 'X', sizeof(1024));
 	size=0;
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
 		}
 	}
+	if ((testflags & TEST_FLUSH) && ((serverflags & (NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA))
+					 != (NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA))) {
+		snprintf(errstr, errstr_len, "Server did not supply flush capability flags");
+		retval = -1;
+		goto err_open;
+	}
 	req.magic=htonl(NBD_REQUEST_MAGIC);
-	req.type=htonl((testflags & TEST_WRITE)?NBD_CMD_WRITE:NBD_CMD_READ);
 	req.len=htonl(1024);
 	if(gettimeofday(&start, NULL)<0) {
 		retval=-1;
@@ -367,6 +380,11 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	}
 	for(i=0;i+1024<=size;i+=1024) {
 		if(do_write) {
+			int sendfua = (testflags & TEST_FLUSH) && ((i & 15) == 3);
+			int sendflush = (testflags & TEST_FLUSH) && ((i & 15) == 11);
+			req.type=htonl((testflags & TEST_WRITE)?NBD_CMD_WRITE:NBD_CMD_READ);
+			if (sendfua)
+				req.type = htonl(NBD_CMD_WRITE | NBD_CMD_FLAG_FUA);
 			memcpy(&(req.handle),&i,sizeof(i));
 			req.from=htonll(i);
 			if (write_all(sock, &req, sizeof(req)) <0) {
@@ -380,6 +398,17 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 				}
 			}
 			printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
+			if (sendflush) {
+				long long int j = i ^ (1LL<<63);
+				req.type = htonl(NBD_CMD_FLUSH);
+				memcpy(&(req.handle),&j,sizeof(j));
+				req.from=0;
+				if (write_all(sock, &req, sizeof(req)) <0) {
+					retval=-1;
+					goto err_open;
+				}
+				printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
+			}
 		}
 		do {
 			FD_ZERO(&set);
