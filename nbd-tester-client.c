@@ -224,13 +224,15 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 		retval=-1;
 		goto end;
 	}
-	READ_ALL_ERR_RT(sock, &buf, datasize, end, -1, "Could not read data: %s", strerror(errno));
+	if (datasize)
+		READ_ALL_ERR_RT(sock, &buf, datasize, end, -1, "Could not read data: %s", strerror(errno));
 
 end:
 	return retval;
 }
 
-int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
+int oversize_test(gchar* hostname, int port, char* name, int sock,
+		  char sock_is_open, char close_sock, int write) {
 	int retval=0;
 	struct nbd_request req;
 	struct nbd_reply rep;
@@ -298,9 +300,11 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	return retval;
 }
 
-int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
+int throughput_test(gchar* hostname, int port, char* name, int sock,
+		    char sock_is_open, char close_sock, int write) {
 	long long int i;
 	char buf[1024];
+	char writebuf[1024];
 	struct nbd_request req;
 	int requests=0;
 	fd_set set;
@@ -315,6 +319,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 	signed int do_write=TRUE;
 	pid_t mypid = getpid();
 
+	memset (writebuf, 'X', sizeof(1024));
 	size=0;
 	if(!sock_is_open) {
 		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
@@ -324,7 +329,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		}
 	}
 	req.magic=htonl(NBD_REQUEST_MAGIC);
-	req.type=htonl(NBD_CMD_READ);
+	req.type=htonl(write?NBD_CMD_WRITE:NBD_CMD_READ);
 	req.len=htonl(1024);
 	if(gettimeofday(&start, NULL)<0) {
 		retval=-1;
@@ -339,6 +344,12 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 				retval=-1;
 				goto err_open;
 			}
+			if (write) {
+				if (write_all(sock, writebuf, 1024) <0) {
+					retval=-1;
+					goto err_open;
+				}
+			}
 			printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
 		}
 		do {
@@ -350,7 +361,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 			if(FD_ISSET(sock, &set)) {
 				/* Okay, there's something ready for
 				 * reading here */
-				if(read_packet_check_header(sock, 1024, i)<0) {
+				if(read_packet_check_header(sock, write?0:1024, i)<0) {
 					retval=-1;
 					goto err_open;
 				}
@@ -381,7 +392,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		if(FD_ISSET(sock, &set)) {
 			/* Okay, there's something ready for
 			 * reading here */
-			read_packet_check_header(sock, 1024, i);
+			read_packet_check_header(sock, write?0:1024, i);
 			printf("%d: Requests(-): %d\n", (int)mypid, --requests);
 		}
 	} while (requests);
@@ -404,7 +415,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		speed>>=10;
 		speedchar[0]='G';
 	}
-	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%siB/s", (int)getpid(), timespan,speed,speedchar);
+	g_message("%d: Throughput %s test complete. Took %.3f seconds to complete, %d%siB/s", (int)getpid(), write?"write":"read", timespan, speed, speedchar);
 
 err_open:
 	if(close_sock) {
@@ -414,7 +425,7 @@ err:
 	return retval;
 }
 
-typedef int (*testfunc)(gchar*, int, char*, int, char, char);
+typedef int (*testfunc)(gchar*, int, char*, int, char, char, int);
 
 int main(int argc, char**argv) {
 	gchar *hostname;
@@ -424,6 +435,7 @@ int main(int argc, char**argv) {
 	int c;
 	bool want_port = TRUE;
 	int nonopt=0;
+	int write=0;
 	testfunc test = throughput_test;
 
 	if(argc<3) {
@@ -433,7 +445,7 @@ int main(int argc, char**argv) {
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	while((c=getopt(argc, argv, "-N:o"))>=0) {
+	while((c=getopt(argc, argv, "-N:ow"))>=0) {
 		switch(c) {
 			case 1:
 				switch(nonopt) {
@@ -459,10 +471,13 @@ int main(int argc, char**argv) {
 			case 'o':
 				test=oversize_test;
 				break;
+			case 'w':
+				write=1;
+				break;
 		}
 	}
 
-	if(test(hostname, (int)p, name, sock, FALSE, TRUE)<0) {
+	if(test(hostname, (int)p, name, sock, FALSE, TRUE, write)<0) {
 		g_warning("Could not run test: %s", errstr);
 		exit(EXIT_FAILURE);
 	}
