@@ -116,6 +116,9 @@ gchar* rungroup=NULL;
 /** whether to export using the old negotiation protocol (port-based) */
 gboolean do_oldstyle=FALSE;
 
+/* Whether we should avoid forking */
+int dontfork = 0;
+
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
 #define msg2(a,b) syslog(a,b)
@@ -413,6 +416,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
+		{"dont-fork", no_argument, NULL, 'd'},
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
@@ -434,7 +438,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:M:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -502,6 +506,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
+		        break;
+		case 'd': 
+			dontfork = 1;
 		        break;
 		case 'C':
 			g_free(config_file_pos);
@@ -1787,31 +1794,33 @@ int serveloop(GArray* servers) {
 				}
 				msg2(LOG_INFO,"Authorized client") ;
 				pid=g_malloc(sizeof(pid_t));
-#ifndef NOFORK
-				if ((*pid=fork())<0) {
-					msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-					close(net);
-					continue;
+
+				if (!dontfork) {
+					if ((*pid=fork())<0) {
+						msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+						close(net);
+						continue;
+					}
+					if (*pid>0) { /* parent */
+						close(net);
+						g_hash_table_insert(children, pid, pid);
+						continue;
+					}
+					/* child */
+					g_hash_table_destroy(children);
+					for(i=0;i<servers->len;i++) {
+						serve=&g_array_index(servers, SERVER, i);
+						close(serve->socket);
+					}
+					/* FALSE does not free the
+					   actual data. This is required,
+					   because the client has a
+					   direct reference into that
+					   data, and otherwise we get a
+					   segfault... */
+					g_array_free(servers, FALSE);
 				}
-				if (*pid>0) { /* parent */
-					close(net);
-					g_hash_table_insert(children, pid, pid);
-					continue;
-				}
-				/* child */
-				g_hash_table_destroy(children);
-				for(i=0;i<servers->len;i++) {
-					serve=&g_array_index(servers, SERVER, i);
-					close(serve->socket);
-				}
-				/* FALSE does not free the
-				actual data. This is required,
-				because the client has a
-				direct reference into that
-				data, and otherwise we get a
-				segfault... */
-				g_array_free(servers, FALSE);
-#endif // NOFORK
+
 				msg2(LOG_INFO,"Starting to serve");
 				serveconnection(client);
 				exit(EXIT_SUCCESS);
@@ -1978,7 +1987,7 @@ void setup_servers(GArray* servers) {
  * 	is only used to create a PID file of the form
  * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
  **/
-#if !defined(NODAEMON) && !defined(NOFORK)
+#if !defined(NODAEMON)
 void daemonize(SERVER* serve) {
 	FILE*pidf;
 
@@ -2007,7 +2016,7 @@ void daemonize(SERVER* serve) {
 }
 #else
 #define daemonize(serve)
-#endif /* !defined(NODAEMON) && !defined(NOFORK) */
+#endif /* !defined(NODAEMON) */
 
 /*
  * Everything beyond this point (in the file) is run in non-daemon mode.
@@ -2146,7 +2155,8 @@ int main(int argc, char *argv[]) {
 		g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
-	daemonize(serve);
+	if (!dontfork)
+		daemonize(serve);
 	setup_servers(servers);
 	dousers();
 	serveloop(servers);
