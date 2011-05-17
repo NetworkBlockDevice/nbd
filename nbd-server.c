@@ -700,21 +700,21 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	SERVER s;
 	gchar *virtstyle=NULL;
 	PARAM lp[] = {
-		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
-		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
-		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
-		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "postrun",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
-		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
-		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
-		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
-		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
-		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
-		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
-		{ "maxconnections", FALSE, PARAM_INT,	NULL, 0 },
+		{ "exportname", TRUE,	PARAM_STRING, 	&(s.exportname),	0 },
+		{ "port", 	TRUE,	PARAM_INT, 	&(s.port),		0 },
+		{ "authfile",	FALSE,	PARAM_STRING,	&(s.authname),		0 },
+		{ "filesize",	FALSE,	PARAM_INT,	&(s.expected_size),	0 },
+		{ "virtstyle",	FALSE,	PARAM_STRING,	&(virtstyle),		0 },
+		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
+		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
+		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
+		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
+		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
+		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
+		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
+		{ "sync",	FALSE,  PARAM_BOOL,	&(s.flags),		F_SYNC },
+		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
+		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
@@ -754,18 +754,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	groups = g_key_file_get_groups(cfile, NULL);
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
-		lp[0].target=&(s.exportname);
-		lp[1].target=&(s.port);
-		lp[2].target=&(s.authname);
-		lp[3].target=&(s.expected_size);
-		lp[4].target=&(virtstyle);
-		lp[5].target=&(s.prerun);
-		lp[6].target=&(s.postrun);
-		lp[7].target=lp[8].target=lp[9].target=
-				lp[10].target=lp[11].target=
-				lp[12].target=&(s.flags);
-		lp[13].target=&(s.listenaddr);
-		lp[14].target=&(s.max_connections);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -1759,6 +1747,7 @@ int serveloop(GArray* servers) {
 					err_nonfatal("negotiation failed");
 					close(net);
 					net=0;
+					continue;
 				}
 				serve = client->server;
 			}
