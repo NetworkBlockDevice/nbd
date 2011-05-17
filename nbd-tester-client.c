@@ -56,6 +56,35 @@ typedef enum {
 	CONNECTION_CLOSE_FAST,
 } CLOSE_TYPE;
 
+#define TEST_WRITE (1<<0)
+#define TEST_FLUSH (1<<1)
+
+int timeval_subtract (struct timeval *result, struct timeval *x,
+		      struct timeval *y) {
+	if (x->tv_usec < y->tv_usec) {
+		int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+		y->tv_usec -= 1000000 * nsec;
+		y->tv_sec += nsec;
+	}
+	
+	if (x->tv_usec - y->tv_usec > 1000000) {
+		int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+		y->tv_usec += 1000000 * nsec;
+		y->tv_sec -= nsec;
+	}
+	
+	result->tv_sec = x->tv_sec - y->tv_sec;
+	result->tv_usec = x->tv_usec - y->tv_usec;
+	
+	return x->tv_sec < y->tv_sec;
+}
+
+double timeval_diff_to_double (struct timeval * x, struct timeval * y) {
+	struct timeval r;
+	timeval_subtract(&r, x, y);
+	return r.tv_sec * 1.0 + r.tv_usec/1000000.0;
+}
+
 static inline int read_all(int f, void *buf, size_t len) {
 	ssize_t res;
 	size_t retval=0;
@@ -94,7 +123,7 @@ static inline int write_all(int f, void *buf, size_t len) {
 #define WRITE_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
 #define WRITE_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
-int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype) {
+int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
 	int sock;
 	struct hostent *host;
 	struct sockaddr_in addr;
@@ -165,8 +194,10 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
 	size = ntohll(size);
 	uint16_t flags;
-	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
+	READ_ALL_ERRCHK(sock, &flags, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
 	flags = ntohs(flags);
+	*serverflags = flags;
+	g_warning("Server flags are: %08x", flags);
 	READ_ALL_ERRCHK(sock, buf, 124, err_open, "Could not read reserved zeroes: %s", strerror(errno));
 	goto end;
 err_open:
@@ -224,25 +255,28 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 		retval=-1;
 		goto end;
 	}
-	READ_ALL_ERR_RT(sock, &buf, datasize, end, -1, "Could not read data: %s", strerror(errno));
+	if (datasize)
+		READ_ALL_ERR_RT(sock, &buf, datasize, end, -1, "Could not read data: %s", strerror(errno));
 
 end:
 	return retval;
 }
 
-int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
+int oversize_test(gchar* hostname, int port, char* name, int sock,
+		  char sock_is_open, char close_sock, int testflags) {
 	int retval=0;
 	struct nbd_request req;
 	struct nbd_reply rep;
 	int request=0;
 	int i=0;
+	int serverflags = 0;
 	pid_t mypid = getpid();
 	char buf[((1024*1024)+sizeof(struct nbd_request)/2)<<1];
 	bool got_err;
 
 	/* This should work */
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
@@ -298,33 +332,46 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	return retval;
 }
 
-int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_is_open, char close_sock) {
+int throughput_test(gchar* hostname, int port, char* name, int sock,
+		    char sock_is_open, char close_sock, int testflags) {
 	long long int i;
 	char buf[1024];
+	char writebuf[1024];
 	struct nbd_request req;
 	int requests=0;
 	fd_set set;
 	struct timeval tv;
 	struct timeval start;
 	struct timeval stop;
-	float timespan;
-	int speed;
+	double timespan;
+	double speed;
 	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
+	int serverflags = 0;
 	size_t tmp;
 	signed int do_write=TRUE;
 	pid_t mypid = getpid();
 
+
+	if (!(testflags & TEST_WRITE))
+		testflags &= ~TEST_FLUSH;
+
+	memset (writebuf, 'X', sizeof(1024));
 	size=0;
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL))<0) {
+		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
 		}
 	}
+	if ((testflags & TEST_FLUSH) && ((serverflags & (NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA))
+					 != (NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA))) {
+		snprintf(errstr, errstr_len, "Server did not supply flush capability flags");
+		retval = -1;
+		goto err_open;
+	}
 	req.magic=htonl(NBD_REQUEST_MAGIC);
-	req.type=htonl(NBD_CMD_READ);
 	req.len=htonl(1024);
 	if(gettimeofday(&start, NULL)<0) {
 		retval=-1;
@@ -333,13 +380,35 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 	}
 	for(i=0;i+1024<=size;i+=1024) {
 		if(do_write) {
+			int sendfua = (testflags & TEST_FLUSH) && ((i & 15) == 3);
+			int sendflush = (testflags & TEST_FLUSH) && ((i & 15) == 11);
+			req.type=htonl((testflags & TEST_WRITE)?NBD_CMD_WRITE:NBD_CMD_READ);
+			if (sendfua)
+				req.type = htonl(NBD_CMD_WRITE | NBD_CMD_FLAG_FUA);
 			memcpy(&(req.handle),&i,sizeof(i));
 			req.from=htonll(i);
 			if (write_all(sock, &req, sizeof(req)) <0) {
 				retval=-1;
 				goto err_open;
 			}
+			if (testflags & TEST_WRITE) {
+				if (write_all(sock, writebuf, 1024) <0) {
+					retval=-1;
+					goto err_open;
+				}
+			}
 			printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
+			if (sendflush) {
+				long long int j = i ^ (1LL<<63);
+				req.type = htonl(NBD_CMD_FLUSH);
+				memcpy(&(req.handle),&j,sizeof(j));
+				req.from=0;
+				if (write_all(sock, &req, sizeof(req)) <0) {
+					retval=-1;
+					goto err_open;
+				}
+				printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
+			}
 		}
 		do {
 			FD_ZERO(&set);
@@ -350,7 +419,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 			if(FD_ISSET(sock, &set)) {
 				/* Okay, there's something ready for
 				 * reading here */
-				if(read_packet_check_header(sock, 1024, i)<0) {
+				if(read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i)<0) {
 					retval=-1;
 					goto err_open;
 				}
@@ -381,7 +450,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		if(FD_ISSET(sock, &set)) {
 			/* Okay, there's something ready for
 			 * reading here */
-			read_packet_check_header(sock, 1024, i);
+			read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i);
 			printf("%d: Requests(-): %d\n", (int)mypid, --requests);
 		}
 	} while (requests);
@@ -390,21 +459,21 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
 		goto err_open;
 	}
-	timespan=(float)(stop.tv_sec-start.tv_sec+(stop.tv_usec-start.tv_usec))/(float)1000000;
-	speed=(int)(size/timespan);
+	timespan=timeval_diff_to_double(&stop, &start);
+	speed=size/timespan;
 	if(speed>1024) {
-		speed>>=10;
+		speed=speed/1024.0;
 		speedchar[0]='K';
 	}
 	if(speed>1024) {
-		speed>>=10;
+		speed=speed/1024.0;
 		speedchar[0]='M';
 	}
 	if(speed>1024) {
-		speed>>=10;
+		speed=speed/1024.0;
 		speedchar[0]='G';
 	}
-	g_message("%d: Throughput test complete. Took %.3f seconds to complete, %d%siB/s", (int)getpid(), timespan,speed,speedchar);
+	g_message("%d: Throughput %s test complete. Took %.3f seconds to complete, %.3f%sib/s", (int)getpid(), (testflags & TEST_WRITE)?"write":"read", timespan, speed, speedchar);
 
 err_open:
 	if(close_sock) {
@@ -414,7 +483,7 @@ err:
 	return retval;
 }
 
-typedef int (*testfunc)(gchar*, int, char*, int, char, char);
+typedef int (*testfunc)(gchar*, int, char*, int, char, char, int);
 
 int main(int argc, char**argv) {
 	gchar *hostname;
@@ -424,6 +493,7 @@ int main(int argc, char**argv) {
 	int c;
 	bool want_port = TRUE;
 	int nonopt=0;
+	int testflags=0;
 	testfunc test = throughput_test;
 
 	if(argc<3) {
@@ -433,7 +503,7 @@ int main(int argc, char**argv) {
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	while((c=getopt(argc, argv, "-N:o"))>=0) {
+	while((c=getopt(argc, argv, "-N:owf"))>=0) {
 		switch(c) {
 			case 1:
 				switch(nonopt) {
@@ -459,10 +529,16 @@ int main(int argc, char**argv) {
 			case 'o':
 				test=oversize_test;
 				break;
+			case 'w':
+				testflags|=TEST_WRITE;
+				break;
+			case 'f':
+				testflags|=TEST_FLUSH;
+				break;
 		}
 	}
 
-	if(test(hostname, (int)p, name, sock, FALSE, TRUE)<0) {
+	if(test(hostname, (int)p, name, sock, FALSE, TRUE, testflags)<0) {
 		g_warning("Could not run test: %s", errstr);
 		exit(EXIT_FAILURE);
 	}

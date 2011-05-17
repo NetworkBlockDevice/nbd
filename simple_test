@@ -6,7 +6,7 @@ tmpnam=`mktemp`
 ulimit -c unlimited
 
 # Create a one-meg device
-dd if=/dev/zero of=$tmpnam bs=1024 count=4096
+dd if=/dev/zero of=$tmpnam bs=1024 count=4096 >/dev/null 2>&1
 
 echo $1
 
@@ -97,6 +97,32 @@ EOF
 		PID=$!
 		sleep 1
 		./nbd-tester-client localhost -N export1
+		retval=$?
+	;;
+	*/write)
+		# Test new-style exports
+		cat >nbd-server.conf <<EOF
+[generic]
+[export1]
+	exportname = $tmpnam
+EOF
+		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		PID=$!
+		sleep 1
+		./nbd-tester-client localhost -N export1 -w
+		retval=$?
+	;;
+	*/flush)
+		# Test new-style exports
+		cat >nbd-server.conf <<EOF
+[generic]
+[export1]
+	exportname = $tmpnam
+EOF
+		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		PID=$!
+		sleep 1
+		./nbd-tester-client localhost -N export1 -w -f
 		retval=$?
 	;;
 	*)
