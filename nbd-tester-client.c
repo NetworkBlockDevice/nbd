@@ -72,8 +72,27 @@ static inline int read_all(int f, void *buf, size_t len) {
 	return retval;
 }
 
+static inline int write_all(int f, void *buf, size_t len) {
+	ssize_t res;
+	size_t retval=0;
+
+	while(len>0) {
+		if((res=write(f, buf, len)) <=0) {
+			snprintf(errstr, errstr_len, "Write failed: %s", strerror(errno));
+			return -1;
+		}
+		len-=res;
+		buf+=res;
+		retval+=res;
+	}
+	return retval;
+}
+
 #define READ_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((read_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
 #define READ_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((read_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
+
+#define WRITE_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
+#define WRITE_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
 int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype) {
 	int sock;
@@ -131,21 +150,24 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 		goto end;
 	}
 	/* flags */
-	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
+	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read reserved field: %s", strerror(errno));
 	/* reserved field */
-	write(sock, &tmp32, sizeof(tmp32));
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err_open, "Could not write reserved field: %s", strerror(errno));
 	/* magic */
 	tmp64 = htonll(opts_magic);
-	write(sock, &tmp64, sizeof(tmp64));
+	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err_open, "Could not write magic: %s", strerror(errno));
 	/* name */
 	tmp32 = htonl(NBD_OPT_EXPORT_NAME);
-	write(sock, &tmp32, sizeof(tmp32));
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err_open, "Could not write option: %s", strerror(errno));
 	tmp32 = htonl((uint32_t)strlen(name));
-	write(sock, &tmp32, sizeof(tmp32));
-	write(sock, name, strlen(name));
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err_open, "Could not write name length: %s", strerror(errno));
+	WRITE_ALL_ERRCHK(sock, name, strlen(name), err_open, "Could not write name:: %s", strerror(errno));
 	READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
 	size = ntohll(size);
-	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t)+124, err_open, "Could not read reserved zeroes: %s", strerror(errno));
+	uint16_t flags;
+	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
+	flags = ntohs(flags);
+	READ_ALL_ERRCHK(sock, buf, 124, err_open, "Could not read reserved zeroes: %s", strerror(errno));
 	goto end;
 err_open:
 	close(sock);
@@ -193,12 +215,12 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	rep.magic=ntohl(rep.magic);
 	rep.error=ntohl(rep.error);
 	if(rep.magic!=NBD_REPLY_MAGIC) {
-		snprintf(errstr, errstr_len, "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX", curhandle, curhandle, *((u64*)rep.handle), *((u64*)rep.handle), (long unsigned int)rep.magic, (long unsigned int)NBD_REPLY_MAGIC);
+		snprintf(errstr, errstr_len, "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX", (long long int)curhandle, (long long unsigned int)curhandle, (long long int)*((u64*)rep.handle), (long long unsigned int)*((u64*)rep.handle), (long unsigned int)rep.magic, (long unsigned int)NBD_REPLY_MAGIC);
 		retval=-1;
 		goto end;
 	}
 	if(rep.error) {
-		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", (long int)rep.error, (long unsigned int)rep.error, (long long int)(*((u64*)rep.handle)), *((u64*)rep.handle));
+		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", (long int)rep.error, (long unsigned int)rep.error, (long long int)(*((u64*)rep.handle)), (long long unsigned int)*((u64*)rep.handle));
 		retval=-1;
 		goto end;
 	}
@@ -231,7 +253,7 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	req.len=htonl(1024*1024);
 	memcpy(&(req.handle),&i,sizeof(i));
 	req.from=htonll(i);
-	write(sock, &req, sizeof(req));
+	WRITE_ALL_ERR_RT(sock, &req, sizeof(req), err, -1, "Could not write request: %s", strerror(errno));
 	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
 	READ_ALL_ERR_RT(sock, &rep, sizeof(struct nbd_reply), err, -1, "Could not read reply header: %s", strerror(errno));
 	READ_ALL_ERR_RT(sock, &buf, ntohl(req.len), err, -1, "Could not read data: %s", strerror(errno));
@@ -245,7 +267,7 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	/* This probably should not work */
 	i++; req.from=htonll(i);
 	req.len = htonl(ntohl(req.len) + sizeof(struct nbd_request) / 2);
-	write(sock, &req, sizeof(req));
+	WRITE_ALL_ERR_RT(sock, &req, sizeof(req), err, -1, "Could not write request: %s", strerror(errno));
 	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
 	READ_ALL_ERR_RT(sock, &rep, sizeof(struct nbd_reply), err, -1, "Could not read reply header: %s", strerror(errno));
 	READ_ALL_ERR_RT(sock, &buf, ntohl(req.len), err, -1, "Could not read data: %s", strerror(errno));
@@ -259,7 +281,7 @@ int oversize_test(gchar* hostname, int port, char* name, int sock, char sock_is_
 	/* ... unless this works, too */
 	i++; req.from=htonll(i);
 	req.len = htonl(ntohl(req.len) << 1);
-	write(sock, &req, sizeof(req));
+	WRITE_ALL_ERR_RT(sock, &req, sizeof(req), err, -1, "Could not write request: %s", strerror(errno));
 	printf("%d: testing oversized request: %d: ", getpid(), ntohl(req.len));
 	READ_ALL_ERR_RT(sock, &rep, sizeof(struct nbd_reply), err, -1, "Could not read reply header: %s", strerror(errno));
 	READ_ALL_ERR_RT(sock, &buf, ntohl(req.len), err, -1, "Could not read data: %s", strerror(errno));
@@ -313,7 +335,10 @@ int throughput_test(gchar* hostname, int port, char* name, int sock, char sock_i
 		if(do_write) {
 			memcpy(&(req.handle),&i,sizeof(i));
 			req.from=htonll(i);
-			write(sock, &req, sizeof(req));
+			if (write_all(sock, &req, sizeof(req)) <0) {
+				retval=-1;
+				goto err_open;
+			}
 			printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
 		}
 		do {
