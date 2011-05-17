@@ -26,8 +26,8 @@ server during the handshake.
 There are two message types in the data pushing phase: the request, and
 the response.
 
-There are three request types in the data pushing phase: NBD_CMD_READ,
-NBD_CMD_WRITE, and NBD_CMD_DISC (disconnect).
+There are four request types in the data pushing phase: NBD_CMD_READ,
+NBD_CMD_WRITE, NBD_CMD_DISC (disconnect), and NBD_CMD_FLUSH.
 
 The request is sent by the client; the response by the server. A request
 header consists a 32 bit magic number (magic), a 32 bit field denoting
@@ -49,6 +49,16 @@ connection. Requests are currently handled synchronously; when (not if)
 we change that to asynchronous handling, handling the disconnect request
 will probably be postponed until there are no other outstanding
 requests.
+
+A flush request will not be sent unless NBD_FLAG_SEND_FLUSH is set,
+and indicates the backing file should be fdatasync()'d to disk.
+
+The top 16 bits of the request are flags. NBD_CMD_FLAG_FUA implies
+a force unit access, and can currently only be usefully combined
+with NBD_CMD_WRITE. This is implementing using sync_file_range
+if present, else by fdatasync() of that file (note not all files
+in a multifile environment). NBD_CMD_FLAG_FUA will not be set
+unless NBD_FLAG_SEND_FUA is set.
 
 There are two versions of the negotiation: the 'old' style (nbd <=
 2.9.16) and the 'new' style (nbd >= 2.9.17, though due to a bug it does

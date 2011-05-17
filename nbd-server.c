@@ -137,11 +137,13 @@ int dontfork = 0;
 #define DEBUG2( a,b ) printf( a,b )
 #define DEBUG3( a,b,c ) printf( a,b,c )
 #define DEBUG4( a,b,c,d ) printf( a,b,c,d )
+#define DEBUG5( a,b,c,d,e ) printf( a,b,c,d,e )
 #else
 #define DEBUG( a )
 #define DEBUG2( a,b ) 
 #define DEBUG3( a,b,c ) 
 #define DEBUG4( a,b,c,d ) 
+#define DEBUG5( a,b,c,d,e ) 
 #endif
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION ""
@@ -163,6 +165,9 @@ int dontfork = 0;
 #define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
 #define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
 #define F_SYNC 64	  /**< Whether to fsync() after a write */
+#define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
+#define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
+#define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -720,6 +725,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
 		{ "sync",	FALSE,  PARAM_BOOL,	&(s.flags),		F_SYNC },
+		{ "flush",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FLUSH },
+		{ "fua",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FUA },
+		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
@@ -1055,7 +1063,7 @@ void myseek(int handle,off_t a) {
  * @param client The client we're serving for
  * @return The number of bytes actually written, or -1 in case of an error
  **/
-ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
+ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
@@ -1066,12 +1074,20 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("(WRITE to fd %d offset %llu len %u), ", fhandle, foffset, len);
+	DEBUG5("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, foffset, len, fua);
 
 	myseek(fhandle, foffset);
 	retval = write(fhandle, buf, len);
 	if(client->server->flags & F_SYNC) {
 		fsync(fhandle);
+	} else if (fua) {
+#ifdef USE_SYNC_FILE_RANGE
+		sync_file_range(fhandle, foffset, len,
+				SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE |
+				SYNC_FILE_RANGE_WAIT_AFTER);
+#else
+		fdatasync(fhandle);
+#endif
 	}
 	return retval;
 }
@@ -1080,10 +1096,10 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
  * Call rawexpwrite repeatedly until all data has been written.
  * @return 0 on success, nonzero on failure
  **/
-int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
+int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	ssize_t ret=0;
 
-	while(len > 0 && (ret=rawexpwrite(a, buf, len, client)) > 0 ) {
+	while(len > 0 && (ret=rawexpwrite(a, buf, len, client, fua)) > 0 ) {
 		a += ret;
 		buf += ret;
 		len -= ret;
@@ -1184,7 +1200,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param client The client we're going to write for.
  * @return 0 on success, nonzero on failure
  **/
-int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
+int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	char pagebuf[DIFFPAGESIZE];
 	off_t mapcnt,mapl,maph;
 	off_t wrlen,rdlen; 
@@ -1192,7 +1208,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t offset;
 
 	if (!(client->server->flags & F_COPYONWRITE))
-		return(rawexpwrite_fully(a, buf, len, client)); 
+		return(rawexpwrite_fully(a, buf, len, client, fua)); 
 	DEBUG3("Asked to write %d bytes at %llu.\n", len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
@@ -1225,6 +1241,33 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 		}						    
 		len-=wrlen ; a+=wrlen ; buf+=wrlen ;
 	}
+	if (client->server->flags & F_SYNC) {
+		fsync(client->difffile);
+	} else if (fua) {
+		/* open question: would it be cheaper to do multiple sync_file_ranges?
+		   as we iterate through the above?
+		 */
+		fdatasync(client->difffile);
+	}
+	return 0;
+}
+
+int expflush(CLIENT *client) {
+	int fhandle;
+	off_t foffset;
+	size_t maxbytes;
+	gint i;
+
+        if (client->server->flags & F_COPYONWRITE) {
+		return fsync(client->difffile);
+	}
+	
+	for (i = 0; i < client->export->len; i++) {
+		FILE_INFO fi = g_array_index(client->export, FILE_INFO, i);
+		if (fsync(fi.fhandle) < 0)
+			return -1;
+	}
+	
 	return 0;
 }
 
@@ -1317,6 +1360,12 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		err("Negotiation failed: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
+	if (client->server->flags & F_FLUSH)
+		flags |= NBD_FLAG_SEND_FLUSH;
+	if (client->server->flags & F_FUA)
+		flags |= NBD_FLAG_SEND_FUA;
+	if (client->server->flags & F_ROTATIONAL)
+		flags |= NBD_FLAG_ROTATIONAL;
 	if (!client->modern) {
 		/* oldstyle */
 		flags = htonl(flags);
@@ -1366,6 +1415,7 @@ int mainloop(CLIENT *client) {
 		size_t len;
 		size_t currlen;
 		size_t writelen;
+		uint16_t command;
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
@@ -1373,8 +1423,9 @@ int mainloop(CLIENT *client) {
 		readit(client->net, &request, sizeof(request));
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
+		command = request.type & NBD_CMD_MASK_COMMAND;
 
-		if (request.type==NBD_CMD_DISC) {
+		if (command==NBD_CMD_DISC) {
 			msg2(LOG_INFO, "Disconnect request received.");
                 	if (client->server->flags & F_COPYONWRITE) { 
 				if (client->difmap) g_free(client->difmap) ;
@@ -1397,7 +1448,7 @@ int mainloop(CLIENT *client) {
 			currlen = len;
 		}
 #ifdef DODBG
-		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
+		printf("%s from %llu (%llu) len %d, ", command ? "WRITE" :
 				"READ", (unsigned long long)request.from,
 				(unsigned long long)request.from / 512, len);
 #endif
@@ -1414,7 +1465,7 @@ int mainloop(CLIENT *client) {
 			continue;
 		}
 
-		if (request.type==NBD_CMD_WRITE) {
+		if (command==NBD_CMD_WRITE) {
 			DEBUG("wr: net->buf, ");
 			while(len > 0) {
 				readit(client->net, buf, currlen);
@@ -1425,7 +1476,8 @@ int mainloop(CLIENT *client) {
 					ERROR(client, reply, EPERM);
 					continue;
 				}
-				if (expwrite(request.from, buf, len, client)) {
+				if (expwrite(request.from, buf, len, client,
+					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
 					continue;
@@ -1437,27 +1489,43 @@ int mainloop(CLIENT *client) {
 			}
 			continue;
 		}
-		/* READ */
 
-		DEBUG("exp->buf, ");
-		memcpy(buf, &reply, sizeof(struct nbd_reply));
-		p = buf + sizeof(struct nbd_reply);
-		writelen = currlen + sizeof(struct nbd_reply);
-		while(len > 0) {
-			if (expread(request.from, p, currlen, client)) {
-				DEBUG("Read failed: %m");
+		if (command==NBD_CMD_FLUSH) {
+			DEBUG("fl: ");
+			if (expflush(client)) {
+				DEBUG("Flush failed: %m");
 				ERROR(client, reply, errno);
 				continue;
 			}
-
-			DEBUG("buf->net, ");
-			writeit(client->net, buf, writelen);
-			len -= currlen;
-			currlen = (len < BUFSIZE) ? len : BUFSIZE;
-			p = buf;
-			writelen = currlen;
+			SEND(client->net, reply);
+			DEBUG("OK!\n");
+			continue;
 		}
-		DEBUG("OK!\n");
+
+		if (command==NBD_CMD_READ) {
+			DEBUG("exp->buf, ");
+			memcpy(buf, &reply, sizeof(struct nbd_reply));
+			p = buf + sizeof(struct nbd_reply);
+			writelen = currlen + sizeof(struct nbd_reply);
+			while(len > 0) {
+				if (expread(request.from, p, currlen, client)) {
+					DEBUG("Read failed: %m");
+					ERROR(client, reply, errno);
+					continue;
+				}
+				
+				DEBUG("buf->net, ");
+				writeit(client->net, buf, writelen);
+				len -= currlen;
+				currlen = (len < BUFSIZE) ? len : BUFSIZE;
+				p = buf;
+				writelen = currlen;
+			}
+			DEBUG("OK!\n");
+			continue;
+		}
+
+		DEBUG ("Ignoring unknown command\n");
 	}
 	return 0;
 }

@@ -410,6 +410,64 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>flush</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will inform the client that it
+	    supports and desires to be sent flush requests when the
+	    elevator layer receives them. Receipt of a flush request
+	    will cause an fdatasync() (or, if the sync option is set,
+	    an fsync()) on the backend storage. This increases
+	    reliability in the case of an unclean shutdown at
+	    the expense of a degradation of performance. The default
+	    state is disabled. This option will have no effect unless
+	    supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>fua</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will inform the client that it
+	    supports and desires to be sent fua (force unit access) commands
+	    when the elevator layer receives them. Receipt of a force unit
+	    access command will cause the specified command to be synced
+	    to backend storage using sync_file_range() if supported, or
+	    fdatasync() otherwise. This increases
+	    reliability in the case of an unclean shutdown at
+	    the expense of a degradation of performance. The default
+	    state is disabled. This option will have no effect unless
+	    supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>rotational</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will inform the client that it
+	    it would prefer it to send requests in elevator order, perhaps
+	    because it has a backing store and no local elevator. By
+	    default, the client uses QUEUE_FLAG_NONROT, which effectively
+	    restricts the function of the elevator to block merges. By
+	    specifying this flag on the server, the client will not use
+	    QUEUE_FLAG_NONROT, meaning the client elevator will perform
+	    normal elevator ordering of I/O requests. Note that even when
+	    the backing store is on rotating media, it is not normally
+	    necessary to specify this flag, as the server's elevator
+	    algorithm will be used. This flag is only required where
+	    the server will not be using an elevator algorithm or where
+	    the elevator algorithm is effectively neutered (e.g. with
+	    the sync option set). This option will have no effect unless
+	    supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>sparse_cow</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>

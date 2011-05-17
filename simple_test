@@ -2,6 +2,8 @@
 # Yes, that's POSIX sh, not bash!
 
 tmpnam=`mktemp`
+conffile=${tmpnam}.conf
+pidfile=${tmpnam}.pid
 
 ulimit -c unlimited
 
@@ -13,7 +15,7 @@ echo $1
 case $1 in
 	*/cmd)
 		# Test with export specified on command line
-		./nbd-server -C /dev/null -p `pwd`/nbd-server.pid 11111 $tmpnam &
+		./nbd-server -C /dev/null -p ${pidfile} 11111 $tmpnam &
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
@@ -23,7 +25,7 @@ case $1 in
 	;;
 	*/cfgsize)
 		# Test oversized requests
-		./nbd-server -C /dev/null -p `pwd`/nbd-server.pid 11111 $tmpnam &
+		./nbd-server -C /dev/null -p ${pidfile} 11111 $tmpnam &
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
@@ -33,14 +35,14 @@ case $1 in
 	;;
 	*/cfg1)
 		# Test with export specified in config file
-		cat > nbd-server.conf <<EOF
+		cat > ${conffile} <<EOF
 [generic]
 	oldstyle = true
 [export]
 	exportname = $tmpnam
 	port = 11112
 EOF
-		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
 		./nbd-tester-client 127.0.0.1 11112
@@ -49,7 +51,7 @@ EOF
 	*/cfgmulti)
 		# Test with multiple exports specified in config file, and
 		# testing more options too
-		cat >nbd-server.conf <<EOF
+		cat >${conffile} <<EOF
 [generic]
 	oldstyle = true
 [export1]
@@ -63,23 +65,23 @@ EOF
 	readonly = true
 	listenaddr = 127.0.0.1
 EOF
-		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
 		./nbd-tester-client localhost 11113
 		retval=$?
 		if [ $retval -ne 0 ]
 		then
-			if [ -f nbd-server.pid ]
+			if [ -f ${pidfile} ]
 			then
-				kill `cat nbd-server.pid`
-				rm -f nbd-server.pid
+				kill `cat ${pidfile}`
+				rm -f ${pidfile}
 			else
 				kill $PID
 			fi
 			if [ -z "$2" ]
 			then
-				rm -f $tmpnam nbd-server.conf
+				rm -f $tmpnam ${conffile}
 			fi
 			exit $retval
 		fi
@@ -88,38 +90,41 @@ EOF
 	;;
 	*/cfgnew)
 		# Test new-style exports
-		cat >nbd-server.conf <<EOF
+		cat >${conffile} <<EOF
 [generic]
 [export1]
 	exportname = $tmpnam
 EOF
-		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
 		./nbd-tester-client localhost -N export1
 		retval=$?
 	;;
 	*/write)
-		# Test new-style exports
-		cat >nbd-server.conf <<EOF
+		# Test writing
+		cat >${conffile} <<EOF
 [generic]
 [export1]
 	exportname = $tmpnam
 EOF
-		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
 		./nbd-tester-client localhost -N export1 -w
 		retval=$?
 	;;
 	*/flush)
-		# Test new-style exports
-		cat >nbd-server.conf <<EOF
+		# Test writes with flush
+		cat >${conffile} <<EOF
 [generic]
 [export1]
 	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
 EOF
-		./nbd-server -C nbd-server.conf -p `pwd`/nbd-server.pid &
+		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
 		./nbd-tester-client localhost -N export1 -w -f
@@ -130,16 +135,16 @@ EOF
 		exit 1
 	;;
 esac
-if [ -f nbd-server.pid ]
+if [ -f ${pidfile} ]
 then
-	kill `cat nbd-server.pid`
-	rm -f nbd-server.pid
+	kill `cat ${pidfile}`
+	rm -f ${pidfile}
 else
 	kill $PID
 fi
 if [ -z "$2" ]
 then
-	rm -f $tmpnam nbd-server.conf
+	rm -f $tmpnam ${conffile}
 fi
 if [ $retval -ne 0 ]
 then

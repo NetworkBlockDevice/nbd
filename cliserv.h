@@ -40,7 +40,12 @@ typedef unsigned long long u64;
 #include "nbd.h"
 
 #if NBD_LFS==1
+/* /usr/include/features.h (included from /usr/include/sys/types.h)
+   defines this when _GNU_SOURCE is defined
+ */
+#ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
+#endif
 #define _FILE_OFFSET_BITS 64
 #endif
 

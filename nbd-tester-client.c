@@ -356,7 +356,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	if (!(testflags & TEST_WRITE))
 		testflags &= ~TEST_FLUSH;
 
-	memset (writebuf, 'X', sizeof(1024));
+	memset (writebuf, 'X', 1024);
 	size=0;
 	if(!sock_is_open) {
 		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
@@ -380,8 +380,8 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	}
 	for(i=0;i+1024<=size;i+=1024) {
 		if(do_write) {
-			int sendfua = (testflags & TEST_FLUSH) && ((i & 15) == 3);
-			int sendflush = (testflags & TEST_FLUSH) && ((i & 15) == 11);
+			int sendfua = (testflags & TEST_FLUSH) && (((i>>10) & 15) == 3);
+			int sendflush = (testflags & TEST_FLUSH) && (((i>>10) & 15) == 11);
 			req.type=htonl((testflags & TEST_WRITE)?NBD_CMD_WRITE:NBD_CMD_READ);
 			if (sendfua)
 				req.type = htonl(NBD_CMD_WRITE | NBD_CMD_FLAG_FUA);
@@ -473,7 +473,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 		speed=speed/1024.0;
 		speedchar[0]='G';
 	}
-	g_message("%d: Throughput %s test complete. Took %.3f seconds to complete, %.3f%sib/s", (int)getpid(), (testflags & TEST_WRITE)?"write":"read", timespan, speed, speedchar);
+	g_message("%d: Throughput %s test (%s flushes) complete. Took %.3f seconds to complete, %.3f%sib/s", (int)getpid(), (testflags & TEST_WRITE)?"write":"read", (testflags & TEST_FLUSH)?"with":"without", timespan, speed, speedchar);
 
 err_open:
 	if(close_sock) {
