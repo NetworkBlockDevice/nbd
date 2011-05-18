@@ -1452,17 +1452,19 @@ int mainloop(CLIENT *client) {
 				"READ", (unsigned long long)request.from,
 				(unsigned long long)request.from / 512, len);
 #endif
-		memcpy(reply.handle, request.handle, sizeof(reply.handle));
-		if ((request.from + len) > (OFFT_MAX)) {
-			DEBUG("[Number too large!]");
-			ERROR(client, reply, EINVAL);
-			continue;
-		}
+		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
+			memcpy(reply.handle, request.handle, sizeof(reply.handle));
+			if ((request.from + len) > (OFFT_MAX)) {
+				DEBUG("[Number too large!]");
+				ERROR(client, reply, EINVAL);
+				continue;
+			}
 
-		if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
-			DEBUG("[RANGE!]");
-			ERROR(client, reply, EINVAL);
-			continue;
+			if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
+				DEBUG("[RANGE!]");
+				ERROR(client, reply, EINVAL);
+				continue;
+			}
 		}
 
 		if (command==NBD_CMD_WRITE) {
