@@ -663,6 +663,30 @@ manpage.1: manpage.sgml
 	  </para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>transactionlog</option></term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>
+	    If specified, then this pathname is used to generate a transaction
+	    log. A transaction log is a binary file consisting of the requests
+	    sent to and the replies received by the server, but excluding any
+	    data (so, for a write command, it records the offset and length
+	    of the write but not the data written). It is therefore relatively
+	    safe to distribute to a third party. Note that the transaction log
+	    does not include the negotiation sequence. Transaction logs are
+	    mainly useful for debugging. The program
+	    <emphasis>nbd-tester-client</emphasis> distributed with the source
+	    to this program can reply a transaction log against a server and
+	    perform a data integrity test. Note that the transaction log is
+	    written to for every client opened. If it is necessary to maintain
+	    separate transaction logs for each client, the
+	    <emphasis>prerun</emphasis> script should rename the transaction log
+	    (which will just have been opened in order to avoid transaction logs
+	    overwriting eachother. This action should be race-free.
+	  </para>
+	</listitem>
+      </varlistentry>
     </variablelist>
     
   </refsect1>

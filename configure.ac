@@ -93,7 +93,7 @@ AC_CHECK_SIZEOF(unsigned short int)
 AC_CHECK_SIZEOF(unsigned int)
 AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
-AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr])
+AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp])
 AC_CHECK_FUNC([sync_file_range],
 	[AC_DEFINE([HAVE_SYNC_FILE_RANGE], [sync_file_range(2) is not supported], [sync_file_range(2) is supported])],
         [])

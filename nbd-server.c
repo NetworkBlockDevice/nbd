@@ -213,6 +213,7 @@ typedef struct {
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
 	int max_connections; /**< maximum number of opened connections */
+	gchar* transactionlog;/**< filename for transaction log */
 } SERVER;
 
 /**
@@ -239,6 +240,7 @@ typedef struct {
 	u32 difffilelen;     /**< number of pages in difffile */
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
+	int transactionlogfd;/**< fd for transaction log */
 } CLIENT;
 
 /**
@@ -582,6 +584,8 @@ void remove_server(gpointer s) {
 		g_free(server->prerun);
 	if(server->postrun)
 		g_free(server->postrun);
+	if(server->transactionlog)
+		g_free(server->transactionlog);
 	g_free(server);
 }
 
@@ -621,6 +625,9 @@ SERVER* dup_serve(SERVER *s) {
 
 	if(s->postrun)
 		serve->postrun = g_strdup(s->postrun);
+
+	if(s->transactionlog)
+		serve->transactionlog = g_strdup(s->transactionlog);
 	
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
@@ -719,6 +726,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "virtstyle",	FALSE,	PARAM_STRING,	&(virtstyle),		0 },
 		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
 		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
+		{ "transactionlog", FALSE, PARAM_STRING, &(s.transactionlog),	0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
@@ -1347,6 +1355,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 				client->exportsize = OFFT_MAX;
 				client->net = net;
 				client->modern = TRUE;
+				client->transactionlogfd = -1;
 				free(name);
 				return client;
 			}
@@ -1386,7 +1395,9 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 }
 
 /** sending macro. */
-#define SEND(net,reply) writeit( net, &reply, sizeof( reply ));
+#define SEND(net,reply) { writeit( net, &reply, sizeof( reply )); \
+	if (client->transactionlogfd != -1) \
+		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
 /** error macro. */
 #define ERROR(client,reply,errcode) { reply.error = htonl(errcode); SEND(client->net,reply); reply.error = 0; }
 /**
@@ -1421,6 +1432,9 @@ int mainloop(CLIENT *client) {
 		printf("%d: ", i);
 #endif
 		readit(client->net, &request, sizeof(request));
+		if (client->transactionlogfd != -1)
+			writeit(client->transactionlogfd, &request, sizeof(request));
+
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
 		command = request.type & NBD_CMD_MASK_COMMAND;
@@ -1508,6 +1522,8 @@ int mainloop(CLIENT *client) {
 		if (command==NBD_CMD_READ) {
 			DEBUG("exp->buf, ");
 			memcpy(buf, &reply, sizeof(struct nbd_reply));
+			if (client->transactionlogfd != -1)
+				writeit(client->transactionlogfd, &reply, sizeof(reply));
 			p = buf + sizeof(struct nbd_reply);
 			writelen = currlen + sizeof(struct nbd_reply);
 			while(len > 0) {
@@ -1520,6 +1536,7 @@ int mainloop(CLIENT *client) {
 				DEBUG("buf->net, ");
 				writeit(client->net, buf, writelen);
 				len -= currlen;
+				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 				p = buf;
 				writelen = currlen;
@@ -1658,6 +1675,15 @@ int do_run(gchar* command, gchar* file) {
  * @param client a connected client
  **/
 void serveconnection(CLIENT *client) {
+	if (client->server->transactionlog && (client->transactionlogfd == -1))
+	{
+		if (-1 == (client->transactionlogfd = open(client->server->transactionlog,
+							   O_WRONLY | O_CREAT,
+							   S_IRUSR | S_IWUSR)))
+			g_warning("Could not open transaction log %s",
+				  client->server->transactionlog);
+	}
+
 	if(do_run(client->server->prerun, client->exportname)) {
 		exit(EXIT_FAILURE);
 	}
@@ -1671,6 +1697,12 @@ void serveconnection(CLIENT *client) {
 
 	mainloop(client);
 	do_run(client->server->postrun, client->exportname);
+
+	if (-1 != client->transactionlogfd)
+	{
+		close(client->transactionlogfd);
+		client->transactionlogfd = -1;
+	}
 }
 
 /**
@@ -1856,6 +1888,7 @@ int serveloop(GArray* servers) {
 					client->server=serve;
 					client->exportsize=OFFT_MAX;
 					client->net=net;
+					client->transactionlogfd = -1;
 				}
 				set_peername(net, client);
 				if (!authorized_client(client)) {

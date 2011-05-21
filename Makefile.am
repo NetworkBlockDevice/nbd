@@ -3,7 +3,7 @@ bin_PROGRAMS = nbd-server
 sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client knbd-client
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
-TESTS = cmd cfg1 cfgmulti cfgnew cfgsize write flush
+TESTS = cmd cfg1 cfgmulti cfgnew cfgsize write flush integrity
 check_PROGRAMS = nbd-tester-client
 knbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_client_SOURCES = nbd-client.c cliserv.h
@@ -23,3 +23,5 @@ cfgnew:
 cfgsize:
 write:
 flush:
+integrity:
+

@@ -130,6 +130,24 @@ EOF
 		./nbd-tester-client localhost -N export1 -w -f
 		retval=$?
 	;;
+	*/integrity)
+		# Integrity test
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
+EOF
+		# we need a bigger disk
+		dd if=/dev/zero of=$tmpnam bs=1M count=50 >/dev/null 2>&1
+		./nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client localhost -N export1 -i
+		retval=$?
+	;;
 	*)
 		echo "E: unknown test $1"
 		exit 1
