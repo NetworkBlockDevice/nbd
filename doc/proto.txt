@@ -34,8 +34,9 @@ header consists a 32 bit magic number (magic), a 32 bit field denoting
 the request type (see below; 'type'), a 64 bit handle ('handle'), a 64
 bit data offset ('from'), and a 32 bit length ('len'). In case of a
 write request, the header is immediately followed by 'len' bytes of
-data. In the case of NBD_CMD_FLUSH, the offset and length are
-ignored.
+data. In the case of NBD_CMD_FLUSH, the offset and length should
+be zero (meaning "flush entire device"); other values are reserved
+for future use (e.g. for flushing specific areas without a write).
 
 The reply contains three fields: a 32 bit magic number ('magic'), a 32
 bit error code ('error'; 0, unless an error occurred in which case it is
