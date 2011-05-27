@@ -420,9 +420,8 @@ manpage.1: manpage.sgml
 	    will cause an fdatasync() (or, if the sync option is set,
 	    an fsync()) on the backend storage. This increases
 	    reliability in the case of an unclean shutdown at
-	    the expense of a degradation of performance. The default
-	    state is disabled. This option will have no effect unless
-	    supported by the client.
+	    the expense of a degradation of performance. This option
+	    will have no effect unless supported by the client.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -438,9 +437,8 @@ manpage.1: manpage.sgml
 	    to backend storage using sync_file_range() if supported, or
 	    fdatasync() otherwise. This increases
 	    reliability in the case of an unclean shutdown at
-	    the expense of a degradation of performance. The default
-	    state is disabled. This option will have no effect unless
-	    supported by the client.
+	    the expense of a degradation of performance. This option
+	    will have no effect unless supported by the client.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -449,7 +447,7 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Optional; boolean.</para>
 	  <para>When this option is enabled,
-	    <command>nbd-server</command> will inform the client that it
+	    <command>nbd-server</command> will inform the client that 
 	    it would prefer it to send requests in elevator order, perhaps
 	    because it has a backing store and no local elevator. By
 	    default, the client uses QUEUE_FLAG_NONROT, which effectively
