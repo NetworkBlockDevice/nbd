@@ -448,7 +448,7 @@ manpage.1: manpage.sgml
 	  <para>Optional; boolean.</para>
 	  <para>When this option is enabled,
 	    <command>nbd-server</command> will inform the client that 
-	    it would prefer it to send requests in elevator order, perhaps
+	    it would prefer it to send requests in elevator (i.e., optimized) order, perhaps
 	    because it has a backing store and no local elevator. By
 	    default, the client uses QUEUE_FLAG_NONROT, which effectively
 	    restricts the function of the elevator to block merges. By
