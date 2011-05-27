@@ -15,7 +15,7 @@ nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_trdump_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@
 nbd_tester_client_LDADD = @GLIB_LIBS@
-EXTRA_DIST = gznbd simple_test integrity-test.tr
+EXTRA_DIST = gznbd simple_test integrity-test.tr maketr
 dist-hook:
 	rm -Rf `find $(distdir) -name '.svn' -type d -print`
 cmd:
