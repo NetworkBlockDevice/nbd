@@ -43,6 +43,17 @@ int main(int argc, char**argv) {
 	char * ctext;
 	int readfd = 0; /* stdin */
 
+	if(argc > 1) {
+		int retval=0;
+		if(strcmp(argv[1], "--help") && strcmp(argv[1], "-h")) {
+			printf("E: unknown option %s.\n", argv[1]);
+			retval=1;
+		}
+		printf("This is nbd-trdump, part of nbd %s.\n", PACKAGE_VERSION);
+		printf("Use: %s < transactionlog\n", argv[0]);
+		return retval;
+	}
+
 	while (1) {
 		/* Read a request or reply from the transaction file */
 		doread(readfd, &magic, sizeof(magic));
