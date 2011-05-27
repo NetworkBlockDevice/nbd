@@ -145,7 +145,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -i
+		./nbd-tester-client localhost -N export1 -i -t $(dirname $1)/integrity-test.tr
 		retval=$?
 	;;
 	*)
