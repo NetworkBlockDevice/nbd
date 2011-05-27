@@ -1,7 +1,7 @@
 SUBDIRS = man
-bin_PROGRAMS = nbd-server
+bin_PROGRAMS = nbd-server nbd-trdump
 sbin_PROGRAMS = @NBD_CLIENT_NAME@
-EXTRA_PROGRAMS = nbd-client knbd-client nbd-trdump
+EXTRA_PROGRAMS = nbd-client knbd-client
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
 TESTS = cmd cfg1 cfgmulti cfgnew cfgsize write flush integrity
 check_PROGRAMS = nbd-tester-client
