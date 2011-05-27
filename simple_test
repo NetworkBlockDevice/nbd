@@ -1,9 +1,10 @@
 #!/bin/sh
 # Yes, that's POSIX sh, not bash!
 
-tmpnam=`mktemp`
-conffile=${tmpnam}.conf
-pidfile=${tmpnam}.pid
+tmpdir=`mktemp -d`
+conffile=${tmpdir}/nbd.conf
+pidfile=${tmpdir}/nbd.pid
+tmpnam=${tmpdir}/nbd.dd
 
 ulimit -c unlimited
 
@@ -75,13 +76,12 @@ EOF
 			if [ -f ${pidfile} ]
 			then
 				kill `cat ${pidfile}`
-				rm -f ${pidfile}
 			else
 				kill $PID
 			fi
 			if [ -z "$2" ]
 			then
-				rm -f $tmpnam ${conffile}
+				rm -rf $tmpdir
 			fi
 			exit $retval
 		fi
@@ -156,13 +156,12 @@ esac
 if [ -f ${pidfile} ]
 then
 	kill `cat ${pidfile}`
-	rm -f ${pidfile}
 else
 	kill $PID
 fi
 if [ -z "$2" ]
 then
-	rm -f $tmpnam ${conffile}
+	rm -rf $tmpdir
 fi
 if [ $retval -ne 0 ]
 then
