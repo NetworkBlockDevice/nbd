@@ -35,11 +35,11 @@
 #include <unistd.h>
 #include "config.h"
 #include "lfs.h"
-#define MY_NAME "nbd-tester-client"
-#include "cliserv.h"
-
 #include <netinet/in.h>
 #include <glib.h>
+
+#define MY_NAME "nbd-tester-client"
+#include "cliserv.h"
 
 static gchar errstr[1024];
 const static int errstr_len=1024;
@@ -333,10 +333,9 @@ int oversize_test(gchar* hostname, int port, char* name, int sock,
 	int retval=0;
 	struct nbd_request req;
 	struct nbd_reply rep;
-	int request=0;
 	int i=0;
 	int serverflags = 0;
-	pid_t mypid = getpid();
+	pid_t G_GNUC_UNUSED mypid = getpid();
 	char buf[((1024*1024)+sizeof(struct nbd_request)/2)<<1];
 	bool got_err;
 
@@ -401,7 +400,6 @@ int oversize_test(gchar* hostname, int port, char* name, int sock,
 int throughput_test(gchar* hostname, int port, char* name, int sock,
 		    char sock_is_open, char close_sock, int testflags) {
 	long long int i;
-	char buf[1024];
 	char writebuf[1024];
 	struct nbd_request req;
 	int requests=0;
@@ -414,7 +412,6 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
 	int serverflags = 0;
-	size_t tmp;
 	signed int do_write=TRUE;
 	pid_t mypid = getpid();
 
@@ -609,7 +606,6 @@ static inline void dumpcommand(char * text, uint32_t command)
 
 int integrity_test(gchar* hostname, int port, char* name, int sock,
 		   char sock_is_open, char close_sock, int testflags) {
-	struct nbd_request req;
 	struct nbd_reply rep;
 	fd_set rset;
 	fd_set wset;
@@ -621,7 +617,7 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 	char speedchar[2] = { '\0', '\0' };
 	int retval=0;
 	int serverflags = 0;
-	pid_t mypid = getpid();
+	pid_t G_GNUC_UNUSED mypid = getpid();
 	int blkhashfd = -1;
 	char *blkhashname=NULL;
 	uint32_t *blkhash = NULL;
@@ -710,7 +706,6 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 		int ret;
 
 		uint32_t magic;
-                uint64_t hand;
                 uint32_t command;
                 uint64_t from;
                 uint32_t len;

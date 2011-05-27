@@ -133,17 +133,9 @@ int dontfork = 0;
 /* Debugging macros */
 //#define DODBG
 #ifdef DODBG
-#define DEBUG( a ) printf( a )
-#define DEBUG2( a,b ) printf( a,b )
-#define DEBUG3( a,b,c ) printf( a,b,c )
-#define DEBUG4( a,b,c,d ) printf( a,b,c,d )
-#define DEBUG5( a,b,c,d,e ) printf( a,b,c,d,e )
+#define DEBUG(...) printf(__VA_ARGS__)
 #else
-#define DEBUG( a )
-#define DEBUG2( a,b ) 
-#define DEBUG3( a,b,c ) 
-#define DEBUG4( a,b,c,d ) 
-#define DEBUG5( a,b,c,d,e ) 
+#define DEBUG(...)
 #endif
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION ""
@@ -914,7 +906,7 @@ void sigchld_handler(int s) {
 		if(!i) {
 			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
 		} else {
-			DEBUG2("Removing %d from the list of children", pid);
+			DEBUG("Removing %d from the list of children", pid);
 			g_hash_table_remove(children, &pid);
 		}
 	}
@@ -992,7 +984,7 @@ off_t size_autodetect(int fhandle) {
 	if (es > ((off_t)0)) {
 		return es;
         } else {
-                DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
+                DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
 
 	err("Could not find size of exported block device: %m");
@@ -1082,7 +1074,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG5("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, foffset, len, fua);
+	DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
 
 	myseek(fhandle, foffset);
 	retval = write(fhandle, buf, len);
@@ -1167,7 +1159,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("(READ from fd %d offset %llu len %u), ", fhandle, foffset, len);
+	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
 	myseek(fhandle, foffset);
 	return read(fhandle, buf, len);
@@ -1204,7 +1196,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 
 	if (!(client->server->flags & F_COPYONWRITE))
 		return(rawexpread_fully(a, buf, len, client));
-	DEBUG3("Asked to read %d bytes at %llu.\n", len, (unsigned long long)a);
+	DEBUG("Asked to read %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
@@ -1214,12 +1206,12 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		rdlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
 			len : (size_t)DIFFPAGESIZE-offset;
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
+			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
 			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
 		} else { /* the block is not there */
-			DEBUG2("Page %llu is not here, we read the original one\n",
+			DEBUG("Page %llu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
 			if(rawexpread_fully(a, buf, rdlen, client)) return -1;
 		}
@@ -1248,7 +1240,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 	if (!(client->server->flags & F_COPYONWRITE))
 		return(rawexpwrite_fully(a, buf, len, client, fua)); 
-	DEBUG3("Asked to write %d bytes at %llu.\n", len, (unsigned long long)a);
+	DEBUG("Asked to write %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -1259,7 +1251,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 			len : (size_t)DIFFPAGESIZE-offset;
 
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
+			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
 			myseek(client->difffile,
 					client->difmap[mapcnt]*DIFFPAGESIZE+offset);
@@ -1267,7 +1259,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		} else { /* the block is not there */
 			myseek(client->difffile,client->difffilelen*DIFFPAGESIZE) ;
 			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
-			DEBUG3("Page %llu is not here, we put it at %lu\n",
+			DEBUG("Page %llu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			rdlen=DIFFPAGESIZE ;
@@ -1292,9 +1284,6 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 }
 
 int expflush(CLIENT *client) {
-	int fhandle;
-	off_t foffset;
-	size_t maxbytes;
 	gint i;
 
         if (client->server->flags & F_COPYONWRITE) {
@@ -1492,11 +1481,9 @@ int mainloop(CLIENT *client) {
 		} else {
 			currlen = len;
 		}
-#ifdef DODBG
-		printf("%s from %llu (%llu) len %d, ", command ? "WRITE" :
+		DEBUG("%s from %llu (%llu) len %d, ", command ? "WRITE" :
 				"READ", (unsigned long long)request.from,
-				(unsigned long long)request.from / 512, len);
-#endif
+				(unsigned long long)request.from / 512, (unsigned int)len);
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
 		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
@@ -1607,7 +1594,7 @@ void setupexport(CLIENT* client) {
 		} else {
 			tmpname=g_strdup(client->exportname);
 		}
-		DEBUG2( "Opening %s\n", tmpname );
+		DEBUG( "Opening %s\n", tmpname );
 		fi.fhandle = open(tmpname, mode);
 		if(fi.fhandle == -1 && mode == O_RDWR) {
 			/* Try again because maybe media was read-only */

@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
 	int cont=0;
 	int timeout=0;
 	int sdp=0;
-	int nofork=0;
+	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	u64 size64;
 	u32 flags;
 	int c;

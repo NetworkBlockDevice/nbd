@@ -76,8 +76,10 @@ void setmysockopt(int sock) {
 #ifndef G_GNUC_NORETURN
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define G_GNUC_NORETURN __attribute__((__noreturn__))
+#define G_GNUC_UNUSED __attribute__((unused))
 #else
 #define G_GNUC_NORETURN
+#define G_GNUC_UNUSED
 #endif
 #endif
 
