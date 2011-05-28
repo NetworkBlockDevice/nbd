@@ -57,7 +57,7 @@ and indicates the backing file should be fdatasync()'d to disk.
 
 The top 16 bits of the request are flags. NBD_CMD_FLAG_FUA implies
 a force unit access, and can currently only be usefully combined
-with NBD_CMD_WRITE. This is implementing using sync_file_range
+with NBD_CMD_WRITE. This is implemented using sync_file_range
 if present, else by fdatasync() of that file (note not all files
 in a multifile environment). NBD_CMD_FLAG_FUA will not be set
 unless NBD_FLAG_SEND_FUA is set.

@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.21a],[wouter@debian.org])
+AC_INIT([nbd],[2.9.22],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -123,6 +123,6 @@ AC_TYPE_PID_T
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile doc/Doxyfile man/Makefile man/nbd-client.8.sh man/nbd-server.5.sh man/nbd-server.1.sh man/nbd-trdump.8.sh])
+AC_CONFIG_FILES([Makefile doc/Doxyfile man/Makefile man/nbd-client.8.sh man/nbd-server.5.sh man/nbd-server.1.sh man/nbd-trdump.1.sh])
 AC_OUTPUT
 
