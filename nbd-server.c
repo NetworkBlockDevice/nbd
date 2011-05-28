@@ -261,6 +261,22 @@ typedef struct {
 				  is PARAM_BOOL. */
 } PARAM;
 
+static inline const char * getcommandname(uint64_t command) {
+	switch (command) {
+	case NBD_CMD_READ:
+		return "NBD_CMD_READ";
+	case NBD_CMD_WRITE:
+		return "NBD_CMD_WRITE";
+	case NBD_CMD_DISC:
+		return "NBD_CMD_DISC";
+	case NBD_CMD_FLUSH:
+		return "NBD_CMD_FLUSH";
+	default:
+		break;
+	}
+	return "UNKNOWN";
+}
+
 /**
  * Check whether a client is allowed to connect. Works with an authorization
  * file which contains one line per machine, no wildcards.
@@ -1458,32 +1474,15 @@ int mainloop(CLIENT *client) {
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
 		command = request.type & NBD_CMD_MASK_COMMAND;
-
-		if (command==NBD_CMD_DISC) {
-			msg2(LOG_INFO, "Disconnect request received.");
-                	if (client->server->flags & F_COPYONWRITE) { 
-				if (client->difmap) g_free(client->difmap) ;
-                		close(client->difffile);
-				unlink(client->difffilename);
-				free(client->difffilename);
-			}
-			go_on=FALSE;
-			continue;
-		}
-
 		len = ntohl(request.len);
+
+		DEBUG("%s from %llu (%llu) len %d, ", getcommandname(command),
+				(unsigned long long)request.from,
+				(unsigned long long)request.from / 512, (unsigned int)len);
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
-		if (len > BUFSIZE - sizeof(struct nbd_reply)) {
-			currlen = BUFSIZE - sizeof(struct nbd_reply);
-			msg2(LOG_INFO, "oversized request (this is not a problem)");
-		} else {
-			currlen = len;
-		}
-		DEBUG("%s from %llu (%llu) len %d, ", command ? "WRITE" :
-				"READ", (unsigned long long)request.from,
-				(unsigned long long)request.from / 512, (unsigned int)len);
+
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
 		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
@@ -1498,9 +1497,28 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, EINVAL);
 				continue;
 			}
+
+			currlen = len;
+			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
+				currlen = BUFSIZE - sizeof(struct nbd_reply);
+				msg2(LOG_INFO, "oversized request (this is not a problem)");
+			}
 		}
 
-		if (command==NBD_CMD_WRITE) {
+		switch (command) {
+
+		case NBD_CMD_DISC:
+			msg2(LOG_INFO, "Disconnect request received.");
+                	if (client->server->flags & F_COPYONWRITE) { 
+				if (client->difmap) g_free(client->difmap) ;
+                		close(client->difffile);
+				unlink(client->difffilename);
+				free(client->difffilename);
+			}
+			go_on=FALSE;
+			continue;
+
+		case NBD_CMD_WRITE:
 			DEBUG("wr: net->buf, ");
 			while(len > 0) {
 				readit(client->net, buf, currlen);
@@ -1517,15 +1535,14 @@ int mainloop(CLIENT *client) {
 					ERROR(client, reply, errno);
 					continue;
 				}
-				SEND(client->net, reply);
-				DEBUG("OK!\n");
 				len -= currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
+			SEND(client->net, reply);
+			DEBUG("OK!\n");
 			continue;
-		}
 
-		if (command==NBD_CMD_FLUSH) {
+		case NBD_CMD_FLUSH:
 			DEBUG("fl: ");
 			if (expflush(client)) {
 				DEBUG("Flush failed: %m");
@@ -1535,9 +1552,8 @@ int mainloop(CLIENT *client) {
 			SEND(client->net, reply);
 			DEBUG("OK!\n");
 			continue;
-		}
 
-		if (command==NBD_CMD_READ) {
+		case NBD_CMD_READ:
 			DEBUG("exp->buf, ");
 			memcpy(buf, &reply, sizeof(struct nbd_reply));
 			if (client->transactionlogfd != -1)
@@ -1561,9 +1577,11 @@ int mainloop(CLIENT *client) {
 			}
 			DEBUG("OK!\n");
 			continue;
-		}
 
-		DEBUG ("Ignoring unknown command\n");
+		default:
+			DEBUG ("Ignoring unknown command\n");
+			continue;
+		}
 	}
 	return 0;
 }
