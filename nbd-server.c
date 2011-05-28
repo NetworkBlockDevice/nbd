@@ -360,6 +360,24 @@ static inline void readit(int f, void *buf, size_t len) {
 }
 
 /**
+ * Consume data from an FD that we don't want
+ *
+ * @param f a file descriptor
+ * @param buf a buffer
+ * @param len the number of bytes to consume
+ * @param bufsiz the size of the buffer
+ **/
+static inline void consume(int f, void * buf, size_t len, size_t bufsiz) {
+	size_t curlen;
+	while (len>0) {
+		curlen = (len>bufsiz)?bufsiz:len;
+		readit(f, buf, curlen);
+		len -= curlen;
+	}
+}
+
+
+/**
  * Write data from a buffer into a filedescriptor
  *
  * @param f a file descriptor
@@ -1547,12 +1565,14 @@ int mainloop(CLIENT *client) {
 				    (client->server->flags & F_AUTOREADONLY)) {
 					DEBUG("[WRITE to READONLY!]");
 					ERROR(client, reply, EPERM);
+					consume(client->net, buf, len-currlen, BUFSIZE);
 					continue;
 				}
 				if (expwrite(request.from, buf, len, client,
 					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
+					consume(client->net, buf, len-currlen, BUFSIZE);
 					continue;
 				}
 				len -= currlen;
