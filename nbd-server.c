@@ -1576,6 +1576,7 @@ int mainloop(CLIENT *client) {
 					continue;
 				}
 				len -= currlen;
+				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
 			SEND(client->net, reply);
