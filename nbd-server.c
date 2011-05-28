@@ -261,6 +261,12 @@ typedef struct {
 				  is PARAM_BOOL. */
 } PARAM;
 
+/**
+ * Translate a command name into human readable form
+ *
+ * @param command The command number (after applying NBD_CMD_MASK_COMMAND)
+ * @return pointer to the command name
+ **/
 static inline const char * getcommandname(uint64_t command) {
 	switch (command) {
 	case NBD_CMD_READ:
@@ -1077,6 +1083,7 @@ void myseek(int handle,off_t a) {
  * @param buf The buffer to write from
  * @param len The length of buf
  * @param client The client we're serving for
+ * @param fua Flag to indicate 'Force Unit Access'
  * @return The number of bytes actually written, or -1 in case of an error
  **/
 ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
@@ -1141,6 +1148,12 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 /**
  * Call rawexpwrite repeatedly until all data has been written.
+ *
+ * @param a The offset where the write should start
+ * @param buf The buffer to write from
+ * @param len The length of buf
+ * @param client The client we're serving for
+ * @param fua Flag to indicate 'Force Unit Access'
  * @return 0 on success, nonzero on failure
  **/
 int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
@@ -1245,6 +1258,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param buf The buffer to write from
  * @param len The length of buf
  * @param client The client we're going to write for.
+ * @param fua Flag to indicate 'Force Unit Access'
  * @return 0 on success, nonzero on failure
  **/
 int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
@@ -1299,6 +1313,12 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	return 0;
 }
 
+/**
+ * Flush data to a client
+ *
+ * @param client The client we're going to write for.
+ * @return 0 on success, nonzero on failure
+ **/
 int expflush(CLIENT *client) {
 	gint i;
 
