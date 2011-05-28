@@ -21,10 +21,12 @@ nbd-server
 doc/doxygen-output
 nbd-server.config
 nbd-server.5
+nbd-trdump.1
 *.o
 nbd-client.8.in
 nbd-server.1.in
 nbd-server.5.in
+nbd-trdump.1.in
 Makefile.in
 config.h.in
 aclocal.m4
@@ -34,3 +36,5 @@ install-sh
 configure
 man/*.sh
 man/*.sh.in
+make-integrityhuge
+nbd-trdump
