@@ -691,7 +691,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>nbd-server (1), nbd-client (8)</para>
+    <para>nbd-server (1), nbd-client (8), nbd-trdump (8)</para>
       
 
   </refsect1>
