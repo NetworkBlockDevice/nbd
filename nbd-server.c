@@ -1568,7 +1568,7 @@ int mainloop(CLIENT *client) {
 					consume(client->net, buf, len-currlen, BUFSIZE);
 					continue;
 				}
-				if (expwrite(request.from, buf, len, client,
+				if (expwrite(request.from, buf, currlen, client,
 					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
