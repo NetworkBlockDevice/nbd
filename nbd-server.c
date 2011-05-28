@@ -1535,10 +1535,10 @@ int mainloop(CLIENT *client) {
 					ERROR(client, reply, errno);
 					continue;
 				}
-				SEND(client->net, reply);
 				len -= currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
+			SEND(client->net, reply);
 			DEBUG("OK!\n");
 			continue;
 
