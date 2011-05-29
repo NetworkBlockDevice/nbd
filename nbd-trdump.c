@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include <unistd.h>
 #include "config.h"
+/* We don't want to do syslog output in this program */
+#undef ISSERVER
 #include "cliserv.h"
 #include "nbd.h"
 
