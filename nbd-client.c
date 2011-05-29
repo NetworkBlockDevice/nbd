@@ -150,7 +150,7 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 		if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
 			err("Failed reading flags: %m");
 		}
-		*flags = ((u32)ntohs(tmp)) << 16;
+		*flags = ((u32)ntohs(tmp));
 
 		/* reserved for future use*/
 		if (write(sock, &reserved, sizeof(reserved)) < 0)
@@ -240,6 +240,9 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
 
+	/* ignore error as kernel may not support */
+	ioctl(nbd, NBD_SET_FLAGS, (unsigned long) flags);
+
 	if (ioctl(nbd, BLKROSET, (unsigned long) &read_only) < 0)
 		err("Unable to set read-only attribute for device");
 }
@@ -317,7 +320,7 @@ int main(int argc, char *argv[]) {
 	int cont=0;
 	int timeout=0;
 	int sdp=0;
-	int nofork=0;
+	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	u64 size64;
 	u32 flags;
 	int c;

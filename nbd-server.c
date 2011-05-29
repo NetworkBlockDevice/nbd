@@ -116,6 +116,9 @@ gchar* rungroup=NULL;
 /** whether to export using the old negotiation protocol (port-based) */
 gboolean do_oldstyle=FALSE;
 
+/* Whether we should avoid forking */
+int dontfork = 0;
+
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
 #define msg2(a,b) syslog(a,b)
@@ -130,15 +133,9 @@ gboolean do_oldstyle=FALSE;
 /* Debugging macros */
 //#define DODBG
 #ifdef DODBG
-#define DEBUG( a ) printf( a )
-#define DEBUG2( a,b ) printf( a,b )
-#define DEBUG3( a,b,c ) printf( a,b,c )
-#define DEBUG4( a,b,c,d ) printf( a,b,c,d )
+#define DEBUG(...) printf(__VA_ARGS__)
 #else
-#define DEBUG( a )
-#define DEBUG2( a,b ) 
-#define DEBUG3( a,b,c ) 
-#define DEBUG4( a,b,c,d ) 
+#define DEBUG(...)
 #endif
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION ""
@@ -160,6 +157,9 @@ gboolean do_oldstyle=FALSE;
 #define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
 #define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
 #define F_SYNC 64	  /**< Whether to fsync() after a write */
+#define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
+#define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
+#define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -205,6 +205,7 @@ typedef struct {
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
 	int max_connections; /**< maximum number of opened connections */
+	gchar* transactionlog;/**< filename for transaction log */
 } SERVER;
 
 /**
@@ -231,6 +232,7 @@ typedef struct {
 	u32 difffilelen;     /**< number of pages in difffile */
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
+	int transactionlogfd;/**< fd for transaction log */
 } CLIENT;
 
 /**
@@ -258,6 +260,28 @@ typedef struct {
 	gint flagval;		/**< Flag mask for this parameter in case ptype
 				  is PARAM_BOOL. */
 } PARAM;
+
+/**
+ * Translate a command name into human readable form
+ *
+ * @param command The command number (after applying NBD_CMD_MASK_COMMAND)
+ * @return pointer to the command name
+ **/
+static inline const char * getcommandname(uint64_t command) {
+	switch (command) {
+	case NBD_CMD_READ:
+		return "NBD_CMD_READ";
+	case NBD_CMD_WRITE:
+		return "NBD_CMD_WRITE";
+	case NBD_CMD_DISC:
+		return "NBD_CMD_DISC";
+	case NBD_CMD_FLUSH:
+		return "NBD_CMD_FLUSH";
+	default:
+		break;
+	}
+	return "UNKNOWN";
+}
 
 /**
  * Check whether a client is allowed to connect. Works with an authorization
@@ -334,6 +358,24 @@ static inline void readit(int f, void *buf, size_t len) {
 		}
 	}
 }
+
+/**
+ * Consume data from an FD that we don't want
+ *
+ * @param f a file descriptor
+ * @param buf a buffer
+ * @param len the number of bytes to consume
+ * @param bufsiz the size of the buffer
+ **/
+static inline void consume(int f, void * buf, size_t len, size_t bufsiz) {
+	size_t curlen;
+	while (len>0) {
+		curlen = (len>bufsiz)?bufsiz:len;
+		readit(f, buf, curlen);
+		len -= curlen;
+	}
+}
+
 
 /**
  * Write data from a buffer into a filedescriptor
@@ -413,6 +455,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
+		{"dont-fork", no_argument, NULL, 'd'},
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"config-file", required_argument, NULL, 'C'},
 		{"pid-file", required_argument, NULL, 'p'},
@@ -434,7 +477,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cl:mo:rp:M:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -503,6 +546,9 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
 		        break;
+		case 'd': 
+			dontfork = 1;
+		        break;
 		case 'C':
 			g_free(config_file_pos);
 			config_file_pos=g_strdup(optarg);
@@ -570,6 +616,8 @@ void remove_server(gpointer s) {
 		g_free(server->prerun);
 	if(server->postrun)
 		g_free(server->postrun);
+	if(server->transactionlog)
+		g_free(server->transactionlog);
 	g_free(server);
 }
 
@@ -609,6 +657,9 @@ SERVER* dup_serve(SERVER *s) {
 
 	if(s->postrun)
 		serve->postrun = g_strdup(s->postrun);
+
+	if(s->transactionlog)
+		serve->transactionlog = g_strdup(s->transactionlog);
 	
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
@@ -700,21 +751,25 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	SERVER s;
 	gchar *virtstyle=NULL;
 	PARAM lp[] = {
-		{ "exportname", TRUE,	PARAM_STRING, 	NULL, 0 },
-		{ "port", 	TRUE,	PARAM_INT, 	NULL, 0 },
-		{ "authfile",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "filesize",	FALSE,	PARAM_INT,	NULL, 0 },
-		{ "virtstyle",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "prerun",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "postrun",	FALSE,	PARAM_STRING,	NULL, 0 },
-		{ "readonly",	FALSE,	PARAM_BOOL,	NULL, F_READONLY },
-		{ "multifile",	FALSE,	PARAM_BOOL,	NULL, F_MULTIFILE },
-		{ "copyonwrite", FALSE,	PARAM_BOOL,	NULL, F_COPYONWRITE },
-		{ "sparse_cow",	FALSE,	PARAM_BOOL,	NULL, F_SPARSE },
-		{ "sdp",	FALSE,	PARAM_BOOL,	NULL, F_SDP },
-		{ "sync",	FALSE,  PARAM_BOOL,	NULL, F_SYNC },
-		{ "listenaddr", FALSE,  PARAM_STRING,   NULL, 0 },
-		{ "maxconnections", FALSE, PARAM_INT,	NULL, 0 },
+		{ "exportname", TRUE,	PARAM_STRING, 	&(s.exportname),	0 },
+		{ "port", 	TRUE,	PARAM_INT, 	&(s.port),		0 },
+		{ "authfile",	FALSE,	PARAM_STRING,	&(s.authname),		0 },
+		{ "filesize",	FALSE,	PARAM_INT,	&(s.expected_size),	0 },
+		{ "virtstyle",	FALSE,	PARAM_STRING,	&(virtstyle),		0 },
+		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
+		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
+		{ "transactionlog", FALSE, PARAM_STRING, &(s.transactionlog),	0 },
+		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
+		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
+		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
+		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
+		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
+		{ "sync",	FALSE,  PARAM_BOOL,	&(s.flags),		F_SYNC },
+		{ "flush",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FLUSH },
+		{ "fua",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FUA },
+		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
+		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
+		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
 	PARAM gp[] = {
@@ -754,18 +809,6 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	groups = g_key_file_get_groups(cfile, NULL);
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
-		lp[0].target=&(s.exportname);
-		lp[1].target=&(s.port);
-		lp[2].target=&(s.authname);
-		lp[3].target=&(s.expected_size);
-		lp[4].target=&(virtstyle);
-		lp[5].target=&(s.prerun);
-		lp[6].target=&(s.postrun);
-		lp[7].target=lp[8].target=lp[9].target=
-				lp[10].target=lp[11].target=
-				lp[12].target=&(s.flags);
-		lp[13].target=&(s.listenaddr);
-		lp[14].target=&(s.max_connections);
 
 		/* After the [generic] group, start parsing exports */
 		if(i==1) {
@@ -903,7 +946,7 @@ void sigchld_handler(int s) {
 		if(!i) {
 			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
 		} else {
-			DEBUG2("Removing %d from the list of children", pid);
+			DEBUG("Removing %d from the list of children", pid);
 			g_hash_table_remove(children, &pid);
 		}
 	}
@@ -981,7 +1024,7 @@ off_t size_autodetect(int fhandle) {
 	if (es > ((off_t)0)) {
 		return es;
         } else {
-                DEBUG2("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
+                DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
 
 	err("Could not find size of exported block device: %m");
@@ -1058,9 +1101,10 @@ void myseek(int handle,off_t a) {
  * @param buf The buffer to write from
  * @param len The length of buf
  * @param client The client we're serving for
+ * @param fua Flag to indicate 'Force Unit Access'
  * @return The number of bytes actually written, or -1 in case of an error
  **/
-ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
+ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
@@ -1071,24 +1115,69 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("(WRITE to fd %d offset %llu len %u), ", fhandle, foffset, len);
+	DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
 
 	myseek(fhandle, foffset);
 	retval = write(fhandle, buf, len);
 	if(client->server->flags & F_SYNC) {
 		fsync(fhandle);
+	} else if (fua) {
+
+	  /* This is where we would do the following
+	   *   #ifdef USE_SYNC_FILE_RANGE
+	   * However, we don't, for the reasons set out below
+	   * by Christoph Hellwig <hch@infradead.org>
+	   *
+	   * [BEGINS] 
+	   * fdatasync is equivalent to fsync except that it does not flush
+	   * non-essential metadata (basically just timestamps in practice), but it
+	   * does flush metadata requried to find the data again, e.g. allocation
+	   * information and extent maps.  sync_file_range does nothing but flush
+	   * out pagecache content - it means you basically won't get your data
+	   * back in case of a crash if you either:
+	   * 
+	   *  a) have a volatile write cache in your disk (e.g. any normal SATA disk)
+	   *  b) are using a sparse file on a filesystem
+	   *  c) are using a fallocate-preallocated file on a filesystem
+	   *  d) use any file on a COW filesystem like btrfs
+	   * 
+	   * e.g. it only does anything useful for you if you do not have a volatile
+	   * write cache, and either use a raw block device node, or just overwrite
+	   * an already fully allocated (and not preallocated) file on a non-COW
+	   * filesystem.
+	   * [ENDS]
+	   *
+	   * What we should do is open a second FD with O_DSYNC set, then write to
+	   * that when appropriate. However, with a Linux client, every REQ_FUA
+	   * immediately follows a REQ_FLUSH, so fdatasync does not cause performance
+	   * problems.
+	   *
+	   */
+#if 0
+		sync_file_range(fhandle, foffset, len,
+				SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE |
+				SYNC_FILE_RANGE_WAIT_AFTER);
+#else
+		fdatasync(fhandle);
+#endif
 	}
 	return retval;
 }
 
 /**
  * Call rawexpwrite repeatedly until all data has been written.
+ *
+ * @param a The offset where the write should start
+ * @param buf The buffer to write from
+ * @param len The length of buf
+ * @param client The client we're serving for
+ * @param fua Flag to indicate 'Force Unit Access'
  * @return 0 on success, nonzero on failure
  **/
-int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client) {
+int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	ssize_t ret=0;
 
-	while(len > 0 && (ret=rawexpwrite(a, buf, len, client)) > 0 ) {
+	while(len > 0 && (ret=rawexpwrite(a, buf, len, client, fua)) > 0 ) {
 		a += ret;
 		buf += ret;
 		len -= ret;
@@ -1117,7 +1206,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
-	DEBUG4("(READ from fd %d offset %llu len %u), ", fhandle, foffset, len);
+	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
 	myseek(fhandle, foffset);
 	return read(fhandle, buf, len);
@@ -1154,7 +1243,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 
 	if (!(client->server->flags & F_COPYONWRITE))
 		return(rawexpread_fully(a, buf, len, client));
-	DEBUG3("Asked to read %d bytes at %llu.\n", len, (unsigned long long)a);
+	DEBUG("Asked to read %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
@@ -1164,12 +1253,12 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		rdlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
 			len : (size_t)DIFFPAGESIZE-offset;
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
+			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
 			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
 		} else { /* the block is not there */
-			DEBUG2("Page %llu is not here, we read the original one\n",
+			DEBUG("Page %llu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
 			if(rawexpread_fully(a, buf, rdlen, client)) return -1;
 		}
@@ -1187,9 +1276,10 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
  * @param buf The buffer to write from
  * @param len The length of buf
  * @param client The client we're going to write for.
+ * @param fua Flag to indicate 'Force Unit Access'
  * @return 0 on success, nonzero on failure
  **/
-int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
+int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	char pagebuf[DIFFPAGESIZE];
 	off_t mapcnt,mapl,maph;
 	off_t wrlen,rdlen; 
@@ -1197,8 +1287,8 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t offset;
 
 	if (!(client->server->flags & F_COPYONWRITE))
-		return(rawexpwrite_fully(a, buf, len, client)); 
-	DEBUG3("Asked to write %d bytes at %llu.\n", len, (unsigned long long)a);
+		return(rawexpwrite_fully(a, buf, len, client, fua)); 
+	DEBUG("Asked to write %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -1209,7 +1299,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 			len : (size_t)DIFFPAGESIZE-offset;
 
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
-			DEBUG3("Page %llu is at %lu\n", (unsigned long long)mapcnt,
+			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
 			myseek(client->difffile,
 					client->difmap[mapcnt]*DIFFPAGESIZE+offset);
@@ -1217,7 +1307,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 		} else { /* the block is not there */
 			myseek(client->difffile,client->difffilelen*DIFFPAGESIZE) ;
 			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
-			DEBUG3("Page %llu is not here, we put it at %lu\n",
+			DEBUG("Page %llu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			rdlen=DIFFPAGESIZE ;
@@ -1230,6 +1320,36 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client) {
 		}						    
 		len-=wrlen ; a+=wrlen ; buf+=wrlen ;
 	}
+	if (client->server->flags & F_SYNC) {
+		fsync(client->difffile);
+	} else if (fua) {
+		/* open question: would it be cheaper to do multiple sync_file_ranges?
+		   as we iterate through the above?
+		 */
+		fdatasync(client->difffile);
+	}
+	return 0;
+}
+
+/**
+ * Flush data to a client
+ *
+ * @param client The client we're going to write for.
+ * @return 0 on success, nonzero on failure
+ **/
+int expflush(CLIENT *client) {
+	gint i;
+
+        if (client->server->flags & F_COPYONWRITE) {
+		return fsync(client->difffile);
+	}
+	
+	for (i = 0; i < client->export->len; i++) {
+		FILE_INFO fi = g_array_index(client->export, FILE_INFO, i);
+		if (fsync(fi.fhandle) < 0)
+			return -1;
+	}
+	
 	return 0;
 }
 
@@ -1309,6 +1429,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 				client->exportsize = OFFT_MAX;
 				client->net = net;
 				client->modern = TRUE;
+				client->transactionlogfd = -1;
 				free(name);
 				return client;
 			}
@@ -1322,6 +1443,12 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		err("Negotiation failed: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
+	if (client->server->flags & F_FLUSH)
+		flags |= NBD_FLAG_SEND_FLUSH;
+	if (client->server->flags & F_FUA)
+		flags |= NBD_FLAG_SEND_FUA;
+	if (client->server->flags & F_ROTATIONAL)
+		flags |= NBD_FLAG_ROTATIONAL;
 	if (!client->modern) {
 		/* oldstyle */
 		flags = htonl(flags);
@@ -1342,7 +1469,9 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 }
 
 /** sending macro. */
-#define SEND(net,reply) writeit( net, &reply, sizeof( reply ));
+#define SEND(net,reply) { writeit( net, &reply, sizeof( reply )); \
+	if (client->transactionlogfd != -1) \
+		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
 /** error macro. */
 #define ERROR(client,reply,errcode) { reply.error = htonl(errcode); SEND(client->net,reply); reply.error = 0; }
 /**
@@ -1371,15 +1500,52 @@ int mainloop(CLIENT *client) {
 		size_t len;
 		size_t currlen;
 		size_t writelen;
+		uint16_t command;
 #ifdef DODBG
 		i++;
 		printf("%d: ", i);
 #endif
 		readit(client->net, &request, sizeof(request));
+		if (client->transactionlogfd != -1)
+			writeit(client->transactionlogfd, &request, sizeof(request));
+
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
+		command = request.type & NBD_CMD_MASK_COMMAND;
+		len = ntohl(request.len);
 
-		if (request.type==NBD_CMD_DISC) {
+		DEBUG("%s from %llu (%llu) len %d, ", getcommandname(command),
+				(unsigned long long)request.from,
+				(unsigned long long)request.from / 512, (unsigned int)len);
+
+		if (request.magic != htonl(NBD_REQUEST_MAGIC))
+			err("Not enough magic.");
+
+		memcpy(reply.handle, request.handle, sizeof(reply.handle));
+
+		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
+			if ((request.from + len) > (OFFT_MAX)) {
+				DEBUG("[Number too large!]");
+				ERROR(client, reply, EINVAL);
+				continue;
+			}
+
+			if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
+				DEBUG("[RANGE!]");
+				ERROR(client, reply, EINVAL);
+				continue;
+			}
+
+			currlen = len;
+			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
+				currlen = BUFSIZE - sizeof(struct nbd_reply);
+				msg2(LOG_INFO, "oversized request (this is not a problem)");
+			}
+		}
+
+		switch (command) {
+
+		case NBD_CMD_DISC:
 			msg2(LOG_INFO, "Disconnect request received.");
                 	if (client->server->flags & F_COPYONWRITE) { 
 				if (client->difmap) g_free(client->difmap) ;
@@ -1389,37 +1555,8 @@ int mainloop(CLIENT *client) {
 			}
 			go_on=FALSE;
 			continue;
-		}
 
-		len = ntohl(request.len);
-
-		if (request.magic != htonl(NBD_REQUEST_MAGIC))
-			err("Not enough magic.");
-		if (len > BUFSIZE - sizeof(struct nbd_reply)) {
-			currlen = BUFSIZE - sizeof(struct nbd_reply);
-			msg2(LOG_INFO, "oversized request (this is not a problem)");
-		} else {
-			currlen = len;
-		}
-#ifdef DODBG
-		printf("%s from %llu (%llu) len %d, ", request.type ? "WRITE" :
-				"READ", (unsigned long long)request.from,
-				(unsigned long long)request.from / 512, len);
-#endif
-		memcpy(reply.handle, request.handle, sizeof(reply.handle));
-		if ((request.from + len) > (OFFT_MAX)) {
-			DEBUG("[Number too large!]");
-			ERROR(client, reply, EINVAL);
-			continue;
-		}
-
-		if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
-			DEBUG("[RANGE!]");
-			ERROR(client, reply, EINVAL);
-			continue;
-		}
-
-		if (request.type==NBD_CMD_WRITE) {
+		case NBD_CMD_WRITE:
 			DEBUG("wr: net->buf, ");
 			while(len > 0) {
 				readit(client->net, buf, currlen);
@@ -1428,41 +1565,64 @@ int mainloop(CLIENT *client) {
 				    (client->server->flags & F_AUTOREADONLY)) {
 					DEBUG("[WRITE to READONLY!]");
 					ERROR(client, reply, EPERM);
+					consume(client->net, buf, len-currlen, BUFSIZE);
 					continue;
 				}
-				if (expwrite(request.from, buf, len, client)) {
+				if (expwrite(request.from, buf, currlen, client,
+					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
+					consume(client->net, buf, len-currlen, BUFSIZE);
 					continue;
 				}
-				SEND(client->net, reply);
-				DEBUG("OK!\n");
 				len -= currlen;
+				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
+			SEND(client->net, reply);
+			DEBUG("OK!\n");
 			continue;
-		}
-		/* READ */
 
-		DEBUG("exp->buf, ");
-		memcpy(buf, &reply, sizeof(struct nbd_reply));
-		p = buf + sizeof(struct nbd_reply);
-		writelen = currlen + sizeof(struct nbd_reply);
-		while(len > 0) {
-			if (expread(request.from, p, currlen, client)) {
-				DEBUG("Read failed: %m");
+		case NBD_CMD_FLUSH:
+			DEBUG("fl: ");
+			if (expflush(client)) {
+				DEBUG("Flush failed: %m");
 				ERROR(client, reply, errno);
 				continue;
 			}
+			SEND(client->net, reply);
+			DEBUG("OK!\n");
+			continue;
 
-			DEBUG("buf->net, ");
-			writeit(client->net, buf, writelen);
-			len -= currlen;
-			currlen = (len < BUFSIZE) ? len : BUFSIZE;
-			p = buf;
-			writelen = currlen;
+		case NBD_CMD_READ:
+			DEBUG("exp->buf, ");
+			memcpy(buf, &reply, sizeof(struct nbd_reply));
+			if (client->transactionlogfd != -1)
+				writeit(client->transactionlogfd, &reply, sizeof(reply));
+			p = buf + sizeof(struct nbd_reply);
+			writelen = currlen + sizeof(struct nbd_reply);
+			while(len > 0) {
+				if (expread(request.from, p, currlen, client)) {
+					DEBUG("Read failed: %m");
+					ERROR(client, reply, errno);
+					continue;
+				}
+				
+				DEBUG("buf->net, ");
+				writeit(client->net, buf, writelen);
+				len -= currlen;
+				request.from += currlen;
+				currlen = (len < BUFSIZE) ? len : BUFSIZE;
+				p = buf;
+				writelen = currlen;
+			}
+			DEBUG("OK!\n");
+			continue;
+
+		default:
+			DEBUG ("Ignoring unknown command\n");
+			continue;
 		}
-		DEBUG("OK!\n");
 	}
 	return 0;
 }
@@ -1493,7 +1653,7 @@ void setupexport(CLIENT* client) {
 		} else {
 			tmpname=g_strdup(client->exportname);
 		}
-		DEBUG2( "Opening %s\n", tmpname );
+		DEBUG( "Opening %s\n", tmpname );
 		fi.fhandle = open(tmpname, mode);
 		if(fi.fhandle == -1 && mode == O_RDWR) {
 			/* Try again because maybe media was read-only */
@@ -1592,6 +1752,15 @@ int do_run(gchar* command, gchar* file) {
  * @param client a connected client
  **/
 void serveconnection(CLIENT *client) {
+	if (client->server->transactionlog && (client->transactionlogfd == -1))
+	{
+		if (-1 == (client->transactionlogfd = open(client->server->transactionlog,
+							   O_WRONLY | O_CREAT,
+							   S_IRUSR | S_IWUSR)))
+			g_warning("Could not open transaction log %s",
+				  client->server->transactionlog);
+	}
+
 	if(do_run(client->server->prerun, client->exportname)) {
 		exit(EXIT_FAILURE);
 	}
@@ -1605,6 +1774,12 @@ void serveconnection(CLIENT *client) {
 
 	mainloop(client);
 	do_run(client->server->postrun, client->exportname);
+
+	if (-1 != client->transactionlogfd)
+	{
+		close(client->transactionlogfd);
+		client->transactionlogfd = -1;
+	}
 }
 
 /**
@@ -1759,6 +1934,7 @@ int serveloop(GArray* servers) {
 					err_nonfatal("negotiation failed");
 					close(net);
 					net=0;
+					continue;
 				}
 				serve = client->server;
 			}
@@ -1789,6 +1965,7 @@ int serveloop(GArray* servers) {
 					client->server=serve;
 					client->exportsize=OFFT_MAX;
 					client->net=net;
+					client->transactionlogfd = -1;
 				}
 				set_peername(net, client);
 				if (!authorized_client(client)) {
@@ -1798,31 +1975,33 @@ int serveloop(GArray* servers) {
 				}
 				msg2(LOG_INFO,"Authorized client") ;
 				pid=g_malloc(sizeof(pid_t));
-#ifndef NOFORK
-				if ((*pid=fork())<0) {
-					msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-					close(net);
-					continue;
+
+				if (!dontfork) {
+					if ((*pid=fork())<0) {
+						msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+						close(net);
+						continue;
+					}
+					if (*pid>0) { /* parent */
+						close(net);
+						g_hash_table_insert(children, pid, pid);
+						continue;
+					}
+					/* child */
+					g_hash_table_destroy(children);
+					for(i=0;i<servers->len;i++) {
+						serve=&g_array_index(servers, SERVER, i);
+						close(serve->socket);
+					}
+					/* FALSE does not free the
+					   actual data. This is required,
+					   because the client has a
+					   direct reference into that
+					   data, and otherwise we get a
+					   segfault... */
+					g_array_free(servers, FALSE);
 				}
-				if (*pid>0) { /* parent */
-					close(net);
-					g_hash_table_insert(children, pid, pid);
-					continue;
-				}
-				/* child */
-				g_hash_table_destroy(children);
-				for(i=0;i<servers->len;i++) {
-					serve=&g_array_index(servers, SERVER, i);
-					close(serve->socket);
-				}
-				/* FALSE does not free the
-				actual data. This is required,
-				because the client has a
-				direct reference into that
-				data, and otherwise we get a
-				segfault... */
-				g_array_free(servers, FALSE);
-#endif // NOFORK
+
 				msg2(LOG_INFO,"Starting to serve");
 				serveconnection(client);
 				exit(EXIT_SUCCESS);
@@ -1989,7 +2168,7 @@ void setup_servers(GArray* servers) {
  * 	is only used to create a PID file of the form
  * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
  **/
-#if !defined(NODAEMON) && !defined(NOFORK)
+#if !defined(NODAEMON)
 void daemonize(SERVER* serve) {
 	FILE*pidf;
 
@@ -2018,7 +2197,7 @@ void daemonize(SERVER* serve) {
 }
 #else
 #define daemonize(serve)
-#endif /* !defined(NODAEMON) && !defined(NOFORK) */
+#endif /* !defined(NODAEMON) */
 
 /*
  * Everything beyond this point (in the file) is run in non-daemon mode.
@@ -2157,7 +2336,8 @@ int main(int argc, char *argv[]) {
 		g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
-	daemonize(serve);
+	if (!dontfork)
+		daemonize(serve);
 	setup_servers(servers);
 	dousers();
 	serveloop(servers);

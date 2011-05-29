@@ -40,7 +40,12 @@ typedef unsigned long long u64;
 #include "nbd.h"
 
 #if NBD_LFS==1
+/* /usr/include/features.h (included from /usr/include/sys/types.h)
+   defines this when _GNU_SOURCE is defined
+ */
+#ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
+#endif
 #define _FILE_OFFSET_BITS 64
 #endif
 
@@ -71,8 +76,10 @@ void setmysockopt(int sock) {
 #ifndef G_GNUC_NORETURN
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define G_GNUC_NORETURN __attribute__((__noreturn__))
+#define G_GNUC_UNUSED __attribute__((unused))
 #else
 #define G_GNUC_NORETURN
+#define G_GNUC_UNUSED
 #endif
 #endif
 
@@ -131,10 +138,6 @@ u64 ntohll(u64 a) {
 }
 #endif
 #define htonll ntohll
-
-/* Flags used between the client and server */
-#define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */
-#define NBD_FLAG_READ_ONLY	(1 << 1)	/* Device is read-only */
 
 #define NBD_DEFAULT_PORT	"10809"	/* Port on which named exports are
 					 * served */

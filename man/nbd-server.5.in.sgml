@@ -287,6 +287,39 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>flush</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will inform the client that it
+	    supports and desires to be sent flush requests when the
+	    elevator layer receives them. Receipt of a flush request
+	    will cause an fdatasync() (or, if the sync option is set,
+	    an fsync()) on the backend storage. This increases
+	    reliability in the case of an unclean shutdown at
+	    the expense of a degradation of performance. This option
+	    will have no effect unless supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>fua</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will inform the client that it
+	    supports and desires to be sent fua (force unit access) commands
+	    when the elevator layer receives them. Receipt of a force unit
+	    access command will cause the specified command to be synced
+	    to backend storage using sync_file_range() if supported, or
+	    fdatasync() otherwise. This increases
+	    reliability in the case of an unclean shutdown at
+	    the expense of a degradation of performance. This option
+	    will have no effect unless supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term>listenaddr</term>
 	<listitem>
 	  <para>
@@ -297,6 +330,16 @@ manpage.1: manpage.sgml
 	    similarly to the global listenaddr parameter, but for the
 	    individual port of this particular export. If the 'oldstyle'
 	    parameter is not set, this parameter is ignored.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>maxconnections</option></term>
+	<listitem>
+	  <para>Optional; integer</para>
+	  <para>
+	    If specified, then it limits the number of opened connections for
+	    this export.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -354,6 +397,53 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>postrun</option></term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>
+	    If specified, then it is assumed to be a command
+	    that will be ran when a client has
+	    disconnected. This can be useful to clean up
+	    whatever <option>prerun</option> has set up, to log
+	    something, or similar.
+	  </para>
+	  <para>
+	    If the literal string '%s' is present in the
+	    command, it will be replaced by the file name that
+	    has just been closed.
+	  </para>
+	  <para>
+	    In contrast to the <option>prerun</option> option,
+	    the exit state of <option>postrun</option> is
+	    <emphasis>ignored</emphasis>.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>prerun</option></term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>
+	    If specified, then this command will be ran after a
+	    client has connected to the server (and has been
+	    accepted), but before the server starts serving. If
+	    the command contains the literal string '%s', then
+	    this string will be replaced by the filename of the
+	    file which nbd-server wants to export.
+	  </para>
+	  <para>
+	    This is useful to create export files on the fly, or
+	    to verify that a file can be used for export, to
+	    write something to a log file, or similar.
+	  </para>
+	  <para>
+	    If the command runs with a non-zero exit status,
+	    then nbd-server will assume the export will fail,
+	    and refuse to serve it.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>readonly</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>
@@ -368,6 +458,29 @@ manpage.1: manpage.sgml
 	  </para>
 	  <para>Corresponds to the <option>-r</option> option on the
 	  command line.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>rotational</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will inform the client that 
+	    it would prefer it to send requests in elevator (i.e., optimized) order, perhaps
+	    because it has a backing store and no local elevator. By
+	    default, the client uses QUEUE_FLAG_NONROT, which effectively
+	    restricts the function of the elevator to block merges. By
+	    specifying this flag on the server, the client will not use
+	    QUEUE_FLAG_NONROT, meaning the client elevator will perform
+	    normal elevator ordering of I/O requests. Note that even when
+	    the backing store is on rotating media, it is not normally
+	    necessary to specify this flag, as the server's elevator
+	    algorithm will be used. This flag is only required where
+	    the server will not be using an elevator algorithm or where
+	    the elevator algorithm is effectively neutered (e.g. with
+	    the sync option set). This option will have no effect unless
+	    supported by the client.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -389,23 +502,6 @@ manpage.1: manpage.sgml
 	    <command>nbd-server</command> does not have support for SDP,
 	    then <command>nbd-server</command> will exit with an error
 	    message.
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-        <term><option>sync</option></term>
-	<listitem>
-	  <para>Optional; boolean.</para>
-	  <para>When this option is enabled,
-	    <command>nbd-server</command> will call an fsync() after every
-	    write to the backend storage. Calling fsync() increases
-	    reliability in case of an unclean shutdown of nbd-server; but,
-	    depending on the file system used on the nbd-server side, may
-	    degrade performance. The use of this option isn't always
-	    necessary; e.g., on ext3 filesystems, it is recommended that
-	    it is <emphasis>not</emphasis> enabled, since it seriously
-	    reduces performance on ext3 filesystems while not
-	    importantly impacting reliability.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -435,6 +531,23 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>sync</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will call an fsync() after every
+	    write to the backend storage. Calling fsync() increases
+	    reliability in case of an unclean shutdown of nbd-server; but,
+	    depending on the file system used on the nbd-server side, may
+	    degrade performance. The use of this option isn't always
+	    necessary; e.g., on ext3 filesystems, it is recommended that
+	    it is <emphasis>not</emphasis> enabled, since it seriously
+	    reduces performance on ext3 filesystems while not
+	    importantly impacting reliability.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>timeout</option></term>
 	<listitem>
 	  <para>Optional; integer; default 0</para>
@@ -448,6 +561,30 @@ manpage.1: manpage.sgml
 	  <para>
 	    Corresponds to the <option>-a</option> option on the
 	    command line
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>transactionlog</option></term>
+	<listitem>
+	  <para>Optional; string</para>
+	  <para>
+	    If specified, then this pathname is used to generate a transaction
+	    log. A transaction log is a binary file consisting of the requests
+	    sent to and the replies received by the server, but excluding any
+	    data (so, for a write command, it records the offset and length
+	    of the write but not the data written). It is therefore relatively
+	    safe to distribute to a third party. Note that the transaction log
+	    does not include the negotiation sequence. Transaction logs are
+	    mainly useful for debugging. The program
+	    <emphasis>nbd-tester-client</emphasis> distributed with the source
+	    to this program can reply a transaction log against a server and
+	    perform a data integrity test. Note that the transaction log is
+	    written to for every client opened. If it is necessary to maintain
+	    separate transaction logs for each client, the
+	    <emphasis>prerun</emphasis> script should rename the transaction log
+	    (which will just have been opened in order to avoid transaction logs
+	    overwriting eachother. This action should be race-free.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -548,70 +685,13 @@ manpage.1: manpage.sgml
 	  </variablelist>
 	</listitem>
       </varlistentry>
-      <varlistentry>
-	<term><option>prerun</option></term>
-	<listitem>
-	  <para>Optional; string</para>
-	  <para>
-	    If specified, then this command will be ran after a
-	    client has connected to the server (and has been
-	    accepted), but before the server starts serving. If
-	    the command contains the literal string '%s', then
-	    this string will be replaced by the filename of the
-	    file which nbd-server wants to export.
-	  </para>
-	  <para>
-	    This is useful to create export files on the fly, or
-	    to verify that a file can be used for export, to
-	    write something to a log file, or similar.
-	  </para>
-	  <para>
-	    If the command runs with a non-zero exit status,
-	    then nbd-server will assume the export will fail,
-	    and refuse to serve it.
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>postrun</option></term>
-	<listitem>
-	  <para>Optional; string</para>
-	  <para>
-	    If specified, then it is assumed to be a command
-	    that will be ran when a client has
-	    disconnected. This can be useful to clean up
-	    whatever <option>prerun</option> has set up, to log
-	    something, or similar.
-	  </para>
-	  <para>
-	    If the literal string '%s' is present in the
-	    command, it will be replaced by the file name that
-	    has just been closed.
-	  </para>
-	  <para>
-	    In contrast to the <option>prerun</option> option,
-	    the exit state of <option>postrun</option> is
-	    <emphasis>ignored</emphasis>.
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>maxconnections</option></term>
-	<listitem>
-	  <para>Optional; integer</para>
-	  <para>
-	    If specified, then it limits the number of opened connections for
-	    this export.
-	  </para>
-	</listitem>
-      </varlistentry>
     </variablelist>
     
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para>nbd-server (1), nbd-client (8)</para>
+    <para>nbd-server (1), nbd-client (8), nbd-trdump (8)</para>
       
 
   </refsect1>

@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.21],[wouter@debian.org])
+AC_INIT([nbd],[2.9.22],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -93,7 +93,10 @@ AC_CHECK_SIZEOF(unsigned short int)
 AC_CHECK_SIZEOF(unsigned int)
 AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
-AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr])
+AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp])
+AC_CHECK_FUNC([sync_file_range],
+	[AC_DEFINE([HAVE_SYNC_FILE_RANGE], [sync_file_range(2) is not supported], [sync_file_range(2) is supported])],
+        [])
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
@@ -120,6 +123,6 @@ AC_TYPE_PID_T
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile doc/Doxyfile man/Makefile man/nbd-client.8.sh man/nbd-server.5.sh man/nbd-server.1.sh])
+AC_CONFIG_FILES([Makefile doc/Doxyfile man/Makefile man/nbd-client.8.sh man/nbd-server.5.sh man/nbd-server.1.sh man/nbd-trdump.1.sh])
 AC_OUTPUT
 

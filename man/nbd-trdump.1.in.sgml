@@ -1,0 +1,143 @@
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.5//EN" [
+
+<!-- Process this file with docbook-to-man to generate an nroff manual
+     page: `docbook-to-man manpage.sgml > manpage.1'.  You may view
+     the manual page with: `docbook-to-man manpage.sgml | nroff -man |
+     less'.  A typical entry in a Makefile or Makefile.am is:
+
+manpage.1: manpage.sgml
+	docbook-to-man $< > $@
+  -->
+
+  <!-- Fill in your name for FIRSTNAME and SURNAME. -->
+  <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
+  <!ENTITY dhsurname   "<surname>Verhelst</surname>">
+  <!-- Please adjust the date whenever revising the manpage. -->
+  <!ENTITY dhdate      "<date>$Date$</date>">
+  <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
+       allowed: see man(7), man(1). -->
+  <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
+  <!ENTITY dhemail     "<email>wouter@debian.org</email>">
+  <!ENTITY dhusername  "Wouter Verhelst">
+  <!ENTITY dhucpackage "<refentrytitle>NBD-TRDUMP</refentrytitle>">
+  <!ENTITY dhpackage   "nbd-trdump">
+
+  <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
+  <!ENTITY gnu         "<acronym>GNU</acronym>">
+]>
+
+<refentry>
+  <refentryinfo>
+    <address>
+      &dhemail;
+    </address>
+    <author>
+      &dhfirstname;
+      &dhsurname;
+    </author>
+    <copyright>
+      <year>2001</year>
+      <holder>&dhusername;</holder>
+    </copyright>
+    &dhdate;
+  </refentryinfo>
+  <refmeta>
+    &dhucpackage;
+
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>&dhpackage;</refname>
+
+    <refpurpose>translate an nbd transaction log into human readable form</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para><command>&dhpackage;</command> translates
+    a transaction log produced by <command>nbd-server</command>
+    (specifically by the <command>transactionlog</command>
+    configuration directive) into human readable form.</para>
+
+    <para>The command acts as a traditional UNIX filter, i.e. the
+    transaction log must be supplied on standard input, and the
+    human readable output is sent to standard output.</para>
+  </refsect1>
+  <refsect1>
+    <title>OUTPUT</title>
+
+    <para>The following may be output:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>&gt;</option></term>
+	<listitem>
+	  <para>A request packet sent from the client to the server.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>&lt;</option></term>
+	<listitem>
+	  <para>A reply packet sent from the server to the client.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>H</option></term>
+	<listitem>
+	  <para>The handle of the packet.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>C</option></term>
+	<listitem>
+	  <para>The command sent.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>O</option></term>
+	<listitem>
+	  <para>The offet from the start of the disk.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>L</option></term>
+	<listitem>
+	  <para>The length of data.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>E</option></term>
+	<listitem>
+	  <para>The error returned.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para>nbd-server (1).</para>
+
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>The NBD kernel module and the NBD tools have been written by
+    Pavel Macheck (pavel@ucw.cz).</para>
+
+    <para>The kernel module is now maintained by Paul Clements
+    (Paul.Clements@steeleye.com), while the userland tools are maintained by
+    Wouter Verhelst (wouter@debian.org)</para>
+
+    <para>This manual page was written by &dhusername; (&dhemail;) for
+    the &debian; system (but may be used by others).  Permission is
+    granted to copy, distribute and/or modify this document under the
+    terms of the <acronym>GNU</acronym> General Public License,
+    version 2, as published by the Free Software Foundation.</para>
+
+  </refsect1>
+</refentry>

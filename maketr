@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Example script to make a transaction log file
+# Must be run as root. Remember to chown the file afterwards
+
+# Insert the name of a tarfile here
+tarfile=/home/amb/iptables/iptables_1.4.4.orig.tar.gz
+tmpnam=`mktemp`
+conffile=${tmpnam}.conf
+pidfile=${tmpnam}.pid
+output=`pwd`/output.tr
+
+ulimit -c unlimited
+
+cat >${conffile} <<EOF
+[generic]
+[export1]
+        exportname = $tmpnam
+	transactionlog = $output
+        flush = true
+        fua = true
+        rotational = true
+EOF
+./nbd-server -C ${conffile} -p ${pidfile} &
+PID=$!
+sleep 1
+dd if=/dev/zero of=${tmpnam} bs=1M count=50
+./nbd-client -N export1 127.0.0.1 /dev/nbd0
+mkfs.ext3 /dev/nbd0
+mount -t ext3 -odata=journal,barrier=1 /dev/nbd0 /mnt
+(cd /mnt ; tar xvzf ${tarfile} ; sync) 2>&1 >/dev/null
+umount /mnt
+mount -t ext3 -odata=journal,barrier=1 /dev/nbd0 /mnt
+(cd /mnt ; tar cvzf /dev/null . ; sync) 2>&1 >/dev/null
+dbench -D /mnt 1 &
+sleep 10
+killall dbench
+sleep 2
+killall -KILL dbench
+sync
+umount /mnt
+./nbd-client -d /dev/nbd0
+if [ -f ${pidfile} ]
+then
+        kill `cat ${pidfile}`
+        rm -f ${pidfile}
+else
+        kill $PID
+fi
+rm -f $tmpnam ${conffile}
+ls -la ${output}

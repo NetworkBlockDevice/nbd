@@ -4,7 +4,13 @@
 #include "config.h"
 #if NBD_LFS
 #define _FILE_OFFSET_BITS 64
+#ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
+#endif
+#ifdef HAVE_SYNC_FILE_RANGE
+#define USE_SYNC_FILE_RANGE
+#define _GNU_SOURCE
+#endif /* HAVE_SYNC_FILE_RANGE */
 #endif /* NBD_LFS */
 
 #endif /* LFS_H */
