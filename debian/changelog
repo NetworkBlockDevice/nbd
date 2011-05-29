@@ -1,3 +1,14 @@
+nbd (1:2.9.22-1) unstable; urgency=low
+
+  * New upstream release
+    - Fixes CVE-2011-1925; Closes: #627042.
+    - Fixes a number of data corruption bugs in the handling of oversized
+      requests.
+    - Has far better test suite coverage.
+    - Adds -d option to nbd-server to run non-detached; Closes: #557809.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 29 May 2011 09:40:55 +0200
+
 nbd (1:2.9.21-1) unstable; urgency=low
 
   * New upstream release
