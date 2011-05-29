@@ -127,20 +127,20 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>user</option></term>
-        <listitem>
-          <para>
-	    Optional; string.
-	  </para>
+	<term><option>listenaddr</option></term>
+	<listitem>
 	  <para>
-	    The name of the user this server must run as. If this
-	    parameter is not specified, then nbd-server will not
-	    attempt to change its UID (so the UID it runs as will be
-	    the user who starts nbd-server). If it is specified, then
-	    nbd-server will change its UID after opening ports, but
-	    before accepting connections or opening files.
+	    Optional; string
 	  </para>
-        </listitem>
+	  <para>If this option is set, it should contain the local IP
+	  address on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not
+	    set, <command>nbd-server</command> will listen to all
+	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
+	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
+	  is not possible to specify more than one IP address
+	  here.</para>
+	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>oldstyle</option></term>
@@ -181,21 +181,21 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>listenaddr</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
+	<term><option>user</option></term>
+        <listitem>
+          <para>
+	    Optional; string.
 	  </para>
-	  <para>If this option is set, it should contain the local IP
-	  address on which we should listen to
-	  <command>nbd-client</command>(8) connections. If it is not
-	    set, <command>nbd-server</command> will listen to all
-	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
-	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
-	  is not possible to specify more than one IP address
-	  here.</para>
-	</listitem>
-      </varlistentry
+	  <para>
+	    The name of the user this server must run as. If this
+	    parameter is not specified, then nbd-server will not
+	    attempt to change its UID (so the UID it runs as will be
+	    the user who starts nbd-server). If it is specified, then
+	    nbd-server will change its UID after opening ports, but
+	    before accepting connections or opening files.
+	  </para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </refsect1>
   <refsect1>
