@@ -1186,7 +1186,7 @@ int main(int argc, char**argv) {
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
 		g_message("%d: Usage: %s <hostname> <port>", (int)getpid(), argv[0]);
-		g_message("%d: Or: %s <hostname> -N <exportname>", (int)getpid(), argv[0]);
+		g_message("%d: Or: %s <hostname> -N <exportname> [<port>]", (int)getpid(), argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	logging();
@@ -1199,7 +1199,6 @@ int main(int argc, char**argv) {
 						nonopt++;
 						break;
 					case 1:
-						if(want_port)
 						p=(strtol(argv[2], NULL, 0));
 						if(p==LONG_MIN||p==LONG_MAX) {
 							g_critical("Could not parse port number: %s", strerror(errno));
@@ -1210,7 +1209,9 @@ int main(int argc, char**argv) {
 				break;
 			case 'N':
 				name=g_strdup(optarg);
-				p = 10809;
+				if(!p) {
+					p = 10809;
+				}
 				want_port = false;
 				break;
 			case 't':

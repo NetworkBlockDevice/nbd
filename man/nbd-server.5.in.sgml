@@ -181,6 +181,19 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>port</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>
+	    The port on which to listen for new-style nbd-client
+	    connections. If not specified, the IANA-assigned port of
+	    10809 is used.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>user</option></term>
         <listitem>
           <para>

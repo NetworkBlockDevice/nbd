@@ -171,6 +171,8 @@ int modernsock=0;	  /**< Socket for the modern handler. Not used
 			       oldstyle is set to false (and then the
 			       command-line client isn't used, gna gna) */
 char* modern_listen;	  /**< listenaddr value for modernsock */
+char* modernport=NBD_DEFAULT_PORT; /**< Port number on which to listen for
+			              new-style nbd-client connections */
 
 /**
  * Types of virtuatlization
@@ -410,7 +412,7 @@ void usage() {
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
 	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
-	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
+	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
 	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
@@ -777,6 +779,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
 		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
+		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -846,8 +849,8 @@ GArray* parse_cfile(gchar* f, GError** e) {
 					}
 					break;
 			}
-			if(!strcmp(p[j].paramname, "port") && !strcmp(p[j].target, NBD_DEFAULT_PORT)) {
-				g_set_error(e, errdomain, CFILE_INCORRECT_PORT, "Config file specifies default port for oldstyle export");
+			if(!strcmp(p[j].paramname, "port") && !strcmp(p[j].target, modernport)) {
+				g_set_error(e, errdomain, CFILE_INCORRECT_PORT, "Config file specifies new-style port for oldstyle export");
 				g_key_file_free(cfile);
 				return NULL;
 			}
@@ -2112,7 +2115,7 @@ void open_modern(void) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_protocol = IPPROTO_TCP;
-	e = getaddrinfo(modern_listen, NBD_DEFAULT_PORT, &hints, &ai);
+	e = getaddrinfo(modern_listen, modernport, &hints, &ai);
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		exit(EXIT_FAILURE);
