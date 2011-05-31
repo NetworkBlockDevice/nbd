@@ -160,6 +160,7 @@ int dontfork = 0;
 #define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
 #define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
+#define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -774,6 +775,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "flush",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FLUSH },
 		{ "fua",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FUA },
 		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
+		{ "temporary",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TEMPORARY },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
@@ -1021,7 +1023,9 @@ off_t size_autodetect(int fhandle) {
 	stat_buf.st_size = 0;
 	error = fstat(fhandle, &stat_buf);
 	if (!error) {
-		if(stat_buf.st_size > 0)
+		/* always believe stat if a regular file as it might really
+		 * be zero length */
+		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
 			return (off_t)stat_buf.st_size;
         } else {
                 err("fstat failed: %m");
@@ -1644,6 +1648,8 @@ void setupexport(CLIENT* client) {
 	int i;
 	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
+	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
+	int cancreate = (client->server->expected_size) && !multifile;
 
 	client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
@@ -1654,24 +1660,35 @@ void setupexport(CLIENT* client) {
 		FILE_INFO fi;
 		gchar *tmpname;
 		gchar* error_string;
-		mode_t mode = (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR;
 
-		if(multifile) {
-			tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+		if (i)
+		  cancreate = 0;
+		/* if expected_size is specified, and this is the first file, we can create the file */
+		mode_t mode = (client->server->flags & F_READONLY) ?
+		  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+
+		if (temporary) {
+			tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
+			DEBUG( "Opening %s\n", tmpname );
+			fi.fhandle = mkstemp(tmpname);
 		} else {
-			tmpname=g_strdup(client->exportname);
-		}
-		DEBUG( "Opening %s\n", tmpname );
-		fi.fhandle = open(tmpname, mode);
-		if(fi.fhandle == -1 && mode == O_RDWR) {
-			/* Try again because maybe media was read-only */
-			fi.fhandle = open(tmpname, O_RDONLY);
-			if(fi.fhandle != -1) {
-				/* Opening the base file in copyonwrite mode is
-				 * okay */
-				if(!(client->server->flags & F_COPYONWRITE)) {
-					client->server->flags |= F_AUTOREADONLY;
-					client->server->flags |= F_READONLY;
+			if(multifile) {
+				tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+			} else {
+				tmpname=g_strdup(client->exportname);
+			}
+			DEBUG( "Opening %s\n", tmpname );
+			fi.fhandle = open(tmpname, mode, 0x600);
+			if(fi.fhandle == -1 && mode == O_RDWR) {
+				/* Try again because maybe media was read-only */
+				fi.fhandle = open(tmpname, O_RDONLY);
+				if(fi.fhandle != -1) {
+					/* Opening the base file in copyonwrite mode is
+					 * okay */
+					if(!(client->server->flags & F_COPYONWRITE)) {
+						client->server->flags |= F_AUTOREADONLY;
+						client->server->flags |= F_READONLY;
+					}
 				}
 			}
 		}
@@ -1683,6 +1700,10 @@ void setupexport(CLIENT* client) {
 				tmpname);
 			err(error_string);
 		}
+
+		if (temporary)
+			unlink(tmpname); /* File will stick around whilst FD open */
+
 		fi.startoff = laststartoff + lastsize;
 		g_array_append_val(client->export, fi);
 		g_free(tmpname);
@@ -1692,7 +1713,17 @@ void setupexport(CLIENT* client) {
 		laststartoff = fi.startoff;
 		lastsize = size_autodetect(fi.fhandle);
 
-		if(!multifile)
+		/* If we created the file, it will be length zero */
+		if (!lastsize && cancreate) {
+			/* we can ignore errors as we recalculate the size */
+			ftruncate (fi.fhandle, client->server->expected_size);
+			lastsize = size_autodetect(fi.fhandle);
+			if (lastsize != client->server->expected_size)
+				err("Could not expand file");
+			break; /* don't look for any more files */
+		}
+
+		if(!multifile || temporary)
 			break;
 	}
 

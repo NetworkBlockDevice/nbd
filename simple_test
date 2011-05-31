@@ -140,9 +140,9 @@ EOF
 	flush = true
 	fua = true
 	rotational = true
+	filesize = 52428800
+	temporary = true
 EOF
-		# we need a bigger disk
-		dd if=/dev/zero of=$tmpnam bs=1M count=50 >/dev/null 2>&1
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
@@ -158,9 +158,9 @@ EOF
 	flush = true
 	fua = true
 	rotational = true
+	filesize = 52428800
+	temporary = true
 EOF
-		# we need a bigger disk
-		dd if=/dev/zero of=$tmpnam bs=1M count=50 >/dev/null 2>&1
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1

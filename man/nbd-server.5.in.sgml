@@ -264,7 +264,12 @@ manpage.1: manpage.sgml
 	  <para>
 	    The name of the file (or block device) that will be
 	    exported. This must be a fully-qualified path and filename;
-	    relative paths are not allowed.
+	    relative paths are not allowed. If used in conjunction with
+	    the <option>temporary</option>, this specifies a template
+	    for the temporary file concerned, and thus can be used
+	    to control the directory it is created in. If the file
+	    does not exist, but <option>filesize</option> is set, then
+	    the file will be created.
 	  </para>
 	  <para>
 	    Note that <command>nbd-server</command> will only try to
@@ -292,7 +297,27 @@ manpage.1: manpage.sgml
 	    bytes. If the <option>multifile</option> option is in
 	    effect, this option specifies the size of the
 	    <emphasis>entire</emphasis> export, not of individual
-	    files.
+	    files. If the file is not present, a single file is
+	    created of this size.
+	  </para>
+	  <para>When specified on the command line, this should be the
+	    third argument.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>temporary</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    Create a temporary export with a name based on exportname
+	    (this can be used to set the directory). A unique filename
+	    is created, which is unlinked as soon as it is created,
+	    and therefore the export will not persist between
+	    invocations of <command>nbd-server</command>. Se the
+	    size of the file using the <command>filesize</command>
+	    option. This option is incompatible with the
+	    <option>multifile</option> option.
 	  </para>
 	  <para>When specified on the command line, this should be the
 	    third argument.
