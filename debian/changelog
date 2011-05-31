@@ -1,3 +1,9 @@
+nbd (1:2.9.22-2) unstable; urgency=low
+
+  * Make it a non-native package again.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 30 May 2011 12:58:35 +0200
+
 nbd (1:2.9.22-1) unstable; urgency=low
 
   * New upstream release
