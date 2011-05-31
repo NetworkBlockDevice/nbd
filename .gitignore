@@ -18,7 +18,7 @@ mkinstalldirs
 nbd-tester-client
 nbd-client
 nbd-server
-doc
+doc/doxygen-output
 nbd-server.config
 nbd-server.5
 nbd-trdump.1
