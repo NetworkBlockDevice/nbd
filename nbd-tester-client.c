@@ -1087,7 +1087,12 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 					if (checkbuf(dbuf, blkhash[blknum], blknum))
 					{
 						retval=-1;
-						snprintf(errstr, errstr_len, "Bad reply data: seq %08x", blkhash[blknum]);
+						snprintf(errstr, errstr_len, "Bad reply data: I wanted blk %08x, seq %08x but I got (at a guess) blk %08x, seq %08x",
+							 (unsigned int) blknum,
+							 blkhash[blknum],
+							 ((uint32_t *)(dbuf))[0],
+							 ((uint32_t *)(dbuf))[1]
+							 );
 						goto err_open;
 						
 					}
