@@ -1183,6 +1183,9 @@ int main(int argc, char**argv) {
 	int testflags=0;
 	testfunc test = throughput_test;
 
+	/* Ignore SIGPIPE as we want to pick up the error from write() */
+	signal (SIGPIPE, SIG_IGN);
+
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
 		g_message("%d: Usage: %s <hostname> <port>", (int)getpid(), argv[0]);
