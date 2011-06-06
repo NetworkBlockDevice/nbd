@@ -1,14 +1,14 @@
-# translation of nbd to Swedish
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# Translation of nbd debconf template to Swedish
+# Copyright (C) 2011 Martin Bagge <brother@bsnet.se>
 # This file is distributed under the same license as the nbd package.
 #
-# Martin Bagge <brother@bsnet.se>, 2009.
+# Martin Bagge <brother@bsnet.se>, 2009, 2011
 msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2011-01-05 18:59+0100\n"
-"PO-Revision-Date: 2010-08-02 03:37+0100\n"
+"PO-Revision-Date: 2011-06-02 17:59+0100\n"
 "Last-Translator: Martin Bagge / brother <brother@bsnet.se>\n"
 "Language-Team: Swedish <debian-l10n-swedish@lists.debian.org>\n"
 "Language: \n"
@@ -132,20 +132,19 @@ msgstr "Ange nätverksnamn eller IP-adress för maskinen som kör nbd-servern."
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-#, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
 msgid "Port or name for nbd export (number: ${number})?"
-msgstr "Värdnamn för servern (nummer: ${number})?"
+msgstr "Port eller namn för nbd-export (nummer: ${number})?"
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:6001
-#, fuzzy
 #| msgid "Please enter the TCP port number to access nbd-server."
 msgid ""
 "Please enter the TCP port number or NBD export name needed to access nbd-"
 "server."
-msgstr "Ange TCP-port-nummer att ansluta till på nbd-servern."
+msgstr ""
+"Ange TCP-port-nummer eller NBD-export för att ansluta till på nbd-servern."
 
 #. Type: string
 #. Description
@@ -156,6 +155,9 @@ msgid ""
 "enter the TCP port number here, and should make sure not to enter any non-"
 "numeric characters in the field."
 msgstr ""
+"nbd-server upp till version  2.9.16 hade inte stöd för att namnge en NBD-"
+"export. Om din NBD-server är av äldre version ska du ange TCP-portnummer "
+"här, du kan inte ange något annat än siffror i det fallet."
 
 #. Type: string
 #. Description
@@ -166,6 +168,10 @@ msgid ""
 "this configuration system will accept that as a name and provide it to nbd-"
 "client as a name-based export rather than a port-based one."
 msgstr ""
+"Nyare versioner av nbd-server har stöd för att namnge en export. Om värdet i "
+"detta fält innehåller annat än siffror kommer denna inställningshanterare "
+"att anta att detta är ett namn och förmedla den till nbd-client som "
+"namnbaserad export istället för en portbaserad."
 
 #. Type: string
 #. Description
@@ -280,7 +286,6 @@ msgstr "TCP-port för server ${number}:"
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
-#, fuzzy
 #| msgid ""
 #| "Please specify the TCP port this instance of nbd server will use for "
 #| "listening. As NBD is likely to use more than one port, no dedicated port "
@@ -289,23 +294,21 @@ msgid ""
 "Please specify the TCP port this instance of nbd server will use for "
 "backwards compatibility with older clients."
 msgstr ""
-"Ange TCP-port som denna instans av nbd-servern ska använda för att lyssna. "
-"Eftersom NBD troligen kommer att använda mer än en port har ingen port "
-"blivit tilldelad i IANA:s listor."
+"Ange TCP-port som denna instans av nbd-servern ska använda för "
+"bakåtkompabilitet med äldre klienter."
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
-#, fuzzy
 #| msgid "File to export (server number ${number}):"
 msgid "Name of export ${number}:"
-msgstr "Fil att exportera (server ${number}):"
+msgstr "Namn för export ${number}:"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:4001
 msgid "Please specify a name for this export."
-msgstr ""
+msgstr "Ange namn för denna export."
 
 #. Type: string
 #. Description
@@ -432,7 +435,7 @@ msgstr ""
 #. Description
 #: ../nbd-server.templates:8001
 msgid "Support port-based exports?"
-msgstr ""
+msgstr "Stöd för portbaserad export?"
 
 #. Type: boolean
 #. Description
@@ -444,6 +447,11 @@ msgid ""
 "a lot of trouble to update your older configurations in order to migrate to "
 "name-based exports. In either of those cases, you should accept this option."
 msgstr ""
+"I och med version 2.9.18 har nbd-server stöd för namnbaserad export istället "
+"för portbaserad. I de flesta fallen är detta att föredra men du kanske "
+"behöver stöd för system som kör äldre versioner av nbd-client eller vill "
+"undvika trubbel vid uppdatering av äldre inställningar för att gå över till "
+"namnbaserad export. För dessa fall ska du aktivera detta alternativ."
 
 #. Type: boolean
 #. Description
@@ -452,108 +460,5 @@ msgid ""
 "Everyone else should leave the option at the default setting, which will "
 "cause nbd-server to only support name-based exports."
 msgstr ""
-
-#~ msgid "Port on which the nbd-server is running (number: ${number})?"
-#~ msgstr "Port som nbd-servern lyssnar på (nummer: ${number})?"
-
-#~ msgid ""
-#~ "Therefore, NBD does not have a standard port number, which means you need "
-#~ "to provide one. You should make sure this port is not already in use."
-#~ msgstr ""
-#~ "Därför har NBD inget standardvärd för portnummer och du måste dämed ange "
-#~ "ett. Säkerställ att du inte anger ett portnummer som redan används."
-
-#~ msgid ""
-#~ "There's a line in /etc/nbd-client that reads \"AUTO_GEN=n\" -- or "
-#~ "something likewise in sh-syntaxis. This means you don't want me to "
-#~ "automatically regenerate that file."
-#~ msgstr ""
-#~ "Det finns en rad i /etc/nbd-client som lyder \"AUTO_GEN=n\" eller "
-#~ "motsvarande i bash-kod. Det betyder att du inte vill att debconf "
-#~ "automatiskt ska skapa den filen."
-
-#~ msgid ""
-#~ "You need to fill in some name with which to resolve the machine on which "
-#~ "the nbd-server process is running. This can be its hostname (also known "
-#~ "to some as its \"network name\") or its IP-address."
-#~ msgstr ""
-#~ "Du behöver ange ett namn som motsvarar maskinen som kör nbd-server-"
-#~ "processen. Det kan vara dess värdnamn (även kallat \"nätverksnamn\") "
-#~ "eller en IP-adress."
-
-#~ msgid ""
-#~ "You need to fill in the portnumber on which the nbd-server is running. "
-#~ "This could technically be any number between 1 and 65535, but for this to "
-#~ "work, it needs to be the one on which a server can be found on the "
-#~ "machine running nbd-server..."
-#~ msgstr ""
-#~ "Du måste ange portnummer som nbd-servern lyssnar på. Tekniskt sett kan "
-#~ "det var vilket heltal som helst mellan 1 och 65535 men för att det ska "
-#~ "fungera måste det vara samma som nbd-servern lyssnar på."
-
-#~ msgid ""
-#~ "The traditional behaviour was to stop all nbd-client devices, including "
-#~ "those that were not specified in the nbd-client config file; for that "
-#~ "reason, the default answer is to kill all nbd devices. However, if you "
-#~ "are running critical file systems, such as your root device, on NBD, then "
-#~ "this is a bad idea; in that case, please do not accept this option."
-#~ msgstr ""
-#~ "Det traditionella valet är att stoppa alla nbd-client-enheter, även de "
-#~ "som inte finns i inställningsfilen för nbd-client. På grund av detta är "
-#~ "standardvalet att stoppa alla nbd-enheter. Om du kör något mycket "
-#~ "känsligt filsystem på en nbd-enhet, exempelvis ditt rotfilsystem, är "
-#~ "detta ett mycket dåligt alternativ att nyttja, välj i så fall inte att "
-#~ "döda alla nbd-enheter."
-
-#~ msgid "How many nbd-servers do you want to run?"
-#~ msgstr "Hur många nbd-servrar vill du köra?"
-
-#~ msgid "What port do you want to run the server on (number: ${number})?"
-#~ msgstr "Vilken port vill du köra servern på (nummer: ${number})?"
-
-#~ msgid ""
-#~ "A port is a number in the TCP-header of a TCP/IP network package, that "
-#~ "defines which application should process the data being sent. For most "
-#~ "application-layer protocols, like FTP, HTTP, POP3 or SMTP, these numbers "
-#~ "have been well-defined by IANA, and can be found in /etc/services or STD "
-#~ "2; for NBD, however, this would not be appropriate since NBD works with a "
-#~ "separate port for each and every block device being used."
-#~ msgstr ""
-#~ "En port är ett tal i TCP-huvudet på ett TCP/IP-nätverkspaket som "
-#~ "definierar vilken applikation som ska ta hand om data som skickas. För de "
-#~ "flesta applikationslagerprotokollen, som FTP, HTTP, POP3 eller SMTP har "
-#~ "dessa nummer blivit definierade av IANA och kan hittas i /etc/services "
-#~ "ellet STD 2; för NBD är detta dock inget bra alternativ eftersom NBD "
-#~ "arbetar med en separat port för varje blockenhet som ska användas."
-
-#~ msgid "What file do you want to export (number: ${number})?"
-#~ msgstr "Vilken fil vill du exportera (nummer: ${number})?"
-
-#~ msgid ""
-#~ "/etc/nbd-server contains a line \"AUTO_GEN=n\" -- or something equivalent "
-#~ "in bash-syntaxis. This means you don't want me to automatically "
-#~ "regenerate that file."
-#~ msgstr ""
-#~ "Det finns en rad i /etc/nbd-cserver som lyder \"AUTO_GEN=n\" eller "
-#~ "motsvarande i bash-kod. Det betyder att du inte vill att debconf "
-#~ "automatiskt ska skapa den filen."
-
-#~ msgid ""
-#~ "A pre-2.9 nbd-server configuration file has been found on your system. "
-#~ "The current nbd-server package no longer supports this file; if you "
-#~ "depend on it, your nbd-server no longer works. If you accept this option, "
-#~ "the system will generate a new style configuration file based upon your "
-#~ "old style configuration file. Then, the old style configuration file will "
-#~ "be removed. If you do not accept this option, a new style configuration "
-#~ "file will be generated based on a number of questions that will be asked; "
-#~ "these may be the very same questions that you used to create the old "
-#~ "style configuration file in the first place."
-#~ msgstr ""
-#~ "En pre-2.9 nbd-server inställningsfil har hittats på ditt system. Det "
-#~ "nuvarande nbd-server-paketet stödjer inte denna fil. Nbd-server fungerar "
-#~ "inte om filen inte konverteras till det nya formatet. Om du accepterar "
-#~ "detta alternativ kommer en ny inställningsfil baserad på dina gamla "
-#~ "inställningar att skapas. Den gamla filen kommer sedan att tas bort. Om "
-#~ "du inte accepterar detta alternativet kommer en ny inställningsfil skapas "
-#~ "baserad på en uppsättning frågor, dessa kan vara precis likadana som de "
-#~ "du besvarade för att skapa den gamla filen från allra första början."
+"Övriga ska låta alternativet vara på standardinställningen, vilket medför "
+"att nbd-server endast har stöd för namnbaserad export."

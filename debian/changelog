@@ -1,8 +1,10 @@
 nbd (1:2.9.22-2) unstable; urgency=low
 
   * Make it a non-native package again.
+  * Updated translations:
+    - Swedish, by Martin Bagge; Closes: #628962
 
- -- Wouter Verhelst <wouter@debian.org>  Mon, 30 May 2011 12:58:35 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 06 Jun 2011 13:09:51 +0200
 
 nbd (1:2.9.22-1) unstable; urgency=low
 
