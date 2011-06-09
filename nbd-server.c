@@ -165,6 +165,10 @@ char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
+#define NEG_INIT	(1 << 0)
+#define NEG_OLD		(1 << 1)
+#define NEG_MODERN	(1 << 2)
+
 int modernsock=0;	  /**< Socket for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
@@ -1361,7 +1365,7 @@ int expflush(CLIENT *client) {
  *
  * @param client The client we're negotiating with.
  **/
-CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
+CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	char zeros[128];
 	uint64_t size_host;
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
@@ -1369,14 +1373,14 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
-	if(!client || !client->modern) {
+	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
 			err_nonfatal("Negotiation failed: %m");
 			if(client)
 				exit(EXIT_FAILURE);
 		}
-		if(!client || client->modern) {
+		if(phase & NEG_MODERN) {
 			/* modern */
 			magic = htonll(opts_magic);
 		} else {
@@ -1389,7 +1393,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 				exit(EXIT_FAILURE);
 		}
 	}
-	if(!client) {
+	if(phase & NEG_MODERN) {
 		/* modern */
 		uint32_t reserved;
 		uint32_t opt;
@@ -1452,7 +1456,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		flags |= NBD_FLAG_SEND_FUA;
 	if (client->server->flags & F_ROTATIONAL)
 		flags |= NBD_FLAG_ROTATIONAL;
-	if (!client->modern) {
+	if (phase & NEG_OLD) {
 		/* oldstyle */
 		flags = htonl(flags);
 		if (write(client->net, &flags, 4) < 0)
@@ -1493,7 +1497,7 @@ int mainloop(CLIENT *client) {
 #ifdef DODBG
 	int i = 0;
 #endif
-	negotiate(client->net, client, NULL);
+	negotiate(client->net, client, NULL, client->modern ? NEG_MODERN : (NEG_OLD | NEG_INIT));
 	DEBUG("Entering request loop!\n");
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
@@ -1932,7 +1936,7 @@ int serveloop(GArray* servers) {
 			if(FD_ISSET(modernsock, &rset)) {
 				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 					err("accept: %m");
-				client = negotiate(net, NULL, servers);
+				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
 				if(!client) {
 					err_nonfatal("negotiation failed");
 					close(net);
