@@ -1390,11 +1390,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		}
 		if (write(net, &magic, sizeof(magic)) < 0) {
 			err_nonfatal("Negotiation failed: %m");
-			if(client)
+			if(phase & NEG_OLD)
 				exit(EXIT_FAILURE);
 		}
 	}
-	if(phase & NEG_MODERN) {
+	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
 		/* modern */
 		uint32_t reserved;
 		uint32_t opt;
