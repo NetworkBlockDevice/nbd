@@ -793,7 +793,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	GQuark errdomain;
 	GArray *retval=NULL;
 	gchar **groups;
-	gboolean value;
+	gboolean bval;
+	gint ival;
+	gchar* sval;
 	gchar* startgroup;
 	gint i;
 	gint j;
@@ -827,36 +829,35 @@ GArray* parse_cfile(gchar* f, GError** e) {
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
 			switch(p[j].ptype) {
 				case PARAM_INT:
-					*((gint*)p[j].target) =
-						g_key_file_get_integer(cfile,
+					ival = g_key_file_get_integer(cfile,
 								groups[i],
 								p[j].paramname,
 								&err);
+					if(!err) {
+						*((gint*)p[j].target) = ival;
+					}
 					break;
 				case PARAM_STRING:
-					*((gchar**)p[j].target) =
-						g_key_file_get_string(cfile,
+					sval = g_key_file_get_string(cfile,
 								groups[i],
 								p[j].paramname,
 								&err);
+					if(!err) {
+						*((gchar**)p[j].target) = sval;
+					}
 					break;
 				case PARAM_BOOL:
-					value = g_key_file_get_boolean(cfile,
+					bval = g_key_file_get_boolean(cfile,
 							groups[i],
 							p[j].paramname, &err);
 					if(!err) {
-						if(value) {
+						if(bval) {
 							*((gint*)p[j].target) |= p[j].flagval;
 						} else {
 							*((gint*)p[j].target) &= ~(p[j].flagval);
 						}
 					}
 					break;
-			}
-			if(!strcmp(p[j].paramname, "port") && !strcmp(p[j].target, modernport)) {
-				g_set_error(e, errdomain, CFILE_INCORRECT_PORT, "Config file specifies new-style port for oldstyle export");
-				g_key_file_free(cfile);
-				return NULL;
 			}
 			if(err) {
 				if(err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
