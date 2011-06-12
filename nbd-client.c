@@ -218,11 +218,10 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
-		int er;
 		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
 			err("Ioctl/1.1a failed: %m\n");
 		size = (unsigned long)(size64>>12);
-		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
+		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
 		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
 			err("Ioctl/1.1c failed: %m\n");
