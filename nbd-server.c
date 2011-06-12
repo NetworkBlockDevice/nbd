@@ -2273,6 +2273,7 @@ void glib_message_syslog_redirect(const gchar *log_domain,
         break;
       case G_LOG_LEVEL_DEBUG:
         level=LOG_DEBUG;
+	break;
       default:
         level=LOG_ERR;
     }
