@@ -435,7 +435,6 @@ int main(int argc, char *argv[]) {
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-	++argv; --argc; /* skip device */
 
 	sock = opennet(hostname, port, sdp);
 
