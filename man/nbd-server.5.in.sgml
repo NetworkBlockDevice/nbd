@@ -314,7 +314,7 @@ manpage.1: manpage.sgml
 	    (this can be used to set the directory). A unique filename
 	    is created, which is unlinked as soon as it is created,
 	    and therefore the export will not persist between
-	    invocations of <command>nbd-server</command>. Se the
+	    invocations of <command>nbd-server</command>. Set the
 	    size of the file using the <command>filesize</command>
 	    option. This option is incompatible with the
 	    <option>multifile</option> option.
