@@ -3,6 +3,7 @@
  *
  * Copyright 1997,1998 Pavel Machek, distribute under GPL
  *  <pavel@atrey.karlin.mff.cuni.cz>
+ * Copyright (c) 2002 - 2011 Wouter Verhelst <w@uter.be>
  *
  * Version 1.0 - 64bit issues should be fixed, now
  * Version 1.1 - added bs (blocksize) option (Alexey Guzeev, aga@permonline.ru)
