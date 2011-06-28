@@ -1,3 +1,12 @@
+nbd (1:2.9.22-3) unstable; urgency=low
+
+  * Add a delay between tests, so that 'make check' works again, rather
+    than failing to open a port. A proper fix for this was released
+    upstream, but that needs a bit of a wait, so this workaround should
+    be fine.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 28 Jun 2011 22:07:46 +0200
+
 nbd (1:2.9.22-2) unstable; urgency=low
 
   * Make it a non-native package again.

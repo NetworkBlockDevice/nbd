@@ -182,6 +182,12 @@ if [ -z "$2" ]
 then
 	rm -rf $tmpdir
 fi
+
+# quick and dirty fix for "port already in use" issues:
+sleep 5
+# This will add about 1:30 to the build, but whatever -- there's a fixed
+# version upstream which still needs to be uploaded.
+
 if [ $retval -ne 0 ]
 then
 	exit $retval
