@@ -131,7 +131,7 @@ manpage.1: manpage.sgml
 	  <para>The TCP port on which <command>nbd-server</command> is
 	    running at the server.</para>
 	  <para>This option is required, unless the -N option is
-	    specified, in which case it is not allowed.</para>
+	    specified.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

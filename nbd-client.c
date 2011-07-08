@@ -3,6 +3,7 @@
  *
  * Copyright 1997,1998 Pavel Machek, distribute under GPL
  *  <pavel@atrey.karlin.mff.cuni.cz>
+ * Copyright (c) 2002 - 2011 Wouter Verhelst <w@uter.be>
  *
  * Version 1.0 - 64bit issues should be fixed, now
  * Version 1.1 - added bs (blocksize) option (Alexey Guzeev, aga@permonline.ru)
@@ -218,11 +219,10 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
-		int er;
 		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
 			err("Ioctl/1.1a failed: %m\n");
 		size = (unsigned long)(size64>>12);
-		if ((er = ioctl(nbd, NBD_SET_SIZE_BLOCKS, size)) < 0)
+		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
 		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
 			err("Ioctl/1.1c failed: %m\n");
@@ -278,7 +278,8 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 	}
-	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-name|-N name]\n");
+	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
+	fprintf(stderr, "Or   : nbd-client -name|-N name host [port] nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
@@ -286,6 +287,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
 	fprintf(stderr, "blocksizes other than 1024 without patches\n");
+	fprintf(stderr, "Default value for port with -N is 10809. Note that port must always be numeric\n");
 }
 
 void disconnect(char* device) {
@@ -374,10 +376,6 @@ int main(int argc, char *argv[]) {
 						nonspecial++;
 					} else {
 						port = optarg;
-						if(name) {
-							usage("port and name specified at the same time. This is not supported.");
-							exit(EXIT_FAILURE);
-						}
 					}
 					break;
 				case 2:
@@ -406,11 +404,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'N':
 			name=optarg;
-			if(port) {
-				usage("port and name specified at the same time. This is not supported.");
-				exit(EXIT_FAILURE);
+			if(!port) {
+				port = NBD_DEFAULT_PORT;
 			}
-			port = NBD_DEFAULT_PORT;
 			break;
 		case 'p':
 			cont=1;
@@ -439,7 +435,6 @@ int main(int argc, char *argv[]) {
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-	++argv; --argc; /* skip device */
 
 	sock = opennet(hostname, port, sdp);
 

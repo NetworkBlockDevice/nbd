@@ -127,20 +127,20 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>user</option></term>
-        <listitem>
-          <para>
-	    Optional; string.
-	  </para>
+	<term><option>listenaddr</option></term>
+	<listitem>
 	  <para>
-	    The name of the user this server must run as. If this
-	    parameter is not specified, then nbd-server will not
-	    attempt to change its UID (so the UID it runs as will be
-	    the user who starts nbd-server). If it is specified, then
-	    nbd-server will change its UID after opening ports, but
-	    before accepting connections or opening files.
+	    Optional; string
 	  </para>
-        </listitem>
+	  <para>If this option is set, it should contain the local IP
+	  address on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not
+	    set, <command>nbd-server</command> will listen to all
+	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
+	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
+	  is not possible to specify more than one IP address
+	  here.</para>
+	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>oldstyle</option></term>
@@ -181,21 +181,34 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>listenaddr</option></term>
+        <term><option>port</option></term>
 	<listitem>
 	  <para>
 	    Optional; string
 	  </para>
-	  <para>If this option is set, it should contain the local IP
-	  address on which we should listen to
-	  <command>nbd-client</command>(8) connections. If it is not
-	    set, <command>nbd-server</command> will listen to all
-	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
-	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
-	  is not possible to specify more than one IP address
-	  here.</para>
+	  <para>
+	    The port on which to listen for new-style nbd-client
+	    connections. If not specified, the IANA-assigned port of
+	    10809 is used.
+	  </para>
 	</listitem>
-      </varlistentry
+      </varlistentry>
+      <varlistentry>
+	<term><option>user</option></term>
+        <listitem>
+          <para>
+	    Optional; string.
+	  </para>
+	  <para>
+	    The name of the user this server must run as. If this
+	    parameter is not specified, then nbd-server will not
+	    attempt to change its UID (so the UID it runs as will be
+	    the user who starts nbd-server). If it is specified, then
+	    nbd-server will change its UID after opening ports, but
+	    before accepting connections or opening files.
+	  </para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </refsect1>
   <refsect1>
@@ -251,7 +264,12 @@ manpage.1: manpage.sgml
 	  <para>
 	    The name of the file (or block device) that will be
 	    exported. This must be a fully-qualified path and filename;
-	    relative paths are not allowed.
+	    relative paths are not allowed. If used in conjunction with
+	    the <option>temporary</option>, this specifies a template
+	    for the temporary file concerned, and thus can be used
+	    to control the directory it is created in. If the file
+	    does not exist, but <option>filesize</option> is set, then
+	    the file will be created.
 	  </para>
 	  <para>
 	    Note that <command>nbd-server</command> will only try to
@@ -279,7 +297,27 @@ manpage.1: manpage.sgml
 	    bytes. If the <option>multifile</option> option is in
 	    effect, this option specifies the size of the
 	    <emphasis>entire</emphasis> export, not of individual
-	    files.
+	    files. If the file is not present, a single file is
+	    created of this size.
+	  </para>
+	  <para>When specified on the command line, this should be the
+	    third argument.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>temporary</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    Create a temporary export with a name based on exportname
+	    (this can be used to set the directory). A unique filename
+	    is created, which is unlinked as soon as it is created,
+	    and therefore the export will not persist between
+	    invocations of <command>nbd-server</command>. Set the
+	    size of the file using the <command>filesize</command>
+	    option. This option is incompatible with the
+	    <option>multifile</option> option.
 	  </para>
 	  <para>When specified on the command line, this should be the
 	    third argument.

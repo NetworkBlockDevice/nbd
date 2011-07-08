@@ -160,10 +160,15 @@ int dontfork = 0;
 #define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
 #define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
+#define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
+
+#define NEG_INIT	(1 << 0)
+#define NEG_OLD		(1 << 1)
+#define NEG_MODERN	(1 << 2)
 
 int modernsock=0;	  /**< Socket for the modern handler. Not used
 			       if a client was only specified on the
@@ -171,6 +176,8 @@ int modernsock=0;	  /**< Socket for the modern handler. Not used
 			       oldstyle is set to false (and then the
 			       command-line client isn't used, gna gna) */
 char* modern_listen;	  /**< listenaddr value for modernsock */
+char* modernport=NBD_DEFAULT_PORT; /**< Port number on which to listen for
+			              new-style nbd-client connections */
 
 /**
  * Types of virtuatlization
@@ -410,7 +417,7 @@ void usage() {
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
 	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
-	       "\tif port is set to 0, stdin is used (for running from inetd)\n"
+	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
 	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
@@ -768,6 +775,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "flush",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FLUSH },
 		{ "fua",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FUA },
 		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
+		{ "temporary",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TEMPORARY },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
@@ -777,6 +785,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
 		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
+		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -786,7 +795,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	GQuark errdomain;
 	GArray *retval=NULL;
 	gchar **groups;
-	gboolean value;
+	gboolean bval;
+	gint ival;
+	gchar* sval;
 	gchar* startgroup;
 	gint i;
 	gint j;
@@ -820,36 +831,35 @@ GArray* parse_cfile(gchar* f, GError** e) {
 			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
 			switch(p[j].ptype) {
 				case PARAM_INT:
-					*((gint*)p[j].target) =
-						g_key_file_get_integer(cfile,
+					ival = g_key_file_get_integer(cfile,
 								groups[i],
 								p[j].paramname,
 								&err);
+					if(!err) {
+						*((gint*)p[j].target) = ival;
+					}
 					break;
 				case PARAM_STRING:
-					*((gchar**)p[j].target) =
-						g_key_file_get_string(cfile,
+					sval = g_key_file_get_string(cfile,
 								groups[i],
 								p[j].paramname,
 								&err);
+					if(!err) {
+						*((gchar**)p[j].target) = sval;
+					}
 					break;
 				case PARAM_BOOL:
-					value = g_key_file_get_boolean(cfile,
+					bval = g_key_file_get_boolean(cfile,
 							groups[i],
 							p[j].paramname, &err);
 					if(!err) {
-						if(value) {
+						if(bval) {
 							*((gint*)p[j].target) |= p[j].flagval;
 						} else {
 							*((gint*)p[j].target) &= ~(p[j].flagval);
 						}
 					}
 					break;
-			}
-			if(!strcmp(p[j].paramname, "port") && !strcmp(p[j].target, NBD_DEFAULT_PORT)) {
-				g_set_error(e, errdomain, CFILE_INCORRECT_PORT, "Config file specifies default port for oldstyle export");
-				g_key_file_free(cfile);
-				return NULL;
 			}
 			if(err) {
 				if(err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
@@ -1013,7 +1023,9 @@ off_t size_autodetect(int fhandle) {
 	stat_buf.st_size = 0;
 	error = fstat(fhandle, &stat_buf);
 	if (!error) {
-		if(stat_buf.st_size > 0)
+		/* always believe stat if a regular file as it might really
+		 * be zero length */
+		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
 			return (off_t)stat_buf.st_size;
         } else {
                 err("fstat failed: %m");
@@ -1358,7 +1370,7 @@ int expflush(CLIENT *client) {
  *
  * @param client The client we're negotiating with.
  **/
-CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
+CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	char zeros[128];
 	uint64_t size_host;
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
@@ -1366,14 +1378,14 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
-	if(!client || !client->modern) {
+	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
 			err_nonfatal("Negotiation failed: %m");
 			if(client)
 				exit(EXIT_FAILURE);
 		}
-		if(!client || client->modern) {
+		if(phase & NEG_MODERN) {
 			/* modern */
 			magic = htonll(opts_magic);
 		} else {
@@ -1382,11 +1394,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		}
 		if (write(net, &magic, sizeof(magic)) < 0) {
 			err_nonfatal("Negotiation failed: %m");
-			if(client)
+			if(phase & NEG_OLD)
 				exit(EXIT_FAILURE);
 		}
 	}
-	if(!client) {
+	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
 		/* modern */
 		uint32_t reserved;
 		uint32_t opt;
@@ -1449,7 +1461,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers) {
 		flags |= NBD_FLAG_SEND_FUA;
 	if (client->server->flags & F_ROTATIONAL)
 		flags |= NBD_FLAG_ROTATIONAL;
-	if (!client->modern) {
+	if (phase & NEG_OLD) {
 		/* oldstyle */
 		flags = htonl(flags);
 		if (write(client->net, &flags, 4) < 0)
@@ -1490,7 +1502,7 @@ int mainloop(CLIENT *client) {
 #ifdef DODBG
 	int i = 0;
 #endif
-	negotiate(client->net, client, NULL);
+	negotiate(client->net, client, NULL, client->modern ? NEG_MODERN : (NEG_OLD | NEG_INIT));
 	DEBUG("Entering request loop!\n");
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
@@ -1636,6 +1648,8 @@ void setupexport(CLIENT* client) {
 	int i;
 	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
+	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
+	int cancreate = (client->server->expected_size) && !multifile;
 
 	client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
@@ -1646,24 +1660,35 @@ void setupexport(CLIENT* client) {
 		FILE_INFO fi;
 		gchar *tmpname;
 		gchar* error_string;
-		mode_t mode = (client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR;
 
-		if(multifile) {
-			tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+		if (i)
+		  cancreate = 0;
+		/* if expected_size is specified, and this is the first file, we can create the file */
+		mode_t mode = (client->server->flags & F_READONLY) ?
+		  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+
+		if (temporary) {
+			tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
+			DEBUG( "Opening %s\n", tmpname );
+			fi.fhandle = mkstemp(tmpname);
 		} else {
-			tmpname=g_strdup(client->exportname);
-		}
-		DEBUG( "Opening %s\n", tmpname );
-		fi.fhandle = open(tmpname, mode);
-		if(fi.fhandle == -1 && mode == O_RDWR) {
-			/* Try again because maybe media was read-only */
-			fi.fhandle = open(tmpname, O_RDONLY);
-			if(fi.fhandle != -1) {
-				/* Opening the base file in copyonwrite mode is
-				 * okay */
-				if(!(client->server->flags & F_COPYONWRITE)) {
-					client->server->flags |= F_AUTOREADONLY;
-					client->server->flags |= F_READONLY;
+			if(multifile) {
+				tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+			} else {
+				tmpname=g_strdup(client->exportname);
+			}
+			DEBUG( "Opening %s\n", tmpname );
+			fi.fhandle = open(tmpname, mode, 0x600);
+			if(fi.fhandle == -1 && mode == O_RDWR) {
+				/* Try again because maybe media was read-only */
+				fi.fhandle = open(tmpname, O_RDONLY);
+				if(fi.fhandle != -1) {
+					/* Opening the base file in copyonwrite mode is
+					 * okay */
+					if(!(client->server->flags & F_COPYONWRITE)) {
+						client->server->flags |= F_AUTOREADONLY;
+						client->server->flags |= F_READONLY;
+					}
 				}
 			}
 		}
@@ -1675,6 +1700,10 @@ void setupexport(CLIENT* client) {
 				tmpname);
 			err(error_string);
 		}
+
+		if (temporary)
+			unlink(tmpname); /* File will stick around whilst FD open */
+
 		fi.startoff = laststartoff + lastsize;
 		g_array_append_val(client->export, fi);
 		g_free(tmpname);
@@ -1684,7 +1713,17 @@ void setupexport(CLIENT* client) {
 		laststartoff = fi.startoff;
 		lastsize = size_autodetect(fi.fhandle);
 
-		if(!multifile)
+		/* If we created the file, it will be length zero */
+		if (!lastsize && cancreate) {
+			/* we can ignore errors as we recalculate the size */
+			ftruncate (fi.fhandle, client->server->expected_size);
+			lastsize = size_autodetect(fi.fhandle);
+			if (lastsize != client->server->expected_size)
+				err("Could not expand file");
+			break; /* don't look for any more files */
+		}
+
+		if(!multifile || temporary)
 			break;
 	}
 
@@ -1929,7 +1968,7 @@ int serveloop(GArray* servers) {
 			if(FD_ISSET(modernsock, &rset)) {
 				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 					err("accept: %m");
-				client = negotiate(net, NULL, servers);
+				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
 				if(!client) {
 					err_nonfatal("negotiation failed");
 					close(net);
@@ -2112,7 +2151,7 @@ void open_modern(void) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_protocol = IPPROTO_TCP;
-	e = getaddrinfo(modern_listen, NBD_DEFAULT_PORT, &hints, &ai);
+	e = getaddrinfo(modern_listen, modernport, &hints, &ai);
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		exit(EXIT_FAILURE);
@@ -2265,6 +2304,7 @@ void glib_message_syslog_redirect(const gchar *log_domain,
         break;
       case G_LOG_LEVEL_DEBUG:
         level=LOG_DEBUG;
+	break;
       default:
         level=LOG_ERR;
     }
