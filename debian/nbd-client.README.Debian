@@ -50,5 +50,5 @@ DO keep the initscript running and the nbd-client package installed on
 every client that boots off an NBD device, even if no other NBD devices
 are configured; this is required because the initscript will detect that
 you're running off an NBD device and add the nbd-client PID number to
-/lib/init/rw/sendsigs.omit.d, to prevent init from killing nbd-client
+/run/sendsigs.omit.d, to prevent init from killing nbd-client
 prematurely at shutdown.

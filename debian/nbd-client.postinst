@@ -103,6 +103,11 @@ case "$1" in
 	then
 		update-initramfs -u
 	fi
+	# Migrate sendsigs.omit.d file
+	if [ -f /lib/init/rw/sendsigs.omit.d/nbd-client ]
+	then
+		mv /lib/init/rw/sendsigs.omit.d/nbd-client /run/sendsigs.omit.d
+	fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

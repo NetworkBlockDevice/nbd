@@ -1,3 +1,10 @@
+nbd (1:2.9.22-4) unstable; urgency=low
+
+  * Migrate use of /lib/init/rw/sendsigs.omit.d to /run/sendsigs.omit.d.
+    Closes: #633032.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 08 Jul 2011 13:03:21 +0200
+
 nbd (1:2.9.22-3) unstable; urgency=low
 
   * Add a delay between tests, so that 'make check' works again, rather

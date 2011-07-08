@@ -123,7 +123,7 @@ case "$1" in
 	echo -n "Starting $DESC: "
 	$0 connect
 	$0 activate
-	if [ ! -f /lib/init/rw/sendsigs.omit.d/nbd-client ]
+	if [ ! -f /run/sendsigs.omit.d/nbd-client ]
 	then
 	  for x in $(cat /proc/cmdline); do
 	    case $x in
@@ -140,7 +140,7 @@ case "$1" in
 	  OMITKILL="$OMITKILL ${nbdrootdev%p*}"
 	  for x in $OMITKILL
 	  do
-	    nbd-client -c $x >> /lib/init/rw/sendsigs.omit.d/nbd-client
+	    nbd-client -c $x >> /run/sendsigs.omit.d/nbd-client
 	  done
 	fi
 	;;
