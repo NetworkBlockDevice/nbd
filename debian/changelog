@@ -1,9 +1,10 @@
-nbd (1:2.9.22-4) unstable; urgency=low
+nbd (1:2.9.23-1) unstable; urgency=low
 
+  * New upstream release.
   * Migrate use of /lib/init/rw/sendsigs.omit.d to /run/sendsigs.omit.d.
     Closes: #633032.
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 08 Jul 2011 13:03:21 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 08 Jul 2011 13:14:35 +0200
 
 nbd (1:2.9.22-3) unstable; urgency=low
 
