@@ -27,12 +27,12 @@ case $1 in
 	;;
 	*/cfgsize)
 		# Test oversized requests
-		./nbd-server -C /dev/null -p ${pidfile} 11111 $tmpnam &
+		./nbd-server -C /dev/null -p ${pidfile} 11112 $tmpnam &
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 11111 -o
+		./nbd-tester-client 127.0.0.1 11112 -o
 		retval=$?
 	;;
 	*/cfg1)
@@ -40,14 +40,15 @@ case $1 in
 		cat > ${conffile} <<EOF
 [generic]
 	oldstyle = true
+	port = 10809
 [export]
 	exportname = $tmpnam
-	port = 11112
+	port = 11113
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 11112
+		./nbd-tester-client 127.0.0.1 11113
 		retval=$?
 	;;
 	*/cfgmulti)
@@ -56,21 +57,22 @@ EOF
 		cat >${conffile} <<EOF
 [generic]
 	oldstyle = true
+	port = 10810
 [export1]
 	exportname = $tmpnam
-	port = 11113
+	port = 11114
 	copyonwrite = true
 	listenaddr = 127.0.0.1
 [export2]
 	exportname = $tmpnam
-	port = 11114
+	port = 11115
 	readonly = true
 	listenaddr = 127.0.0.1
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost 11113
+		./nbd-tester-client localhost 11114
 		retval=$?
 		if [ $retval -ne 0 ]
 		then
@@ -86,39 +88,42 @@ EOF
 			fi
 			exit $retval
 		fi
-		./nbd-tester-client localhost 11114
+		./nbd-tester-client localhost 11115
 		retval=$?
 	;;
 	*/cfgnew)
 		# Test new-style exports
 		cat >${conffile} <<EOF
 [generic]
+	port = 10811
 [export1]
 	exportname = $tmpnam
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1
+		./nbd-tester-client localhost -N export1 10811
 		retval=$?
 	;;
 	*/write)
 		# Test writing
 		cat >${conffile} <<EOF
 [generic]
+	port = 10812
 [export1]
 	exportname = $tmpnam
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -w
+		./nbd-tester-client localhost -N export1 10812 -w
 		retval=$?
 	;;
 	*/flush)
 		# Test writes with flush
 		cat >${conffile} <<EOF
 [generic]
+	port = 10813
 [export1]
 	exportname = $tmpnam
 	flush = true
@@ -128,13 +133,14 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -w -f
+		./nbd-tester-client localhost -N export1 10813 -w -f
 		retval=$?
 	;;
 	*/integrity)
 		# Integrity test
 		cat >${conffile} <<EOF
 [generic]
+	port = 10814
 [export1]
 	exportname = $tmpnam
 	flush = true
@@ -146,13 +152,14 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrity-test.tr
+		./nbd-tester-client localhost -N export1 10814 -i -t ${mydir}/integrity-test.tr
 		retval=$?
 	;;
 	*/integrityhuge)
 		# Integrity test
 		cat >${conffile} <<EOF
 [generic]
+	port = 10815
 [export1]
 	exportname = $tmpnam
 	flush = true
@@ -164,7 +171,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrityhuge-test.tr
+		./nbd-tester-client localhost -N export1 10815 -i -t ${mydir}/integrityhuge-test.tr
 		retval=$?
 	;;
 	*)
@@ -182,11 +189,6 @@ if [ -z "$2" ]
 then
 	rm -rf $tmpdir
 fi
-
-# quick and dirty fix for "port already in use" issues:
-sleep 5
-# This will add about 1:30 to the build, but whatever -- there's a fixed
-# version upstream which still needs to be uploaded.
 
 if [ $retval -ne 0 ]
 then
