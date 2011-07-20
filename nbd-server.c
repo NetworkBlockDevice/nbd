@@ -1004,7 +1004,7 @@ void sigterm_handler(int s) {
  **/
 off_t size_autodetect(int fhandle) {
 	off_t es;
-	u64 bytes;
+	u64 bytes __attribute__((unused));
 	struct stat stat_buf;
 	int error;
 
@@ -1381,7 +1381,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
-			err_nonfatal("Negotiation failed: %m");
+			err_nonfatal("Negotiation failed/1: %m");
 			if(client)
 				exit(EXIT_FAILURE);
 		}
@@ -1393,7 +1393,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 			magic = htonll(cliserv_magic);
 		}
 		if (write(net, &magic, sizeof(magic)) < 0) {
-			err_nonfatal("Negotiation failed: %m");
+			err_nonfatal("Negotiation failed/2: %m");
 			if(phase & NEG_OLD)
 				exit(EXIT_FAILURE);
 		}
@@ -1409,30 +1409,30 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		if(!servers)
 			err("programmer error");
 		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/3: %m");
 		if (read(net, &reserved, sizeof(reserved)) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/4: %m");
 		if (read(net, &magic, sizeof(magic)) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/5: %m");
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			close(net);
 			return NULL;
 		}
 		if (read(net, &opt, sizeof(opt)) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/6: %m");
 		opt = ntohl(opt);
 		if(opt != NBD_OPT_EXPORT_NAME) {
 			close(net);
 			return NULL;
 		}
 		if (read(net, &namelen, sizeof(namelen)) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/7: %m");
 		namelen = ntohl(namelen);
 		name = malloc(namelen+1);
 		name[namelen]=0;
 		if (read(net, name, namelen) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/8: %m");
 		for(i=0; i<servers->len; i++) {
 			SERVER* serve = &(g_array_index(servers, SERVER, i));
 			if(!strcmp(serve->servename, name)) {
@@ -1452,7 +1452,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	/* common */
 	size_host = htonll((u64)(client->exportsize));
 	if (write(net, &size_host, 8) < 0)
-		err("Negotiation failed: %m");
+		err("Negotiation failed/9: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
 	if (client->server->flags & F_FLUSH)
@@ -1465,18 +1465,18 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		/* oldstyle */
 		flags = htonl(flags);
 		if (write(client->net, &flags, 4) < 0)
-			err("Negotiation failed: %m");
+			err("Negotiation failed/10: %m");
 	} else {
 		/* modern */
 		smallflags = (uint16_t)(flags & ~((uint16_t)0));
 		smallflags = htons(smallflags);
 		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
-			err("Negotiation failed: %m");
+			err("Negotiation failed/11: %m");
 		}
 	}
 	/* common */
 	if (write(client->net, zeros, 124) < 0)
-		err("Negotiation failed: %m");
+		err("Negotiation failed/12: %m");
 	return NULL;
 }
 
@@ -1551,7 +1551,7 @@ int mainloop(CLIENT *client) {
 			currlen = len;
 			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
 				currlen = BUFSIZE - sizeof(struct nbd_reply);
-				msg2(LOG_INFO, "oversized request (this is not a problem)");
+				msg2(LOG_DEBUG, "oversized request (this is not a problem)");
 			}
 		}
 
@@ -2055,23 +2055,31 @@ void dosockopts(int socket) {
 #else
 	char yes='1';
 #endif /* sun */
-	int sock_flags;
+	struct linger l;
+
+	//int sock_flags;
 
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
 	        err("setsockopt SO_REUSEADDR");
+	}
+	l.l_onoff = 1;
+	l.l_linger = 10;
+	if (setsockopt(socket,SOL_SOCKET,SO_LINGER,&l,sizeof(l)) == -1) {
+	        perror("setsockopt SO_LINGER");
+		exit(EXIT_FAILURE);
 	}
 	if (setsockopt(socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
 		err("setsockopt SO_KEEPALIVE");
 	}
 
 	/* make the listening socket non-blocking */
-	if ((sock_flags = fcntl(socket, F_GETFL, 0)) == -1) {
+	/*if ((sock_flags = fcntl(socket, F_GETFL, 0)) == -1) {
 		err("fcntl F_GETFL");
 	}
 	if (fcntl(socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
 		err("fcntl F_SETFL O_NONBLOCK");
-	}
+	}*/
 }
 
 /**
