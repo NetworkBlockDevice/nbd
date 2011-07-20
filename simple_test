@@ -40,7 +40,6 @@ case $1 in
 		cat > ${conffile} <<EOF
 [generic]
 	oldstyle = true
-	port = 10809
 [export]
 	exportname = $tmpnam
 	port = 11113
@@ -57,7 +56,6 @@ EOF
 		cat >${conffile} <<EOF
 [generic]
 	oldstyle = true
-	port = 10810
 [export1]
 	exportname = $tmpnam
 	port = 11114
@@ -95,35 +93,32 @@ EOF
 		# Test new-style exports
 		cat >${conffile} <<EOF
 [generic]
-	port = 10811
 [export1]
 	exportname = $tmpnam
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 10811
+		./nbd-tester-client localhost -N export1 
 		retval=$?
 	;;
 	*/write)
 		# Test writing
 		cat >${conffile} <<EOF
 [generic]
-	port = 10812
 [export1]
 	exportname = $tmpnam
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 10812 -w
+		./nbd-tester-client localhost -N export1 -w
 		retval=$?
 	;;
 	*/flush)
 		# Test writes with flush
 		cat >${conffile} <<EOF
 [generic]
-	port = 10813
 [export1]
 	exportname = $tmpnam
 	flush = true
@@ -133,14 +128,13 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 10813 -w -f
+		./nbd-tester-client localhost -N export1 -w -f
 		retval=$?
 	;;
 	*/integrity)
 		# Integrity test
 		cat >${conffile} <<EOF
 [generic]
-	port = 10814
 [export1]
 	exportname = $tmpnam
 	flush = true
@@ -152,14 +146,13 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 10814 -i -t ${mydir}/integrity-test.tr
+		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrity-test.tr
 		retval=$?
 	;;
 	*/integrityhuge)
 		# Integrity test
 		cat >${conffile} <<EOF
 [generic]
-	port = 10815
 [export1]
 	exportname = $tmpnam
 	flush = true
@@ -171,7 +164,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 10815 -i -t ${mydir}/integrityhuge-test.tr
+		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrityhuge-test.tr
 		retval=$?
 	;;
 	*)

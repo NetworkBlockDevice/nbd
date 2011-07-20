@@ -3,9 +3,6 @@ nbd (1:2.9.23-1) unstable; urgency=low
   * New upstream release.
   * Migrate use of /lib/init/rw/sendsigs.omit.d to /run/sendsigs.omit.d.
     Closes: #633032.
-  * Revert our quick and dirty workaround for make check failing on some
-    architectures (which it didn't acutally work around), and really fix
-    it by varying the ports we use in the test suite.
   * Steal commit 4659322a6dee9cce51130df7e4d805bd6b0cb0c5 from git HEAD
     so that it will actually work on FreeBSD again. I hope.
 
