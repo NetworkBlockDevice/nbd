@@ -6,8 +6,10 @@ nbd (1:2.9.23-1) unstable; urgency=low
   * Revert our quick and dirty workaround for make check failing on some
     architectures (which it didn't acutally work around), and really fix
     it by varying the ports we use in the test suite.
+  * Steal commit 4659322a6dee9cce51130df7e4d805bd6b0cb0c5 from git HEAD
+    so that it will actually work on FreeBSD again. I hope.
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 08 Jul 2011 13:18:09 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 20 Jul 2011 19:02:30 +0200
 
 nbd (1:2.9.22-3) unstable; urgency=low
 
