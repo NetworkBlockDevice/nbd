@@ -179,6 +179,8 @@ char* modern_listen;	  /**< listenaddr value for modernsock */
 char* modernport=NBD_DEFAULT_PORT; /**< Port number on which to listen for
 			              new-style nbd-client connections */
 
+bool logged_oversized=false;  /**< whether we logged oversized requests already */
+
 /**
  * Types of virtuatlization
  **/
@@ -1551,7 +1553,10 @@ int mainloop(CLIENT *client) {
 			currlen = len;
 			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
 				currlen = BUFSIZE - sizeof(struct nbd_reply);
-				msg2(LOG_DEBUG, "oversized request (this is not a problem)");
+				if(!logged_oversized) {
+					msg2(LOG_DEBUG, "oversized request (this is not a problem)");
+					logged_oversized = true;
+				}
 			}
 		}
 
