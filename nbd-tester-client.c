@@ -1184,7 +1184,7 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 			free(prc);
 		}
 
-		if (!(printer++ % 10000) || !(readtransactionfile || txqueue.numitems || inflight.numitems) )
+		if (!(printer++ % 1000) || !(readtransactionfile || txqueue.numitems || inflight.numitems) )
 			printf("%d: Seq %08lld Queued: %08d Inflight: %08d Done: %08lld\n",
 			       (int)mypid,
 			       (long long int) seq,
