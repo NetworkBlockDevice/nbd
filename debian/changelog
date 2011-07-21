@@ -3,6 +3,10 @@ nbd (1:2.9.23-2) unstable; urgency=low
   * Add missing dependency on initscripts (>= 2.88dsf-13.3), as the
     bugreport tells me to, so that the migration to /run in the previous
     upload doesn't break.
+  * Fix 32/64 bit pointer confusion, so that specifying a file size in
+    the config file works on big-endian architectures, too.
+  * Make oversized request log occur only once per client, so that we
+    don't overrun the buildd timeout on the integrityhuge test.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 20 Jul 2011 21:00:50 +0200
 
