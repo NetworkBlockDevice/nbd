@@ -1,3 +1,10 @@
+nbd (1:2.9.23-3) unstable; urgency=low
+
+  * Disable integrityhuge test for now, as it deadlocks on some
+    architectures for no good reason.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 22 Jul 2011 22:51:31 +0200
+
 nbd (1:2.9.23-2) unstable; urgency=low
 
   * Add missing dependency on initscripts (>= 2.88dsf-13.3), as the
