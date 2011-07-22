@@ -62,16 +62,16 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/select.h>		/* select */
-#include <sys/wait.h>		/* wait */
+#include <sys/select.h>
+#include <sys/wait.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
 #include <sys/param.h>
 #ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>		/* For BLKGETSIZE */
+#include <sys/mount.h>
 #endif
-#include <signal.h>		/* sigaction */
+#include <signal.h>
 #include <errno.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
