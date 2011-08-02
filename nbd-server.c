@@ -90,6 +90,7 @@
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
+#include <dirent.h>
 
 #include <glib.h>
 
@@ -609,6 +610,8 @@ typedef enum {
 				     define any exports */
 	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
 				     old-style export. */
+	CFILE_DIR_UNKNOWN,	/**< A directory requested does not exist*/
+	CFILE_READDIR_ERR,	/**< Error occurred during readdir() */
 } CFILE_ERRORS;
 
 /**
@@ -746,6 +749,52 @@ int append_serve(SERVER *s, GArray *a) {
 	return ret;
 }
 
+/* forward definition of parse_cfile */
+GArray* parse_cfile(gchar* f, bool have_global, GError** e);
+
+/**
+ * Parse config file snippets in a directory. Uses readdir() and friends
+ * to find files and open them, then passes them on to parse_cfile
+ * with have_global set false
+ **/
+GArray* do_cfile_dir(gchar* dir, GError** e) {
+	DIR* dirh = opendir(dir);
+	GQuark errdomain = g_quark_from_string("do_cfile_dir");
+	struct dirent* de;
+	GArray* retval = NULL;
+	GArray* tmp;
+
+	if(!dir) {
+		g_set_error(e, errdomain, CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
+		return NULL;
+	}
+	errno=0;
+	while((de = readdir(dirh))) {
+		switch(de->d_type) {
+			case DT_REG:
+				/* Skip unless the name ends with '.conf' */
+				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
+					continue;
+				}
+				tmp = parse_cfile(de->d_name, FALSE, e);
+				retval = g_array_append_vals(retval, tmp->data, tmp->len);
+				g_array_free(tmp, TRUE);
+				if(*e) {
+					goto err_out;
+				}
+			default:
+				break;
+		}
+	}
+	if(errno) {
+		g_set_error(e, errdomain, CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
+	err_out:
+		g_array_free(retval, TRUE);
+		return NULL;
+	}
+	return retval;
+}
+
 /**
  * Parse the config file.
  *
@@ -756,9 +805,10 @@ int append_serve(SERVER *s, GArray *a) {
  *	exist, returns an empty GHashTable; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, GError** e) {
+GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
+	gchar* cfdir = NULL;
 	SERVER s;
 	gchar *virtstyle=NULL;
 	PARAM lp[] = {
@@ -790,6 +840,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
+		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -826,8 +877,9 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
 
-		/* After the [generic] group, start parsing exports */
-		if(i==1) {
+		/* After the [generic] group or when we're parsing an include
+		 * directory, start parsing exports */
+		if(i==1 || !have_global) {
 			p=lp;
 			p_size=lp_size;
 		} 
@@ -949,6 +1001,18 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
 	g_key_file_free(cfile);
+	if(cfdir) {
+		GArray* extra = do_cfile_dir(cfdir, e);
+		if(extra) {
+			retval = g_array_append_vals(retval, extra->data, extra->len);
+			g_array_free(extra, TRUE);
+		} else {
+			if(*e) {
+				g_array_free(retval, TRUE);
+				return NULL;
+			}
+		}
+	}
 	return retval;
 }
 
@@ -2355,7 +2419,7 @@ int main(int argc, char *argv[]) {
 	logging();
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
-	servers = parse_cfile(config_file_pos, &err);
+	servers = parse_cfile(config_file_pos, TRUE, &err);
 	
 	if(serve) {
 		serve->socket_family = AF_UNSPEC;
