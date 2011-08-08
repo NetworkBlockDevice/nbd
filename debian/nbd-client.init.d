@@ -1,9 +1,5 @@
 #! /bin/bash
 # vim: ft=sh
-# We use some bashisms (arrays), so /bin/sh won't work.
-# I hope this is policy-compliant; I couldn't find anything different,
-# but if so, I'm gonna need help here to find a better way of handling
-# this.
 #
 # skeleton	example file to build /etc/init.d/ scripts.
 #		This file should be used to construct scripts for /etc/init.d.
