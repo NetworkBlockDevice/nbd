@@ -24,7 +24,7 @@ override_dh_install:
 	dh_install -s
 
 override_dh_installinit:
-	dh_installinit -p nbd-client --no-start -- start 41 S . start 34 0 6 .
+	dh_installinit -p nbd-client --no-start -- start 41 S . stop 34 0 6 .
 	dh_installinit -p nbd-server
 
 debian/po/templates.pot: debian/nbd-client.templates debian/nbd-server.templates

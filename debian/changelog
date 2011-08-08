@@ -1,3 +1,9 @@
+nbd (1:2.9.23-4) UNRELEASED; urgency=low
+
+  * Fix dh_installinit invocation. LP: #822304.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 08 Aug 2011 07:54:08 +0200
+
 nbd (1:2.9.23-3) unstable; urgency=low
 
   * Disable integrityhuge test for now, as it deadlocks on some
