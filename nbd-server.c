@@ -868,7 +868,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if(!startgroup || strcmp(startgroup, "generic")) {
+	if((!startgroup || strcmp(startgroup, "generic")) && have_global) {
 		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
