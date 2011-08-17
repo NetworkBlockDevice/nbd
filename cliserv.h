@@ -39,6 +39,10 @@ typedef unsigned long long u64;
 #define __be64 u64
 #include "nbd.h"
 
+#ifndef HAVE_FDATASYNC
+#define fdatasync(arg) fsync(arg)
+#endif
+
 #if NBD_LFS==1
 /* /usr/include/features.h (included from /usr/include/sys/types.h)
    defines this when _GNU_SOURCE is defined
