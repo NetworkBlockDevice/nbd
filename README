@@ -67,8 +67,17 @@ This configuration file is expected to be found at
 	# _before_ opening files.
 	user = nbd
 	group = nbd
+	# Since version 2.9.17, nbd-server will do exports on a name
+	# basis (the used name is the name of the section in which the
+	# export is specified). This however required an incompatible
+	# protocol change. To enable backwards-compatible port-based
+	# exports, uncomment the following line:
+	# oldstyle = true
 [export1]
 	exportname = /export/nbd/export1-file
+	# The following line will be ignored unless the 
+	# "oldstyle = true" line in the generic section above is
+	# enabled.
 	port = 12345
 	authfile = /export/nbd/export1-authfile
 	timeout = 30
@@ -80,8 +89,9 @@ This configuration file is expected to be found at
 	postrun = rm -f %s
 [otherexport]
 	exportname = /export/nbd/experiment
-	port = 12346
-	# The other options are all optional.
+	# The other options are all optional, except this one in case
+	# the oldstyle option is used in [generic]:
+	# port = 12346
 
 The configuration file is parsed with GLib's GKeyFile, which parses key
 files as they are specified in the Freedesktop.org Desktop Entry
