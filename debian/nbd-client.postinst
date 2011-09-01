@@ -64,7 +64,7 @@ case "$1" in
                     device=$RET
 		    db_get nbd-client/extra$i
 		    extra=$RET
-                    [ -e $device ] || mknod $device b 43 $(( $i + 0 ))
+                    [ -e "$device" ] || mknod "$device" b 43 $(( $i + 0 ))
                     db_get nbd-client/type$i
                     case "$RET" in
                         "swap")
@@ -77,6 +77,10 @@ case "$1" in
                             type_="r"
                             ;;
                     esac
+                    if [ -z "$host" -o -z "$port" -o -z "$device" ]
+                    then
+                        type_= # Ensure device will be skipped
+                    fi
                     i=$(( $i + 0 ))
                     sed -i -e 's:\(^NBD_DEVICE\['$i'\]\=\).*:\1"'$device'":g' -e \
                         's/\(^NBD_TYPE\['$i'\]=\).*/\1"'$type_'"/g' -e \

@@ -34,9 +34,9 @@ test -x $DAEMON || exit 0
 get_devices() {
     DEVICES=
     i=0
-    while [ ! -z ${NBD_TYPE[$i]} ]
+    while [ ! -z "${NBD_TYPE[$i]}" ]
     do
-	if [ ${NBD_TYPE[$i]} == "$1" ]
+	if [ "${NBD_TYPE[$i]}" == "$1" ]
 	then
 	    DEVICES="$DEVICES ${NBD_DEVICE[$i]}"
 	fi
@@ -90,16 +90,16 @@ case "$1" in
 	modprobe nbd
 	echo -n 'Connecting...'
 	i=0
-	while [ ! -z ${NBD_TYPE[$i]} ]
+	while [ ! -z "${NBD_TYPE[$i]}" ]
 	  do
 	  # cfq deadlocks NBD devices, so switch to something else if cfq is
 	  # selected by default
 	  # This doesn't take into account non-udev devnames, but since
 	  # there's really no other option these days...
-	  if grep '\[cfq\]' /sys/block/${NBD_DEVICE[$i]/\/dev\//}/queue/scheduler >/dev/null; then
-	  	echo deadline > /sys/block/${NBD_DEVICE[$i]/\/dev\//}/queue/scheduler
+	  if grep '\[cfq\]' "/sys/block/${NBD_DEVICE[$i]/\/dev\//}/queue/scheduler" >/dev/null; then
+	  	echo deadline > "/sys/block/${NBD_DEVICE[$i]/\/dev\//}/queue/scheduler"
 	  fi
-	  if nbd-client -c ${NBD_DEVICE[$i]} >/dev/null
+	  if nbd-client -c "${NBD_DEVICE[$i]}" >/dev/null
 	  then
 	  	echo "${NBD_DEVICE[$i]} already connected, skipping..."
 	  else
@@ -109,7 +109,7 @@ case "$1" in
 		else
 			name=""
 		fi
-	  	$DAEMON ${NBD_HOST[$i]} $name ${NBD_PORT[$i]} ${NBD_DEVICE[$i]} ${NBD_EXTRA[$i]}
+	  	$DAEMON "${NBD_HOST[$i]}" $name "${NBD_PORT[$i]}" "${NBD_DEVICE[$i]}" ${NBD_EXTRA[$i]}
 	  	echo "connected ${NBD_DEVICE[$i]}"
 	  fi
 	  i=$(($i + 1))
@@ -143,16 +143,16 @@ case "$1" in
     activate)
 	echo 'Activating...'
 	i=0
-	while [ ! -z ${NBD_TYPE[$i]} ]
+	while [ ! -z "${NBD_TYPE[$i]}" ]
 	do
 	  case ${NBD_TYPE[$i]} in
 	      "s")
-	      	  /sbin/mkswap ${NBD_DEVICE[$i]}
-		  /sbin/swapon ${NBD_DEVICE[$i]}
+	      	  /sbin/mkswap "${NBD_DEVICE[$i]}"
+		  /sbin/swapon "${NBD_DEVICE[$i]}"
 		  echo "${NBD_DEVICE[$i]}: swap activated."
 		  ;;
 	      "f")
-	          line=$(grep ${NBD_DEVICE[$i]} /etc/fstab | grep "_netdev")
+	          line=$(grep "${NBD_DEVICE[$i]}" /etc/fstab | grep "_netdev")
 		  if [ -z "$line" ]
 		  then
 		    # sysvinit takes care of these.
@@ -160,10 +160,10 @@ case "$1" in
 		    case "$TERM" in
 		      dumb|network|unknown|"") spinner="" ;;
 		    esac
-		    /sbin/fsck $spinner -a ${NBD_DEVICE[$i]}
+		    /sbin/fsck $spinner -a "${NBD_DEVICE[$i]}"
 		    if [ $? -lt 2 ]
 		        then
-		        /bin/mount ${NBD_DEVICE[$i]}
+		        /bin/mount "${NBD_DEVICE[$i]}"
 		        echo "${NBD_DEVICE[$i]}: filesystem mounted."
 		    else
 		        echo "fsck of ${NBD_DEVICE[$i]} failed. Not mounting."
