@@ -6,6 +6,7 @@ nbd (1:2.9.23-4) UNRELEASED; urgency=low
     variables, as that one is supposed to be able to contain multiple
     values.
   * Also properly quote nbd-client.config. Closes: #628388.
+  * Improve error handling in nbd-client initscript. Closes: #628389
 
  -- Wouter Verhelst <wouter@debian.org>  Mon, 08 Aug 2011 07:54:08 +0200
 

@@ -103,14 +103,18 @@ case "$1" in
 	  then
 	  	echo "${NBD_DEVICE[$i]} already connected, skipping..."
 	  else
-	  	if [ ! -z ${NBD_NAME[$i]} ]
+	  	if [ ! -z "${NBD_NAME[$i]}" ]
 		then
 			name="-N ${NBD_NAME[$i]}"
 		else
 			name=""
 		fi
-	  	$DAEMON "${NBD_HOST[$i]}" $name "${NBD_PORT[$i]}" "${NBD_DEVICE[$i]}" ${NBD_EXTRA[$i]}
-	  	echo "connected ${NBD_DEVICE[$i]}"
+	  	if $DAEMON "${NBD_HOST[$i]}" $name "${NBD_PORT[$i]}" "${NBD_DEVICE[$i]}" ${NBD_EXTRA[$i]}
+		then
+	  		echo "connected ${NBD_DEVICE[$i]}"
+		else
+			echo "could not connect ${NBD_DEVICE[$i]}"
+		fi
 	  fi
 	  i=$(($i + 1))
 	done
@@ -143,9 +147,9 @@ case "$1" in
     activate)
 	echo 'Activating...'
 	i=0
-	while [ ! -z "${NBD_TYPE[$i]}" ]
+	while [ ! -z "${NBD_TYPE[$i]}" -a nbd-client -c "${NBD_DEVICE[$i]}" ]
 	do
-	  case ${NBD_TYPE[$i]} in
+	  case "${NBD_TYPE[$i]}" in
 	      "s")
 	      	  /sbin/mkswap "${NBD_DEVICE[$i]}"
 		  /sbin/swapon "${NBD_DEVICE[$i]}"
