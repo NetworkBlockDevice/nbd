@@ -1929,17 +1929,20 @@ void set_peername(int net, CLIENT *client) {
 	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0)
-		err("getsockname failed: %m");
+		err("getpeername failed: %m");
 
-	getnameinfo((struct sockaddr *)&addrin, addrinlen,
-		peername, sizeof (peername), NULL, 0, NI_NUMERICHOST);
+	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
+			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
+		msg2("getnameinfo failed: %s", gai_strerror(e));
+		freeaddrinfo(ai);
+	}
 
 	memset(&hints, '\0', sizeof (hints));
 	hints.ai_flags = AI_ADDRCONFIG;
 	e = getaddrinfo(peername, NULL, &hints, &ai);
 
 	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		msg2("getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 		return;
 	}
