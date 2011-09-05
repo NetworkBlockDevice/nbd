@@ -1918,7 +1918,7 @@ void set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage netaddr;
 	struct sockaddr_in  *netaddr4 = NULL;
 	struct sockaddr_in6 *netaddr6 = NULL;
-	size_t addrinlen = sizeof( addrin );
+	socklen_t addrinlen = sizeof( addrin );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	char peername[NI_MAXHOST];
@@ -1928,10 +1928,10 @@ void set_peername(int net, CLIENT *client) {
 	int e;
 	int shift;
 
-	if (getpeername(net, (struct sockaddr *) &addrin, (socklen_t *)&addrinlen) < 0)
+	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0)
 		err("getsockname failed: %m");
 
-	getnameinfo((struct sockaddr *)&addrin, (socklen_t)addrinlen,
+	getnameinfo((struct sockaddr *)&addrin, addrinlen,
 		peername, sizeof (peername), NULL, 0, NI_NUMERICHOST);
 
 	memset(&hints, '\0', sizeof (hints));
@@ -1964,7 +1964,7 @@ void set_peername(int net, CLIENT *client) {
 				(netaddr4->sin_addr).s_addr>>=32-(client->server->cidrlen);
 				(netaddr4->sin_addr).s_addr<<=32-(client->server->cidrlen);
 
-				getnameinfo((struct sockaddr *) netaddr4, (socklen_t) addrinlen,
+				getnameinfo((struct sockaddr *) netaddr4, addrinlen,
 							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
 				tmp=g_strdup_printf("%s/%s", netname, peername);
 			}else if(ai->ai_family == AF_INET6) {
@@ -1980,7 +1980,7 @@ void set_peername(int net, CLIENT *client) {
 				(netaddr6->sin6_addr).s6_addr[i]>>=shift;
 				(netaddr6->sin6_addr).s6_addr[i]<<=shift;
 
-				getnameinfo((struct sockaddr *)netaddr6, (socklen_t)addrinlen,
+				getnameinfo((struct sockaddr *)netaddr6, addrinlen,
 					    netname, sizeof(netname), NULL, 0, NI_NUMERICHOST);
 				tmp=g_strdup_printf("%s/%s", netname, peername);
 			}
