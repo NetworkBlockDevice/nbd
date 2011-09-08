@@ -652,6 +652,23 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>trim</option></term>
+	<listitem>
+	  <para>Optional; boolean</para>
+	  <para>When this option is activated, the server announces it
+	    supports the NBD_CMD_TRIM command for the export. This
+	    command allows the server to discard the data from the disk,
+	    but does not require it to.
+	  </para>
+	  <para>
+	    Since nbd-server does not currently implement discarding
+	    data yet, this option does nothing (beyond allowing the
+	    client to send extra data to the server that it can't do
+	    anything useful with).
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>virtstyle</option></term>
 	<listitem>
 	  <para>Optional; string; default "ipliteral"</para>
