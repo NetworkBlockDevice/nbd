@@ -26,8 +26,8 @@ server during the handshake.
 There are two message types in the data pushing phase: the request, and
 the response.
 
-There are four request types in the data pushing phase: NBD_CMD_READ,
-NBD_CMD_WRITE, NBD_CMD_DISC (disconnect), and NBD_CMD_FLUSH.
+There are five request types in the data pushing phase: NBD_CMD_READ,
+NBD_CMD_WRITE, NBD_CMD_DISC (disconnect), NBD_CMD_FLUSH, NBD_CMD_TRIM.
 
 The request is sent by the client; the response by the server. A request
 header consists a 32 bit magic number (magic), a 32 bit field denoting
@@ -37,6 +37,9 @@ write request, the header is immediately followed by 'len' bytes of
 data. In the case of NBD_CMD_FLUSH, the offset and length should
 be zero (meaning "flush entire device"); other values are reserved
 for future use (e.g. for flushing specific areas without a write).
+
+Bits 16 and above of the commands are reserved for flags.  Right
+now, the only flag is NBD_CMD_FLAG_FUA (bit 16), "Force unit access".
 
 The reply contains three fields: a 32 bit magic number ('magic'), a 32
 bit error code ('error'; 0, unless an error occurred in which case it is
@@ -77,8 +80,7 @@ description of the data that is sent.
 S: "NBDMAGIC" (the INIT_PASSWD in the code)
 S: 0x00420281861253 (cliserv_magic, a magic number)
 S: size of the export in bytes, 64 bit unsigned int
-S: flags, 4 bytes (may have the NBD_FLAG_READ_ONLY flag set if the
-   export is read-only; the rest is reserved)
+S: flags, 4 bytes
 S: 124 bytes of zeroes (registered for future use, yes this is
    excessive).
 
@@ -140,8 +142,7 @@ Once all options are set, the server replies with information about the
 used export:
 
 S: size of the export in bytes, 64 bit unsigned int
-S: flags (16 bits unsigned int, may contain NBD_FLAG_READ_ONLY if the
-   export is read-only)
+S: flags (16 bits unsigned int)
 S: 124 bytes of zeroes (forgot to remove that, oops)
 
 The reason that the flags field is 16 bits large and not 32 as in the
@@ -154,3 +155,26 @@ out of flags, the server will set the most significant flag bit,
 signalling that an extra flag field will follow, to which the client
 will have to reply with a flag field of its own before the extra flags
 are sent. This is not yet implemented.
+
+Flag bits
+---------
+
+bit 0 - NBD_FLAG_HAS_FLAGS
+should always be 1
+
+bit 1 - NBD_FLAG_READ_ONLY
+should be set to 1 if the export is read-only
+
+bit 2 - NBD_FLAG_SEND_FLUSH
+should be set to 1 if the server supports NBD_CMD_FLUSH commands
+
+bit 3 - NBD_FLAG_SEND_FUA
+should be set to 1 if the server supports the NBD_CMD_FLAG_FUA flag
+
+bit 4 - NBD_FLAG_ROTATIONAL
+should be set to 1 to let the client schedule I/O accesses as for a
+rotational medium
+
+bit 5 - NBD_FLAG_SEND_TRIM
+should be set to 1 if the server supports NBD_CMD_TRIM commands
+

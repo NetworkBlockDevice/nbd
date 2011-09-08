@@ -163,6 +163,7 @@ int dontfork = 0;
 #define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
+#define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -830,6 +831,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		{ "fua",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FUA },
 		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
 		{ "temporary",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TEMPORARY },
+		{ "trim",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TRIM },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
@@ -1539,6 +1541,8 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		flags |= NBD_FLAG_SEND_FUA;
 	if (client->server->flags & F_ROTATIONAL)
 		flags |= NBD_FLAG_ROTATIONAL;
+	if (client->server->flags & F_TRIM)
+		flags |= NBD_FLAG_SEND_TRIM;
 	if (phase & NEG_OLD) {
 		/* oldstyle */
 		flags = htonl(flags);
@@ -1710,6 +1714,13 @@ int mainloop(CLIENT *client) {
 				writelen = currlen;
 			}
 			DEBUG("OK!\n");
+			continue;
+
+		case NBD_CMD_TRIM:
+			/* The kernel module sets discard_zeroes_data == 0,
+			 * so it is okay to do nothing.  */
+			DEBUG ("Ignoring trim request\n");
+			SEND(client->net, reply);
 			continue;
 
 		default:
