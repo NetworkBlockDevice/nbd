@@ -3,7 +3,7 @@ bin_PROGRAMS = nbd-server nbd-trdump
 sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client make-integrityhuge
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
-TESTS = cmd cfg1 cfgmulti cfgnew cfgsize write flush integrity integrityhuge
+TESTS = cmd cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig #integrityhuge
 check_PROGRAMS = nbd-tester-client
 nbd_client_SOURCES = nbd-client.c cliserv.h
 nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h
@@ -27,4 +27,4 @@ write:
 flush:
 integrity:
 integrityhuge:
-
+dirconfig:

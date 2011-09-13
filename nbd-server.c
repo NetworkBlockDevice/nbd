@@ -127,9 +127,9 @@ int dontfork = 0;
 #define msg3(a,b,c) syslog(a,b,c)
 #define msg4(a,b,c,d) syslog(a,b,c,d)
 #else
-#define msg2(a,b) g_message(b)
-#define msg3(a,b,c) g_message(b,c)
-#define msg4(a,b,c,d) g_message(b,c,d)
+#define msg2(a,b) g_message((char*)b)
+#define msg3(a,b,c) g_message((char*)b,c)
+#define msg4(a,b,c,d) g_message((char*)b,c,d)
 #endif
 
 /* Debugging macros */
@@ -762,6 +762,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	DIR* dirh = opendir(dir);
 	GQuark errdomain = g_quark_from_string("do_cfile_dir");
 	struct dirent* de;
+	gchar* fname;
 	GArray* retval = NULL;
 	GArray* tmp;
 
@@ -777,12 +778,16 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					continue;
 				}
-				tmp = parse_cfile(de->d_name, FALSE, e);
-				retval = g_array_append_vals(retval, tmp->data, tmp->len);
-				g_array_free(tmp, TRUE);
+				fname = g_build_filename(dir, de->d_name, NULL);
+				tmp = parse_cfile(fname, FALSE, e);
 				if(*e) {
 					goto err_out;
 				}
+				if(!retval)
+					retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
+				retval = g_array_append_vals(retval, tmp->data, tmp->len);
+				g_array_free(tmp, TRUE);
+				g_free(fname);
 			default:
 				break;
 		}
@@ -790,7 +795,8 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	if(errno) {
 		g_set_error(e, errdomain, CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
 	err_out:
-		g_array_free(retval, TRUE);
+		if(retval)
+			g_array_free(retval, TRUE);
 		return NULL;
 	}
 	return retval;
@@ -884,6 +890,9 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		if(i==1 || !have_global) {
 			p=lp;
 			p_size=lp_size;
+			if(!do_oldstyle) {
+				lp[1].required = 0;
+			}
 		} 
 		for(j=0;j<p_size;j++) {
 			g_assert(p[j].target != NULL);
@@ -980,15 +989,11 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0) {
+		if(i>0 || !have_global) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
 			append_serve(&s, retval);
-		} else {
-			if(!do_oldstyle) {
-				lp[1].required = 0;
-			}
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -999,14 +1004,12 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		}
 #endif
 	}
-	if(i==1) {
-		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
-	}
 	g_key_file_free(cfile);
 	if(cfdir) {
 		GArray* extra = do_cfile_dir(cfdir, e);
 		if(extra) {
 			retval = g_array_append_vals(retval, extra->data, extra->len);
+			i+=extra->len;
 			g_array_free(extra, TRUE);
 		} else {
 			if(*e) {
@@ -1014,6 +1017,9 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 				return NULL;
 			}
 		}
+	}
+	if(i==1 && have_global) {
+		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
 	return retval;
 }
