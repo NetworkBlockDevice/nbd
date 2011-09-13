@@ -1248,7 +1248,6 @@ int main(int argc, char**argv) {
 	char* name = NULL;
 	int sock=0;
 	int c;
-	bool want_port = TRUE;
 	int nonopt=0;
 	int testflags=0;
 	testfunc test = throughput_test;
@@ -1285,7 +1284,6 @@ int main(int argc, char**argv) {
 				if(!p) {
 					p = 10809;
 				}
-				want_port = false;
 				break;
 			case 't':
 				transactionlog=g_strdup(optarg);
