@@ -131,6 +131,23 @@ EOF
 		./nbd-tester-client localhost -N export1 -w -f
 		retval=$?
 	;;
+	*/dirconfig)
+		# config.d-style configuration
+		cat >${conffile} <<EOF
+[generic]
+	includedir = $tmpdir/confdir
+EOF
+		mkdir $tmpdir/confdir
+		cat >$tmpdir/confdir/exp1.conf <<EOF
+[export1]
+	exportname = $tmpnam
+EOF
+		./nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client localhost -N export1
+		retval=$?
+	;;
 	*/integrity)
 		# Integrity test
 		cat >${conffile} <<EOF

@@ -62,16 +62,16 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/select.h>		/* select */
-#include <sys/wait.h>		/* wait */
+#include <sys/select.h>
+#include <sys/wait.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
 #include <sys/param.h>
 #ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>		/* For BLKGETSIZE */
+#include <sys/mount.h>
 #endif
-#include <signal.h>		/* sigaction */
+#include <signal.h>
 #include <errno.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -90,6 +90,7 @@
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
+#include <dirent.h>
 
 #include <glib.h>
 
@@ -126,9 +127,9 @@ int dontfork = 0;
 #define msg3(a,b,c) syslog(a,b,c)
 #define msg4(a,b,c,d) syslog(a,b,c,d)
 #else
-#define msg2(a,b) g_message(b)
-#define msg3(a,b,c) g_message(b,c)
-#define msg4(a,b,c,d) g_message(b,c,d)
+#define msg2(a,b) g_message((char*)b)
+#define msg3(a,b,c) g_message((char*)b,c)
+#define msg4(a,b,c,d) g_message((char*)b,c,d)
 #endif
 
 /* Debugging macros */
@@ -162,6 +163,7 @@ int dontfork = 0;
 #define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
+#define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -609,6 +611,8 @@ typedef enum {
 				     define any exports */
 	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
 				     old-style export. */
+	CFILE_DIR_UNKNOWN,	/**< A directory requested does not exist*/
+	CFILE_READDIR_ERR,	/**< Error occurred during readdir() */
 } CFILE_ERRORS;
 
 /**
@@ -746,6 +750,58 @@ int append_serve(SERVER *s, GArray *a) {
 	return ret;
 }
 
+/* forward definition of parse_cfile */
+GArray* parse_cfile(gchar* f, bool have_global, GError** e);
+
+/**
+ * Parse config file snippets in a directory. Uses readdir() and friends
+ * to find files and open them, then passes them on to parse_cfile
+ * with have_global set false
+ **/
+GArray* do_cfile_dir(gchar* dir, GError** e) {
+	DIR* dirh = opendir(dir);
+	GQuark errdomain = g_quark_from_string("do_cfile_dir");
+	struct dirent* de;
+	gchar* fname;
+	GArray* retval = NULL;
+	GArray* tmp;
+
+	if(!dir) {
+		g_set_error(e, errdomain, CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
+		return NULL;
+	}
+	errno=0;
+	while((de = readdir(dirh))) {
+		switch(de->d_type) {
+			case DT_REG:
+				/* Skip unless the name ends with '.conf' */
+				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
+					continue;
+				}
+				fname = g_build_filename(dir, de->d_name, NULL);
+				tmp = parse_cfile(fname, FALSE, e);
+				if(*e) {
+					goto err_out;
+				}
+				if(!retval)
+					retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
+				retval = g_array_append_vals(retval, tmp->data, tmp->len);
+				g_array_free(tmp, TRUE);
+				g_free(fname);
+			default:
+				break;
+		}
+	}
+	if(errno) {
+		g_set_error(e, errdomain, CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
+	err_out:
+		if(retval)
+			g_array_free(retval, TRUE);
+		return NULL;
+	}
+	return retval;
+}
+
 /**
  * Parse the config file.
  *
@@ -756,9 +812,10 @@ int append_serve(SERVER *s, GArray *a) {
  *	exist, returns an empty GHashTable; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, GError** e) {
+GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
+	gchar* cfdir = NULL;
 	SERVER s;
 	gchar *virtstyle=NULL;
 	PARAM lp[] = {
@@ -780,6 +837,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "fua",	FALSE,  PARAM_BOOL,	&(s.flags),		F_FUA },
 		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
 		{ "temporary",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TEMPORARY },
+		{ "trim",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TRIM },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
@@ -790,6 +848,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
+		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -817,7 +876,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if(!startgroup || strcmp(startgroup, "generic")) {
+	if((!startgroup || strcmp(startgroup, "generic")) && have_global) {
 		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
@@ -826,10 +885,14 @@ GArray* parse_cfile(gchar* f, GError** e) {
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
 
-		/* After the [generic] group, start parsing exports */
-		if(i==1) {
+		/* After the [generic] group or when we're parsing an include
+		 * directory, start parsing exports */
+		if(i==1 || !have_global) {
 			p=lp;
 			p_size=lp_size;
+			if(!do_oldstyle) {
+				lp[1].required = 0;
+			}
 		} 
 		for(j=0;j<p_size;j++) {
 			g_assert(p[j].target != NULL);
@@ -926,15 +989,11 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0) {
+		if(i>0 || !have_global) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
 			append_serve(&s, retval);
-		} else {
-			if(!do_oldstyle) {
-				lp[1].required = 0;
-			}
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -945,10 +1004,23 @@ GArray* parse_cfile(gchar* f, GError** e) {
 		}
 #endif
 	}
-	if(i==1) {
+	g_key_file_free(cfile);
+	if(cfdir) {
+		GArray* extra = do_cfile_dir(cfdir, e);
+		if(extra) {
+			retval = g_array_append_vals(retval, extra->data, extra->len);
+			i+=extra->len;
+			g_array_free(extra, TRUE);
+		} else {
+			if(*e) {
+				g_array_free(retval, TRUE);
+				return NULL;
+			}
+		}
+	}
+	if(i==1 && have_global) {
 		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
-	g_key_file_free(cfile);
 	return retval;
 }
 
@@ -1475,6 +1547,8 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		flags |= NBD_FLAG_SEND_FUA;
 	if (client->server->flags & F_ROTATIONAL)
 		flags |= NBD_FLAG_ROTATIONAL;
+	if (client->server->flags & F_TRIM)
+		flags |= NBD_FLAG_SEND_TRIM;
 	if (phase & NEG_OLD) {
 		/* oldstyle */
 		flags = htonl(flags);
@@ -1646,6 +1720,13 @@ int mainloop(CLIENT *client) {
 				writelen = currlen;
 			}
 			DEBUG("OK!\n");
+			continue;
+
+		case NBD_CMD_TRIM:
+			/* The kernel module sets discard_zeroes_data == 0,
+			 * so it is okay to do nothing.  */
+			DEBUG ("Ignoring trim request\n");
+			SEND(client->net, reply);
 			continue;
 
 		default:
@@ -1854,7 +1935,7 @@ void set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage netaddr;
 	struct sockaddr_in  *netaddr4 = NULL;
 	struct sockaddr_in6 *netaddr6 = NULL;
-	size_t addrinlen = sizeof( addrin );
+	socklen_t addrinlen = sizeof( addrin );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	char peername[NI_MAXHOST];
@@ -1864,18 +1945,21 @@ void set_peername(int net, CLIENT *client) {
 	int e;
 	int shift;
 
-	if (getpeername(net, (struct sockaddr *) &addrin, (socklen_t *)&addrinlen) < 0)
-		err("getsockname failed: %m");
+	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0)
+		err("getpeername failed: %m");
 
-	getnameinfo((struct sockaddr *)&addrin, (socklen_t)addrinlen,
-		peername, sizeof (peername), NULL, 0, NI_NUMERICHOST);
+	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
+			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
+		msg2("getnameinfo failed: %s", gai_strerror(e));
+		freeaddrinfo(ai);
+	}
 
 	memset(&hints, '\0', sizeof (hints));
 	hints.ai_flags = AI_ADDRCONFIG;
 	e = getaddrinfo(peername, NULL, &hints, &ai);
 
 	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		msg2("getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 		return;
 	}
@@ -1900,7 +1984,7 @@ void set_peername(int net, CLIENT *client) {
 				(netaddr4->sin_addr).s_addr>>=32-(client->server->cidrlen);
 				(netaddr4->sin_addr).s_addr<<=32-(client->server->cidrlen);
 
-				getnameinfo((struct sockaddr *) netaddr4, (socklen_t) addrinlen,
+				getnameinfo((struct sockaddr *) netaddr4, addrinlen,
 							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
 				tmp=g_strdup_printf("%s/%s", netname, peername);
 			}else if(ai->ai_family == AF_INET6) {
@@ -1908,15 +1992,15 @@ void set_peername(int net, CLIENT *client) {
 
 				shift = 128-(client->server->cidrlen);
 				i = 3;
-				while(shift >= 32) {
-					((netaddr6->sin6_addr).s6_addr32[i])=0;
-					shift-=32;
+				while(shift >= 8) {
+					((netaddr6->sin6_addr).s6_addr[i])=0;
+					shift-=8;
 					i--;
 				}
-				(netaddr6->sin6_addr).s6_addr32[i]>>=shift;
-				(netaddr6->sin6_addr).s6_addr32[i]<<=shift;
+				(netaddr6->sin6_addr).s6_addr[i]>>=shift;
+				(netaddr6->sin6_addr).s6_addr[i]<<=shift;
 
-				getnameinfo((struct sockaddr *)netaddr6, (socklen_t)addrinlen,
+				getnameinfo((struct sockaddr *)netaddr6, addrinlen,
 					    netname, sizeof(netname), NULL, 0, NI_NUMERICHOST);
 				tmp=g_strdup_printf("%s/%s", netname, peername);
 			}
@@ -2355,7 +2439,7 @@ int main(int argc, char *argv[]) {
 	logging();
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
-	servers = parse_cfile(config_file_pos, &err);
+	servers = parse_cfile(config_file_pos, TRUE, &err);
 	
 	if(serve) {
 		serve->socket_family = AF_UNSPEC;

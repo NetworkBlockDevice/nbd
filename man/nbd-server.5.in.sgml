@@ -127,6 +127,31 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term>includedir</term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>
+	    The argument should be a directory containing files with
+	    the '.conf' extension; these files will be parsed as if
+	    they were part of the configuration file. Note that these
+	    extra configuration files cannot contain a [generic]
+	    section; any configuration that should go in the generic
+	    section must be placed in the main configuration file.
+	  </para>
+	  <para>
+	    If this argument is not specified, then no directory will
+	    be searched. If it is specified but the directory does not
+	    exist, then nbd-server will exit with an appropriate error
+	    message; if it is specified but the given directory is
+	    empty, nbd-server will continue (unless no exports
+	    whatsoever have been configured, in which case it will
+	    exit with an appropriate error message)
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>listenaddr</option></term>
 	<listitem>
 	  <para>
@@ -299,25 +324,6 @@ manpage.1: manpage.sgml
 	    <emphasis>entire</emphasis> export, not of individual
 	    files. If the file is not present, a single file is
 	    created of this size.
-	  </para>
-	  <para>When specified on the command line, this should be the
-	    third argument.
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>temporary</option></term>
-	<listitem>
-	  <para>Optional; boolean.</para>
-	  <para>
-	    Create a temporary export with a name based on exportname
-	    (this can be used to set the directory). A unique filename
-	    is created, which is unlinked as soon as it is created,
-	    and therefore the export will not persist between
-	    invocations of <command>nbd-server</command>. Set the
-	    size of the file using the <command>filesize</command>
-	    option. This option is incompatible with the
-	    <option>multifile</option> option.
 	  </para>
 	  <para>When specified on the command line, this should be the
 	    third argument.
@@ -586,6 +592,25 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>temporary</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>
+	    Create a temporary export with a name based on exportname
+	    (this can be used to set the directory). A unique filename
+	    is created, which is unlinked as soon as it is created,
+	    and therefore the export will not persist between
+	    invocations of <command>nbd-server</command>. Set the
+	    size of the file using the <command>filesize</command>
+	    option. This option is incompatible with the
+	    <option>multifile</option> option.
+	  </para>
+	  <para>When specified on the command line, this should be the
+	    third argument.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>timeout</option></term>
 	<listitem>
 	  <para>Optional; integer; default 0</para>
@@ -623,6 +648,23 @@ manpage.1: manpage.sgml
 	    <emphasis>prerun</emphasis> script should rename the transaction log
 	    (which will just have been opened in order to avoid transaction logs
 	    overwriting eachother. This action should be race-free.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>trim</option></term>
+	<listitem>
+	  <para>Optional; boolean</para>
+	  <para>When this option is activated, the server announces it
+	    supports the NBD_CMD_TRIM command for the export. This
+	    command allows the server to discard the data from the disk,
+	    but does not require it to.
+	  </para>
+	  <para>
+	    Since nbd-server does not currently implement discarding
+	    data yet, this option does nothing (beyond allowing the
+	    client to send extra data to the server that it can't do
+	    anything useful with).
 	  </para>
 	</listitem>
       </varlistentry>
