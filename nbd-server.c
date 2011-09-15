@@ -83,6 +83,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#ifdef HAVE_FALLOC_PH
+#include <linux/falloc.h>
+#endif
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
@@ -1451,6 +1454,35 @@ int expflush(CLIENT *client) {
 	return 0;
 }
 
+/*
+ * If the current system supports it, call fallocate() on the backend
+ * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
+ */
+int exptrim(struct nbd_request* req, CLIENT* client) {
+#ifdef HAVE_FALLOC_PH
+	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
+	FILE_INFO cur = prev;
+	int i = 1;
+	/* We're running on a system that supports the
+	 * FALLOC_FL_PUNCH_HOLE option to re-sparsify a file */
+	do {
+		if(i<client->export->len) {
+			cur = g_array_index(client->export, FILE_INFO, i);
+		}
+		if(prev.startoff < req->from) {
+			off_t curoff = req->from - prev.startoff;
+			off_t curlen = cur.startoff - prev.startoff - curoff;
+			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE, curoff, curlen);
+		}
+		prev = cur;
+	} while(i < client->export->len && cur.startoff < (req->from + req->len));
+	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+#else
+	DEBUG("Ignoring TRIM request (not supported on current platform");
+#endif
+	return 0;
+}
+
 /**
  * Do the initial negotiation.
  *
@@ -1725,7 +1757,11 @@ int mainloop(CLIENT *client) {
 		case NBD_CMD_TRIM:
 			/* The kernel module sets discard_zeroes_data == 0,
 			 * so it is okay to do nothing.  */
-			DEBUG ("Ignoring trim request\n");
+			if (exptrim(&request, client)) {
+				DEBUG("Trim failed: %m");
+				ERROR(client, reply, errno);
+				continue;
+			}
 			SEND(client->net, reply);
 			continue;
 
