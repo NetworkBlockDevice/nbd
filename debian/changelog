@@ -3,6 +3,7 @@ nbd (1:2.9.24-1) UNRELEASED; urgency=low
   * New upstream release.
     - Adds support for directory of config file snippets, by request of
       Vagrant Cascadian.
+  * Fix syntaxis of test for nbd-client connectivity. Closes: #641882.
 
  -- Wouter Verhelst <wouter@debian.org>  Tue, 13 Sep 2011 20:17:05 +0200
 

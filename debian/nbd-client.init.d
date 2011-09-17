@@ -147,7 +147,7 @@ case "$1" in
     activate)
 	echo 'Activating...'
 	i=0
-	while [ ! -z "${NBD_TYPE[$i]}" -a nbd-client -c "${NBD_DEVICE[$i]}" ]
+	while [ ! -z "${NBD_TYPE[$i]}" -a ! -z $(nbd-client -c "${NBD_DEVICE[$i]}") ]
 	do
 	  case "${NBD_TYPE[$i]}" in
 	      "s")
