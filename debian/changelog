@@ -1,11 +1,11 @@
-nbd (1:2.9.24-1) UNRELEASED; urgency=low
+nbd (1:2.9.24-1) unstable; urgency=low
 
   * New upstream release.
     - Adds support for directory of config file snippets, by request of
       Vagrant Cascadian.
   * Fix syntaxis of test for nbd-client connectivity. Closes: #641882.
 
- -- Wouter Verhelst <wouter@debian.org>  Tue, 13 Sep 2011 20:17:05 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 01 Oct 2011 12:29:21 +0200
 
 nbd (1:2.9.23-4) unstable; urgency=low
 
