@@ -775,6 +775,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	}
 	errno=0;
 	while((de = readdir(dirh))) {
+		int saved_errno=errno;
 		switch(de->d_type) {
 			case DT_REG:
 				/* Skip unless the name ends with '.conf' */
@@ -783,6 +784,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				}
 				fname = g_build_filename(dir, de->d_name, NULL);
 				tmp = parse_cfile(fname, FALSE, e);
+				errno=saved_errno;
 				if(*e) {
 					goto err_out;
 				}
