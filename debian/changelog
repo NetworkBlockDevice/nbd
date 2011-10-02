@@ -1,3 +1,10 @@
+nbd (1:2.9.24-2) unstable; urgency=low
+
+  * Cherry-pick 7eca128845ed86754b526bf7f920ad65b95c931d from git HEAD
+    to fix includedir configuration statement on kFreeBSD.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 02 Oct 2011 11:35:05 +0200
+
 nbd (1:2.9.24-1) unstable; urgency=low
 
   * New upstream release.
