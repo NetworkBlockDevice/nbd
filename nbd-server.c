@@ -1988,7 +1988,7 @@ void set_peername(int net, CLIENT *client) {
 
 	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-		msg2(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+		msg3(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 	}
 
@@ -1997,7 +1997,7 @@ void set_peername(int net, CLIENT *client) {
 	e = getaddrinfo(peername, NULL, &hints, &ai);
 
 	if(e != 0) {
-		msg2(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+		msg3(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 		return;
 	}
