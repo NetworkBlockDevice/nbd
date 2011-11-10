@@ -804,7 +804,6 @@ manpage.1: manpage.sgml
       [generic]
       [export]
           exportname = /export/blkdev
-          port = 12345
     </programlisting>
     <para>For increased security, one might want to create an
       authorization file, and set the UID and GID to run as:</para>
@@ -814,7 +813,6 @@ manpage.1: manpage.sgml
           group = nbd
       [export]
           exportname = /export/blkdev
-          port = 12345
           authfile = $sysconfdir/nbd-server/allow
     </programlisting>
     <para>With $sysconfdir/nbd-server/allow containing the following:</para>
@@ -822,6 +820,15 @@ manpage.1: manpage.sgml
       127.0.0.1
       192.168.0.0/8
       192.168.1.1
+    </programlisting>
+    <para>To be compatible with older nbd-client systems, one might wish
+    to enable the old-style, port-based, negotation:</para>
+    <programlisting>
+      [generic]
+          oldstyle = true
+      [export]
+          exportname = /export/blkdev
+	  port = 12345
     </programlisting>
   </refsect1>
 </refentry>
