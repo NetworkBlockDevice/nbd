@@ -1,46 +1,63 @@
+Booting a system with root-on-NBD
+=================================
+
 Starting with nbd-client 1:2.9.9-3, there's support for running root on
 an NBD filesystem. There's only support for initramfs for now. If you
 need something else, patches are welcome.
 
-To boot the system, add the kernel command line parameter
-"nbdroot=X.X.X.X,Y", with "X.X.X.X" being the IP address of the server,
-and "Y" the port on which the server is running. You should also specify
-a "root=" parameter that points to the NBD device. This may be a
-partitioned NBD device, but that is not a requirement.
+To boot the system, the initramfs script needs to know three parameters:
+(1) the server's IP address, (2) the port number or export name of the
+export to be connected to, and (3) the device node on which to connect
+the nbd connection. To get at these parameters, it examines two kernel
+command-line parameters: the "nbdroot" parameter, and the "root"
+parameter.
 
-Starting with nbd-client 1:2.9.11-4, you can also add a third argument
-to the nbdroot parameter, to specify which NBD device to set up in case
-you're running off RAID-on-NBD or LVM-on-NBD, or something similar. If
-you do not specify the third argument, then your root= parameter must
-still contain the /dev/nbdX device node that you're trying to boot off
-of. The format then becomes "nbdroot=X.X.X.X,Y,nbdZ"
+The "root" parameter is only examined for the device name, and only if
+the nbdroot parameter didn't specify them. If the device name specified
+in the root parameter starts with "/dev/nbd", then it is accepted as the
+device node for the nbd-client. If the device name starts with a
+different string, then it is ignored.
 
-Alternatively, you may specify 'nbdroot=dhcp'. In that case, you should
-specify what would go into the nbdroot variable through the root-path
-variable in DHCP, for example (with ISC DHCP):
+The "nbdroot" parameter can have several forms, depending on setup.
+- "nbdroot=<server>,<port or name>,<device>". For example:
+  "nbdroot=192.168.1.1,export,nbd0". Note that you *must* specify an IP
+  address; the initramfs environment does not have the ability to do
+  name resolving.
+- "nbdroot=<server>,<port or name>", or, the above version but without
+  the device part. This will use the device node from the root=
+  parameter.
+- "nbdroot=dhcp". This variant expects a valid nbdroot= parameter to be
+  specified through the DHCP "root-path" variable. With ISC DHCP, this
+  would be specified in dhcpd.conf like so:
+  option root-path "nbdroot=192.168.1.1,export,nbd0";
+- "nbdroot=dhcp,<port or name>,<device>". Takes the server IP address
+  from DHCP, but everything else from the kernel command line (can be
+  used in 2- and 3-option variant). Note, if using this variant, you
+  should specify *only* the IP address of the server, nothing more, i.e.:
+  option root-path "192.168.1.1";
+- Finally, other initramfs scripts can set the environment variable
+  NBDROOT to any valid nbdroot= value. For example:
+  export NBDROOT="192.168.1.1,export,nbd0"
+  This will override any nbdroot= parameter that was specified on the
+  kernel command line. It is parsed in exactly the same way. Note,
+  however, that the root= parameter will still be read; so if you used
+  the two-parameter variant of nbdroot=, then the root= kernel
+  command-line parameter must point to a valid nbd device or the system
+  will not boot.
 
-option root-path "X.X.X.X,Y,nbdZ";
+Port numbers are distinguished from name-based exports by checking if
+they contain any non-digit characters. If the second parameter does
+contain a non-digit character, the script will assume that it is a
+name-based export and add the -N parameter, as is required for doing so.
 
-A third (and final) option is to specify 
+Finally, to make the system work reliably, make sure you do the
+following:
 
-nbdroot=dhcp,Y
-
-or
-
-nbdroot=dhcp,Y,nbdZ
-
-Doing so will take the IP address of the server from DHCP configuration,
-but take everything else from the kernel command line. This is useful to
-override the to be used export, or could also be used with inflexible
-DHCP setups where it is not possible to set the root path.
-
-If the specified port number contains any non-digit characters, the
-script will assume that it is a name-based export and add the -N
-parameter, as is required for doing so.
-
-You will want to set "KILLALL=false" in /etc/nbd-client; this to prevent
-the initscript from yanking the root filesystem from under your nose
-during shutdown or upgrade of the nbd package.
+Add a line
+KILLALL=false
+to /etc/nbd-client; this is to prevent the initscript from yanking the
+root filesystem from under your nose during shutdown or upgrade of the
+nbd package.
 
 DO NOT add configuration for the root filesystem to /etc/nbd-client.
 The initramfs will connect the device, and the initscript should not
@@ -52,3 +69,11 @@ are configured; this is required because the initscript will detect that
 you're running off an NBD device and add the nbd-client PID number to
 /run/sendsigs.omit.d, to prevent init from killing nbd-client
 prematurely at shutdown.
+
+Until #632091 is fixed, you must also add a line like
+NETDOWN=no
+to /etc/default/halt. This will make sure halt is not passed the "-i"
+parameter at shutdown, which causes it to bring down the network
+interfaces and thereby saw off the branch on which it's sitting (which
+may cause the kernel to panic rather than powering off the system if
+you're unlucky).

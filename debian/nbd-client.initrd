@@ -19,6 +19,13 @@ for x in $(cat /proc/cmdline); do
 	esac
 done
 
+# Allow for other initramfs scripts to override the kernel command line
+# by mangling the environment. NBDROOT is a public interface.
+if [ ! -z "$NBDROOT" ]
+then
+	nbdroot="nbdroot=$NBDROOT"
+fi
+
 # if nbd root is not requested exit early and silently
 if [ -z "${nbdroot}" ]; then
 	exit 0
