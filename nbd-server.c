@@ -896,7 +896,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			p=lp;
 			p_size=lp_size;
 			if(!do_oldstyle) {
-				lp[1].required = 0;
+				lp[1].required = FALSE;
 			}
 		} 
 		for(j=0;j<p_size;j++) {
