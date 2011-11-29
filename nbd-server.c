@@ -83,6 +83,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#ifdef HAVE_FALLOC_PH
+#include <linux/falloc.h>
+#endif
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
@@ -893,7 +896,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			p=lp;
 			p_size=lp_size;
 			if(!do_oldstyle) {
-				lp[1].required = 0;
+				lp[1].required = FALSE;
 			}
 		} 
 		for(j=0;j<p_size;j++) {
@@ -981,12 +984,12 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 				g_key_file_free(cfile);
 				return NULL;
 			}
-			if(s.port && !do_oldstyle) {
-				g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
-				g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
-			}
 		} else {
 			s.virtstyle=VIRT_IPLIT;
+		}
+		if(s.port && !do_oldstyle) {
+			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
+			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
 		}
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
@@ -1453,6 +1456,35 @@ int expflush(CLIENT *client) {
 	return 0;
 }
 
+/*
+ * If the current system supports it, call fallocate() on the backend
+ * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
+ */
+int exptrim(struct nbd_request* req, CLIENT* client) {
+#ifdef HAVE_FALLOC_PH
+	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
+	FILE_INFO cur = prev;
+	int i = 1;
+	/* We're running on a system that supports the
+	 * FALLOC_FL_PUNCH_HOLE option to re-sparsify a file */
+	do {
+		if(i<client->export->len) {
+			cur = g_array_index(client->export, FILE_INFO, i);
+		}
+		if(prev.startoff < req->from) {
+			off_t curoff = req->from - prev.startoff;
+			off_t curlen = cur.startoff - prev.startoff - curoff;
+			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE, curoff, curlen);
+		}
+		prev = cur;
+	} while(i < client->export->len && cur.startoff < (req->from + req->len));
+	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+#else
+	DEBUG("Ignoring TRIM request (not supported on current platform");
+#endif
+	return 0;
+}
+
 /**
  * Do the initial negotiation.
  *
@@ -1727,7 +1759,11 @@ int mainloop(CLIENT *client) {
 		case NBD_CMD_TRIM:
 			/* The kernel module sets discard_zeroes_data == 0,
 			 * so it is okay to do nothing.  */
-			DEBUG ("Ignoring trim request\n");
+			if (exptrim(&request, client)) {
+				DEBUG("Trim failed: %m");
+				ERROR(client, reply, errno);
+				continue;
+			}
 			SEND(client->net, reply);
 			continue;
 
@@ -1952,7 +1988,7 @@ void set_peername(int net, CLIENT *client) {
 
 	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-		msg2("getnameinfo failed: %s", gai_strerror(e));
+		msg3(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 	}
 
@@ -1961,7 +1997,7 @@ void set_peername(int net, CLIENT *client) {
 	e = getaddrinfo(peername, NULL, &hints, &ai);
 
 	if(e != 0) {
-		msg2("getaddrinfo failed: %s", gai_strerror(e));
+		msg3(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 		return;
 	}

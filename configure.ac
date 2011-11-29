@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[2.9.24],[wouter@debian.org])
+AC_INIT([nbd],[2.9.25],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2)
 AM_MAINTAINER_MODE
 
@@ -96,17 +96,13 @@ AC_CHECK_SIZEOF(unsigned long long int)
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
 AC_CHECK_HEADERS([linux/falloc.h])
 HAVE_FL_PH=no
-if test x$ac_headers_linux_falloc_h = xyes
+if test "x$ac_cv_header_linux_falloc_h" = "xyes"
 then
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <stdio.h>
-					   #include <linux/falloc.h>],
-					  [printf("%d\n", FALLOC_FL_PUNCH_HOLE);]
-					  )],
-			  [HAVE_FL_PH=yes])
+	AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
 fi
 
 AC_MSG_CHECKING([for FALLOC_FL_PUNCH_HOLE support])
-if test $HAVE_FL_PH = "yes"
+if test "x$HAVE_FL_PH" = "xyes"
 then
 	AC_DEFINE(HAVE_FALLOC_PH, 1, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([yes])
@@ -137,7 +133,7 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h])
-AM_PATH_GLIB_2_0(2.6.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
