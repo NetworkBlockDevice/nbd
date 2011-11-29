@@ -1,3 +1,9 @@
+nbd (1:2.9.25-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 29 Nov 2011 08:54:48 +0100
+
 nbd (1:2.9.24-3) unstable; urgency=low
 
   * Actually add the includedir statement to the default configuration
