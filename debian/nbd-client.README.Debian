@@ -12,17 +12,19 @@ the nbd connection. To get at these parameters, it examines two kernel
 command-line parameters: the "nbdroot" parameter, and the "root"
 parameter.
 
-The "root" parameter is only examined for the device name, and only if
-the nbdroot parameter didn't specify them. If the device name specified
-in the root parameter starts with "/dev/nbd", then it is accepted as the
-device node for the nbd-client. If the device name starts with a
-different string, then it is ignored.
+The "root" parameter is only examined for the device name. If the device
+name specified in the root parameter starts with "/dev/nbd", then it is
+accepted as the device node for the nbd-client. If the device name
+starts with a different string, then it is ignored.
 
 The "nbdroot" parameter can have several forms, depending on setup.
 - "nbdroot=<server>,<port or name>,<device>". For example:
   "nbdroot=192.168.1.1,export,nbd0". Note that you *must* specify an IP
   address; the initramfs environment does not have the ability to do
   name resolving.
+  Note that if you specify both a three-option nbdroot parameter and a
+  root parameter starting with /dev/nbd, then the value in the root
+  parameter takes precedence.
 - "nbdroot=<server>,<port or name>", or, the above version but without
   the device part. This will use the device node from the root=
   parameter.
