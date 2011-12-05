@@ -324,7 +324,7 @@ int authorized_client(CLIENT *opts) {
   
   	inet_aton(opts->clientname, &client);
 	while (fgets(line,LINELEN,f)!=NULL) {
-		if((tmp=index(line, '/'))) {
+		if((tmp=strchr(line, '/'))) {
 			if(strlen(line)<=tmp-line) {
 				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
