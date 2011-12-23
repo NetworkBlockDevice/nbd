@@ -1498,6 +1498,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
+	g_assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
 	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
