@@ -1,6 +1,10 @@
 nbd (1:2.9.25-1) unstable; urgency=low
 
   * New upstream release
+  * Add support for yet more ways to netboot on NBD, this time to help
+    our friends of LTSP.
+  * Update documentation to reflect new possibilities, and refactor it a
+    bit so it's more clear now.
 
  -- Wouter Verhelst <wouter@debian.org>  Tue, 29 Nov 2011 08:54:48 +0100
 
