@@ -8,26 +8,22 @@ prereqs)
 esac
 
 for x in $(cat /proc/cmdline); do
-	case $x in
-		nbdroot*)
-			nbdroot="${x}"
+	case "$x" in
+		nbddev=*)
+			nbddev="${x#nbddev=}"
+			;;
+		nbdroot=*)
+			nbdroot="${x#nbdroot=}"
 			;;
 		root=/dev/nbd*)
-			nbdrootdev="${x#root=}"
-			nbdbasedev="${x#root=/dev/}"
+			nbddev="${x#root=}"
 			;;
 	esac
 done
 
-# Allow for other initramfs scripts to override the kernel command line
-# by mangling the environment. NBDROOT is a public interface.
-if [ ! -z "$NBDROOT" ]
-then
-	nbdroot="nbdroot=$NBDROOT"
-fi
-
 # if nbd root is not requested exit early and silently
-if [ -z "${nbdroot}" ]; then
+if [ -z "$nbdroot" ] && [ -z "$nbddev" ]
+then
 	exit 0
 fi
 
@@ -37,17 +33,18 @@ log_begin_msg "Setting up nbd-client"
 
 configure_networking
 
-x="$nbdroot"
 # Support setting stuff using DHCP by overloading 'option root-path'
-case $x in
-	nbdroot=dhcp)
-		x="$ROOTPATH"
+case "$nbdroot" in
+	''|dhcp)
+		nbdroot=$ROOTPATH
 		;;
 esac
 
-case $x in
-	nbdroot=*,*,*)
-		nbdroot="${x#nbdroot=}"
+nbdrootdev="$nbddev"
+nbdbasedev="${nbddev#/dev/}"
+
+case "$nbdroot" in
+	*,*,*)
 		nbdsrv="${nbdroot%%,*}"
 		nbdport="${nbdroot%,*}"
 		nbdport="${nbdport##*,}"
@@ -58,49 +55,59 @@ case $x in
 			nbdrootdev=/dev/$nbdbasedev
 		fi
 		;;
-	nbdroot=*,*)
-		nbdroot="${x#nbdroot=}"
+	*,*)
 		nbdsrv="${nbdroot%,*}"
 		nbdport="${nbdroot#*,}"
+		;;
+	\[*\]*)
+		# [ipv6]:port/path
+		nbdsrv=${nbdroot%\]*}
+		nbdsrv=${nbdsrv#\[}
+		nbdportpath=${nbdroot#\[$nbdsrv\]}
+		nbdportpath=${nbdportpath#:}
+		nbdport=${nbdportpath%%/*}
+		nbdpath=${nbdportpath#$nbdport}
+		;;
+	*)
+		# ipv4:port/path
+		nbdsrv=${nbdroot%%[:/]*}
+		nbdportpath=${nbdroot#$nbdsrv}
+		nbdportpath=${nbdportpath#:}
+		nbdport=${nbdportpath%%/*}
+		nbdpath=${nbdportpath#$nbdport}
+		;;
+esac
+
+case "$nbdport" in
+	*[^0-9]*)
+		# non-numeric characters, assume a name rather than a port
+		nbdpath="$nbdport"
+		unset nbdport
 		;;
 esac
 
 nbdrootdev=${nbdrootdev%p*}
 nbdbasedev=${nbdbasedev%p*}
+# If host is omitted, use ROOTSERVER from DHCP.
+case "$nbdsrv" in
+	''|dhcp)
+		nbdsrv=$ROOTSERVER
+		;;
+esac
 
-if [ -z "$nbdport" -o -z "$nbdrootdev" ]
+if [ -z "$nbdsrv" ] || [ -z "$nbdrootdev" ] || ( [ -z "$nbdpath" ] && [ -z "$nbdport" ] )
 then
-	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
+	log_failure_msg "Insufficient information to set up nbd, quitting (nbdroot=$nbdroot, host=$nbdsrv, name=$nbdpath, port=$nbdport, nbd-device=$nbdrootdev)"
 	exit 0
 fi
 
-nondigits=$(echo $nbdport | sed -e 's/[0-9]//g')
-if [ ! -z "$nondigits" ]
-then
-	# non-numeric characters, assume a name rather than a port
-	nbdport="-N $nbdport"
-fi
+# Support defining an alternate launch script with env variable NBDCLIENT.
+NBDCLIENT=${NBDCLIENT:-/sbin/nbd-client}
+$NBDCLIENT $nbdsrv ${nbdpath:+-N} $nbdpath $nbdport $nbdrootdev -swap -persist
 
-# Support setting the server's IP address by overloading 'option
-# root-server'. This is separate from the "ROOTPATH" grabbing above, in
-# that here we only specify the server's IP address through DHCP, but
-# expect everything else to be set through the kernel's command line.
-# Netbooting is a can of worms.
-if [ "$nbdsrv" = "dhcp" ]
-then
-	nbdsrv=$ROOTSERVER
-fi
-
-if [ -z "$nbdsrv" ]
-then
-	log_failure_msg "Insufficient information to set up nbd, quitting (nbdsrv=$nbdsrv nbdport=$nbdport nbdroot=$nbdroot root=$nbdrootdev)"
-	exit 0
-fi
-
-/sbin/nbd-client $nbdsrv $nbdport $nbdrootdev -persist
 # This should be removed once the cfq scheduler no longer deadlocks nbd
 # devices
-if grep '\[cfq\]' /sys/block/$nbdbasedev/queue/scheduler >/dev/null
+if grep -q '\[cfq\]' /sys/block/$nbdbasedev/queue/scheduler
 then
 	echo deadline > /sys/block/$nbdbasedev/queue/scheduler
 fi
