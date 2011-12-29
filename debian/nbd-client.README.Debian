@@ -31,7 +31,9 @@ The "nbdroot" parameter can have several forms, depending on setup.
 - "nbdroot=dhcp". This variant expects a valid nbdroot= parameter to be
   specified through the DHCP "root-path" variable. With ISC DHCP, this
   would be specified in dhcpd.conf like so:
-  option root-path "nbdroot=192.168.1.1,export,nbd0";
+  option root-path "192.168.1.1,export,nbd0";
+  For backwards compatibility, you may also specify the above with
+  "nbdroot=" in the root-device option in dhcpd.conf.
 - "nbdroot=dhcp,<port or name>,<device>". Takes the server IP address
   from DHCP, but everything else from the kernel command line (can be
   used in 2- and 3-option variant). Note, if using this variant, you
@@ -79,3 +81,7 @@ parameter at shutdown, which causes it to bring down the network
 interfaces and thereby saw off the branch on which it's sitting (which
 may cause the kernel to panic rather than powering off the system if
 you're unlucky).
+
+To make the above easy, note that you can boot debian-installer with an
+additional command-line option "modules=partman-nbd". After doing so,
+you'll be able to configure nbd from the installer.
