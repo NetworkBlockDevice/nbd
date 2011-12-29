@@ -5,6 +5,7 @@ nbd (1:2.9.25-2) unstable; urgency=low
   * Update documentation to reflect new possibilities, and refactor it a
     bit so it's more clear now.
   * Update standards-version to 3.9.2 (no changes applicable to nbd)
+  * use #if, not #ifdef. Closes: #651116
 
  -- Wouter Verhelst <wouter@debian.org>  Thu, 29 Dec 2011 20:56:15 +0100
 

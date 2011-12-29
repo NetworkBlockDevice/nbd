@@ -83,7 +83,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#ifdef HAVE_FALLOC_PH
+#if HAVE_FALLOC_PH
 #include <linux/falloc.h>
 #endif
 #include <arpa/inet.h>
