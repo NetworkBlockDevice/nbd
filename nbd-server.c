@@ -1461,7 +1461,7 @@ int expflush(CLIENT *client) {
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
-#ifdef HAVE_FALLOC_PH
+#if HAVE_FALLOC_PH
 	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
 	FILE_INFO cur = prev;
 	int i = 1;
