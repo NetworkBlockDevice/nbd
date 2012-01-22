@@ -1,3 +1,10 @@
+nbd (1:2.9.25-3) UNRELEASED; urgency=low
+
+  * Switch to debhelper compat level 9, to enable build flags support.
+    Closes: #653954.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 22 Jan 2012 10:54:16 +0100
+
 nbd (1:2.9.25-2) unstable; urgency=low
 
   * Add support for yet more ways to netboot on NBD, this time to help
