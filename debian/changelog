@@ -1,9 +1,12 @@
-nbd (1:2.9.25-3) UNRELEASED; urgency=low
+nbd (1:3.0-1) UNRELEASED; urgency=low
 
+  * New upstream release
+    - Fixes build failure for when FALLOC_FL_PUNCH_HOLE isn't available.
+      Closes: #660399.
   * Switch to debhelper compat level 9, to enable build flags support.
     Closes: #653954.
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 22 Jan 2012 10:54:16 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 21 Feb 2012 11:13:31 +0100
 
 nbd (1:2.9.25-2) unstable; urgency=low
 
