@@ -324,7 +324,7 @@ int authorized_client(CLIENT *opts) {
   
   	inet_aton(opts->clientname, &client);
 	while (fgets(line,LINELEN,f)!=NULL) {
-		if((tmp=index(line, '/'))) {
+		if((tmp=strchr(line, '/'))) {
 			if(strlen(line)<=tmp-line) {
 				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
@@ -1461,7 +1461,7 @@ int expflush(CLIENT *client) {
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
-#ifdef HAVE_FALLOC_PH
+#if HAVE_FALLOC_PH
 	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
 	FILE_INFO cur = prev;
 	int i = 1;
@@ -1498,6 +1498,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
+	g_assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
 	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
