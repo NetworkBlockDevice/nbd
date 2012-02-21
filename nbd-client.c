@@ -453,7 +453,7 @@ int main(int argc, char *argv[]) {
 #endif
 	do {
 #ifndef NOFORK
-		if (fork()) {
+		if (!fork()) {
 			/* Due to a race, the kernel NBD driver cannot
 			 * call for a reread of the partition table
 			 * in the handling of the NBD_DO_IT ioctl().
