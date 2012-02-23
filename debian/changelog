@@ -1,4 +1,4 @@
-nbd (1:3.0-1) UNRELEASED; urgency=low
+nbd (1:3.0-1) unstable; urgency=low
 
   * New upstream release
     - Fixes build failure for when FALLOC_FL_PUNCH_HOLE isn't available.
