@@ -5,6 +5,8 @@ nbd (1:3.0-1) unstable; urgency=low
       Closes: #660399.
   * Switch to debhelper compat level 9, to enable build flags support.
     Closes: #653954.
+  * New translation: Italian, by Beatrice Torracca; Closes: #663133.
+  * Updated translation: Dutch, by Jeroen Schot; Closes: #663555.
 
  -- Wouter Verhelst <wouter@debian.org>  Tue, 21 Feb 2012 11:13:31 +0100
 
