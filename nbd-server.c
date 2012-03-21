@@ -1871,11 +1871,11 @@ void setupexport(CLIENT* client) {
 
 		/* If we created the file, it will be length zero */
 		if (!lastsize && cancreate) {
-			/* we can ignore errors as we recalculate the size */
-			ftruncate (fi.fhandle, client->server->expected_size);
-			lastsize = size_autodetect(fi.fhandle);
-			if (lastsize != client->server->expected_size)
-				err("Could not expand file");
+			assert(!multifile);
+			if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
+				err("Could not expand file: %m");
+			}
+			lastsize = client->server->expected_size;
 			break; /* don't look for any more files */
 		}
 
