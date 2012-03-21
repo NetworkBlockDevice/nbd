@@ -59,6 +59,7 @@
  * headers, so must come before those */
 #include "lfs.h"
 
+#include <assert.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -913,8 +914,8 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			}
 		} 
 		for(j=0;j<p_size;j++) {
-			g_assert(p[j].target != NULL);
-			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL||p[j].ptype==PARAM_INT64);
+			assert(p[j].target != NULL);
+			assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL||p[j].ptype==PARAM_INT64);
 			switch(p[j].ptype) {
 				case PARAM_INT:
 					ival = g_key_file_get_integer(cfile,
@@ -1181,7 +1182,7 @@ int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* m
 	}
 
 	/* end should never go negative, since first startoff is 0 and a >= 0 */
-	g_assert(end >= 0);
+	assert(end >= 0);
 
 	fi = g_array_index(export, FILE_INFO, end);
 	*fhandle = fi.fhandle;
@@ -1511,7 +1512,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
-	g_assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
+	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
 	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
