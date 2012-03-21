@@ -273,7 +273,7 @@ void usage(char* errmsg, ...) {
 		va_list ap;
 		va_start(ap, errmsg);
 		snprintf(tmp, 256, "ERROR: %s\n\n", errmsg);
-		vfprintf(stderr, errmsg, ap);
+		vfprintf(stderr, tmp, ap);
 		va_end(ap);
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
