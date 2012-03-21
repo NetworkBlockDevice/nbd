@@ -119,8 +119,8 @@ gchar* config_file_pos;
 gchar* runuser=NULL;
 /** What group we're running as */
 gchar* rungroup=NULL;
-/** whether to export using the old negotiation protocol (port-based) */
-gboolean do_oldstyle=FALSE;
+/** global flags */
+int glob_flags=0;
 
 /* Whether we should avoid forking */
 int dontfork = 0;
@@ -155,6 +155,8 @@ int dontfork = 0;
 			       authorization file (yuck) */
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
+
+/** Per-export flags: */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
@@ -168,6 +170,9 @@ int dontfork = 0;
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
+
+/** Global flags: */
+#define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -589,7 +594,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		g_free(serve);
 		serve=NULL;
 	} else {
-		do_oldstyle = TRUE;
+		glob_flags |= F_OLDSTYLE;
 	}
 	if(do_output) {
 		if(!serve) {
@@ -864,7 +869,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&glob_flags,	F_OLDSTYLE },
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
@@ -909,7 +914,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		if(i==1 || !have_global) {
 			p=lp;
 			p_size=lp_size;
-			if(!do_oldstyle) {
+			if(!(glob_flags & F_OLDSTYLE)) {
 				lp[1].required = FALSE;
 			}
 		} 
@@ -1001,7 +1006,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
-		if(s.port && !do_oldstyle) {
+		if(s.port && !(glob_flags & F_OLDSTYLE)) {
 			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
 			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
 		}
@@ -2247,7 +2252,7 @@ int setup_serve(SERVER *serve) {
 	gchar *port = NULL;
 	int e;
 
-	if(!do_oldstyle) {
+	if(!(glob_flags & F_OLDSTYLE)) {
 		return serve->servename ? 1 : 0;
 	}
 	memset(&hints,'\0',sizeof(hints));
