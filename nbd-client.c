@@ -474,8 +474,9 @@ int main(int argc, char *argv[]) {
 #endif
 
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
-			fprintf(stderr, "Kernel call returned: %m");
-			if(errno==EBADR) {
+		        int error = errno;
+			fprintf(stderr, "nbd,%d: Kernel call returned: %d", getpid(), error);
+			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
 				cont=0;
