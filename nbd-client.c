@@ -52,8 +52,8 @@ int check_conn(char* devname, int do_print) {
 	int fd;
 	int len;
 
-	if(!strncmp(devname, "/dev/", 5)) {
-		devname+=5;
+	if( (p=strrchr(devname, '/')) ) {
+		devname=p+1;
 	}
 	if((p=strchr(devname, 'p'))) {
 		/* We can't do checks on partitions. */
