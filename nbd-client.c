@@ -148,6 +148,8 @@ void ask_list(int sock) {
 	if(write(sock, &len, sizeof(len)) < 0) {
 		err("writing length failed: %m");
 	}
+	/* newline, move away from the "Negotiation:" line */
+	printf("\n");
 	do {
 		memset(buf, 0, 1024);
 		if(read(sock, &magic, sizeof(magic)) < 0) {
