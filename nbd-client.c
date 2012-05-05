@@ -46,6 +46,8 @@
 #include <sdp_inet.h>
 #endif
 
+#define NBDC_DO_LIST 1
+
 int check_conn(char* devname, int do_print) {
 	char buf[256];
 	char* p;
@@ -124,7 +126,94 @@ int opennet(char *name, char* portstr, int sdp) {
 	return sock;
 }
 
-void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
+void ask_list(int sock) {
+	uint32_t opt;
+	uint32_t opt_server;
+	uint32_t len;
+	uint32_t reptype;
+	uint64_t magic;
+	char buf[1024];
+
+	magic = ntohll(opts_magic);
+	if (write(sock, &magic, sizeof(magic)) < 0)
+		err("Failed/2.2: %m");
+
+	/* Ask for the list */
+	opt = htonl(NBD_OPT_LIST);
+	if(write(sock, &opt, sizeof(opt)) < 0) {
+		err("writing list option failed: %m");
+	}
+	/* Send the length (zero) */
+	len = htonl(0);
+	if(write(sock, &len, sizeof(len)) < 0) {
+		err("writing length failed: %m");
+	}
+	do {
+		memset(buf, 0, 1024);
+		if(read(sock, &magic, sizeof(magic)) < 0) {
+			err("Reading magic from server: %m");
+		}
+		if(read(sock, &opt_server, sizeof(opt_server)) < 0) {
+			err("Reading option: %m");
+		}
+		if(read(sock, &reptype, sizeof(reptype)) <0) {
+			err("Reading reply from server: %m");
+		}
+		if(read(sock, &len, sizeof(len)) < 0) {
+			err("Reading length from server: %m");
+		}
+		magic=ntohll(magic);
+		len=ntohl(len);
+		reptype=ntohl(reptype);
+		if(magic != rep_magic) {
+			err("Not enough magic from server");
+		}
+		if(reptype & NBD_REP_FLAG_ERROR) {
+			switch(reptype) {
+				case NBD_REP_ERR_POLICY:
+					fprintf(stderr, "\nE: listing not allowed by server.\n");
+					break;
+				default:
+					fprintf(stderr, "\nE: unexpected error from server.\n");
+					break;
+			}
+			if(len) {
+				if(read(sock, buf, len) < 0) {
+					fprintf(stderr, "\nE: could not read error message from server\n");
+				}
+				fprintf(stderr, "Server said: %s\n", buf);
+			}
+			exit(EXIT_FAILURE);
+		} else {
+			if(len) {
+				if(reptype != NBD_REP_SERVER) {
+					err("Server sent us a reply we don't understand!");
+				}
+				if(read(sock, &len, sizeof(len)) < 0) {
+					fprintf(stderr, "\nE: could not read export name length from server\n");
+					exit(EXIT_FAILURE);
+				}
+				len=ntohl(len);
+				if(read(sock, buf, len) < 0) {
+					fprintf(stderr, "\nE: could not read export name from server\n");
+					exit(EXIT_FAILURE);
+				}
+				printf("%s\n", buf);
+			}
+		}
+	} while(reptype != NBD_REP_ACK);
+	opt=htonl(NBD_OPT_ABORT);
+	len=htonl(0);
+	magic=htonll(opts_magic);
+	if (write(sock, &magic, sizeof(magic)) < 0)
+		err("Failed/2.2: %m");
+	if (write(sock, &opt, sizeof(opt)) < 0)
+		err("Failed writing abort");
+	if (write(sock, &len, sizeof(len)) < 0)
+		err("Failed writing length");
+}
+
+void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
 	u64 magic, size64;
 	uint16_t tmp;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
@@ -143,7 +232,6 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 	if(name) {
 		uint32_t opt;
 		uint32_t namesize;
-		uint32_t reserved = 0;
 
 		if (magic != opts_magic)
 			err("Not enough opts_magic");
@@ -152,15 +240,28 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name) {
 			err("Failed reading flags: %m");
 		}
 		*flags = ((u32)ntohs(tmp));
+		if((needed_flags & *flags) != needed_flags) {
+			/* There's currently really only one reason why this
+			 * check could possibly fail, but we may need to change
+			 * this error message in the future... */
+			fprintf(stderr, "\nE: Server does not support listing exports\n");
+			exit(EXIT_FAILURE);
+		}
 
-		/* reserved for future use*/
-		if (write(sock, &reserved, sizeof(reserved)) < 0)
+		client_flags = htonl(client_flags);
+		if (write(sock, &client_flags, sizeof(client_flags)) < 0)
 			err("Failed/2.1: %m");
 
+		if(do_opts & NBDC_DO_LIST) {
+			ask_list(sock);
+			exit(EXIT_SUCCESS);
+		}
+
 		/* Write the export name that we're after */
-		magic = ntohll(opts_magic);
+		magic = htonll(opts_magic);
 		if (write(sock, &magic, sizeof(magic)) < 0)
 			err("Failed/2.2: %m");
+
 		opt = ntohl(NBD_OPT_EXPORT_NAME);
 		if (write(sock, &opt, sizeof(opt)) < 0)
 			err("Failed/2.3: %m");
@@ -283,6 +384,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
+	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
@@ -328,11 +430,15 @@ int main(int argc, char *argv[]) {
 	int c;
 	int nonspecial=0;
 	char* name=NULL;
+	uint32_t needed_flags;
+	uint32_t cflags;
+	uint32_t opts;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
 		{ "disconnect", required_argument, NULL, 'd' },
 		{ "help", no_argument, NULL, 'h' },
+		{ "list", no_argument, NULL, 'l' },
 		{ "name", required_argument, NULL, 'N' },
 		{ "nofork", no_argument, NULL, 'n' },
 		{ "persist", no_argument, NULL, 'p' },
@@ -344,7 +450,7 @@ int main(int argc, char *argv[]) {
 
 	logging();
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hnN:pSst:", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -399,6 +505,14 @@ int main(int argc, char *argv[]) {
 		case 'h':
 			usage(NULL);
 			exit(EXIT_SUCCESS);
+		case 'l':
+			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
+			cflags |= NBD_FLAG_C_FIXED_NEWSTYLE;
+			opts |= NBDC_DO_LIST;
+			name="";
+			nbddev="";
+			port = NBD_DEFAULT_PORT;
+			break;
 		case 'n':
 			nofork=1;
 			break;
@@ -432,13 +546,14 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+	sock = opennet(hostname, port, sdp);
+
+	negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
+
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 
-	sock = opennet(hostname, port, sdp);
-
-	negotiate(sock, &size64, &flags, name);
 	setsizes(nbd, size64, blocksize, flags);
 	set_timeout(nbd, timeout);
 	finish_sock(sock, nbd, swap);
@@ -489,7 +604,7 @@ int main(int argc, char *argv[]) {
 					close(sock); close(nbd);
 					sock = opennet(hostname, port, sdp);
 					nbd = open(nbddev, O_RDWR);
-					negotiate(sock, &new_size, &new_flags, name);
+					negotiate(sock, &new_size, &new_flags, name, needed_flags, cflags, opts);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}

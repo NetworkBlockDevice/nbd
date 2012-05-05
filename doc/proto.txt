@@ -107,7 +107,8 @@ production purposes.
 
 S: "NBDMAGIC" (as in the old style handshake)
 S: 0x49484156454F5054 (note different magic number)
-S: 16 bits of zero (reserved for future use)
+S: 16 bits of zero (bits 1-15 reserved for future use; bit 0 in use to
+   signal fixed newstyle (see below))
 C: 32 bits of zero (reserved for future use)
 
 This completes the initial phase of negotiation; the client and server
@@ -123,11 +124,9 @@ The generic format of setting an option is as follows:
 
 C: 0x49484156454F5054 (note same new-style handshake's magic number)
 C: 32 bits denoting the chosen option (NBD_OPT_EXPORT_NAME is the only
-   possible value currently)
+   possible value in this version of the protocol)
 C: unsigned 32 bit length of option data
 C: (any data needed for the chosen option)
-S: (any response as needed and defined by the chosen option; currently
-   this does not happen).
 
 The presence of the option length in every option allows the server
 to skip any options presented by the client that it does not
@@ -156,25 +155,143 @@ signalling that an extra flag field will follow, to which the client
 will have to reply with a flag field of its own before the extra flags
 are sent. This is not yet implemented.
 
+Fixed 'new' style handshake
+---------------------------
+
+Unfortunately, due to a mistake on my end, the server would immediately
+close the connection when it saw an option it did not understand, rather
+than signalling this fact to the client, which would've allowed it to
+retry; and replies from the server were not structured either, which
+meant that if the server were to send something the client did not
+understand, it would have to abort negotiation as well.
+
+To fix these two issues, the handshake has been extended once more:
+
+- The server will set bit 0 of its first set of reserved flags, to
+  signal that it supports this version of the protocol.
+- The client should reply with bit 0 set in its reserved field too,
+  though its side of the protocol does not change incompatibly.
+- The client may now send other options to the server as appropriate, in
+  the generic format for sending an option as described above.
+- The server will reply to any option apart from NBD_OPT_EXPORT_NAME
+  with reply packets in the following format:
+
+S: 64 bits, 0x3e889045565a9 (magic number for replies)
+S: 32 bits, the option as sent by the client to which this is a reply
+   packet.
+S: 32 bits, denoting reply type (e.g., NBD_REP_ACK to denote successful
+   completion, or NBD_REP_ERR_UNSUP to denote use of an option not known
+   by this server
+S: 32 bits, length of the reply. This may be zero for some replies, in
+   which case the next field is not sent
+S: any data as required by the reply (e.g., an export name in the case
+   of NBD_REP_SERVER
+
+As there is no unique number for client requests, clients who want to
+differentiate between answers to two instances of the same option during
+any negotiation must make sure they've seen the answer to an outstanding
+request before sending the next one of the same type.
+
+Values
+------
+
+This section describes the meaning of constants (other than magic
+numbers) in the protocol handshake.
+
 Flag bits
----------
+- - - - -
 
-bit 0 - NBD_FLAG_HAS_FLAGS
-should always be 1
+* Per-export (16 bits, sent after option haggling, or immediately after
+  the global flag field in oldstyle negotiation):
 
-bit 1 - NBD_FLAG_READ_ONLY
-should be set to 1 if the export is read-only
+  bit 0 - NBD_FLAG_HAS_FLAGS
+  should always be 1
 
-bit 2 - NBD_FLAG_SEND_FLUSH
-should be set to 1 if the server supports NBD_CMD_FLUSH commands
+  bit 1 - NBD_FLAG_READ_ONLY
+  should be set to 1 if the export is read-only
 
-bit 3 - NBD_FLAG_SEND_FUA
-should be set to 1 if the server supports the NBD_CMD_FLAG_FUA flag
+  bit 2 - NBD_FLAG_SEND_FLUSH
+  should be set to 1 if the server supports NBD_CMD_FLUSH commands
 
-bit 4 - NBD_FLAG_ROTATIONAL
-should be set to 1 to let the client schedule I/O accesses as for a
-rotational medium
+  bit 3 - NBD_FLAG_SEND_FUA
+  should be set to 1 if the server supports the NBD_CMD_FLAG_FUA flag
 
-bit 5 - NBD_FLAG_SEND_TRIM
-should be set to 1 if the server supports NBD_CMD_TRIM commands
+  bit 4 - NBD_FLAG_ROTATIONAL
+  should be set to 1 to let the client schedule I/O accesses as for a
+  rotational medium
 
+  bit 5 - NBD_FLAG_SEND_TRIM
+  should be set to 1 if the server supports NBD_CMD_TRIM commands
+
+* Global flag bits (16 bits, after initial connection):
+
+  bit 0 - NBD_FLAG_FIXED_NEWSTYLE
+  should be set by servers that support the fixed newstyle protocol
+
+* Client (after initial connection and after receiving flags from
+  server):
+
+  bit 0 - NBD_FLAG_C_FIXED_NEWSTYLE
+  Should be set by clients that support the fixed newstyle protocol.
+  Servers may choose to honour fixed newstyle from clients that didn't
+  set this bit, but relying on this isn't recommended.
+
+Option types
+- - - - - - -
+
+* NBD_OPT_EXPORT_NAME (1)
+  Choose the export which the client would like to use, and end option
+  haggling. Data: name of the export, free-form UTF8 text (subject to
+  limitations by server implementation). If the chosen export does not
+  exist, the server closes the connection.
+
+* NBD_OPT_LIST (2)
+  Returns a number of NBD_REP_SERVER replies, one for each export,
+  followed by an NBD_REP_ACK.
+
+* NBD_OPT_ABORT (3)
+  Abort negotiation and close the connection. Optional.
+
+Reply types
+- - - - - -
+
+* NBD_REP_ACK (1)
+  Will be sent by the server when it accepts the option, or when sending
+  data related to the option (in the case of NBD_OPT_LIST) has finished.
+  No data.
+
+* NBD_REP_SERVER (2)
+  A description of an export. Data:
+  - 32 bits, length of name
+  - Name of the export, as expected by NBD_OPT_EXPORT_NAME
+  - If length of name < (length of reply as sent in the reply packet
+    header - 4), then the rest of the data contains some undefined
+    implementation-specific details about the export. This is not
+    currently implemented, but future versions of nbd-server may send
+    along some details about the export. If the client did not
+    explicitly request otherwise, these details are defined to be UTF-8
+    encoded data suitable for direct display to a human being.
+
+There are a number of error reply types, all of which are denoted by
+having bit 31 set. All error replies may have some data set, in which
+case that data is an error message suitable for display to the user.
+
+* NBD_REP_ERR_UNSUP (2^31 + 1)
+  The option sent by the client is unknown by this server
+  implementation (e.g., because the server is too old, or from another
+  source).
+
+* NBD_REP_ERR_POLICY (2^31 + 2)
+  The option sent by the client is known by this server and
+  syntactically valid, but server-side policy forbids the server to
+  allow the option (e.g., the client sent NBD_OPT_LIST but server
+  configuration has that disabled)
+
+* NBD_REP_ERR_INVALID (2^31 + 3)
+  The option sent by the client is know by this server, but was
+  determined by the server to be syntactically invalid. For instance,
+  the client sent an NBD_OPT_LIST with nonzero data length.
+
+* NBD_REP_ERR_PLATFORM (2^31 + 4)
+  The option sent by the client is not supported on the platform on
+  which the server is running. Not currently used.

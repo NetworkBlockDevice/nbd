@@ -170,9 +170,11 @@ int dontfork = 0;
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
+#define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
+#define F_LIST 2	  /**< Allow clients to list the exports on a server */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -254,6 +256,7 @@ typedef struct {
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 	int transactionlogfd;/**< fd for transaction log */
+	int clientfeats;     /**< Features supported by this client */
 } CLIENT;
 
 /**
@@ -873,6 +876,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
+		{ "allowlist",  FALSE, PARAM_BOOL,	&glob_flags,	F_LIST },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -1504,6 +1508,77 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	return 0;
 }
 
+static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasize, void* data) {
+	uint64_t magic = htonll(0x3e889045565a9LL);
+	reply_type = htonl(reply_type);
+	uint32_t datsize = htonl(datasize);
+	struct iovec v_data[] = {
+		{ &magic, sizeof(magic) },
+		{ &opt, sizeof(opt) },
+		{ &reply_type, sizeof(reply_type) },
+		{ &datsize, sizeof(datsize) },
+		{ data, datasize },
+	};
+	writev(net, v_data, 5);
+}
+
+static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+	uint32_t namelen;
+	char* name;
+	int i;
+
+	if (read(net, &namelen, sizeof(namelen)) < 0)
+		err("Negotiation failed/7: %m");
+	namelen = ntohl(namelen);
+	name = malloc(namelen+1);
+	name[namelen]=0;
+	if (read(net, name, namelen) < 0)
+		err("Negotiation failed/8: %m");
+	for(i=0; i<servers->len; i++) {
+		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		if(!strcmp(serve->servename, name)) {
+			CLIENT* client = g_new0(CLIENT, 1);
+			client->server = serve;
+			client->exportsize = OFFT_MAX;
+			client->net = net;
+			client->modern = TRUE;
+			client->transactionlogfd = -1;
+			client->clientfeats = cflags;
+			free(name);
+			return client;
+		}
+	}
+	free(name);
+	return NULL;
+}
+
+static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+	uint32_t len;
+	int i;
+	char buf[1024];
+	char *ptr = buf + sizeof(len);
+
+	if (read(net, &len, sizeof(len)) < 0)
+		err("Negotiation failed/8: %m");
+	len = ntohl(len);
+	if(len) {
+		send_reply(opt, net, NBD_REP_ERR_INVALID, 0, NULL);
+	}
+	if(!(glob_flags & F_LIST)) {
+		send_reply(opt, net, NBD_REP_ERR_POLICY, 0, NULL);
+		err_nonfatal("Client tried disallowed list option");
+		return;
+	}
+	for(i=0; i<servers->len; i++) {
+		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		len = strlen(serve->servename);
+		memcpy(buf, &len, sizeof(len));
+		strcpy(ptr, serve->servename);
+		send_reply(opt, net, NBD_REP_SERVER, len+sizeof(len), buf);
+	}
+	send_reply(opt, net, NBD_REP_ACK, 0, NULL);
+}
+
 /**
  * Do the initial negotiation.
  *
@@ -1518,6 +1593,9 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 
 	memset(zeros, '\0', sizeof(zeros));
 	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
+	if(phase & NEG_MODERN) {
+		smallflags |= NBD_FLAG_FIXED_NEWSTYLE;
+	}
 	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
@@ -1540,54 +1618,50 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	}
 	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
 		/* modern */
-		uint32_t reserved;
+		uint32_t cflags;
 		uint32_t opt;
-		uint32_t namelen;
-		char* name;
-		int i;
 
 		if(!servers)
 			err("programmer error");
+		smallflags = htons(smallflags);
 		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-			err("Negotiation failed/3: %m");
-		if (read(net, &reserved, sizeof(reserved)) < 0)
-			err("Negotiation failed/4: %m");
-		if (read(net, &magic, sizeof(magic)) < 0)
-			err("Negotiation failed/5: %m");
-		magic = ntohll(magic);
-		if(magic != opts_magic) {
-			close(net);
-			return NULL;
-		}
-		if (read(net, &opt, sizeof(opt)) < 0)
-			err("Negotiation failed/6: %m");
-		opt = ntohl(opt);
-		if(opt != NBD_OPT_EXPORT_NAME) {
-			close(net);
-			return NULL;
-		}
-		if (read(net, &namelen, sizeof(namelen)) < 0)
-			err("Negotiation failed/7: %m");
-		namelen = ntohl(namelen);
-		name = malloc(namelen+1);
-		name[namelen]=0;
-		if (read(net, name, namelen) < 0)
-			err("Negotiation failed/8: %m");
-		for(i=0; i<servers->len; i++) {
-			SERVER* serve = &(g_array_index(servers, SERVER, i));
-			if(!strcmp(serve->servename, name)) {
-				CLIENT* client = g_new0(CLIENT, 1);
-				client->server = serve;
-				client->exportsize = OFFT_MAX;
-				client->net = net;
-				client->modern = TRUE;
-				client->transactionlogfd = -1;
-				free(name);
-				return client;
+			err_nonfatal("Negotiation failed/3: %m");
+		if (read(net, &cflags, sizeof(cflags)) < 0)
+			err_nonfatal("Negotiation failed/4: %m");
+		cflags = htonl(cflags);
+		do {
+			if (read(net, &magic, sizeof(magic)) < 0)
+				err_nonfatal("Negotiation failed/5: %m");
+			magic = ntohll(magic);
+			if(magic != opts_magic) {
+				close(net);
+				return NULL;
 			}
+			if (read(net, &opt, sizeof(opt)) < 0)
+				err_nonfatal("Negotiation failed/6: %m");
+			opt = ntohl(opt);
+			switch(opt) {
+			case NBD_OPT_EXPORT_NAME:
+				// NBD_OPT_EXPORT_NAME must be the last
+				// selected option, so return from here
+				// if that is chosen.
+				return handle_export_name(opt, net, servers, cflags);
+				break;
+			case NBD_OPT_LIST:
+				handle_list(opt, net, servers, cflags);
+				break;
+			case NBD_OPT_ABORT:
+				// handled below
+				break;
+			default:
+				send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
+				break;
+			}
+		} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
+		if(opt == NBD_OPT_ABORT) {
+			close(net);
+			return NULL;
 		}
-		free(name);
-		return NULL;
 	}
 	/* common */
 	size_host = htonll((u64)(client->exportsize));
