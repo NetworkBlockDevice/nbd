@@ -714,8 +714,8 @@ static inline void makebuf(char *buf, uint64_t seq, uint64_t blknum) {
 }
 		
 static inline int checkbuf(char *buf, uint64_t seq, uint64_t blknum) {
-	char cmp[512];
-	makebuf(cmp, seq, blknum);
+	uint64_t cmp[64]; // 512/8 = 64
+	makebuf((char *)cmp, seq, blknum);
 	return memcmp(cmp, buf, 512)?-1:0;
 }
 
@@ -1100,13 +1100,15 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 				goto err_open;
 			}
 				
-			prc = g_hash_table_lookup(handlehash, rep.handle);
+			uint64_t handle;
+			memcpy(&handle,rep.handle,8);
+			prc = g_hash_table_lookup(handlehash, &handle);
 			if (!prc) {
 				retval=-1;
 				snprintf(errstr, errstr_len, "Unrecognised handle in reply: 0x%llX", *(long long unsigned int*)(rep.handle));
 				goto err_open;
 			}
-			if (!g_hash_table_remove(handlehash, rep.handle)) {
+			if (!g_hash_table_remove(handlehash, &handle)) {
 				retval=-1;
 				snprintf(errstr, errstr_len, "Could not remove handle from hash: 0x%llX", *(long long unsigned int*)(rep.handle));
 				goto err_open;
