@@ -605,7 +605,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 					goto err_open;
 				}
 			}
-			printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
+			printf("%d: Requests(+): %d\r", (int)mypid, ++requests);
 			if (sendflush) {
 				long long int j = i ^ (1LL<<63);
 				req.type = htonl(NBD_CMD_FLUSH);
@@ -615,7 +615,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 					retval=-1;
 					goto err_open;
 				}
-				printf("%d: Requests(+): %d\n", (int)mypid, ++requests);
+				printf("%d: Requests(+): %d\r", (int)mypid, ++requests);
 			}
 		}
 		do {
@@ -631,7 +631,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 					retval=-1;
 					goto err_open;
 				}
-				printf("%d: Requests(-): %d\n", (int)mypid, --requests);
+				printf("%d: Requests(-): %d\r", (int)mypid, --requests);
 			}
 		} while FD_ISSET(sock, &set);
 		/* Now wait until we can write again or until a second have
@@ -659,9 +659,10 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 			/* Okay, there's something ready for
 			 * reading here */
 			read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i);
-			printf("%d: Requests(-): %d\n", (int)mypid, --requests);
+			printf("%d: Requests(-): %d\r", (int)mypid, --requests);
 		}
 	} while (requests);
+	printf("\n");
 	if(gettimeofday(&stop, NULL)<0) {
 		retval=-1;
 		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
@@ -1187,7 +1188,7 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 		}
 
 		if (!(printer++ % 1000) || !(readtransactionfile || txqueue.numitems || inflight.numitems) )
-			printf("%d: Seq %08lld Queued: %08d Inflight: %08d Done: %08lld\n",
+			printf("%d: Seq %08lld Queued: %08d Inflight: %08d Done: %08lld\r",
 			       (int)mypid,
 			       (long long int) seq,
 			       txqueue.numitems,
@@ -1195,6 +1196,8 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 			       (long long int) processed);
 
 	}
+
+	printf("\n");
 
 	if (gettimeofday(&stop, NULL)<0) {
 		retval=-1;
