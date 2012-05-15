@@ -1,5 +1,7 @@
-nbd (1:3.1-1) UNRELEASED; urgency=low
+nbd (1:3.1-1) unstable; urgency=low
 
+  * New upstream release
+    - Contains fixes for alignment issues in test suite; Closes: 653653.
   * Remove upgrade support for pre-2.9 nbd-server config files. This is
     pre-lenny, so it's been long enough.
   * Make sure /etc/nbd-server/config is created in all cases. Closes:
