@@ -672,12 +672,6 @@ manpage.1: manpage.sgml
 	    command allows the server to discard the data from the disk,
 	    but does not require it to.
 	  </para>
-	  <para>
-	    Since nbd-server does not currently implement discarding
-	    data yet, this option does nothing (beyond allowing the
-	    client to send extra data to the server that it can't do
-	    anything useful with).
-	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
