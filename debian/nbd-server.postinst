@@ -22,42 +22,6 @@ function shell_quote () {
        done
 }
 
-# Convert an old-style configuration file to a new-style one
-function convert_config () {
-	[ -f /etc/nbd-server.oldconf ] && . /etc/nbd-server.oldconf
-	[ -f /etc/nbd-server ] && . /etc/nbd-server
-	TMPFILE=$(mktemp /tmp/nbd-server.XXXXXX)
-	if [ "$AUTO_GEN" = "n" ]
-	then
-		db_input critical nbd-server/autogen
-		db_go
-		exit 1
-	fi
-	cat /usr/share/nbd-server/nbd-server.conf.tmpl > $TMPFILE
-	while [ ! -z ${NBD_FILE[$i]} ]
-	do
-		nbd-server -o "export-$i" ${NBD_PORT[$i]} ${NBD_FILE[$i]} ${NBD_SERVER_OPTS[$i]} >> $TMPFILE
-		i=$(( $i + 1 ))
-	done
-}
-
-# summary of how this script can be called:
-#        * <postinst> `configure' <most-recently-configured-version>
-#        * <old-postinst> `abort-upgrade' <new version>
-#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
-#          <new-version>
-#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
-#          <failed-install-package> <version> `removing'
-#          <conflicting-package> <version>
-# for details, see /usr/share/doc/packaging-manual/
-#
-# quoting from the policy:
-#     Any necessary prompting should almost always be confined to the
-#     post-installation script, and should be protected with a conditional
-#     so that unnecessary prompting doesn't happen if a package's
-#     installation fails and the `postinst' is called with `abort-upgrade',
-#     `abort-remove' or `abort-deconfigure'.
-
 case "$1" in
     configure)
 	if [ -f /etc/nbd-server -o -f /etc/nbd-server.oldconf ]
@@ -104,6 +68,8 @@ case "$1" in
 	      fi
 	    done
 	    ucf --debconf-ok $TMPFILE /etc/nbd-server/config
+	else
+	    ucf --debconf-ok /usr/share/nbd-server/nbd-server.conf.tmpl /etc/nbd-server/config
 	fi
 	if ! id nbd >/dev/null 2>&1; then
 	    adduser --system --group --home /etc/nbd-server --no-create-home nbd
