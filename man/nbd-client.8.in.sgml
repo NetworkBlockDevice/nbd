@@ -74,6 +74,10 @@ manpage.1: manpage.sgml
       <command>&dhpackage;</command>
       <arg choice="plain"><option>-c <replaceable>nbd-device</replaceable></option></arg>
     </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
+      <arg choice="plain"><option>-l <replaceable>host</replaceable></option></arg>
+    </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>DESCRIPTION</title>
@@ -164,6 +168,22 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Disconnect the specified nbd device from the
 	  server</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-list</option></term>
+	<term><option>-l</option></term>
+	<listitem>
+	  <para>
+	    Ask the server for a list of available exports. If the
+	    server is exporting over IPv6 as well as over IPv4, this
+	    will list all exports twice; otherwise, it should list them
+	    all only once.</para>
+	  <para>Note that this option <emph>only</emph> works
+	    with nbd-server processes running version 3.1 or above, and
+	    must be enabled in server configuration (with the
+	    "allowlist" option) before it can be used.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>

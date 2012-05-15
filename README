@@ -9,8 +9,8 @@ on a different machine; although it's technically possible to use
 nbd-server and nbd-client on the same machine, you may run into some
 deadlock issues if you do that[1].
 
-To install the package, please see the INSTALL file. You'll need to
-install it on both the client and the server.
+To install the package, do the normal configure/make/make install dance.
+You'll need to install it on both the client and the server.
 
 Using NBD is quite easy. First, on the client, you need to create the
 device nodes:

@@ -59,6 +59,7 @@
  * headers, so must come before those */
 #include "lfs.h"
 
+#include <assert.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -118,8 +119,8 @@ gchar* config_file_pos;
 gchar* runuser=NULL;
 /** What group we're running as */
 gchar* rungroup=NULL;
-/** whether to export using the old negotiation protocol (port-based) */
-gboolean do_oldstyle=FALSE;
+/** global flags */
+int glob_flags=0;
 
 /* Whether we should avoid forking */
 int dontfork = 0;
@@ -154,6 +155,8 @@ int dontfork = 0;
 			       authorization file (yuck) */
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
+
+/** Per-export flags: */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
 #define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
 #define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
@@ -167,6 +170,11 @@ int dontfork = 0;
 #define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
+#define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
+
+/** Global flags: */
+#define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
+#define F_LIST 2	  /**< Allow clients to list the exports on a server */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -248,6 +256,7 @@ typedef struct {
 	u32 *difmap;	     /**< see comment on the global difmap for this one */
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 	int transactionlogfd;/**< fd for transaction log */
+	int clientfeats;     /**< Features supported by this client */
 } CLIENT;
 
 /**
@@ -588,7 +597,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		g_free(serve);
 		serve=NULL;
 	} else {
-		do_oldstyle = TRUE;
+		glob_flags |= F_OLDSTYLE;
 	}
 	if(do_output) {
 		if(!serve) {
@@ -768,6 +777,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	gchar* fname;
 	GArray* retval = NULL;
 	GArray* tmp;
+	struct stat stbuf;
 
 	if(!dir) {
 		g_set_error(e, errdomain, CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
@@ -776,13 +786,24 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	errno=0;
 	while((de = readdir(dirh))) {
 		int saved_errno=errno;
+		fname = g_build_filename(dir, de->d_name, NULL);
 		switch(de->d_type) {
+			case DT_UNKNOWN:
+				/* Filesystem doesn't return type of
+				 * file through readdir. Run stat() on
+				 * the file instead */
+				if(stat(fname, &stbuf)) {
+					perror("stat");
+					goto err_out;
+				}
+				if (!S_ISREG(stbuf.st_mode)) {
+					goto next;
+				}
 			case DT_REG:
 				/* Skip unless the name ends with '.conf' */
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					continue;
 				}
-				fname = g_build_filename(dir, de->d_name, NULL);
 				tmp = parse_cfile(fname, FALSE, e);
 				errno=saved_errno;
 				if(*e) {
@@ -792,10 +813,11 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 					retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 				retval = g_array_append_vals(retval, tmp->data, tmp->len);
 				g_array_free(tmp, TRUE);
-				g_free(fname);
 			default:
 				break;
 		}
+	next:
+		g_free(fname);
 	}
 	if(errno) {
 		g_set_error(e, errdomain, CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
@@ -850,10 +872,11 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
 		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&do_oldstyle,	1 },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&glob_flags,	F_OLDSTYLE },
 		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
+		{ "allowlist",  FALSE, PARAM_BOOL,	&glob_flags,	F_LIST },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -895,13 +918,13 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		if(i==1 || !have_global) {
 			p=lp;
 			p_size=lp_size;
-			if(!do_oldstyle) {
+			if(!(glob_flags & F_OLDSTYLE)) {
 				lp[1].required = FALSE;
 			}
 		} 
 		for(j=0;j<p_size;j++) {
-			g_assert(p[j].target != NULL);
-			g_assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL||p[j].ptype==PARAM_INT64);
+			assert(p[j].target != NULL);
+			assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL||p[j].ptype==PARAM_INT64);
 			switch(p[j].ptype) {
 				case PARAM_INT:
 					ival = g_key_file_get_integer(cfile,
@@ -987,7 +1010,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
-		if(s.port && !do_oldstyle) {
+		if(s.port && !(glob_flags & F_OLDSTYLE)) {
 			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
 			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
 		}
@@ -1168,7 +1191,7 @@ int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* m
 	}
 
 	/* end should never go negative, since first startoff is 0 and a >= 0 */
-	g_assert(end >= 0);
+	assert(end >= 0);
 
 	fi = g_array_index(export, FILE_INFO, end);
 	*fhandle = fi.fhandle;
@@ -1485,6 +1508,77 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	return 0;
 }
 
+static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasize, void* data) {
+	uint64_t magic = htonll(0x3e889045565a9LL);
+	reply_type = htonl(reply_type);
+	uint32_t datsize = htonl(datasize);
+	struct iovec v_data[] = {
+		{ &magic, sizeof(magic) },
+		{ &opt, sizeof(opt) },
+		{ &reply_type, sizeof(reply_type) },
+		{ &datsize, sizeof(datsize) },
+		{ data, datasize },
+	};
+	writev(net, v_data, 5);
+}
+
+static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+	uint32_t namelen;
+	char* name;
+	int i;
+
+	if (read(net, &namelen, sizeof(namelen)) < 0)
+		err("Negotiation failed/7: %m");
+	namelen = ntohl(namelen);
+	name = malloc(namelen+1);
+	name[namelen]=0;
+	if (read(net, name, namelen) < 0)
+		err("Negotiation failed/8: %m");
+	for(i=0; i<servers->len; i++) {
+		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		if(!strcmp(serve->servename, name)) {
+			CLIENT* client = g_new0(CLIENT, 1);
+			client->server = serve;
+			client->exportsize = OFFT_MAX;
+			client->net = net;
+			client->modern = TRUE;
+			client->transactionlogfd = -1;
+			client->clientfeats = cflags;
+			free(name);
+			return client;
+		}
+	}
+	free(name);
+	return NULL;
+}
+
+static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+	uint32_t len;
+	int i;
+	char buf[1024];
+	char *ptr = buf + sizeof(len);
+
+	if (read(net, &len, sizeof(len)) < 0)
+		err("Negotiation failed/8: %m");
+	len = ntohl(len);
+	if(len) {
+		send_reply(opt, net, NBD_REP_ERR_INVALID, 0, NULL);
+	}
+	if(!(glob_flags & F_LIST)) {
+		send_reply(opt, net, NBD_REP_ERR_POLICY, 0, NULL);
+		err_nonfatal("Client tried disallowed list option");
+		return;
+	}
+	for(i=0; i<servers->len; i++) {
+		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		len = htonl(strlen(serve->servename));
+		memcpy(buf, &len, sizeof(len));
+		strcpy(ptr, serve->servename);
+		send_reply(opt, net, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
+	}
+	send_reply(opt, net, NBD_REP_ACK, 0, NULL);
+}
+
 /**
  * Do the initial negotiation.
  *
@@ -1498,7 +1592,10 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint64_t magic;
 
 	memset(zeros, '\0', sizeof(zeros));
-	g_assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
+	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
+	if(phase & NEG_MODERN) {
+		smallflags |= NBD_FLAG_FIXED_NEWSTYLE;
+	}
 	if(phase & NEG_INIT) {
 		/* common */
 		if (write(net, INIT_PASSWD, 8) < 0) {
@@ -1521,54 +1618,50 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	}
 	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
 		/* modern */
-		uint32_t reserved;
+		uint32_t cflags;
 		uint32_t opt;
-		uint32_t namelen;
-		char* name;
-		int i;
 
 		if(!servers)
 			err("programmer error");
+		smallflags = htons(smallflags);
 		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-			err("Negotiation failed/3: %m");
-		if (read(net, &reserved, sizeof(reserved)) < 0)
-			err("Negotiation failed/4: %m");
-		if (read(net, &magic, sizeof(magic)) < 0)
-			err("Negotiation failed/5: %m");
-		magic = ntohll(magic);
-		if(magic != opts_magic) {
-			close(net);
-			return NULL;
-		}
-		if (read(net, &opt, sizeof(opt)) < 0)
-			err("Negotiation failed/6: %m");
-		opt = ntohl(opt);
-		if(opt != NBD_OPT_EXPORT_NAME) {
-			close(net);
-			return NULL;
-		}
-		if (read(net, &namelen, sizeof(namelen)) < 0)
-			err("Negotiation failed/7: %m");
-		namelen = ntohl(namelen);
-		name = malloc(namelen+1);
-		name[namelen]=0;
-		if (read(net, name, namelen) < 0)
-			err("Negotiation failed/8: %m");
-		for(i=0; i<servers->len; i++) {
-			SERVER* serve = &(g_array_index(servers, SERVER, i));
-			if(!strcmp(serve->servename, name)) {
-				CLIENT* client = g_new0(CLIENT, 1);
-				client->server = serve;
-				client->exportsize = OFFT_MAX;
-				client->net = net;
-				client->modern = TRUE;
-				client->transactionlogfd = -1;
-				free(name);
-				return client;
+			err_nonfatal("Negotiation failed/3: %m");
+		if (read(net, &cflags, sizeof(cflags)) < 0)
+			err_nonfatal("Negotiation failed/4: %m");
+		cflags = htonl(cflags);
+		do {
+			if (read(net, &magic, sizeof(magic)) < 0)
+				err_nonfatal("Negotiation failed/5: %m");
+			magic = ntohll(magic);
+			if(magic != opts_magic) {
+				close(net);
+				return NULL;
 			}
+			if (read(net, &opt, sizeof(opt)) < 0)
+				err_nonfatal("Negotiation failed/6: %m");
+			opt = ntohl(opt);
+			switch(opt) {
+			case NBD_OPT_EXPORT_NAME:
+				// NBD_OPT_EXPORT_NAME must be the last
+				// selected option, so return from here
+				// if that is chosen.
+				return handle_export_name(opt, net, servers, cflags);
+				break;
+			case NBD_OPT_LIST:
+				handle_list(opt, net, servers, cflags);
+				break;
+			case NBD_OPT_ABORT:
+				// handled below
+				break;
+			default:
+				send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
+				break;
+			}
+		} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
+		if(opt == NBD_OPT_ABORT) {
+			close(net);
+			return NULL;
 		}
-		free(name);
-		return NULL;
 	}
 	/* common */
 	size_host = htonll((u64)(client->exportsize));
@@ -1852,11 +1945,11 @@ void setupexport(CLIENT* client) {
 
 		/* If we created the file, it will be length zero */
 		if (!lastsize && cancreate) {
-			/* we can ignore errors as we recalculate the size */
-			ftruncate (fi.fhandle, client->server->expected_size);
-			lastsize = size_autodetect(fi.fhandle);
-			if (lastsize != client->server->expected_size)
-				err("Could not expand file");
+			assert(!multifile);
+			if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
+				err("Could not expand file: %m");
+			}
+			lastsize = client->server->expected_size;
 			break; /* don't look for any more files */
 		}
 
@@ -2233,7 +2326,7 @@ int setup_serve(SERVER *serve) {
 	gchar *port = NULL;
 	int e;
 
-	if(!do_oldstyle) {
+	if(!(glob_flags & F_OLDSTYLE)) {
 		return serve->servename ? 1 : 0;
 	}
 	memset(&hints,'\0',sizeof(hints));

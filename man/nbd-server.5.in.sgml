@@ -110,6 +110,18 @@ manpage.1: manpage.sgml
     <!-- These are in alphabetical order, please keep it that way -->    
     <variablelist>
       <varlistentry>
+        <term><option>allowlist</option></term>
+	<listitem>
+	  <para>
+	    Optional; boolean
+	   </para>
+	   <para>
+	     Whether to allow the client to fetch a list of exports from
+	     this server. If enabled, the client can run
+	     <command>nbd-client -l</command> to get a list of exports
+	     on this server.
+	   </para>
+      <varlistentry>
 	<term><option>group</option></term>
 	<listitem>
 	  <para>
@@ -659,12 +671,6 @@ manpage.1: manpage.sgml
 	    supports the NBD_CMD_TRIM command for the export. This
 	    command allows the server to discard the data from the disk,
 	    but does not require it to.
-	  </para>
-	  <para>
-	    Since nbd-server does not currently implement discarding
-	    data yet, this option does nothing (beyond allowing the
-	    client to send extra data to the server that it can't do
-	    anything useful with).
 	  </para>
 	</listitem>
       </varlistentry>
