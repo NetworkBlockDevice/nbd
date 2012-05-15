@@ -110,6 +110,18 @@ manpage.1: manpage.sgml
     <!-- These are in alphabetical order, please keep it that way -->    
     <variablelist>
       <varlistentry>
+        <term><option>allowlist</option></term>
+	<listitem>
+	  <para>
+	    Optional; boolean
+	   </para>
+	   <para>
+	     Whether to allow the client to fetch a list of exports from
+	     this server. If enabled, the client can run
+	     <command>nbd-client -l</command> to get a list of exports
+	     on this server.
+	   </para>
+      <varlistentry>
 	<term><option>group</option></term>
 	<listitem>
 	  <para>
