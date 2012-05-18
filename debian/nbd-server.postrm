@@ -27,7 +27,8 @@ case "$1" in
 
         ;;
        purge)
-	ucf --purge /etc/nbd-server/config || rm -f /etc/nbd-server/config
+	ucf --purge /etc/nbd-server/config ||:
+	rm -f /etc/nbd-server/config ||:
 	db_purge ||:
 	;;
     *)
