@@ -432,7 +432,7 @@ int main(int argc, char *argv[]) {
 	int c;
 	int nonspecial=0;
 	char* name=NULL;
-	uint32_t needed_flags;
+	uint32_t needed_flags=0;
 	uint32_t cflags;
 	uint32_t opts;
 	struct option long_options[] = {
