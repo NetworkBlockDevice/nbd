@@ -28,6 +28,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include "netdb-compat.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <syslog.h>

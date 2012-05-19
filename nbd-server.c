@@ -77,6 +77,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include "netdb-compat.h"
 #include <syslog.h>
 #include <unistd.h>
 #include <stdbool.h>
