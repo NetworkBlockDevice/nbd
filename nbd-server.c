@@ -77,7 +77,6 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include "netdb-compat.h"
 #include <syslog.h>
 #include <unistd.h>
 #include <stdbool.h>
@@ -102,6 +101,7 @@
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
+#include "netdb-compat.h"
 
 #ifdef WITH_SDP
 #include <sdp_inet.h>
