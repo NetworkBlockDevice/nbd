@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Wouter Verhelst <wouter@debian.org>
 Build-Depends: debhelper (>= 7.4.0), libglib2.0-dev
 Standards-Version: 3.9.2
-Vcs-Git: git://git.debian.org/~wouter/nbd.git
+Vcs-Git: git://anonscm.debian.org/users/wouter/nbd.git
 Vcs-Browser: http://git.debian.org/?p=users/wouter/nbd.git;a=summary
 Homepage: http://nbd.sourceforge.net/
 

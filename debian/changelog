@@ -1,3 +1,9 @@
+nbd (1:3.1-3) UNRELEASED; urgency=low
+
+  * Update Vcs-Git: header to point to the correct repository URL
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 21 May 2012 19:40:11 +0200
+
 nbd (1:3.1-2) unstable; urgency=low
 
   * Cherry-pick commit f540626 from git HEAD to fix needed_flags
