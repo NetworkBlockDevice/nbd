@@ -101,6 +101,7 @@
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
+#include "netdb-compat.h"
 
 #ifdef WITH_SDP
 #include <sdp_inet.h>

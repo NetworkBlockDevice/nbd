@@ -28,6 +28,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include "netdb-compat.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <syslog.h>
@@ -433,8 +434,8 @@ int main(int argc, char *argv[]) {
 	int nonspecial=0;
 	char* name=NULL;
 	uint32_t needed_flags=0;
-	uint32_t cflags;
-	uint32_t opts;
+	uint32_t cflags=0;
+	uint32_t opts=0;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
