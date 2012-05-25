@@ -184,6 +184,30 @@ EOF
 		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrityhuge-test.tr
 		retval=$?
 	;;
+	*/list)
+		# List exports
+		# This only works if we built nbd-client, which only exists on
+		# Linux. But hey, testing nbd-client itself isn't a bad idea,
+		# so here goes.
+		if [ ! -x ./nbd-client ]
+		then
+			retval=0
+		else
+			cat >${conffile} <<EOF
+[generic]
+	listenaddr = 127.0.0.1
+	allowlist = true
+[export1]
+	exportname = $tmpnam
+	readonly = true
+EOF
+			./nbd-server -C ${conffile} -p ${pidfile} &
+			PID=$!
+			sleep 1
+			./nbd-client -l localhost
+			retval=$?
+		fi
+		;;
 	*)
 		echo "E: unknown test $1"
 		exit 1
