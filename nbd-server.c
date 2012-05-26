@@ -803,7 +803,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 			case DT_REG:
 				/* Skip unless the name ends with '.conf' */
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
-					continue;
+					goto next;
 				}
 				tmp = parse_cfile(fname, FALSE, e);
 				errno=saved_errno;
