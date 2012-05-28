@@ -189,9 +189,9 @@ EOF
 		# This only works if we built nbd-client, which only exists on
 		# Linux. But hey, testing nbd-client itself isn't a bad idea,
 		# so here goes.
-		if [ ! -x ./nbd-client ]
+		if [ uname -s != "Linux" ]
 		then
-			retval=0
+			retval=77
 		else
 			cat >${conffile} <<EOF
 [generic]
