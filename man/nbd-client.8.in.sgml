@@ -201,7 +201,7 @@ manpage.1: manpage.sgml
 	<term><option>-S</option></term>
 	<listitem>
 	  <para>Connect to the server using the Socket Direct Protocol
-	    (SDP), rather than IP. See nbd-server(1) for details.
+	    (SDP), rather than IP. See nbd-server(5) for details.
 	  </para>
 	</listitem>
       </varlistentry>
