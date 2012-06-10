@@ -2099,18 +2099,22 @@ void set_peername(int net, CLIENT *client) {
 
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
+			msg2(LOG_DEBUG, "virtualization is off");
 			client->exportname=g_strdup(client->server->exportname);
 			break;
 		case VIRT_IPHASH:
+			msg2(LOG_DEBUG, "virtstyle iphash");
 			for(i=0;i<strlen(peername);i++) {
 				if(peername[i]=='.') {
 					peername[i]='/';
 				}
 			}
 		case VIRT_IPLIT:
+			msg2(LOG_DEBUG, "virststyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
 			break;
 		case VIRT_CIDR:
+			msg3(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &addrin, addrinlen);
 			if(ai->ai_family == AF_INET) {
 				netaddr4 = (struct sockaddr_in *)&netaddr;
