@@ -217,7 +217,10 @@ if [ -f ${pidfile} ]
 then
 	kill `cat ${pidfile}`
 else
-	kill $PID
+	if [ ! -z "$PID" ]
+	then
+		kill $PID
+	fi
 fi
 if [ -z "$2" ]
 then
