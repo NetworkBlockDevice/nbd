@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <sys/mman.h>
+#include <signal.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdarg.h>
@@ -571,6 +572,16 @@ int main(int argc, char *argv[]) {
 #endif
 	do {
 #ifndef NOFORK
+#ifdef SA_NOCLDWAIT
+		struct sigaction sa;
+
+		sa.sa_handler = SIG_DFL;
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags = SA_NOCLDWAIT;
+		if (sigaction(SIGCHLD, &sa, NULL) < 0)
+			err("sigaction: %m");
+#endif
+
 		if (!fork()) {
 			/* Due to a race, the kernel NBD driver cannot
 			 * call for a reread of the partition table
