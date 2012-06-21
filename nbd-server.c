@@ -2278,6 +2278,7 @@ int serveloop(GArray* servers) {
 					   data, and otherwise we get a
 					   segfault... */
 					g_array_free(servers, FALSE);
+					close(modernsock);
 				}
 
 				msg2(LOG_INFO,"Starting to serve");
