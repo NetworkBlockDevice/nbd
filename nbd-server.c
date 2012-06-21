@@ -2263,15 +2263,14 @@ int serveloop(GArray* servers) {
 		max=modernsock>max?modernsock:max;
 	}
 	for(;;) {
-		CLIENT *client = NULL;
-
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
-			int net = -1;
-			SERVER* serve=NULL;
+			int net;
 
 			DEBUG("accept, ");
 			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
+				CLIENT *client;
+
 				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 					err_nonfatal("accept: %m");
 					continue;
@@ -2282,19 +2281,20 @@ int serveloop(GArray* servers) {
 					close(net);
 					continue;
 				}
-				serve = client->server;
+				handle_connection(servers, net, client->server, client);
 			}
-			for(i=0; i < servers->len && net < 0; i++) {
+			for(i=0; i < servers->len; i++) {
+				SERVER *serve;
+
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 						err_nonfatal("accept: %m");
 						continue;
 					}
+					handle_connection(servers, net, serve, NULL);
 				}
 			}
-			if (net >= 0)
-				handle_connection(servers, net, serve, client);
 		}
 	}
 }
