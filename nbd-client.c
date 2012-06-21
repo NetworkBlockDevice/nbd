@@ -95,7 +95,7 @@ int opennet(char *name, char* portstr, int sdp) {
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		freeaddrinfo(ai);
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	if(sdp) {
@@ -119,8 +119,10 @@ int opennet(char *name, char* portstr, int sdp) {
 			break;		/* success */
 	}
 
-	if (rp == NULL)
-		err("Socket failed: %m");
+	if (rp == NULL) {
+		err_nonfatal("Socket failed: %m");
+		return -1;
+	}
 
 	setmysockopt(sock);
 
@@ -568,6 +570,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	sock = opennet(hostname, port, sdp);
+	if (sock < 0)
+		exit(EXIT_FAILURE);
 
 	negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
 
@@ -640,10 +644,17 @@ int main(int argc, char *argv[]) {
 					u64 new_size;
 					u32 new_flags;
 
-					fprintf(stderr, " Reconnecting\n");
 					close(sock); close(nbd);
-					sock = opennet(hostname, port, sdp);
+					for (;;) {
+						fprintf(stderr, " Reconnecting\n");
+						sock = opennet(hostname, port, sdp);
+						if (sock >= 0)
+							break;
+						sleep (1);
+					}
 					nbd = open(nbddev, O_RDWR);
+					if (nbd < 0)
+						err("Cannot open NBD: %m");
 					negotiate(sock, &new_size, &new_flags, name, needed_flags, cflags, opts);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
