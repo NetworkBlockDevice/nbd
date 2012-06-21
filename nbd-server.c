@@ -2165,7 +2165,8 @@ void destroy_pid_t(gpointer data) {
 static void
 handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 {
-	int sock_flags;
+	int sock_flags_old;
+	int sock_flags_new;
 
 	if(serve->max_connections > 0 &&
 	   g_hash_table_size(children) >= serve->max_connections) {
@@ -2173,10 +2174,12 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		close(net);
 		return;
 	}
-	if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
+	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
 		err("fcntl F_GETFL");
 	}
-	if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
+	sock_flags_new = sock_flags_old & ~O_NONBLOCK;
+	if (sock_flags_new != sock_flags_old &&
+	    fcntl(net, F_SETFL, sock_flags_new) == -1) {
 		err("fcntl F_SETFL ~O_NONBLOCK");
 	}
 	if(!client) {
