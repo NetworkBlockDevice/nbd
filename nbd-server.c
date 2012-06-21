@@ -2199,7 +2199,7 @@ int serveloop(GArray* servers) {
 
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
-			int net = 0;
+			int net = -1;
 			SERVER* serve=NULL;
 
 			DEBUG("accept, ");
@@ -2210,19 +2210,18 @@ int serveloop(GArray* servers) {
 				if(!client) {
 					err_nonfatal("negotiation failed");
 					close(net);
-					net=0;
 					continue;
 				}
 				serve = client->server;
 			}
-			for(i=0;i<servers->len && !net;i++) {
+			for(i=0; i < servers->len && net < 0; i++) {
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 						err("accept: %m");
 				}
 			}
-			if(net) {
+			if(net >= 0) {
 				int sock_flags;
 
 				if(serve->max_connections > 0 &&
@@ -2600,7 +2599,7 @@ int main(int argc, char *argv[]) {
 #endif
 			client=g_malloc(sizeof(CLIENT));
 			client->server=serve;
-			client->net=0;
+			client->net=-1;
 			client->exportsize=OFFT_MAX;
 			set_peername(0,client);
 			serveconnection(client);
