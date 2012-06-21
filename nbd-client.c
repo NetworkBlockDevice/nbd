@@ -372,6 +372,23 @@ void finish_sock(int sock, int nbd, int swap) {
 		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
+#ifdef __linux__
+static int
+oom_adjust(const char *file, const char *value)
+{
+	int fd, rc;
+	size_t len;
+
+	fd = open(file, O_WRONLY);
+	if (fd < 0)
+		return -1;
+	len = strlen(value);
+	rc = write(fd, value, len) != (ssize_t) len;
+	close(fd);
+	return rc ? -1 : 0;
+}
+#endif
+
 void usage(char* errmsg, ...) {
 	if(errmsg) {
 		char tmp[256];
@@ -561,6 +578,15 @@ int main(int argc, char *argv[]) {
 	setsizes(nbd, size64, blocksize, flags);
 	set_timeout(nbd, timeout);
 	finish_sock(sock, nbd, swap);
+#ifdef __linux__
+	if (swap) {
+		/* try linux >= 2.6.36 interface first */
+		if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
+			/* fall back to linux <= 2.6.35 interface */
+			oom_adjust("/proc/self/oom_adj", "-17");
+		}
+	}
+#endif
 
 	/* Go daemon */
 	
