@@ -185,7 +185,7 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
-int modernsock=0;	  /**< Socket for the modern handler. Not used
+int modernsock=-1;	  /**< Socket for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
 			       oldstyle is set to false (and then the
@@ -2189,7 +2189,7 @@ int serveloop(GArray* servers) {
 			max=sock>max?sock:max;
 		}
 	}
-	if(modernsock) {
+	if(modernsock >= 0) {
 		FD_SET(modernsock, &mset);
 		max=modernsock>max?modernsock:max;
 	}
@@ -2203,7 +2203,7 @@ int serveloop(GArray* servers) {
 			SERVER* serve=NULL;
 
 			DEBUG("accept, ");
-			if(FD_ISSET(modernsock, &rset)) {
+			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
 				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
 					err("accept: %m");
 				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
