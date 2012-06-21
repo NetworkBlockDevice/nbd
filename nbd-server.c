@@ -2204,8 +2204,10 @@ int serveloop(GArray* servers) {
 
 			DEBUG("accept, ");
 			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
-				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-					err("accept: %m");
+				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+					err_nonfatal("accept: %m");
+					continue;
+				}
 				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
 				if(!client) {
 					err_nonfatal("negotiation failed");
@@ -2217,8 +2219,10 @@ int serveloop(GArray* servers) {
 			for(i=0; i < servers->len && net < 0; i++) {
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
-					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-						err("accept: %m");
+					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+						err_nonfatal("accept: %m");
+						continue;
+					}
 				}
 			}
 			if(net >= 0) {
