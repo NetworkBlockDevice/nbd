@@ -1087,10 +1087,8 @@ void sigchld_handler(int s) {
  **/
 void killchild(gpointer key, gpointer value, gpointer user_data) {
 	pid_t *pid=value;
-	int *parent=user_data;
 
 	kill(*pid, SIGTERM);
-	*parent=1;
 }
 
 /**
@@ -1099,13 +1097,8 @@ void killchild(gpointer key, gpointer value, gpointer user_data) {
  * is severely wrong).
  **/
 void sigterm_handler(int s) {
-	int parent=0;
-
-	g_hash_table_foreach(children, killchild, &parent);
-
-	if(parent) {
-		unlink(pidfname);
-	}
+	g_hash_table_foreach(children, killchild, NULL);
+	unlink(pidfname);
 
 	exit(EXIT_SUCCESS);
 }
@@ -2198,9 +2191,16 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 	if (!dontfork) {
 		pid_t pid;
 		int i;
+		sigset_t newset;
+		sigset_t oldset;
 
+		sigemptyset(&newset);
+		sigaddset(&newset, SIGCHLD);
+		sigaddset(&newset, SIGTERM);
+		sigprocmask(SIG_BLOCK, &newset, &oldset);
 		if ((pid = fork()) < 0) {
 			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
 			goto handle_connection_out;
 		}
 		if (pid > 0) { /* parent */
@@ -2209,9 +2209,14 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 			pidp = g_malloc(sizeof(pid_t));
 			*pidp = pid;
 			g_hash_table_insert(children, pidp, pidp);
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
 			goto handle_connection_out;
 		}
 		/* child */
+		signal(SIGCHLD, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
+
 		g_hash_table_destroy(children);
 		children = NULL;
 		for(i=0;i<servers->len;i++) {
