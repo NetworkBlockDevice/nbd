@@ -2162,6 +2162,75 @@ void destroy_pid_t(gpointer data) {
 	g_free(data);
 }
 
+static void
+handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
+{
+	int sock_flags;
+
+	if(serve->max_connections > 0 &&
+	   g_hash_table_size(children) >= serve->max_connections) {
+		msg2(LOG_INFO, "Max connections reached");
+		close(net);
+		return;
+	}
+	if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
+		err("fcntl F_GETFL");
+	}
+	if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
+		err("fcntl F_SETFL ~O_NONBLOCK");
+	}
+	if(!client) {
+		client = g_new0(CLIENT, 1);
+		client->server=serve;
+		client->exportsize=OFFT_MAX;
+		client->net=net;
+		client->transactionlogfd = -1;
+	}
+	set_peername(net, client);
+	if (!authorized_client(client)) {
+		msg2(LOG_INFO,"Unauthorized client") ;
+		close(net);
+		return;
+	}
+	msg2(LOG_INFO,"Authorized client") ;
+
+	if (!dontfork) {
+		pid_t *pid;
+		int i;
+
+		pid=g_malloc(sizeof(pid_t));
+		if ((*pid=fork())<0) {
+			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+			close(net);
+			return;
+		}
+		if (*pid>0) { /* parent */
+			close(net);
+			g_hash_table_insert(children, pid, pid);
+			return;
+		}
+		/* child */
+		g_hash_table_destroy(children);
+		children = NULL;
+		for(i=0;i<servers->len;i++) {
+			serve=&g_array_index(servers, SERVER, i);
+			close(serve->socket);
+		}
+		/* FALSE does not free the
+		   actual data. This is required,
+		   because the client has a
+		   direct reference into that
+		   data, and otherwise we get a
+		   segfault... */
+		g_array_free(servers, FALSE);
+		close(modernsock);
+	}
+
+	msg2(LOG_INFO,"Starting to serve");
+	serveconnection(client);
+	exit(EXIT_SUCCESS);
+}
+
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
@@ -2195,7 +2264,6 @@ int serveloop(GArray* servers) {
 	}
 	for(;;) {
 		CLIENT *client = NULL;
-		pid_t *pid;
 
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
@@ -2225,69 +2293,8 @@ int serveloop(GArray* servers) {
 					}
 				}
 			}
-			if(net >= 0) {
-				int sock_flags;
-
-				if(serve->max_connections > 0 &&
-				   g_hash_table_size(children) >= serve->max_connections) {
-					msg2(LOG_INFO, "Max connections reached");
-					close(net);
-					continue;
-				}
-				if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
-					err("fcntl F_GETFL");
-				}
-				if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
-					err("fcntl F_SETFL ~O_NONBLOCK");
-				}
-				if(!client) {
-					client = g_new0(CLIENT, 1);
-					client->server=serve;
-					client->exportsize=OFFT_MAX;
-					client->net=net;
-					client->transactionlogfd = -1;
-				}
-				set_peername(net, client);
-				if (!authorized_client(client)) {
-					msg2(LOG_INFO,"Unauthorized client") ;
-					close(net);
-					continue;
-				}
-				msg2(LOG_INFO,"Authorized client") ;
-				pid=g_malloc(sizeof(pid_t));
-
-				if (!dontfork) {
-					if ((*pid=fork())<0) {
-						msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-						close(net);
-						continue;
-					}
-					if (*pid>0) { /* parent */
-						close(net);
-						g_hash_table_insert(children, pid, pid);
-						continue;
-					}
-					/* child */
-					g_hash_table_destroy(children);
-					children = NULL;
-					for(i=0;i<servers->len;i++) {
-						serve=&g_array_index(servers, SERVER, i);
-						close(serve->socket);
-					}
-					/* FALSE does not free the
-					   actual data. This is required,
-					   because the client has a
-					   direct reference into that
-					   data, and otherwise we get a
-					   segfault... */
-					g_array_free(servers, FALSE);
-					close(modernsock);
-				}
-
-				msg2(LOG_INFO,"Starting to serve");
-				serveconnection(client);
-				exit(EXIT_SUCCESS);
-			}
+			if (net >= 0)
+				handle_connection(servers, net, serve, client);
 		}
 	}
 }
