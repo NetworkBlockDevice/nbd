@@ -2266,6 +2266,7 @@ int serveloop(GArray* servers) {
 					}
 					/* child */
 					g_hash_table_destroy(children);
+					children = NULL;
 					for(i=0;i<servers->len;i++) {
 						serve=&g_array_index(servers, SERVER, i);
 						close(serve->socket);
