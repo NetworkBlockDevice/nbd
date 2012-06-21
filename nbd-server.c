@@ -2171,8 +2171,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 	if(serve->max_connections > 0 &&
 	   g_hash_table_size(children) >= serve->max_connections) {
 		msg2(LOG_INFO, "Max connections reached");
-		close(net);
-		return;
+		goto handle_connection_out;
 	}
 	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
 		err("fcntl F_GETFL");
@@ -2192,25 +2191,25 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 	set_peername(net, client);
 	if (!authorized_client(client)) {
 		msg2(LOG_INFO,"Unauthorized client") ;
-		close(net);
-		return;
+		goto handle_connection_out;
 	}
 	msg2(LOG_INFO,"Authorized client") ;
 
 	if (!dontfork) {
-		pid_t *pid;
+		pid_t pid;
 		int i;
 
-		pid=g_malloc(sizeof(pid_t));
-		if ((*pid=fork())<0) {
+		if ((pid = fork()) < 0) {
 			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-			close(net);
-			return;
+			goto handle_connection_out;
 		}
-		if (*pid>0) { /* parent */
-			close(net);
-			g_hash_table_insert(children, pid, pid);
-			return;
+		if (pid > 0) { /* parent */
+			pid_t *pidp;
+
+			pidp = g_malloc(sizeof(pid_t));
+			*pidp = pid;
+			g_hash_table_insert(children, pidp, pidp);
+			goto handle_connection_out;
 		}
 		/* child */
 		g_hash_table_destroy(children);
@@ -2232,6 +2231,10 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 	msg2(LOG_INFO,"Starting to serve");
 	serveconnection(client);
 	exit(EXIT_SUCCESS);
+
+handle_connection_out:
+	g_free(client);
+	close(net);
 }
 
 /**
