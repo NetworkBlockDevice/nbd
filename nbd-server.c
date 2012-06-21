@@ -2454,11 +2454,14 @@ void setup_servers(GArray* servers) {
 
 	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGTERM);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGCHLD, &sa, NULL) == -1)
 		err("sigaction: %m");
+
 	sa.sa_handler = sigterm_handler;
 	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGCHLD);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
 		err("sigaction: %m");
