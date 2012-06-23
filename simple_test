@@ -7,6 +7,8 @@ pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
 mydir=$(dirname "`readlink -f $0`")
 
+set -e
+
 ulimit -c unlimited
 
 # Create a one-meg device
@@ -189,7 +191,7 @@ EOF
 		# This only works if we built nbd-client, which only exists on
 		# Linux. But hey, testing nbd-client itself isn't a bad idea,
 		# so here goes.
-		if [ uname -s != "Linux" ]
+		if [ `uname -s` != "Linux" ]
 		then
 			retval=77
 		else
