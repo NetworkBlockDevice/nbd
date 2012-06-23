@@ -374,7 +374,6 @@ void finish_sock(int sock, int nbd, int swap) {
 		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
-#ifdef __linux__
 static int
 oom_adjust(const char *file, const char *value)
 {
@@ -389,7 +388,6 @@ oom_adjust(const char *file, const char *value)
 	close(fd);
 	return rc ? -1 : 0;
 }
-#endif
 
 void usage(char* errmsg, ...) {
 	if(errmsg) {
@@ -582,7 +580,6 @@ int main(int argc, char *argv[]) {
 	setsizes(nbd, size64, blocksize, flags);
 	set_timeout(nbd, timeout);
 	finish_sock(sock, nbd, swap);
-#ifdef __linux__
 	if (swap) {
 		/* try linux >= 2.6.36 interface first */
 		if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
@@ -590,7 +587,6 @@ int main(int argc, char *argv[]) {
 			oom_adjust("/proc/self/oom_adj", "-17");
 		}
 	}
-#endif
 
 	/* Go daemon */
 	
