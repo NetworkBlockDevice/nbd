@@ -2055,8 +2055,9 @@ void serveconnection(CLIENT *client) {
  * @param client information about the client. The IP address in human-readable
  * format will be written to a new char* buffer, the address of which will be
  * stored in client->clientname.
+ * @return: 0 - OK, -1 - failed.
  **/
-void set_peername(int net, CLIENT *client) {
+int set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage addrin;
 	struct sockaddr_storage netaddr;
 	struct sockaddr_in  *netaddr4 = NULL;
@@ -2071,13 +2072,15 @@ void set_peername(int net, CLIENT *client) {
 	int e;
 	int shift;
 
-	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0)
-		err("getpeername failed: %m");
+	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0) {
+		msg2(LOG_INFO, "getpeername failed: %m");
+		return -1;
+	}
 
 	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
 		msg3(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
-		freeaddrinfo(ai);
+		return -1;
 	}
 
 	memset(&hints, '\0', sizeof (hints));
@@ -2087,7 +2090,7 @@ void set_peername(int net, CLIENT *client) {
 	if(e != 0) {
 		msg3(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
-		return;
+		return -1;
 	}
 
 	switch(client->server->virtstyle) {
@@ -2145,6 +2148,7 @@ void set_peername(int net, CLIENT *client) {
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
 	client->clientname=g_strdup(peername);
+	return 0;
 }
 
 /**
@@ -2181,7 +2185,9 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		client->net=net;
 		client->transactionlogfd = -1;
 	}
-	set_peername(net, client);
+	if (set_peername(net, client)) {
+		goto handle_connection_out;
+	}
 	if (!authorized_client(client)) {
 		msg2(LOG_INFO,"Unauthorized client") ;
 		goto handle_connection_out;
@@ -2626,7 +2632,8 @@ int main(int argc, char *argv[]) {
 			client->server=serve;
 			client->net=-1;
 			client->exportsize=OFFT_MAX;
-			set_peername(0,client);
+			if (set_peername(0, client))
+				exit(EXIT_FAILURE);
 			serveconnection(client);
 			return 0;
 		}
