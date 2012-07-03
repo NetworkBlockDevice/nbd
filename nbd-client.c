@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <sys/mman.h>
+#include <signal.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdarg.h>
@@ -94,7 +95,7 @@ int opennet(char *name, char* portstr, int sdp) {
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		freeaddrinfo(ai);
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	if(sdp) {
@@ -118,8 +119,10 @@ int opennet(char *name, char* portstr, int sdp) {
 			break;		/* success */
 	}
 
-	if (rp == NULL)
-		err("Socket failed: %m");
+	if (rp == NULL) {
+		err_nonfatal("Socket failed: %m");
+		return -1;
+	}
 
 	setmysockopt(sock);
 
@@ -371,6 +374,21 @@ void finish_sock(int sock, int nbd, int swap) {
 		mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
+static int
+oom_adjust(const char *file, const char *value)
+{
+	int fd, rc;
+	size_t len;
+
+	fd = open(file, O_WRONLY);
+	if (fd < 0)
+		return -1;
+	len = strlen(value);
+	rc = write(fd, value, len) != (ssize_t) len;
+	close(fd);
+	return rc ? -1 : 0;
+}
+
 void usage(char* errmsg, ...) {
 	if(errmsg) {
 		char tmp[256];
@@ -550,6 +568,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	sock = opennet(hostname, port, sdp);
+	if (sock < 0)
+		exit(EXIT_FAILURE);
 
 	negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
 
@@ -560,6 +580,13 @@ int main(int argc, char *argv[]) {
 	setsizes(nbd, size64, blocksize, flags);
 	set_timeout(nbd, timeout);
 	finish_sock(sock, nbd, swap);
+	if (swap) {
+		/* try linux >= 2.6.36 interface first */
+		if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
+			/* fall back to linux <= 2.6.35 interface */
+			oom_adjust("/proc/self/oom_adj", "-17");
+		}
+	}
 
 	/* Go daemon */
 	
@@ -571,6 +598,16 @@ int main(int argc, char *argv[]) {
 #endif
 	do {
 #ifndef NOFORK
+#ifdef SA_NOCLDWAIT
+		struct sigaction sa;
+
+		sa.sa_handler = SIG_DFL;
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags = SA_NOCLDWAIT;
+		if (sigaction(SIGCHLD, &sa, NULL) < 0)
+			err("sigaction: %m");
+#endif
+
 		if (!fork()) {
 			/* Due to a race, the kernel NBD driver cannot
 			 * call for a reread of the partition table
@@ -603,10 +640,17 @@ int main(int argc, char *argv[]) {
 					u64 new_size;
 					u32 new_flags;
 
-					fprintf(stderr, " Reconnecting\n");
 					close(sock); close(nbd);
-					sock = opennet(hostname, port, sdp);
+					for (;;) {
+						fprintf(stderr, " Reconnecting\n");
+						sock = opennet(hostname, port, sdp);
+						if (sock >= 0)
+							break;
+						sleep (1);
+					}
 					nbd = open(nbddev, O_RDWR);
+					if (nbd < 0)
+						err("Cannot open NBD: %m");
 					negotiate(sock, &new_size, &new_flags, name, needed_flags, cflags, opts);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");

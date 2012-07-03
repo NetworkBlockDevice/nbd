@@ -201,7 +201,7 @@ manpage.1: manpage.sgml
 	<term><option>-S</option></term>
 	<listitem>
 	  <para>Connect to the server using the Socket Direct Protocol
-	    (SDP), rather than IP. See nbd-server(1) for details.
+	    (SDP), rather than IP. See nbd-server(5) for details.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -211,8 +211,9 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Specifies that this NBD device will be used as
 	  swapspace. This option attempts to prevent deadlocks by
-	  performing mlockall() at an appropriate time. It does not
-	  however guarantee that such deadlocks can be avoided.</para>
+	  performing mlockall() and adjusting the oom-killer score
+	  at an appropriate time. It does not however guarantee
+	  that such deadlocks can be avoided.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

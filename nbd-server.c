@@ -185,7 +185,7 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
-int modernsock=0;	  /**< Socket for the modern handler. Not used
+int modernsock=-1;	  /**< Socket for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
 			       oldstyle is set to false (and then the
@@ -803,7 +803,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 			case DT_REG:
 				/* Skip unless the name ends with '.conf' */
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
-					continue;
+					goto next;
 				}
 				tmp = parse_cfile(fname, FALSE, e);
 				errno=saved_errno;
@@ -1087,10 +1087,8 @@ void sigchld_handler(int s) {
  **/
 void killchild(gpointer key, gpointer value, gpointer user_data) {
 	pid_t *pid=value;
-	int *parent=user_data;
 
 	kill(*pid, SIGTERM);
-	*parent=1;
 }
 
 /**
@@ -1099,13 +1097,8 @@ void killchild(gpointer key, gpointer value, gpointer user_data) {
  * is severely wrong).
  **/
 void sigterm_handler(int s) {
-	int parent=0;
-
-	g_hash_table_foreach(children, killchild, &parent);
-
-	if(parent) {
-		unlink(pidfname);
-	}
+	g_hash_table_foreach(children, killchild, NULL);
+	unlink(pidfname);
 
 	exit(EXIT_SUCCESS);
 }
@@ -2062,8 +2055,9 @@ void serveconnection(CLIENT *client) {
  * @param client information about the client. The IP address in human-readable
  * format will be written to a new char* buffer, the address of which will be
  * stored in client->clientname.
+ * @return: 0 - OK, -1 - failed.
  **/
-void set_peername(int net, CLIENT *client) {
+int set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage addrin;
 	struct sockaddr_storage netaddr;
 	struct sockaddr_in  *netaddr4 = NULL;
@@ -2078,13 +2072,15 @@ void set_peername(int net, CLIENT *client) {
 	int e;
 	int shift;
 
-	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0)
-		err("getpeername failed: %m");
+	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0) {
+		msg2(LOG_INFO, "getpeername failed: %m");
+		return -1;
+	}
 
 	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
 		msg3(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
-		freeaddrinfo(ai);
+		return -1;
 	}
 
 	memset(&hints, '\0', sizeof (hints));
@@ -2094,23 +2090,27 @@ void set_peername(int net, CLIENT *client) {
 	if(e != 0) {
 		msg3(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
-		return;
+		return -1;
 	}
 
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
+			msg2(LOG_DEBUG, "virtualization is off");
 			client->exportname=g_strdup(client->server->exportname);
 			break;
 		case VIRT_IPHASH:
+			msg2(LOG_DEBUG, "virtstyle iphash");
 			for(i=0;i<strlen(peername);i++) {
 				if(peername[i]=='.') {
 					peername[i]='/';
 				}
 			}
 		case VIRT_IPLIT:
+			msg2(LOG_DEBUG, "virststyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
 			break;
 		case VIRT_CIDR:
+			msg3(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &addrin, addrinlen);
 			if(ai->ai_family == AF_INET) {
 				netaddr4 = (struct sockaddr_in *)&netaddr;
@@ -2148,6 +2148,7 @@ void set_peername(int net, CLIENT *client) {
 	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
 	     peername, client->exportname);
 	client->clientname=g_strdup(peername);
+	return 0;
 }
 
 /**
@@ -2156,6 +2157,95 @@ void set_peername(int net, CLIENT *client) {
  **/
 void destroy_pid_t(gpointer data) {
 	g_free(data);
+}
+
+static void
+handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
+{
+	int sock_flags_old;
+	int sock_flags_new;
+
+	if(serve->max_connections > 0 &&
+	   g_hash_table_size(children) >= serve->max_connections) {
+		msg2(LOG_INFO, "Max connections reached");
+		goto handle_connection_out;
+	}
+	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
+		err("fcntl F_GETFL");
+	}
+	sock_flags_new = sock_flags_old & ~O_NONBLOCK;
+	if (sock_flags_new != sock_flags_old &&
+	    fcntl(net, F_SETFL, sock_flags_new) == -1) {
+		err("fcntl F_SETFL ~O_NONBLOCK");
+	}
+	if(!client) {
+		client = g_new0(CLIENT, 1);
+		client->server=serve;
+		client->exportsize=OFFT_MAX;
+		client->net=net;
+		client->transactionlogfd = -1;
+	}
+	if (set_peername(net, client)) {
+		goto handle_connection_out;
+	}
+	if (!authorized_client(client)) {
+		msg2(LOG_INFO,"Unauthorized client") ;
+		goto handle_connection_out;
+	}
+	msg2(LOG_INFO,"Authorized client") ;
+
+	if (!dontfork) {
+		pid_t pid;
+		int i;
+		sigset_t newset;
+		sigset_t oldset;
+
+		sigemptyset(&newset);
+		sigaddset(&newset, SIGCHLD);
+		sigaddset(&newset, SIGTERM);
+		sigprocmask(SIG_BLOCK, &newset, &oldset);
+		if ((pid = fork()) < 0) {
+			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+			goto handle_connection_out;
+		}
+		if (pid > 0) { /* parent */
+			pid_t *pidp;
+
+			pidp = g_malloc(sizeof(pid_t));
+			*pidp = pid;
+			g_hash_table_insert(children, pidp, pidp);
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+			goto handle_connection_out;
+		}
+		/* child */
+		signal(SIGCHLD, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
+
+		g_hash_table_destroy(children);
+		children = NULL;
+		for(i=0;i<servers->len;i++) {
+			serve=&g_array_index(servers, SERVER, i);
+			close(serve->socket);
+		}
+		/* FALSE does not free the
+		   actual data. This is required,
+		   because the client has a
+		   direct reference into that
+		   data, and otherwise we get a
+		   segfault... */
+		g_array_free(servers, FALSE);
+		close(modernsock);
+	}
+
+	msg2(LOG_INFO,"Starting to serve");
+	serveconnection(client);
+	exit(EXIT_SUCCESS);
+
+handle_connection_out:
+	g_free(client);
+	close(net);
 }
 
 /**
@@ -2185,99 +2275,42 @@ int serveloop(GArray* servers) {
 			max=sock>max?sock:max;
 		}
 	}
-	if(modernsock) {
+	if(modernsock >= 0) {
 		FD_SET(modernsock, &mset);
 		max=modernsock>max?modernsock:max;
 	}
 	for(;;) {
-		CLIENT *client = NULL;
-		pid_t *pid;
-
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
-			int net = 0;
-			SERVER* serve=NULL;
+			int net;
 
 			DEBUG("accept, ");
-			if(FD_ISSET(modernsock, &rset)) {
-				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-					err("accept: %m");
+			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
+				CLIENT *client;
+
+				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+					err_nonfatal("accept: %m");
+					continue;
+				}
 				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
 				if(!client) {
 					err_nonfatal("negotiation failed");
 					close(net);
-					net=0;
 					continue;
 				}
-				serve = client->server;
+				handle_connection(servers, net, client->server, client);
 			}
-			for(i=0;i<servers->len && !net;i++) {
+			for(i=0; i < servers->len; i++) {
+				SERVER *serve;
+
 				serve=&(g_array_index(servers, SERVER, i));
 				if(FD_ISSET(serve->socket, &rset)) {
-					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0)
-						err("accept: %m");
-				}
-			}
-			if(net) {
-				int sock_flags;
-
-				if(serve->max_connections > 0 &&
-				   g_hash_table_size(children) >= serve->max_connections) {
-					msg2(LOG_INFO, "Max connections reached");
-					close(net);
-					continue;
-				}
-				if((sock_flags = fcntl(net, F_GETFL, 0))==-1) {
-					err("fcntl F_GETFL");
-				}
-				if(fcntl(net, F_SETFL, sock_flags &~O_NONBLOCK)==-1) {
-					err("fcntl F_SETFL ~O_NONBLOCK");
-				}
-				if(!client) {
-					client = g_new0(CLIENT, 1);
-					client->server=serve;
-					client->exportsize=OFFT_MAX;
-					client->net=net;
-					client->transactionlogfd = -1;
-				}
-				set_peername(net, client);
-				if (!authorized_client(client)) {
-					msg2(LOG_INFO,"Unauthorized client") ;
-					close(net);
-					continue;
-				}
-				msg2(LOG_INFO,"Authorized client") ;
-				pid=g_malloc(sizeof(pid_t));
-
-				if (!dontfork) {
-					if ((*pid=fork())<0) {
-						msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
-						close(net);
+					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+						err_nonfatal("accept: %m");
 						continue;
 					}
-					if (*pid>0) { /* parent */
-						close(net);
-						g_hash_table_insert(children, pid, pid);
-						continue;
-					}
-					/* child */
-					g_hash_table_destroy(children);
-					for(i=0;i<servers->len;i++) {
-						serve=&g_array_index(servers, SERVER, i);
-						close(serve->socket);
-					}
-					/* FALSE does not free the
-					   actual data. This is required,
-					   because the client has a
-					   direct reference into that
-					   data, and otherwise we get a
-					   segfault... */
-					g_array_free(servers, FALSE);
+					handle_connection(servers, net, serve, NULL);
 				}
-
-				msg2(LOG_INFO,"Starting to serve");
-				serveconnection(client);
-				exit(EXIT_SUCCESS);
 			}
 		}
 	}
@@ -2432,11 +2465,14 @@ void setup_servers(GArray* servers) {
 
 	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGTERM);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGCHLD, &sa, NULL) == -1)
 		err("sigaction: %m");
+
 	sa.sa_handler = sigterm_handler;
 	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGCHLD);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
 		err("sigaction: %m");
@@ -2594,9 +2630,10 @@ int main(int argc, char *argv[]) {
 #endif
 			client=g_malloc(sizeof(CLIENT));
 			client->server=serve;
-			client->net=0;
+			client->net=-1;
 			client->exportsize=OFFT_MAX;
-			set_peername(0,client);
+			if (set_peername(0, client))
+				exit(EXIT_FAILURE);
 			serveconnection(client);
 			return 0;
 		}
