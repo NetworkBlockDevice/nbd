@@ -1,5 +1,4 @@
 bin/nbd-server
-bin/nbd-trdump
 usr/share/man/man1/nbd-server.1
 usr/share/man/man5/nbd-server.5
 usr/share/nbd-server/nbd-server.conf.tmpl
