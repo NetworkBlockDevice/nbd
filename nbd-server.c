@@ -303,10 +303,11 @@ static inline const char * getcommandname(uint64_t command) {
 		return "NBD_CMD_DISC";
 	case NBD_CMD_FLUSH:
 		return "NBD_CMD_FLUSH";
+	case NBD_CMD_TRIM:
+		return "NBD_CMD_TRIM";
 	default:
-		break;
+		return "UNKNOWN";
 	}
-	return "UNKNOWN";
 }
 
 /**
