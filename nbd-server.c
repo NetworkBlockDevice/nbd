@@ -1489,7 +1489,7 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		if(i<client->export->len) {
 			cur = g_array_index(client->export, FILE_INFO, i);
 		}
-		if(prev.startoff < req->from) {
+		if(prev.startoff <= req->from) {
 			off_t curoff = req->from - prev.startoff;
 			off_t curlen = cur.startoff - prev.startoff - curoff;
 			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE, curoff, curlen);
