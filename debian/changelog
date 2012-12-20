@@ -1,8 +1,12 @@
-nbd (1:3.2-2) UNRELEASED; urgency=low
+nbd (1:3.2-2) unstable; urgency=low
 
-  * Update build-dependencies: Build-depend on debhelper 9, and tighten
-    libglib2.0-dev dependency, since nbd-server requires at least 2.26 these
-    days.
+  * Update build-dependencies: Build-depend on debhelper 9 (we already
+    say 9 in debian/compat, so this is just stating what's effectively
+    already the case), and tighten libglib2.0-dev dependency, since
+    nbd-server requires at least 2.26 these days.
+  * Change nbd-client-udeb from Architecture: <long list> to
+    Architecture: linux-any, similarly to how it's done for nbd-client.
+    I keep forgetting about this teensie tiny thing here. Oh well.
 
  -- Wouter Verhelst <wouter@debian.org>  Sat, 08 Sep 2012 19:38:02 +0200
 
