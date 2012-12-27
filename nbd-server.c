@@ -714,10 +714,8 @@ int append_serve(SERVER *s, GArray *a) {
 	int e;
 	int ret;
 
-	if(!s) {
+	if(!s)
 		err("Invalid parsing server");
-		return -1;
-	}
 
 	port = g_strdup_printf("%d", s->port);
 
@@ -1149,7 +1147,6 @@ off_t size_autodetect(int fhandle) {
         }
 
 	err("Could not find size of exported block device: %m");
-	return OFFT_MAX;
 }
 
 /**
