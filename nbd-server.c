@@ -2268,7 +2268,7 @@ int serveloop(GArray* servers) {
 	max=0;
 	FD_ZERO(&mset);
 	for(i=0;i<servers->len;i++) {
-		if((sock=(g_array_index(servers, SERVER, i)).socket)) {
+		if((sock=(g_array_index(servers, SERVER, i)).socket) >= 0) {
 			FD_SET(sock, &mset);
 			max=sock>max?sock:max;
 		}
@@ -2357,6 +2357,22 @@ int setup_serve(SERVER *serve) {
 	struct addrinfo *ai = NULL;
 	gchar *port = NULL;
 	int e;
+
+        /* Without this, it's possible that socket == 0, even if it's
+         * not initialized at all. And that would be wrong because 0 is
+         * totally legal value for properly initialized descriptor. This
+         * line is required to ensure that unused/uninitialized
+         * descriptors are marked as such (new style configuration
+         * case). Currently, servers are being initialized in multiple
+         * places, and some of the them do the socket initialization
+         * incorrectly. This is the only point common to all code paths,
+         * and therefore setting -1 is put here. However, the whole
+         * server initialization procedure should be extracted to its
+         * own function and all code paths wanting to mess with servers
+         * should initialize servers with that function.
+         * 
+         * TODO: fix server initialization */
+        serve->socket = -1;
 
 	if(!(glob_flags & F_OLDSTYLE)) {
 		return serve->servename ? 1 : 0;
