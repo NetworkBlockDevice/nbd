@@ -2535,14 +2535,6 @@ void daemonize(SERVER* serve) {
  * The stuff above daemonize() isn't.
  */
 
-void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN;
-
-void serve_err(SERVER* serve, const char* msg) {
-	g_message("Export of %s on port %d failed:", serve->exportname,
-			serve->port);
-	err(msg);
-}
-
 /**
  * Set up user-ID and/or group-ID
  **/
