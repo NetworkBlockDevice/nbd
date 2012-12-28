@@ -126,16 +126,18 @@ int glob_flags=0;
 /* Whether we should avoid forking */
 int dontfork = 0;
 
+static void msg(const int priority, const char *const format, ...) {
+        va_list ap;
+
+        va_start(ap, format);
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
-#define msg2(a,b) syslog(a,b)
-#define msg3(a,b,c) syslog(a,b,c)
-#define msg4(a,b,c,d) syslog(a,b,c,d)
+        vsyslog(priority, format, ap);
 #else
-#define msg2(a,b) g_message((char*)b)
-#define msg3(a,b,c) g_message((char*)b,c)
-#define msg4(a,b,c,d) g_message((char*)b,c,d)
+        g_logv(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, format, ap);
 #endif
+        va_end(ap);
+}
 
 /* Debugging macros */
 //#define DODBG
@@ -328,8 +330,8 @@ int authorized_client(CLIENT *opts) {
 	int len;
 
 	if ((f=fopen(opts->server->authname,"r"))==NULL) {
-		msg4(LOG_INFO,"Can't open authorization file %s (%s).",
-		     opts->server->authname,strerror(errno)) ;
+                msg(LOG_INFO, "Can't open authorization file %s (%s).",
+                    opts->server->authname, strerror(errno));
 		return 1 ; 
 	}
   
@@ -337,12 +339,12 @@ int authorized_client(CLIENT *opts) {
 	while (fgets(line,LINELEN,f)!=NULL) {
 		if((tmp=strchr(line, '/'))) {
 			if(strlen(line)<=tmp-line) {
-				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
+				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
 			}
 			*(tmp++)=0;
 			if(!inet_aton(line,&addr)) {
-				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
+				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
 			}
 			len=strtol(tmp, NULL, 0);
@@ -1064,11 +1066,11 @@ void sigchld_handler(int s) {
 
 	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
 		if(WIFEXITED(status)) {
-			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+			msg(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 		}
 		i=g_hash_table_lookup(children, &pid);
 		if(!i) {
-			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
+			msg(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
 		} else {
 			DEBUG("Removing %d from the list of children", pid);
 			g_hash_table_remove(children, &pid);
@@ -1760,7 +1762,7 @@ int mainloop(CLIENT *client) {
 			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
 				currlen = BUFSIZE - sizeof(struct nbd_reply);
 				if(!logged_oversized) {
-					msg2(LOG_DEBUG, "oversized request (this is not a problem)");
+					msg(LOG_DEBUG, "oversized request (this is not a problem)");
 					logged_oversized = true;
 				}
 			}
@@ -1769,7 +1771,7 @@ int mainloop(CLIENT *client) {
 		switch (command) {
 
 		case NBD_CMD_DISC:
-			msg2(LOG_INFO, "Disconnect request received.");
+			msg(LOG_INFO, "Disconnect request received.");
                 	if (client->server->flags & F_COPYONWRITE) { 
 				if (client->difmap) g_free(client->difmap) ;
                 		close(client->difffile);
@@ -1962,9 +1964,9 @@ void setupexport(CLIENT* client) {
 		client->exportsize = client->server->expected_size;
 	}
 
-	msg3(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
+	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
 	if(multifile) {
-		msg3(LOG_INFO, "Total number of files: %d", i);
+		msg(LOG_INFO, "Total number of files: %d", i);
 	}
 }
 
@@ -1975,7 +1977,7 @@ int copyonwrite_prepare(CLIENT* client) {
 	snprintf(client->difffilename, 1024, "%s-%s-%d.diff",client->exportname,client->clientname,
 		(int)getpid()) ;
 	client->difffilename[1023]='\0';
-	msg3(LOG_INFO,"About to create map and diff file %s",client->difffilename) ;
+	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 	if (client->difffile<0) err("Could not create diff file (%m)") ;
 	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
@@ -2071,13 +2073,13 @@ int set_peername(int net, CLIENT *client) {
 	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0) {
-		msg2(LOG_INFO, "getpeername failed: %m");
+		msg(LOG_INFO, "getpeername failed: %m");
 		return -1;
 	}
 
 	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-		msg3(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+		msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
 		return -1;
 	}
 
@@ -2086,29 +2088,29 @@ int set_peername(int net, CLIENT *client) {
 	e = getaddrinfo(peername, NULL, &hints, &ai);
 
 	if(e != 0) {
-		msg3(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+		msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 		return -1;
 	}
 
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
-			msg2(LOG_DEBUG, "virtualization is off");
+			msg(LOG_DEBUG, "virtualization is off");
 			client->exportname=g_strdup(client->server->exportname);
 			break;
 		case VIRT_IPHASH:
-			msg2(LOG_DEBUG, "virtstyle iphash");
+			msg(LOG_DEBUG, "virtstyle iphash");
 			for(i=0;i<strlen(peername);i++) {
 				if(peername[i]=='.') {
 					peername[i]='/';
 				}
 			}
 		case VIRT_IPLIT:
-			msg2(LOG_DEBUG, "virststyle ipliteral");
+			msg(LOG_DEBUG, "virststyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
 			break;
 		case VIRT_CIDR:
-			msg3(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
+			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &addrin, addrinlen);
 			if(ai->ai_family == AF_INET) {
 				netaddr4 = (struct sockaddr_in *)&netaddr;
@@ -2143,8 +2145,8 @@ int set_peername(int net, CLIENT *client) {
 	}
 
 	freeaddrinfo(ai);
-	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
-	     peername, client->exportname);
+        msg(LOG_INFO, "connect from %s, assigned file is %s",
+            peername, client->exportname);
 	client->clientname=g_strdup(peername);
 	return 0;
 }
@@ -2165,7 +2167,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 
 	if(serve->max_connections > 0 &&
 	   g_hash_table_size(children) >= serve->max_connections) {
-		msg2(LOG_INFO, "Max connections reached");
+		msg(LOG_INFO, "Max connections reached");
 		goto handle_connection_out;
 	}
 	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
@@ -2187,10 +2189,10 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		goto handle_connection_out;
 	}
 	if (!authorized_client(client)) {
-		msg2(LOG_INFO,"Unauthorized client") ;
+		msg(LOG_INFO, "Unauthorized client");
 		goto handle_connection_out;
 	}
-	msg2(LOG_INFO,"Authorized client") ;
+	msg(LOG_INFO, "Authorized client");
 
 	if (!dontfork) {
 		pid_t pid;
@@ -2203,7 +2205,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		sigaddset(&newset, SIGTERM);
 		sigprocmask(SIG_BLOCK, &newset, &oldset);
 		if ((pid = fork()) < 0) {
-			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+			msg(LOG_INFO, "Could not fork (%s)", strerror(errno));
 			sigprocmask(SIG_SETMASK, &oldset, NULL);
 			goto handle_connection_out;
 		}
@@ -2237,7 +2239,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		close(modernsock);
 	}
 
-	msg2(LOG_INFO,"Starting to serve");
+	msg(LOG_INFO, "Starting to serve");
 	serveconnection(client);
 	exit(EXIT_SUCCESS);
 
