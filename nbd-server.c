@@ -126,18 +126,12 @@ int glob_flags=0;
 /* Whether we should avoid forking */
 int dontfork = 0;
 
-static void msg(const int priority, const char *const format, ...) {
-        va_list ap;
-
-        va_start(ap, format);
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
-        vsyslog(priority, format, ap);
+#define msg(prio, ...) syslog(prio, __VA_ARGS__)
 #else
-        g_logv(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, format, ap);
+#define msg(prio, ...) g_log(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, __VA_ARGS__)
 #endif
-        va_end(ap);
-}
 
 /* Debugging macros */
 //#define DODBG
