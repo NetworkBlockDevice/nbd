@@ -616,7 +616,6 @@ typedef enum {
 	CFILE_KEY_MISSING,	/**< A (required) key is missing */
 	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
 	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
-	CFILE_PROGERR,		/**< Programmer error */
 	CFILE_NO_EXPORTS,	/**< A config file was specified that does not
 				     define any exports */
 	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
