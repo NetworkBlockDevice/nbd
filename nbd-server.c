@@ -713,7 +713,7 @@ SERVER* dup_serve(const SERVER *const s) {
  * @param a server array
  * @return 0 success, -1 error
  */
-int append_serve(SERVER *s, GArray *a) {
+int append_serve(const SERVER *const s, GArray *const a) {
 	SERVER *ns = NULL;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
