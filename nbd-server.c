@@ -625,6 +625,20 @@ typedef enum {
 } CFILE_ERRORS;
 
 /**
+ * Server setup error domain.
+ **/
+#define SETUP_ERROR g_quark_from_static_string("setup-error-quark")
+
+/**
+ * Server setup error codes.
+ **/
+typedef enum {
+        SETUP_ERROR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
+        SETUP_ERROR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
+        SETUP_ERROR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
+} SETUP_ERRORS;
+
+/**
  * Remove a SERVER from memory. Used from the hash table
  **/
 void remove_server(gpointer s) {
@@ -2309,7 +2323,18 @@ int serveloop(GArray* servers) {
 	}
 }
 
-void dosockopts(int socket) {
+/**
+ * Set server socket options.
+ *
+ * @param socket a socket descriptor of the server
+ *
+ * @param gerror a pointer to an error object pointer used for reporting
+ *        errors. On error, if gerror is not NULL, *gerror is set and -1
+ *        is returned.
+ *
+ * @return 0 on success, -1 on error
+ **/
+int dosockopts(const int socket, GError **const gerror) {
 #ifndef sun
 	int yes=1;
 #else
@@ -2321,16 +2346,24 @@ void dosockopts(int socket) {
 
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-	        err("setsockopt SO_REUSEADDR");
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_REUSEADDR,
+                            "failed to set socket option SO_REUSEADDR: %s",
+                            strerror(errno));
+                return -1;
 	}
 	l.l_onoff = 1;
 	l.l_linger = 10;
 	if (setsockopt(socket,SOL_SOCKET,SO_LINGER,&l,sizeof(l)) == -1) {
-	        perror("setsockopt SO_LINGER");
-		exit(EXIT_FAILURE);
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_LINGER,
+                            "failed to set socket option SO_LINGER: %s",
+                            strerror(errno));
+                return -1;
 	}
 	if (setsockopt(socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
-		err("setsockopt SO_KEEPALIVE");
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_KEEPALIVE,
+                            "failed to set socket option SO_KEEPALIVE: %s",
+                            strerror(errno));
+                return -1;
 	}
 
 	/* make the listening socket non-blocking */
@@ -2340,6 +2373,8 @@ void dosockopts(int socket) {
 	if (fcntl(socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
 		err("fcntl F_SETFL O_NONBLOCK");
 	}*/
+
+        return 0;
 }
 
 /**
@@ -2352,6 +2387,7 @@ int setup_serve(SERVER *serve) {
 	struct addrinfo *ai = NULL;
 	gchar *port = NULL;
 	int e;
+        GError *gerror = NULL;
 
         /* Without this, it's possible that socket == 0, even if it's
          * not initialized at all. And that would be wrong because 0 is
@@ -2406,7 +2442,12 @@ int setup_serve(SERVER *serve) {
 	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
 		err("socket: %m");
 
-	dosockopts(serve->socket);
+	if (dosockopts(serve->socket, &gerror) == -1) {
+                msg(LOG_ERR, "failed to open export-specific socket: %s",
+                    gerror->message);
+                g_clear_error(&gerror);
+                exit(EXIT_FAILURE);
+        }
 
 	DEBUG("Waiting for connections... bind, ");
 	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
@@ -2429,6 +2470,7 @@ void open_modern(void) {
 	struct addrinfo* ai = NULL;
 	struct sock_flags;
 	int e;
+        GError *gerror = NULL;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
@@ -2444,7 +2486,12 @@ void open_modern(void) {
 		err("socket: %m");
 	}
 
-	dosockopts(modernsock);
+	if (dosockopts(modernsock, &gerror) == -1) {
+                msg(LOG_ERR, "failed to open service-wide socket: %s",
+                    gerror->message);
+                g_clear_error(&gerror);
+                exit(EXIT_FAILURE);
+        }
 
 	if(bind(modernsock, ai->ai_addr, ai->ai_addrlen)) {
 		err("bind: %m");
