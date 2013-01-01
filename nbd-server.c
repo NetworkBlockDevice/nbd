@@ -664,7 +664,7 @@ void remove_server(gpointer s) {
  * @param s the old server we want to duplicate
  * @return new duplicated server
  **/
-SERVER* dup_serve(SERVER *s) {
+SERVER* dup_serve(const SERVER *const s) {
 	SERVER *serve = NULL;
 
 	serve=g_new0(SERVER, 1);
