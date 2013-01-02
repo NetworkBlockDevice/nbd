@@ -152,6 +152,7 @@ int dontfork = 0;
 			       authorization file (yuck) */
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
+#define DEFAULT_MAXOPENCHUNKS 64 /**< Default maximum number of open chunks in autochunk mode */
 
 /** Per-export flags: */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
@@ -210,6 +211,9 @@ typedef struct {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
 	off_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
+	off_t autochunk;    /**< Chunk size if we're automatically chunking */
+	int maxopenchunks;   /**< Number of chunks at once we keep filehandles to
+				  in autochunk mode */
 	gchar* listenaddr;   /**< The IP address we're listening on */
 	unsigned int port;   /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
@@ -458,6 +462,12 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	if(serve->expected_size) {
 		printf("\tfilesize = %lld\n", (long long int)serve->expected_size);
 	}
+	if(serve->autochunk) {
+		printf("\tautochunk = %lld\n", (long long int)serve->autochunk);
+	}
+	if(serve->maxopenchunks && serve->maxopenchunks != DEFAULT_MAXOPENCHUNKS) {
+		printf("\tmaxopenchunks = %d\n", serve->maxopenchunks);
+	}
 	if(serve->authname) {
 		printf("\tauthfile = %s\n", serve->authname);
 	}
@@ -675,6 +685,8 @@ SERVER* dup_serve(const SERVER *const s) {
 		serve->exportname = g_strdup(s->exportname);
 
 	serve->expected_size = s->expected_size;
+	serve->autochunk = s->autochunk;
+	serve->maxopenchunks = s->maxopenchunks;
 
 	if(s->listenaddr)
 		serve->listenaddr = g_strdup(s->listenaddr);
@@ -865,6 +877,8 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		{ "transactionlog", FALSE, PARAM_STRING, &(s.transactionlog),	0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
+		{ "autochunk",	FALSE,	PARAM_OFFT,	&(s.autochunk),	0 },
+		{ "maxopenchunks", FALSE, PARAM_INT,	&(s.maxopenchunks),	0 },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
@@ -1025,13 +1039,6 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		}
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
-		/* Don't append values for the [generic] group */
-		if(i>0 || !have_global) {
-			s.socket_family = AF_UNSPEC;
-			s.servename = groups[i];
-
-			append_serve(&s, retval);
-		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
 			g_set_error(e, errdomain, CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
@@ -1040,6 +1047,30 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			return NULL;
 		}
 #endif
+		if(s.autochunk) {
+			if (!s.expected_size) {
+				g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Group %s specifies autochunk but not total filesize", groups[i]);
+				g_array_free(retval, TRUE);
+				g_key_file_free(cfile);
+				return NULL;
+			}
+			if (s.flags & F_MULTIFILE) {
+				g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Group %s specifies both autochunk and multifile", groups[i]);
+				g_array_free(retval, TRUE);
+				g_key_file_free(cfile);
+				return NULL;
+			}
+
+			if (s.maxopenchunks == 0)
+				s.maxopenchunks = DEFAULT_MAXOPENCHUNKS;
+		}
+		/* Don't append values for the [generic] group */
+		if(i>0 || !have_global) {
+			s.socket_family = AF_UNSPEC;
+			s.servename = groups[i];
+
+			append_serve(&s, retval);
+		}
 	}
 	g_key_file_free(cfile);
 	if(cfdir) {
@@ -1159,17 +1190,147 @@ off_t size_autodetect(int fhandle) {
 }
 
 /**
+ * Open a client exportfile; may be one of many
+ * @param client information on the client we're opening an exportfile for
+ * @param filenum which exportfile this is
+ * @param startoff the offset of the begining of exportfile in the exported device
+ * @param create false if we're not allowed to open a new file
+ * @param store_fi Returned file info structure (for autochunk mode)
+ * @param store_lastsize Returned size of this file that was detected
+ * @param insert_pos Position in export array to insert new file info structure
+ * @return true if successful and we want to open more files right now
+ */
+bool openchunk(CLIENT *client, int filenum, off_t startoff, bool create, FILE_INFO *store_fi, off_t *store_lastsize, int insert_pos)
+{
+	int multifile = (client->server->flags & F_MULTIFILE) || (client->server->autochunk != 0);
+	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
+	int cancreate = ((client->server->expected_size) && !multifile && create);
+	int autochunk = (client->server->autochunk != 0);
+	off_t sizedetect;
+
+
+	gchar *tmpname;
+	gchar* error_string;
+
+	FILE_INFO fi;
+
+	if (autochunk)
+		cancreate = create;
+	else if (filenum > 0)
+		cancreate = 0;
+
+	/* if expected_size is specified, and this is the first file, we can create the file */
+	mode_t mode = (client->server->flags & F_READONLY) ?
+		O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+
+	if (temporary) {
+		tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, filenum);
+		DEBUG( "Opening %s\n", tmpname );
+		fi.fhandle = mkstemp(tmpname);
+	} else {
+		if(multifile || autochunk) {
+			tmpname=g_strdup_printf("%s.%d", client->exportname, filenum);
+		} else {
+			tmpname=g_strdup(client->exportname);
+		}
+		DEBUG( "Opening %s\n", tmpname );
+		fi.fhandle = open(tmpname, mode, 0600);
+		if(fi.fhandle == -1 && mode == O_RDWR) {
+			/* Try again because maybe media was read-only */
+			fi.fhandle = open(tmpname, O_RDONLY);
+			if(fi.fhandle != -1) {
+				/* Opening the base file in copyonwrite mode is
+				 * okay */
+				if(!(client->server->flags & F_COPYONWRITE)) {
+					client->server->flags |= F_AUTOREADONLY;
+					client->server->flags |= F_READONLY;
+				}
+			}
+		}
+	}
+	fi.startoff = startoff;
+	if(fi.fhandle == -1) {
+		if((multifile && filenum>0) || (autochunk && !cancreate)) {
+			if (store_fi)
+				*store_fi = fi;
+			return 0;
+		}
+		error_string=g_strdup_printf(
+			"Could not open exported file %s: %%m",
+			tmpname);
+		err(error_string);
+	}
+
+	if (temporary)
+		unlink(tmpname); /* File will stick around whilst FD open */
+
+	g_array_insert_val(client->export, insert_pos, fi);
+	g_free(tmpname);
+
+	if (store_fi)
+		*store_fi = fi;
+
+	if (autochunk)
+		return 1;
+
+	/* Starting offset and size of this file will be used to
+	 * calculate starting offset of next file */
+	sizedetect = size_autodetect(fi.fhandle);
+
+	if (store_lastsize)
+		*store_lastsize = sizedetect;
+
+	/* If we created the file, it will be length zero */
+	if (!sizedetect && cancreate) {
+		assert(!multifile);
+		if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
+			err("Could not expand file: %m");
+		}
+		sizedetect = client->server->expected_size;
+		if (store_lastsize)
+			*store_lastsize = sizedetect;
+		return 0;/* don't look for any more files */
+	}
+
+	if(!multifile || temporary)
+		return 0;
+
+	return 1;
+}
+
+/**
+ * Close all open exportfiles; this is only used for autochunk.
+ * @param client the client we want to close files for
+ */
+void closeallchunks(CLIENT *client) {
+	int i;
+
+	assert(client->server->autochunk != 0);
+
+	for (i = 0; i < client->export->len; i++) {
+		FILE_INFO fi = g_array_index(client->export, FILE_INFO, i);
+
+		if (fi.fhandle >= 0) {
+			close(fi.fhandle);
+		}
+	}
+
+	g_array_set_size(client->export, 0);
+}
+
+/**
  * Get the file handle and offset, given an export offset.
  *
- * @param export An array of export files
+ * @param client The client we're serving for
  * @param a The offset to get corresponding file/offset for
+ * @param command Whether we're reading (NBD_CMD_READ) or writing (NBD_CMD_WRITE)
  * @param fhandle [out] File descriptor
  * @param foffset [out] Offset into fhandle
  * @param maxbytes [out] Tells how many bytes can be read/written
  * from fhandle starting at foffset (0 if there is no limit)
  * @return 0 on success, -1 on failure
  **/
-int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+int get_filepos(CLIENT* client, off_t a, uint64_t command, int* fhandle, off_t* foffset, size_t* maxbytes) {
 	/* Negative offset not allowed */
 	if(a < 0)
 		return -1;
@@ -1177,6 +1338,7 @@ int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* m
 	/* Binary search for last file with starting offset <= a */
 	FILE_INFO fi;
 	int start = 0;
+	GArray *export = client->export;
 	int end = export->len - 1;
 	while( start <= end ) {
 		int mid = (start + end) / 2;
@@ -1191,16 +1353,70 @@ int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* m
 		}
 	}
 
-	/* end should never go negative, since first startoff is 0 and a >= 0 */
-	assert(end >= 0);
+	off_t autochunk = client->server->autochunk;
 
-	fi = g_array_index(export, FILE_INFO, end);
-	*fhandle = fi.fhandle;
-	*foffset = a - fi.startoff;
-	*maxbytes = 0;
-	if( end+1 < export->len ) {
-		FILE_INFO fi_next = g_array_index(export, FILE_INFO, end+1);
-		*maxbytes = fi_next.startoff - a;
+	if (autochunk) {
+		/* In autochunk mode, we automatically create chunk files as necessary. */
+		bool open_new_chunk = false;
+		if (end < 0) {
+			/* we're accessing a position before the first chunk we have open */
+			open_new_chunk = true;
+		} else {
+			fi = g_array_index(export, FILE_INFO, end);
+			if (a >= (fi.startoff + autochunk)) {
+				open_new_chunk = true;
+			}
+		}
+
+		if (open_new_chunk) {
+			/* we need to open a new filehandle for this new chunk we're referencing. */
+			/* first, make sure we don't have too many open files */
+
+			int chunknum = (a / autochunk);
+
+			if (export->len >= client->server->maxopenchunks) {
+				/* Too many chunks open.  Close them all and start over. */
+				/* TODO: add a LRU list so we can close only the oldest one */
+				DEBUG("Closing all chunks due to %d chunks open exceeding maximum of %d\n",
+				      export->len, client->server->maxopenchunks);
+				msg(LOG_DEBUG, "maxopenchunks exceeded; closing chunks");
+				closeallchunks(client);
+			}
+
+			fi.fhandle = -1;
+			int insertpos = end + 1;
+			if (insertpos > client->export->len)
+				insertpos = client->export->len;
+
+			assert(insertpos >= 0 && insertpos <= client->export->len);
+
+			openchunk(client, chunknum, chunknum * autochunk, command != NBD_CMD_READ, &fi, NULL, insertpos);
+			if (fi.fhandle == -1 && command != NBD_CMD_READ) {
+				err("could not open chunk");
+			}
+		}
+
+		*fhandle = fi.fhandle;
+		*foffset = a - fi.startoff;
+		assert(*foffset < autochunk);
+		*maxbytes = autochunk - *foffset;
+
+		assert(*foffset < autochunk);
+		assert((*foffset + *maxbytes) <= autochunk);
+
+	} else {
+		/* end should never go negative, since first startoff is 0 and a >= 0 */
+		assert(end >= 0);
+
+		fi = g_array_index(export, FILE_INFO, end);
+
+		*fhandle = fi.fhandle;
+		*foffset = a - fi.startoff;
+		*maxbytes = 0;
+		if( end+1 < export->len ) {
+			FILE_INFO fi_next = g_array_index(export, FILE_INFO, end+1);
+			*maxbytes = fi_next.startoff - a;
+		}
 	}
 
 	return 0;
@@ -1237,7 +1453,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	size_t maxbytes;
 	ssize_t retval;
 
-	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+	if(get_filepos(client, a, NBD_CMD_WRITE, &fhandle, &foffset, &maxbytes))
 		return -1;
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
@@ -1328,15 +1544,33 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t foffset;
 	size_t maxbytes;
 
-	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+	if(get_filepos(client, a, NBD_CMD_READ, &fhandle, &foffset, &maxbytes))
 		return -1;
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
 
 	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
+	if (fhandle == -1) {
+		/* file doesn't exist; return zeros */
+		memset(buf, 0, len);
+		return len;
+	}
+
 	myseek(fhandle, foffset);
-	return read(fhandle, buf, len);
+	int nread = read(fhandle, buf, len);
+
+	if (nread < 0) {
+		return nread;
+	}
+
+	if ((nread < len) && (client->server->autochunk != 0)) {
+		/* autochunks are zero filled unless otherwise specified */
+		memset(buf + nread, 0, len - nread);
+		nread = len;
+	}
+
+	return nread;
 }
 
 /**
@@ -1481,10 +1715,90 @@ int expflush(CLIENT *client) {
 }
 
 /*
+ * Remove, truncate, or (if the system supports it) punch holes using
+ * fallocate for data which we're told is no longer necessary.
+ * @param req The trim request
+ * @param client The client requesting the trimming
+ * @return 0 on success, nonzero on failure
+ */
+int autochunk_trim(struct nbd_request* req, CLIENT *client) {
+	assert (client->server->autochunk != 0);
+
+	/* first, close all open chunk files we have so we don't have
+	 * to go through them.  TRIM should happen infrequently enough
+	 * that this shouldn't be a problem. */
+	closeallchunks(client);
+
+	off_t trim_start = req->from;
+	off_t trim_end = req->from + req->len;
+	off_t autochunk = client->server->autochunk;
+
+	int chunk = trim_start / autochunk;
+	DEBUG("Trimming %llu to %llu, starting at chunk #%d\n", (unsigned long long)trim_start,
+		(unsigned long long) trim_end, chunk);
+	for (;;) {
+		off_t chunk_start = chunk * autochunk;
+		off_t chunk_end = chunk * autochunk + autochunk;
+
+		if (trim_end <= chunk_start)
+			break;
+
+		gchar *tmpname = g_strdup_printf("%s.%d", client->exportname, chunk);
+		if (trim_start <= chunk_start && trim_end >= chunk_end) {
+			/* data in this chunk is completely unnecessary; delete it */
+			DEBUG("Trim: chunk #%d totally unnecessary\n", chunk);
+			int res = unlink(tmpname);
+			if (res < 0 && errno != ENOENT) {
+				err("trim chunk unlink failed: %m");
+			}
+		} else if (trim_start > chunk_start && trim_end >= chunk_end) {
+			/* cut off the end of the file; we can use ftruncate for this */
+			off_t trunc_chunk = trim_start - chunk_start;
+			DEBUG("Trim: truncate chunk #%d at %llu\n",
+			      chunk, (unsigned long long)trunc_chunk);
+			int res = truncate (tmpname, trunc_chunk);
+			if (res < 0 && errno != ENOENT) {
+				err("trim chunk truncate failed: %m");
+			}
+#if HAVE_FALLOC_PH
+		} else {
+			off_t hole_start;
+			if (trim_start < chunk_start) {
+				hole_start = 0;
+			} else {
+				hole_start = trim_start - chunk_start;
+			}
+			off_t hole_end = trim_end - chunk_start;
+			DEBUG("Trim: cut a piece out of the middle of chunk #%d: %llu-%llu\n",
+			      chunk, (unsigned long long)hole_start, (unsigned long long) hole_end);
+			int fhandle = open(tmpname, O_RDWR);
+			if (fhandle < 0) {
+				if (errno != ENOENT) {
+					err("trim chunk open failed: %m");
+				}
+			} else {
+				fallocate(fhandle, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, hole_start, hole_end - hole_start);
+				close(fhandle);
+			}
+#endif
+		}
+		g_free(tmpname);
+
+		chunk++;
+	}
+	return 0;
+}
+
+
+
+/*
  * If the current system supports it, call fallocate() on the backend
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
+	if (client->server->autochunk) {
+		return autochunk_trim(req, client);
+	}
 #if HAVE_FALLOC_PH
 	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
 	FILE_INFO cur = prev;
@@ -1741,7 +2055,7 @@ int mainloop(CLIENT *client) {
 		request.from = ntohll(request.from);
 		request.type = ntohl(request.type);
 		command = request.type & NBD_CMD_MASK_COMMAND;
-		len = ntohl(request.len);
+		len = request.len = ntohl(request.len);
 
 		DEBUG("%s from %llu (%llu) len %d, ", getcommandname(command),
 				(unsigned long long)request.from,
@@ -1878,102 +2192,42 @@ int mainloop(CLIENT *client) {
 void setupexport(CLIENT* client) {
 	int i;
 	off_t laststartoff = 0, lastsize = 0;
-	int multifile = (client->server->flags & F_MULTIFILE);
-	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
-	int cancreate = (client->server->expected_size) && !multifile;
 
 	client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
-	/* If multi-file, open as many files as we can.
-	 * If not, open exactly one file.
-	 * Calculate file sizes as we go to get total size. */
-	for(i=0; ; i++) {
-		FILE_INFO fi;
-		gchar *tmpname;
-		gchar* error_string;
-
-		if (i)
-		  cancreate = 0;
-		/* if expected_size is specified, and this is the first file, we can create the file */
-		mode_t mode = (client->server->flags & F_READONLY) ?
-		  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
-
-		if (temporary) {
-			tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
-			DEBUG( "Opening %s\n", tmpname );
-			fi.fhandle = mkstemp(tmpname);
-		} else {
-			if(multifile) {
-				tmpname=g_strdup_printf("%s.%d", client->exportname, i);
-			} else {
-				tmpname=g_strdup(client->exportname);
-			}
-			DEBUG( "Opening %s\n", tmpname );
-			fi.fhandle = open(tmpname, mode, 0x600);
-			if(fi.fhandle == -1 && mode == O_RDWR) {
-				/* Try again because maybe media was read-only */
-				fi.fhandle = open(tmpname, O_RDONLY);
-				if(fi.fhandle != -1) {
-					/* Opening the base file in copyonwrite mode is
-					 * okay */
-					if(!(client->server->flags & F_COPYONWRITE)) {
-						client->server->flags |= F_AUTOREADONLY;
-						client->server->flags |= F_READONLY;
-					}
-				}
-			}
-		}
-		if(fi.fhandle == -1) {
-			if(multifile && i>0)
-				break;
-			error_string=g_strdup_printf(
-				"Could not open exported file %s: %%m",
-				tmpname);
-			err(error_string);
-		}
-
-		if (temporary)
-			unlink(tmpname); /* File will stick around whilst FD open */
-
-		fi.startoff = laststartoff + lastsize;
-		g_array_append_val(client->export, fi);
-		g_free(tmpname);
-
-		/* Starting offset and size of this file will be used to
-		 * calculate starting offset of next file */
-		laststartoff = fi.startoff;
-		lastsize = size_autodetect(fi.fhandle);
-
-		/* If we created the file, it will be length zero */
-		if (!lastsize && cancreate) {
-			assert(!multifile);
-			if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
-				err("Could not expand file: %m");
-			}
-			lastsize = client->server->expected_size;
-			break; /* don't look for any more files */
-		}
-
-		if(!multifile || temporary)
-			break;
-	}
-
-	/* Set export size to total calculated size */
-	client->exportsize = laststartoff + lastsize;
-
-	/* Export size may be overridden */
-	if(client->server->expected_size) {
-		/* desired size must be <= total calculated size */
-		if(client->server->expected_size > client->exportsize) {
-			err("Size of exported file is too big\n");
-		}
-
+	if (client->server->autochunk) {
+		/* autochunk automatically chunkifies based on the
+		 * configured size, so don't try to guess based on
+		 * existing files */
 		client->exportsize = client->server->expected_size;
+	} else {
+		/* If multi-file, open as many files as we can.
+		 * If not, open exactly one file.
+		 * Calculate file sizes as we go to get total size. */
+		for(i=0; ; i++) {
+			FILE_INFO fi;
+			int res = openchunk(client, i, laststartoff + lastsize, true, &fi, &lastsize, client->export->len);
+			laststartoff = fi.startoff;
+			if (!res) break;
+		}
+
+		/* Set export size to total calculated size */
+		client->exportsize = laststartoff + lastsize;
+
+		/* Export size may be overridden */
+		if(client->server->expected_size) {
+			/* desired size must be <= total calculated size */
+			if(client->server->expected_size > client->exportsize) {
+				err("Size of exported file is too big\n");
+			}
+
+			client->exportsize = client->server->expected_size;
+		}
 	}
 
 	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
-	if(multifile) {
-		msg(LOG_INFO, "Total number of files: %d", i);
+	if(client->export->len > 1) {
+		msg(LOG_INFO, "Total number of files: %d", client->export->len);
 	}
 }
 

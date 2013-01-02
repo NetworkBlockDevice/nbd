@@ -277,6 +277,26 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>autochunk</option></term>
+	<listitem>
+	  <para>Optional; integer.</para>
+	  <para>
+	    If this option is set, then
+	    <command>nbd-server</command> will store files in the format
+	    <replaceable>exportname</replaceable>.<replaceable>integer</replaceable>,
+	    with <replaceable>exportname</replaceable> being the
+	    filename that would otherwise have been used (after name
+	    transformation for virtualization, if any, has been
+	    performed) and <replaceable>integer</replaceable>, a multiple of
+	    <option>autochunk</option>.
+	  </para>
+	  <para>
+	    The <option>filesize</option> must be specified when using this
+	    option to give the total size of the device.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>copyonwrite</option></term>
 	<listitem>
 	  <para>
@@ -396,6 +416,18 @@ manpage.1: manpage.sgml
 	  <para>
 	    If specified, then it limits the number of opened connections for
 	    this export.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>maxopenchunks</option></term>
+	<listitem>
+	  <para>Optional; integer.</para>
+	  <para>
+	    This option is only used in conjunction with
+	    <option>autochunk</option>.
+	    It specifies the maximum number of chunks for which
+	    open filehandles will be kept at once.
 	  </para>
 	</listitem>
       </varlistentry>
