@@ -116,10 +116,6 @@
 /** Where our config file actually is */
 gchar* config_file_pos;
 
-/** What user we're running as */
-gchar* runuser=NULL;
-/** What group we're running as */
-gchar* rungroup=NULL;
 /** global flags */
 int glob_flags=0;
 
@@ -2614,24 +2610,24 @@ void daemonize(SERVER* serve) {
 /**
  * Set up user-ID and/or group-ID
  **/
-void dousers(void) {
+void dousers(const gchar *const username, const gchar *const groupname) {
 	struct passwd *pw;
 	struct group *gr;
 	gchar* str;
-	if(rungroup) {
-		gr=getgrnam(rungroup);
+	if (groupname) {
+		gr = getgrnam(groupname);
 		if(!gr) {
-			str = g_strdup_printf("Invalid group name: %s", rungroup);
+			str = g_strdup_printf("Invalid group name: %s", groupname);
 			err(str);
 		}
 		if(setgid(gr->gr_gid)<0) {
 			err("Could not set GID: %m"); 
 		}
 	}
-	if(runuser) {
-		pw=getpwnam(runuser);
+	if (username) {
+		pw = getpwnam(username);
 		if(!pw) {
-			str = g_strdup_printf("Invalid user name: %s", runuser);
+			str = g_strdup_printf("Invalid user name: %s", username);
 			err(str);
 		}
 		if(setuid(pw->pw_uid)<0) {
@@ -2698,8 +2694,6 @@ int main(int argc, char *argv[]) {
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
-        runuser       = genconf.user ? genconf.user : runuser;
-        rungroup      = genconf.group ? genconf.group : rungroup;
         modern_listen = genconf.modernaddr ? genconf.modernaddr : modern_listen;
         modernport    = genconf.modernport ? genconf.modernport : modernport;
         glob_flags   |= genconf.flags;
@@ -2752,6 +2746,10 @@ int main(int argc, char *argv[]) {
 	if (!dontfork)
 		daemonize(serve);
 	setup_servers(servers);
-	dousers();
+	dousers(genconf.user, genconf.group);
+
+        g_free(genconf.user);
+        g_free(genconf.group);
+
 	serveloop(servers);
 }
