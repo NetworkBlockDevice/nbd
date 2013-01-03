@@ -2258,7 +2258,7 @@ handle_connection_out:
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
-int serveloop(GArray* servers) {
+void serveloop(GArray* servers) {
 	struct sockaddr_storage addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	int i;
@@ -2322,6 +2322,7 @@ int serveloop(GArray* servers) {
 		}
 	}
 }
+void serveloop(GArray* servers) G_GNUC_NORETURN;
 
 /**
  * Set server socket options.
@@ -2708,5 +2709,4 @@ int main(int argc, char *argv[]) {
 	setup_servers(servers);
 	dousers();
 	serveloop(servers);
-	return 0 ;
 }
