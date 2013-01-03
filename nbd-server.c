@@ -182,9 +182,6 @@ int modernsock=-1;	  /**< Socket for the modern handler. Not used
 			       command line; only port used if
 			       oldstyle is set to false (and then the
 			       command-line client isn't used, gna gna) */
-char* modern_listen;	  /**< listenaddr value for modernsock */
-char* modernport=NBD_DEFAULT_PORT; /**< Port number on which to listen for
-			              new-style nbd-client connections */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -2495,7 +2492,7 @@ int setup_serve(SERVER *serve) {
 	}
 }
 
-void open_modern(void) {
+void open_modern(const gchar *const addr, const gchar *const port) {
 	struct addrinfo hints;
 	struct addrinfo* ai = NULL;
 	struct sock_flags;
@@ -2507,7 +2504,7 @@ void open_modern(void) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_protocol = IPPROTO_TCP;
-	e = getaddrinfo(modern_listen, modernport, &hints, &ai);
+	e = getaddrinfo(addr, port ? port : NBD_DEFAULT_PORT, &hints, &ai);
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		exit(EXIT_FAILURE);
@@ -2536,7 +2533,8 @@ void open_modern(void) {
 /**
  * Connect our servers.
  **/
-void setup_servers(GArray* servers) {
+void setup_servers(GArray *const servers, const gchar *const modernaddr,
+                   const gchar *const modernport) {
 	int i;
 	struct sigaction sa;
 	int want_modern=0;
@@ -2545,7 +2543,7 @@ void setup_servers(GArray* servers) {
 		want_modern |= setup_serve(&(g_array_index(servers, SERVER, i)));
 	}
 	if(want_modern) {
-		open_modern();
+		open_modern(modernaddr, modernport);
 	}
 	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 
@@ -2694,8 +2692,6 @@ int main(int argc, char *argv[]) {
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
-        modern_listen = genconf.modernaddr ? genconf.modernaddr : modern_listen;
-        modernport    = genconf.modernport ? genconf.modernport : modernport;
         glob_flags   |= genconf.flags;
 
 	if(serve) {
@@ -2745,11 +2741,13 @@ int main(int argc, char *argv[]) {
 	}
 	if (!dontfork)
 		daemonize(serve);
-	setup_servers(servers);
+	setup_servers(servers, genconf.modernaddr, genconf.modernport);
 	dousers(genconf.user, genconf.group);
 
         g_free(genconf.user);
         g_free(genconf.group);
+        g_free(genconf.modernaddr);
+        g_free(genconf.modernport);
 
 	serveloop(servers);
 }
