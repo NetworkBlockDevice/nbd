@@ -284,6 +284,17 @@ typedef struct {
 } PARAM;
 
 /**
+ * Configuration file values of the "generic" section
+ **/
+struct generic_conf {
+        gchar *user;            /**< user we run the server as    */
+        gchar *group;           /**< group we run running as      */
+        gchar *modernaddr;      /**< address of the modern socket */
+        gchar *modernport;      /**< port of the modern socket    */
+        gint flags;             /**< global flags                 */
+};
+
+/**
  * Translate a command name into human readable form
  *
  * @param command The command number (after applying NBD_CMD_MASK_COMMAND)
@@ -772,7 +783,7 @@ int append_serve(const SERVER *const s, GArray *const a) {
 }
 
 /* forward definition of parse_cfile */
-GArray* parse_cfile(gchar* f, bool have_global, GError** e);
+GArray* parse_cfile(gchar* f, struct generic_conf *genconf, GError** e);
 
 /**
  * Parse config file snippets in a directory. Uses readdir() and friends
@@ -813,7 +824,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					goto next;
 				}
-				tmp = parse_cfile(fname, FALSE, e);
+				tmp = parse_cfile(fname, NULL, e);
 				errno=saved_errno;
 				if(*e) {
 					goto err_out;
@@ -842,13 +853,18 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
  * Parse the config file.
  *
  * @param f the name of the config file
+ *
+ * @param genconf a pointer to generic configuration which will get
+ *        updated with parsed values. If NULL, then parsed generic
+ *        configuration values are safely and silently discarded.
+ *
  * @param e a GError. @see CFILE_ERRORS for what error values this function can
  * 	return.
  * @return a Array of SERVER* pointers, If the config file is empty or does not
  *	exist, returns an empty GHashTable; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
+GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	gchar* cfdir = NULL;
@@ -878,14 +894,15 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
+        struct generic_conf genconftmp;
 	PARAM gp[] = {
-		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
-		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&glob_flags,	F_OLDSTYLE },
-		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
-		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
-		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
-		{ "allowlist",  FALSE, PARAM_BOOL,	&glob_flags,	F_LIST },
+		{ "user",	FALSE, PARAM_STRING,	&(genconftmp.user),       0 },
+		{ "group",	FALSE, PARAM_STRING,	&(genconftmp.group),      0 },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_OLDSTYLE },
+		{ "listenaddr", FALSE, PARAM_STRING,	&(genconftmp.modernaddr), 0 },
+		{ "port", 	FALSE, PARAM_STRING,	&(genconftmp.modernport), 0 },
+		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
+		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -903,6 +920,15 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	gint i;
 	gint j;
 
+        memset(&genconftmp, 0, sizeof(struct generic_conf));
+
+        if (genconf) {
+                /* Use the passed configuration values as defaults. The
+                 * parsing algorithm below updates all parameter targets
+                 * found from configuration files. */
+                memcpy(&genconftmp, genconf, sizeof(struct generic_conf));
+        }
+
 	errdomain = g_quark_from_string("parse_cfile");
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
@@ -913,7 +939,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if((!startgroup || strcmp(startgroup, "generic")) && have_global) {
+	if((!startgroup || strcmp(startgroup, "generic")) && genconf) {
 		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
@@ -924,7 +950,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
-		if(i==1 || !have_global) {
+		if(i==1 || !genconf) {
 			p=lp;
 			p_size=lp_size;
 			if(!(glob_flags & F_OLDSTYLE)) {
@@ -1026,7 +1052,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0 || !have_global) {
+		if(i>0 || !genconf) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
@@ -1055,9 +1081,16 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			}
 		}
 	}
-	if(i==1 && have_global) {
+	if(i==1 && genconf) {
 		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
+
+        if (genconf) {
+                /* Return the updated generic configuration through the
+                 * pointer parameter. */
+                memcpy(genconf, &genconftmp, sizeof(struct generic_conf));
+        }
+
 	return retval;
 }
 
@@ -2646,6 +2679,9 @@ int main(int argc, char *argv[]) {
 	SERVER *serve;
 	GArray *servers;
 	GError *err=NULL;
+        struct generic_conf genconf;
+
+        memset(&genconf, 0, sizeof(struct generic_conf));
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
@@ -2657,8 +2693,17 @@ int main(int argc, char *argv[]) {
 	logging();
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
-	servers = parse_cfile(config_file_pos, TRUE, &err);
+
+        servers = parse_cfile(config_file_pos, &genconf, &err);
 	
+        /* Update global variables with parsed values. This will be
+         * removed once we get rid of global configuration variables. */
+        runuser       = genconf.user ? genconf.user : runuser;
+        rungroup      = genconf.group ? genconf.group : rungroup;
+        modern_listen = genconf.modernaddr ? genconf.modernaddr : modern_listen;
+        modernport    = genconf.modernport ? genconf.modernport : modernport;
+        glob_flags   |= genconf.flags;
+
 	if(serve) {
 		serve->socket_family = AF_UNSPEC;
 
