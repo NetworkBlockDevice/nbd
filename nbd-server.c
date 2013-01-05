@@ -2744,10 +2744,5 @@ int main(int argc, char *argv[]) {
 	setup_servers(servers, genconf.modernaddr, genconf.modernport);
 	dousers(genconf.user, genconf.group);
 
-        g_free(genconf.user);
-        g_free(genconf.group);
-        g_free(genconf.modernaddr);
-        g_free(genconf.modernport);
-
 	serveloop(servers);
 }
