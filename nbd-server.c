@@ -2348,8 +2348,6 @@ int dosockopts(const int socket, GError **const gerror) {
 #endif /* sun */
 	struct linger l;
 
-	//int sock_flags;
-
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
                 g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_REUSEADDR,
@@ -2371,14 +2369,6 @@ int dosockopts(const int socket, GError **const gerror) {
                             strerror(errno));
                 return -1;
 	}
-
-	/* make the listening socket non-blocking */
-	/*if ((sock_flags = fcntl(socket, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	if (fcntl(socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
-		err("fcntl F_SETFL O_NONBLOCK");
-	}*/
 
         return 0;
 }
