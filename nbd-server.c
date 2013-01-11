@@ -643,27 +643,6 @@ typedef enum {
 } SETUP_ERRORS;
 
 /**
- * Remove a SERVER from memory. Used from the hash table
- **/
-void remove_server(gpointer s) {
-	SERVER *server;
-
-	server=(SERVER*)s;
-	g_free(server->exportname);
-	if(server->authname)
-		g_free(server->authname);
-	if(server->listenaddr)
-		g_free(server->listenaddr);
-	if(server->prerun)
-		g_free(server->prerun);
-	if(server->postrun)
-		g_free(server->postrun);
-	if(server->transactionlog)
-		g_free(server->transactionlog);
-	g_free(server);
-}
-
-/**
  * duplicate server
  * @param s the old server we want to duplicate
  * @return new duplicated server
