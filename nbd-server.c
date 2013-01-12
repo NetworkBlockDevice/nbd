@@ -2382,12 +2382,12 @@ int dosockopts(const int socket, GError **const gerror) {
  *
  * @param serve the server we want to connect.
  **/
-int setup_serve(SERVER *serve) {
+int setup_serve(SERVER *const serve, GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	gchar *port = NULL;
 	int e;
-        GError *gerror = NULL;
+        int retval = -1;
 
         /* Without this, it's possible that socket == 0, even if it's
          * not initialized at all. And that would be wrong because 0 is
@@ -2422,10 +2422,11 @@ int setup_serve(SERVER *serve) {
 	g_free(port);
 
 	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
-		serve->socket = -1;
-		freeaddrinfo(ai);
-		exit(EXIT_FAILURE);
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_GAI,
+                            "failed to open an export socket: "
+                            "failed to get address info: %s",
+                            gai_strerror(e));
+                goto out;
 	}
 
 	if(serve->socket_family == AF_UNSPEC)
@@ -2439,30 +2440,47 @@ int setup_serve(SERVER *serve) {
 			ai->ai_family = AF_INET6_SDP;
 	}
 #endif
-	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-		err("socket: %m");
+	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0) {
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SOCKET,
+                            "failed to open an export socket: "
+                            "failed to create a socket: %s",
+                            strerror(errno));
+                goto out;
+        }
 
-	if (dosockopts(serve->socket, &gerror) == -1) {
-                msg(LOG_ERR, "failed to open export-specific socket: %s",
-                    gerror->message);
-                g_clear_error(&gerror);
-                exit(EXIT_FAILURE);
+	if (dosockopts(serve->socket, gerror) == -1) {
+                g_prefix_error(gerror, "failed to open an export socket: ");
+                goto out;
         }
 
 	DEBUG("Waiting for connections... bind, ");
 	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
-	if (e != 0 && errno != EADDRINUSE)
-		err("bind: %m");
+	if (e != 0 && errno != EADDRINUSE) {
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                            "failed to open an export socket: "
+                            "failed to bind an address to a socket: %s",
+                            strerror(errno));
+                goto out;
+        }
 	DEBUG("listen, ");
-	if (listen(serve->socket, 1) < 0)
-		err("listen: %m");
+	if (listen(serve->socket, 1) < 0) {
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                            "failed to open an export socket: "
+                            "failed to start listening on a socket: %s",
+                            strerror(errno));
+                goto out;
+        }
 
+        retval = serve->servename ? 1 : 0;
+out:
+
+        if (retval == -1 && serve->socket >= 0) {
+                close(serve->socket);
+                serve->socket = -1;
+        }
 	freeaddrinfo (ai);
-	if(serve->servename) {
-		return 1;
-	} else {
-		return 0;
-	}
+
+        return retval;
 }
 
 int open_modern(const gchar *const addr, const gchar *const port,
@@ -2538,7 +2556,18 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 	int want_modern=0;
 
 	for(i=0;i<servers->len;i++) {
-		want_modern |= setup_serve(&(g_array_index(servers, SERVER, i)));
+                GError *gerror = NULL;
+                SERVER *server = &g_array_index(servers, SERVER, i);
+                int ret;
+
+		ret = setup_serve(server, &gerror);
+                if (ret == -1) {
+                        msg(LOG_ERR, "failed to setup servers: %s",
+                            gerror->message);
+                        g_clear_error(&gerror);
+                        exit(EXIT_FAILURE);
+                }
+                want_modern |= ret;
 	}
 	if(want_modern) {
                 GError *gerror = NULL;
