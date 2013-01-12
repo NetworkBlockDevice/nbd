@@ -612,39 +612,34 @@ SERVER* cmdline(int argc, char *argv[]) {
 }
 
 /**
- * Error codes for config file parsing
+ * Error domain common for all NBD server errors.
  **/
-typedef enum {
-	CFILE_NOTFOUND,		/**< The configuration file is not found */
-	CFILE_MISSING_GENERIC,	/**< The (required) group "generic" is missing */
-	CFILE_KEY_MISSING,	/**< A (required) key is missing */
-	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
-	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
-	CFILE_NO_EXPORTS,	/**< A config file was specified that does not
-				     define any exports */
-	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
-				     old-style export. */
-	CFILE_DIR_UNKNOWN,	/**< A directory requested does not exist*/
-	CFILE_READDIR_ERR,	/**< Error occurred during readdir() */
-} CFILE_ERRORS;
+#define NBDS_ERR g_quark_from_static_string("server-error-quark")
 
 /**
- * Server setup error domain.
- **/
-#define SETUP_ERROR g_quark_from_static_string("setup-error-quark")
-
-/**
- * Server setup error codes.
+ * NBD server error codes.
  **/
 typedef enum {
-        SETUP_ERROR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
-        SETUP_ERROR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
-        SETUP_ERROR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
-        SETUP_ERROR_GAI,                     /**< Failed to get address info */
-        SETUP_ERROR_SOCKET,                  /**< Failed to create a socket */
-        SETUP_ERROR_BIND,                    /**< Failed to bind an address to socket */
-        SETUP_ERROR_LISTEN,                  /**< Failed to start listening on a socket */
-} SETUP_ERRORS;
+        NBDS_ERR_CFILE_NOTFOUND,          /**< The configuration file is not found */
+        NBDS_ERR_CFILE_MISSING_GENERIC,   /**< The (required) group "generic" is missing */
+        NBDS_ERR_CFILE_KEY_MISSING,       /**< A (required) key is missing */
+        NBDS_ERR_CFILE_VALUE_INVALID,     /**< A value is syntactically invalid */
+        NBDS_ERR_CFILE_VALUE_UNSUPPORTED, /**< A value is not supported in this build */
+        NBDS_ERR_CFILE_NO_EXPORTS,        /**< A config file was specified that does not
+                                               define any exports */
+        NBDS_ERR_CFILE_INCORRECT_PORT,    /**< The reserved port was specified for an
+                                               old-style export. */
+        NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
+        NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
+        NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
+        NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
+        NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
+        NBDS_ERR_GAI,                     /**< Failed to get address info */
+        NBDS_ERR_SOCKET,                  /**< Failed to create a socket */
+        NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
+        NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
+        NBDS_ERR_SYS,                     /**< Underlying system call or library error */
+} NBDS_ERRS;
 
 /**
  * duplicate server
@@ -768,7 +763,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *genconf, GError** e);
  **/
 GArray* do_cfile_dir(gchar* dir, GError** e) {
 	DIR* dirh = opendir(dir);
-	GQuark errdomain = g_quark_from_string("do_cfile_dir");
 	struct dirent* de;
 	gchar* fname;
 	GArray* retval = NULL;
@@ -776,7 +770,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	struct stat stbuf;
 
 	if(!dir) {
-		g_set_error(e, errdomain, CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
 		return NULL;
 	}
 	errno=0;
@@ -816,7 +810,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 		g_free(fname);
 	}
 	if(errno) {
-		g_set_error(e, errdomain, CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
 	err_out:
 		if(retval)
 			g_array_free(retval, TRUE);
@@ -834,8 +828,11 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
  *        updated with parsed values. If NULL, then parsed generic
  *        configuration values are safely and silently discarded.
  *
- * @param e a GError. @see CFILE_ERRORS for what error values this function can
- * 	return.
+ * @param e a GError. Error code can be any of the following:
+ *        NBDS_ERR_CFILE_NOTFOUND, NBDS_ERR_CFILE_MISSING_GENERIC,
+ *        NBDS_ERR_CFILE_VALUE_INVALID, NBDS_ERR_CFILE_VALUE_UNSUPPORTED
+ *        or NBDS_ERR_CFILE_NO_EXPORTS. @see NBDS_ERRS.
+ *
  * @return a Array of SERVER* pointers, If the config file is empty or does not
  *	exist, returns an empty GHashTable; if the config file contains an
  *	error, returns NULL, and e is set appropriately
@@ -885,7 +882,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	GKeyFile *cfile;
 	GError *err = NULL;
 	const char *err_msg=NULL;
-	GQuark errdomain;
 	GArray *retval=NULL;
 	gchar **groups;
 	gboolean bval;
@@ -905,18 +901,17 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
                 memcpy(&genconftmp, genconf, sizeof(struct generic_conf));
         }
 
-	errdomain = g_quark_from_string("parse_cfile");
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file %s.", f);
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s.", f);
 		g_key_file_free(cfile);
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
 	if((!startgroup || strcmp(startgroup, "generic")) && genconf) {
-		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
 	}
@@ -989,7 +984,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 				} else {
 					err_msg = DEFAULT_ERROR;
 				}
-				g_set_error(e, errdomain, CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
+				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
 				g_array_free(retval, TRUE);
 				g_error_free(err);
 				g_key_file_free(cfile);
@@ -1006,14 +1001,14 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 			} else if(!strncmp(virtstyle, "cidrhash", 8)) {
 				s.virtstyle=VIRT_CIDR;
 				if(strlen(virtstyle)<10) {
-					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
+					g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
 					g_array_free(retval, TRUE);
 					g_key_file_free(cfile);
 					return NULL;
 				}
 				s.cidrlen=strtol(virtstyle+8, NULL, 0);
 			} else {
-				g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
+				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
 				g_array_free(retval, TRUE);
 				g_key_file_free(cfile);
 				return NULL;
@@ -1036,7 +1031,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
-			g_set_error(e, errdomain, CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
 			g_array_free(retval, TRUE);
 			g_key_file_free(cfile);
 			return NULL;
@@ -1058,7 +1053,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		}
 	}
 	if(i==1 && genconf) {
-		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
 
         if (genconf) {
@@ -2354,7 +2349,7 @@ int dosockopts(const int socket, GError **const gerror) {
 
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_REUSEADDR,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SO_REUSEADDR,
                             "failed to set socket option SO_REUSEADDR: %s",
                             strerror(errno));
                 return -1;
@@ -2362,13 +2357,13 @@ int dosockopts(const int socket, GError **const gerror) {
 	l.l_onoff = 1;
 	l.l_linger = 10;
 	if (setsockopt(socket,SOL_SOCKET,SO_LINGER,&l,sizeof(l)) == -1) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_LINGER,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SO_LINGER,
                             "failed to set socket option SO_LINGER: %s",
                             strerror(errno));
                 return -1;
 	}
 	if (setsockopt(socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SO_KEEPALIVE,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SO_KEEPALIVE,
                             "failed to set socket option SO_KEEPALIVE: %s",
                             strerror(errno));
                 return -1;
@@ -2422,7 +2417,7 @@ int setup_serve(SERVER *const serve, GError **const gerror) {
 	g_free(port);
 
 	if(e != 0) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_GAI,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
                             "failed to open an export socket: "
                             "failed to get address info: %s",
                             gai_strerror(e));
@@ -2441,7 +2436,7 @@ int setup_serve(SERVER *const serve, GError **const gerror) {
 	}
 #endif
 	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SOCKET,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
                             "failed to open an export socket: "
                             "failed to create a socket: %s",
                             strerror(errno));
@@ -2456,7 +2451,7 @@ int setup_serve(SERVER *const serve, GError **const gerror) {
 	DEBUG("Waiting for connections... bind, ");
 	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
 	if (e != 0 && errno != EADDRINUSE) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
                             "failed to open an export socket: "
                             "failed to bind an address to a socket: %s",
                             strerror(errno));
@@ -2464,7 +2459,7 @@ int setup_serve(SERVER *const serve, GError **const gerror) {
         }
 	DEBUG("listen, ");
 	if (listen(serve->socket, 1) < 0) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
                             "failed to open an export socket: "
                             "failed to start listening on a socket: %s",
                             strerror(errno));
@@ -2498,7 +2493,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	hints.ai_protocol = IPPROTO_TCP;
 	e = getaddrinfo(addr, port ? port : NBD_DEFAULT_PORT, &hints, &ai);
 	if(e != 0) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_GAI,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
                             "failed to open a modern socket: "
                             "failed to get address info: %s",
                             gai_strerror(e));
@@ -2506,7 +2501,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	}
 
 	if((modernsock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SOCKET,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
                             "failed to open a modern socket: "
                             "failed to create a socket: %s",
                             strerror(errno));
@@ -2519,7 +2514,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
         }
 
 	if(bind(modernsock, ai->ai_addr, ai->ai_addrlen)) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
                             "failed to open a modern socket: "
                             "failed to bind an address to a socket: %s",
                             strerror(errno));
@@ -2527,7 +2522,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	}
 
 	if(listen(modernsock, 10) <0) {
-                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
                             "failed to open a modern socket: "
                             "failed to start listening on a socket: %s",
                             strerror(errno));
@@ -2757,8 +2752,8 @@ int main(int argc, char *argv[]) {
 	}
     
 	if(!servers || !servers->len) {
-		if(err && !(err->domain == g_quark_from_string("parse_cfile")
-				&& err->code == CFILE_NOTFOUND)) {
+                if(err && !(err->domain == NBDS_ERR
+                            && err->code == NBDS_ERR_CFILE_NOTFOUND)) {
 			g_warning("Could not parse config file: %s", 
 					err ? err->message : "Unknown error");
 		}
