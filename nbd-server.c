@@ -640,6 +640,10 @@ typedef enum {
         SETUP_ERROR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
         SETUP_ERROR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
         SETUP_ERROR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
+        SETUP_ERROR_GAI,                     /**< Failed to get address info */
+        SETUP_ERROR_SOCKET,                  /**< Failed to create a socket */
+        SETUP_ERROR_BIND,                    /**< Failed to bind an address to socket */
+        SETUP_ERROR_LISTEN,                  /**< Failed to start listening on a socket */
 } SETUP_ERRORS;
 
 /**
@@ -2461,12 +2465,13 @@ int setup_serve(SERVER *serve) {
 	}
 }
 
-void open_modern(const gchar *const addr, const gchar *const port) {
+int open_modern(const gchar *const addr, const gchar *const port,
+                GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo* ai = NULL;
 	struct sock_flags;
 	int e;
-        GError *gerror = NULL;
+        int retval = -1;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
@@ -2475,28 +2480,52 @@ void open_modern(const gchar *const addr, const gchar *const port) {
 	hints.ai_protocol = IPPROTO_TCP;
 	e = getaddrinfo(addr, port ? port : NBD_DEFAULT_PORT, &hints, &ai);
 	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
-		exit(EXIT_FAILURE);
-	}
-	if((modernsock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
-		err("socket: %m");
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_GAI,
+                            "failed to open a modern socket: "
+                            "failed to get address info: %s",
+                            gai_strerror(e));
+                goto out;
 	}
 
-	if (dosockopts(modernsock, &gerror) == -1) {
-                msg(LOG_ERR, "failed to open service-wide socket: %s",
-                    gerror->message);
-                g_clear_error(&gerror);
-                exit(EXIT_FAILURE);
+	if((modernsock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_SOCKET,
+                            "failed to open a modern socket: "
+                            "failed to create a socket: %s",
+                            strerror(errno));
+                goto out;
+	}
+
+	if (dosockopts(modernsock, gerror) == -1) {
+                g_prefix_error(gerror, "failed to open a modern socket: ");
+                goto out;
         }
 
 	if(bind(modernsock, ai->ai_addr, ai->ai_addrlen)) {
-		err("bind: %m");
-	}
-	if(listen(modernsock, 10) <0) {
-		err("listen: %m");
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                            "failed to open a modern socket: "
+                            "failed to bind an address to a socket: %s",
+                            strerror(errno));
+                goto out;
 	}
 
-	freeaddrinfo(ai);
+	if(listen(modernsock, 10) <0) {
+                g_set_error(gerror, SETUP_ERROR, SETUP_ERROR_BIND,
+                            "failed to open a modern socket: "
+                            "failed to start listening on a socket: %s",
+                            strerror(errno));
+                goto out;
+	}
+
+        retval = 0;
+out:
+
+        if (retval == -1 && modernsock >= 0) {
+                close(modernsock);
+                modernsock = -1;
+        }
+        freeaddrinfo(ai);
+
+        return retval;
 }
 
 /**
@@ -2512,7 +2541,13 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 		want_modern |= setup_serve(&(g_array_index(servers, SERVER, i)));
 	}
 	if(want_modern) {
-		open_modern(modernaddr, modernport);
+                GError *gerror = NULL;
+                if (open_modern(modernaddr, modernport, &gerror) == -1) {
+                        msg(LOG_ERR, "failed to setup servers: %s",
+                            gerror->message);
+                        g_clear_error(&gerror);
+                        exit(EXIT_FAILURE);
+                }
 	}
 	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 
