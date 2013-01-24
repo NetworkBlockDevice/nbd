@@ -2408,9 +2408,14 @@ int setup_serve(SERVER *const serve, GError **const gerror) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = serve->socket_family;
 
-	port = g_strdup_printf ("%d", serve->port);
-	if (port == NULL)
-		return 0;
+	port = g_strdup_printf("%d", serve->port);
+	if (!port) {
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SYS,
+                            "failed to open an export socket: "
+                            "failed to convert a port number to a string: %s",
+                            strerror(errno));
+                goto out;
+        }
 
 	e = getaddrinfo(serve->listenaddr,port,&hints,&ai);
 
