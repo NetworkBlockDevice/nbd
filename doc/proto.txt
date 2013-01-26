@@ -245,12 +245,12 @@ Option types
   limitations by server implementation). If the chosen export does not
   exist, the server closes the connection.
 
-* NBD_OPT_LIST (2)
+* NBD_OPT_ABORT (2)
+  Abort negotiation and close the connection. Optional.
+
+* NBD_OPT_LIST (3)
   Returns a number of NBD_REP_SERVER replies, one for each export,
   followed by an NBD_REP_ACK.
-
-* NBD_OPT_ABORT (3)
-  Abort negotiation and close the connection. Optional.
 
 Reply types
 - - - - - -
