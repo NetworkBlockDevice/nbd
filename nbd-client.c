@@ -283,7 +283,7 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 		printf(".");
 	}
 
-	if (read(sock, &size64, sizeof(size64)) < 0) {
+	if (read(sock, &size64, sizeof(size64)) <= 0) {
 		if (!errno)
 			err("Server closed connection");
 		err("Failed/3: %m\n");
