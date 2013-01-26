@@ -140,6 +140,6 @@ AC_TYPE_PID_T
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile doc/Doxyfile man/Makefile man/nbd-client.8.sh man/nbd-server.5.sh man/nbd-server.1.sh man/nbd-trdump.1.sh])
+AC_CONFIG_FILES([Makefile doc/Doxyfile doc/Makefile man/Makefile man/nbd-client.8.sh man/nbd-server.5.sh man/nbd-server.1.sh man/nbd-trdump.1.sh])
 AC_OUTPUT
 
