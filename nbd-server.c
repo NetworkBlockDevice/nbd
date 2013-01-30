@@ -1521,13 +1521,18 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 	char* name;
 	int i;
 
-	if (read(net, &namelen, sizeof(namelen)) < 0)
+	if (read(net, &namelen, sizeof(namelen)) < 0) {
 		err("Negotiation failed/7: %m");
+		return NULL;
+	}
 	namelen = ntohl(namelen);
 	name = malloc(namelen+1);
 	name[namelen]=0;
-	if (read(net, name, namelen) < 0)
+	if (read(net, name, namelen) < 0) {
 		err("Negotiation failed/8: %m");
+		free(name);
+		return NULL;
+	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
 		if(!strcmp(serve->servename, name)) {
@@ -1542,6 +1547,7 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 			return client;
 		}
 	}
+	err("Negotiation failed/8a: Requested export not found");
 	free(name);
 	return NULL;
 }
@@ -1628,7 +1634,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 				err_nonfatal("Negotiation failed/5: %m");
 			magic = ntohll(magic);
 			if(magic != opts_magic) {
-				close(net);
+				err_nonfatal("Negotiation failed/5a: magic mismatch");
 				return NULL;
 			}
 			if (read(net, &opt, sizeof(opt)) < 0)
@@ -1653,7 +1659,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 			}
 		} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
 		if(opt == NBD_OPT_ABORT) {
-			close(net);
+			err_nonfatal("Session terminated by client");
 			return NULL;
 		}
 	}
@@ -2294,7 +2300,6 @@ int serveloop(GArray* servers) {
 				}
 				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
 				if(!client) {
-					err_nonfatal("negotiation failed");
 					close(net);
 					continue;
 				}
