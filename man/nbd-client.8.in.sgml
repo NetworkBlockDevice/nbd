@@ -136,6 +136,9 @@ manpage.1: manpage.sgml
 	    running at the server.</para>
 	  <para>This option is required, unless the -N option is
 	    specified.</para>
+	  <para>When a port is specified, nbd-client uses the oldstyle
+	    protocol to connect to the server. This version of the
+	    protocol is being deprecated.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -234,8 +237,15 @@ manpage.1: manpage.sgml
 	<term><option>-N</option></term>
 	<listitem>
 	  <para>
-	    Specifies the name of the export that we want to use. Required if
-	    the port is not specified, not allowed in the other case.
+	    Specifies the name of the export that we want to use.
+	    Required if the port is not specified, not allowed in the
+	    other case.
+	  </para>
+	  <para>
+	    When this option is specified, nbd-client uses the newstyle
+	    version of the negotiation protocol. This version is much
+	    more flexible than the oldstyle negotiation, and should be
+	    used for new configurations.
 	  </para>
 	</listitem>
       </varlistentry>
