@@ -283,6 +283,7 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 				err("Not enough cliserv_magic");
 			else
 				err("It looks like you're trying to connect to a newstyle server with the oldstyle protocol. Try the -N option.");
+		}
 		printf(".");
 	}
 
