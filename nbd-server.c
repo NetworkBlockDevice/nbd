@@ -1839,11 +1839,11 @@ int mainloop(CLIENT *client) {
 
 		case NBD_CMD_READ:
 			DEBUG("exp->buf, ");
-			memcpy(buf, &reply, sizeof(struct nbd_reply));
 			if (client->transactionlogfd != -1)
 				writeit(client->transactionlogfd, &reply, sizeof(reply));
-			p = buf + sizeof(struct nbd_reply);
-			writelen = currlen + sizeof(struct nbd_reply);
+			writeit(client->net, &reply, sizeof(reply));
+			p = buf;
+			writelen = currlen;
 			while(len > 0) {
 				if (expread(request.from, p, currlen, client)) {
 					DEBUG("Read failed: %m");
