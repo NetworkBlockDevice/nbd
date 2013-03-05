@@ -1736,9 +1736,9 @@ int mainloop(CLIENT *client) {
 		command = request.type & NBD_CMD_MASK_COMMAND;
 		len = ntohl(request.len);
 
-		DEBUG("%s from %llu (%llu) len %d, ", getcommandname(command),
+		DEBUG("%s from %llu (%llu) len %u, ", getcommandname(command),
 				(unsigned long long)request.from,
-				(unsigned long long)request.from / 512, (unsigned int)len);
+				(unsigned long long)request.from / 512, len);
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
