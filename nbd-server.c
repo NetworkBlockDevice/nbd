@@ -1752,6 +1752,12 @@ int mainloop(CLIENT *client) {
 				continue;
 			}
 
+			if (request.from + len < request.from) { // 64 bit overflow!!
+				DEBUG("[RANGE!]");
+				ERROR(client, reply, EINVAL);
+				continue;
+			}
+
 			if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
 				DEBUG("[RANGE!]");
 				ERROR(client, reply, EINVAL);
