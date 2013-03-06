@@ -905,7 +905,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s.", f);
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s: %s",
+				f, err->message);
 		g_key_file_free(cfile);
 		return retval;
 	}
@@ -2774,7 +2775,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	if((!serve) && (!servers||!servers->len)) {
-		g_message("No configured exports; quitting.");
+		if(err)
+			g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
 	if (!dontfork)
