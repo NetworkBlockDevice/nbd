@@ -238,8 +238,8 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>
 	    Specifies the name of the export that we want to use.
-	    Required if the port is not specified, not allowed in the
-	    other case.
+	    Required if the port is not specified; changes the default
+	    port for newstyle negotiation from 10809 in the other case.
 	  </para>
 	  <para>
 	    When this option is specified, nbd-client uses the newstyle
