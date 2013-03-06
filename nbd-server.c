@@ -1764,14 +1764,8 @@ int mainloop(CLIENT *client) {
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
 		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
-			if ((request.from + len) > (OFFT_MAX)) {
-				DEBUG("[Number too large!]");
-				ERROR(client, reply, EINVAL);
-				continue;
-			}
-
 			if (request.from + len < request.from) { // 64 bit overflow!!
-				DEBUG("[RANGE!]");
+				DEBUG("[Number too large!]");
 				ERROR(client, reply, EINVAL);
 				continue;
 			}
