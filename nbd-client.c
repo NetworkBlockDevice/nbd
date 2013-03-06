@@ -239,8 +239,11 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 		uint32_t opt;
 		uint32_t namesize;
 
-		if (magic != opts_magic)
-			err("Not enough opts_magic");
+		if (magic != opts_magic) {
+			if(magic == cliserv_magic) {
+				err("It looks like you're trying to connect to an oldstyle server with a named export. This won't work.");
+			}
+		}
 		printf(".");
 		if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
 			err("Failed reading flags: %m");
