@@ -1776,7 +1776,7 @@ int mainloop(CLIENT *client) {
 				continue;
 			}
 
-			if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
+			if (((off_t)request.from + len) > client->exportsize) {
 				DEBUG("[RANGE!]");
 				ERROR(client, reply, EINVAL);
 				continue;
