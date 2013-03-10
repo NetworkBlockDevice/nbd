@@ -95,6 +95,13 @@ manpage.1: manpage.sgml
     export, the use of this option is deprecated. It is preferred to
     make use of a configuration file instead, the format of which is
     defined in nbd-server(5).</para>
+
+   <para>While nbd-server is running, new exports can be added by
+   re-writing configuration files and then sending SIGHUP to
+   nbd-server. SIGHUP causes nbd-server to re-read its configuration
+   files and to start serving all new exports which were not served
+   earlier. Reconfiguration does not modify any existing export, it only
+   appends new ones.</para>
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>

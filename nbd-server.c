@@ -177,6 +177,11 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
+static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
+                                                    handler to mark a
+                                                    reconfiguration
+                                                    request */
+
 int modernsock=-1;	  /**< Socket for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
@@ -1114,6 +1119,19 @@ void sigterm_handler(int s) {
 	unlink(pidfname);
 
 	exit(EXIT_SUCCESS);
+}
+
+/**
+ * Handle SIGHUP by setting atomically a flag which will be evaluated in
+ * the main loop of the root server process. This allows us to separate
+ * the signal catching from th actual task triggered by SIGHUP and hence
+ * processing in the interrupt context is kept as minimial as possible.
+ *
+ * @param s the signal we're handling (must be SIGHUP, or something
+ * is severely wrong).
+ **/
+static void sighup_handler(const int s G_GNUC_UNUSED) {
+        is_sighup_caught = 1;
 }
 
 /**
@@ -2239,6 +2257,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		/* child */
 		signal(SIGCHLD, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
+		signal(SIGHUP, SIG_DFL);
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 
 		g_hash_table_destroy(children);
@@ -2264,6 +2283,72 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 handle_connection_out:
 	g_free(client);
 	close(net);
+}
+
+/**
+ * Return the index of the server whose servename matches the given
+ * name.
+ *
+ * @param servename a string to match
+ * @param servers an array of servers
+ * @return the first index of the server whose servename matches the
+ *         given name or -1 if one cannot be found
+ **/
+static int get_index_by_servename(const gchar *const servename,
+                                  const GArray *const servers) {
+        int i;
+
+        for (i = 0; i < servers->len; ++i) {
+                const SERVER server = g_array_index(servers, SERVER, i);
+
+                if (strcmp(servename, server.servename) == 0)
+                        return i;
+        }
+
+        return -1;
+}
+
+int setup_serve(SERVER *const serve, GError **const gerror);
+
+/**
+ * Parse configuration files and add servers to the array if they don't
+ * already exist there. The existence is tested by comparing
+ * servenames. A server is appended to the array only if its servename
+ * is unique among all other servers.
+ *
+ * @param servers an array of servers
+ * @return the number of new servers appended to the array, or -1 in
+ *         case of an error
+ **/
+static int append_new_servers(GArray *const servers, GError **const gerror) {
+        int i;
+        GArray *new_servers;
+        const int old_len = servers->len;
+        int retval = -1;
+        struct generic_conf genconf;
+
+        new_servers = parse_cfile(config_file_pos, &genconf, gerror);
+        if (!new_servers)
+                goto out;
+
+        for (i = 0; i < new_servers->len; ++i) {
+                SERVER new_server = g_array_index(new_servers, SERVER, i);
+
+                if (new_server.servename
+                    && -1 == get_index_by_servename(new_server.servename,
+                                                    servers)) {
+                        if (setup_serve(&new_server, gerror) == -1)
+                                goto out;
+                        if (append_serve(&new_server, servers) == -1)
+                                goto out;
+                }
+        }
+
+        retval = servers->len - old_len;
+out:
+        g_array_free(new_servers, TRUE);
+
+        return retval;
 }
 
 /**
@@ -2298,6 +2383,39 @@ void serveloop(GArray* servers) {
 		max=modernsock>max?modernsock:max;
 	}
 	for(;;) {
+                /* SIGHUP causes the root server process to reconfigure
+                 * itself and add new export servers for each newly
+                 * found export configuration group, i.e. spawn new
+                 * server processes for each previously non-existent
+                 * export. This does not alter old runtime configuration
+                 * but just appends new exports. */
+                if (is_sighup_caught) {
+                        int n;
+                        GError *gerror = NULL;
+
+                        msg(LOG_INFO, "reconfiguration request received");
+                        is_sighup_caught = 0; /* Reset to allow catching
+                                               * it again. */
+
+                        n = append_new_servers(servers, &gerror);
+                        if (n == -1)
+                                msg(LOG_ERR, "failed to append new servers: %s",
+                                    gerror->message);
+
+                        for (i = servers->len - n; i < servers->len; ++i) {
+                                const SERVER server = g_array_index(servers,
+                                                                    SERVER, i);
+
+                                if (server.socket >= 0) {
+                                        FD_SET(server.socket, &mset);
+                                        max = server.socket > max ? server.socket : max;
+                                }
+
+                                msg(LOG_INFO, "reconfigured new server: %s",
+                                    server.servename);
+                        }
+                }
+
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
 			int net;
@@ -2598,6 +2716,12 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 	sigaddset(&sa.sa_mask, SIGCHLD);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
+		err("sigaction: %m");
+
+	sa.sa_handler = sighup_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGHUP, &sa, NULL) == -1)
 		err("sigaction: %m");
 }
 
