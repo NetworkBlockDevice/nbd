@@ -710,8 +710,7 @@ int append_serve(const SERVER *const s, GArray *const a) {
 	int e;
 	int ret;
 
-	if(!s)
-		err("Invalid parsing server");
+	assert(s != NULL);
 
 	port = g_strdup_printf("%d", s->port);
 
