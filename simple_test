@@ -207,6 +207,7 @@ EOF
 			PID=$!
 			sleep 1
 			./nbd-client -l localhost
+			./nbd-tester-client localhost -N export1
 			retval=$?
 		fi
 		;;
