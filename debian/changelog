@@ -7,6 +7,9 @@ nbd (1:3.2-3) UNRELEASED; urgency=low
       - fix for integer output format string
       - fix for 64-bit offset wrapover.
       - remove double cast which results in data loss
+  * Change Standards-Version: to 3.9.4. The only change relevant to nbd
+    is the /run transition, but as we were already compliant with that
+    since 1:2.9.23-3, nothing relevant is left.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 06 Mar 2013 12:21:03 +0100
 
