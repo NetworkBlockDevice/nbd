@@ -2,6 +2,11 @@ nbd (1:3.2-3) UNRELEASED; urgency=low
 
   * Fix handling of NBD_NAME variable in nbd-client initscript. Patch by
     Rogier <rogier777@gmail.com>. Closes: #699372.
+  * Steal stability fixes from git head:
+      - fix for handling of zero-sized read request
+      - fix for integer output format string
+      - fix for 64-bit offset wrapover.
+      - remove double cast which results in data loss
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 06 Mar 2013 12:21:03 +0100
 
