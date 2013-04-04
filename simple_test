@@ -1,7 +1,11 @@
 #!/bin/sh
 # Yes, that's POSIX sh, not bash!
 
-tmpdir=`mktemp -d /tmp/tmp.XXXXXX`
+if [ -z "$TMPDIR" ]
+then
+	TMPDIR=/tmp
+fi
+tmpdir=`mktemp -d $TMPDIR/tmp.XXXXXX`
 conffile=${tmpdir}/nbd.conf
 pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
