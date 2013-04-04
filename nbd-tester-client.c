@@ -1267,7 +1267,7 @@ int main(int argc, char**argv) {
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	while((c=getopt(argc, argv, "N:t:owfil"))>=0) {
+	while((c=getopt(argc, argv, "-N:t:owfil"))>=0) {
 		switch(c) {
 			case 'N':
 				name=g_strdup(optarg);
