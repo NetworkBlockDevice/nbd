@@ -353,7 +353,7 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	}
 	setmysockopt(sock);
 	if(!(host=gethostbyname(hostname))) {
-		strncpy(errstr, strerror(errno), errstr_len);
+		strncpy(errstr, hstrerror(h_errno), errstr_len);
 		goto err_open;
 	}
 	addr.sin_family=AF_INET;
