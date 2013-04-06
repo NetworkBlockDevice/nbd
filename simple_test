@@ -58,7 +58,7 @@ case $1 in
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 11111 -o
+		./nbd-tester-client -o 127.0.0.1 11111
 		retval=$?
 	;;
 	*/cfg1)
