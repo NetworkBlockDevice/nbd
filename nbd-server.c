@@ -182,11 +182,15 @@ static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
                                                     reconfiguration
                                                     request */
 
-int modernsock=-1;	  /**< Socket for the modern handler. Not used
+GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
 			       oldstyle is set to false (and then the
-			       command-line client isn't used, gna gna) */
+			       command-line client isn't used, gna gna).
+			       This may be more than one socket on
+			       systems that don't support serving IPv4
+			       and IPv6 from the same socket (like,
+			       e.g., FreeBSD) */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -2272,7 +2276,10 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		   data, and otherwise we get a
 		   segfault... */
 		g_array_free(servers, FALSE);
-		close(modernsock);
+		for(i=0;i<modernsocks->len;i++) {
+			close(g_array_index(modernsocks, int, i));
+		}
+		g_array_free(modernsocks, TRUE);
 	}
 
 	msg(LOG_INFO, "Starting to serve");
@@ -2377,9 +2384,10 @@ void serveloop(GArray* servers) {
 			max=sock>max?sock:max;
 		}
 	}
-	if(modernsock >= 0) {
-		FD_SET(modernsock, &mset);
-		max=modernsock>max?modernsock:max;
+	for(i=0;i<modernsocks->len;i++) {
+		int sock = g_array_index(modernsocks, int, i);
+		FD_SET(sock, &mset);
+		max=sock>max?sock:max;
 	}
 	for(;;) {
                 /* SIGHUP causes the root server process to reconfigure
@@ -2420,10 +2428,14 @@ void serveloop(GArray* servers) {
 			int net;
 
 			DEBUG("accept, ");
-			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
+			for(i=0; i < modernsocks->len; i++) {
+				int sock = g_array_index(modernsocks, int, i);
+				if(!FD_ISSET(sock, &rset)) {
+					continue;
+				}
 				CLIENT *client;
 
-				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+				if((net=accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 					err_nonfatal("accept: %m");
 					continue;
 				}
@@ -2613,6 +2625,8 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	struct sock_flags;
 	int e;
         int retval = -1;
+	int i=0;
+	int sock = -1;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
@@ -2628,41 +2642,62 @@ int open_modern(const gchar *const addr, const gchar *const port,
                 goto out;
 	}
 
-	if((modernsock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
-                            "failed to open a modern socket: "
-                            "failed to create a socket: %s",
-                            strerror(errno));
-                goto out;
-	}
+	while(ai != NULL) {
+		sock = -1;
 
-	if (dosockopts(modernsock, gerror) == -1) {
-                g_prefix_error(gerror, "failed to open a modern socket: ");
-                goto out;
-        }
+		if((sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+				    "failed to open a modern socket: "
+				    "failed to create a socket: %s",
+				    strerror(errno));
+			goto out;
+		}
 
-	if(bind(modernsock, ai->ai_addr, ai->ai_addrlen)) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-                            "failed to open a modern socket: "
-                            "failed to bind an address to a socket: %s",
-                            strerror(errno));
-                goto out;
-	}
+		if (dosockopts(sock, gerror) == -1) {
+			g_prefix_error(gerror, "failed to open a modern socket: ");
+			goto out;
+		}
 
-	if(listen(modernsock, 10) <0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-                            "failed to open a modern socket: "
-                            "failed to start listening on a socket: %s",
-                            strerror(errno));
-                goto out;
+		if(bind(sock, ai->ai_addr, ai->ai_addrlen)) {
+			/* This is so wrong. 
+			 * 
+			 * Linux will return multiple entries for the
+			 * same system when we ask it for something
+			 * AF_UNSPEC, even though the first entry will
+			 * listen to both protocols. Other systems will
+			 * return multiple entries too, but we actually
+			 * do need to open both. Sigh.
+			 *
+			 * Handle it by ignoring EADDRINUSE if we've
+			 * already got at least one socket open
+			 */
+			if(errno == EADDRINUSE && modernsocks->len > 0) {
+				goto next;
+			}
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				    "failed to open a modern socket: "
+				    "failed to bind an address to a socket: %s",
+				    strerror(errno));
+			goto out;
+		}
+
+		if(listen(sock, 10) <0) {
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				    "failed to open a modern socket: "
+				    "failed to start listening on a socket: %s",
+				    strerror(errno));
+			goto out;
+		}
+		g_array_append_val(modernsocks, sock);
+	next:
+		ai = ai->ai_next;
 	}
 
         retval = 0;
 out:
 
-        if (retval == -1 && modernsock >= 0) {
-                close(modernsock);
-                modernsock = -1;
+        if (retval == -1 && sock >= 0) {
+                close(sock);
         }
         freeaddrinfo(ai);
 
@@ -2845,6 +2880,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	memset(pidftemplate, '\0', 256);
+
+	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
 	logging();
 	config_file_pos = g_strdup(CFILE);
