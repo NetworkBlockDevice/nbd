@@ -1269,6 +1269,21 @@ int main(int argc, char**argv) {
 	logging();
 	while((c=getopt(argc, argv, "-N:t:owfil"))>=0) {
 		switch(c) {
+			case 1:
+				switch(nonopt) {
+					case 0:
+						hostname=g_strdup(optarg);
+						nonopt++;
+						break;
+					case 1:
+						p=(strtol(argv[2], NULL, 0));
+						if(p==LONG_MIN||p==LONG_MAX) {
+							g_critical("Could not parse port number: %s", strerror(errno));
+							exit(EXIT_FAILURE);
+						}
+						break;
+				}
+				break;
 			case 'N':
 				name=g_strdup(optarg);
 				if(!p) {
@@ -1294,27 +1309,6 @@ int main(int argc, char**argv) {
 				test=integrity_test;
 				break;
 		}
-	}
-
-	while(optind < argc) {
-		switch(nonopt) {
-			case 0:
-				hostname=g_strdup(argv[optind]);
-				nonopt++;
-				break;
-			case 1:
-				p=(strtol(argv[optind], NULL, 0));
-				if(p==LONG_MIN||p==LONG_MAX) {
-					g_critical("Could not parse port number: %s", strerror(errno));
-					exit(EXIT_FAILURE);
-				}
-				break;
-			default:
-				g_critical("Unknown option: %s", argv[optind]);
-				exit(EXIT_FAILURE);
-				break;
-		}
-		optind++;
 	}
 
 	if(test(hostname, (int)p, name, sock, FALSE, TRUE, testflags)<0) {
