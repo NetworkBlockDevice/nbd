@@ -2622,6 +2622,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
                 GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo* ai = NULL;
+	struct addrinfo* ai_bak;
 	struct sock_flags;
 	int e;
         int retval = -1;
@@ -2634,6 +2635,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_protocol = IPPROTO_TCP;
 	e = getaddrinfo(addr, port ? port : NBD_DEFAULT_PORT, &hints, &ai);
+	ai_bak = ai;
 	if(e != 0) {
                 g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
                             "failed to open a modern socket: "
@@ -2699,7 +2701,8 @@ out:
         if (retval == -1 && sock >= 0) {
                 close(sock);
         }
-        freeaddrinfo(ai);
+	if(ai_bak)
+		freeaddrinfo(ai_bak);
 
         return retval;
 }
