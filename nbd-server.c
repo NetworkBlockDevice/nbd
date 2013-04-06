@@ -2450,6 +2450,9 @@ void serveloop(GArray* servers) {
 				SERVER *serve;
 
 				serve=&(g_array_index(servers, SERVER, i));
+				if(sock < 0) {
+					continue;
+				}
 				if(FD_ISSET(serve->socket, &rset)) {
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 						err_nonfatal("accept: %m");
