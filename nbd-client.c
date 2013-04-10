@@ -297,19 +297,11 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 	}
 	size64 = ntohll(size64);
 
-#ifdef NBD_SET_SIZE_BLOCKS
 	if ((size64>>12) > (uint64_t)~0UL) {
 		printf("size = %luMB", (unsigned long)(size64>>20));
 		err("Exported device is too big for me. Get 64-bit machine :-(\n");
 	} else
 		printf("size = %luMB", (unsigned long)(size64>>20));
-#else
-	if (size64 > (~0UL >> 1)) {
-		printf("size = %luKB", (unsigned long)(size64>>10));
-		err("Exported device is too big. Get 64-bit machine or newer kernel :-(\n");
-	} else
-		printf("size = %lu", (unsigned long)(size64));
-#endif
 
 	if(!name) {
 		if (read(sock, flags, sizeof(*flags)) < 0)
@@ -332,7 +324,6 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	unsigned long size;
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
-#ifdef NBD_SET_SIZE_BLOCKS
 	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
@@ -345,15 +336,6 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 			err("Ioctl/1.1c failed: %m\n");
 		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, 4096ULL*size);
 	}
-#else
-	if (size64 > (~0UL >> 1)) {
-		err("Device too large.\n");
-	} else {
-		size = (unsigned long)size64;
-		if (ioctl(nbd, NBD_SET_SIZE, size) < 0)
-			err("Ioctl NBD_SET_SIZE failed: %m\n");
-	}
-#endif
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
 
@@ -366,13 +348,9 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 
 void set_timeout(int nbd, int timeout) {
 	if (timeout) {
-#ifdef NBD_SET_TIMEOUT
 		if (ioctl(nbd, NBD_SET_TIMEOUT, (unsigned long)timeout) < 0)
 			err("Ioctl NBD_SET_TIMEOUT failed: %m\n");
 		fprintf(stderr, "timeout=%d\n", timeout);
-#else
-		err("Ioctl NBD_SET_TIMEOUT cannot be called when compiled on a system that does not support it\n");
-#endif
 	}
 }
 
@@ -432,14 +410,9 @@ void disconnect(char* device) {
 	if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
 		err("Ioctl failed: %m\n");
 	printf("disconnect, ");
-#ifdef NBD_DISCONNECT
 	if (ioctl(nbd, NBD_DISCONNECT)<0)
 		err("Ioctl failed: %m\n");
 	printf("sock, ");
-#else
-	fprintf(stderr, "Can't disconnect: I was not compiled with disconnect support!\n" );
-	exit(1);
-#endif
 	if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
 		err("Ioctl failed: %m\n");
 	printf("done\n");
