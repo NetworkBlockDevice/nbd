@@ -464,6 +464,7 @@ int main(int argc, char *argv[]) {
 	uint32_t needed_flags=0;
 	uint32_t cflags=0;
 	uint32_t opts=0;
+	sigset_t block, old;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
@@ -608,15 +609,12 @@ int main(int argc, char *argv[]) {
 #endif
 	do {
 #ifndef NOFORK
-#ifdef SA_NOCLDWAIT
-		struct sigaction sa;
 
-		sa.sa_handler = SIG_DFL;
-		sigemptyset(&sa.sa_mask);
-		sa.sa_flags = SA_NOCLDWAIT;
-		if (sigaction(SIGCHLD, &sa, NULL) < 0)
-			err("sigaction: %m");
-#endif
+		sigfillset(&block);
+		sigdelset(&block, SIGKILL);
+		sigdelset(&block, SIGTERM);
+		sigdelset(&block, SIGPIPE);
+		sigprocmask(SIG_SETMASK, &block, &old);
 
 		if (!fork()) {
 			/* Due to a race, the kernel NBD driver cannot
