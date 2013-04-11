@@ -15,7 +15,7 @@ nbd_trdump_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@
 nbd_tester_client_LDADD = @GLIB_LIBS@
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h
-EXTRA_DIST = gznbd simple_test integrity-test.tr integrityhuge-test.tr maketr
+EXTRA_DIST = gznbd simple_test integrity-test.tr integrityhuge-test.tr maketr CodingStyle autogen.sh
 dist-hook:
 	rm -Rf `find $(distdir) -name '.svn' -type d -print`
 cmd:
