@@ -1,0 +1,22 @@
+Here's a (probably incomplete) list of things I think need to be done to
+nbd. If you feel like taking one of these up, I owe you beer if we ever
+meet...
+
+- Add (optional) authentication to the protocol. Probably best to use
+  SASL to implement this. I should like to have Kerberos working, too,
+  though that might be somewhat involved to get right.
+  Not sure whether we would need full per-export authentication, or if
+  an on/off switch in an export (and the full configuration in the
+  generic section) would be enough
+- Have support for setting defaults for exports in the generic section.
+- Turn much of nbd-server into a library, with the server itself just
+  being a stub that reads the config file and exports files.
+- Performance improvements: nbd-server should use sendfile() and/or
+  libevent to make things go faster. This should be extensively tested
+  so we're sure things *are* actually going faster.
+- Need to fix open_modern(): on FreeBSD, getaddrinfo() with AF_UNSPEC
+  returns two addresses, one for AF_INET and one for AF_INET6. We need
+  to initialize two sockets, there.
+  Should be fairly straightforward, but I just ran out of time.
+- ... probably more, but I can't remember much of them right now. I'll
+  add to this list as I remember things.

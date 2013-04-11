@@ -1,13 +1,37 @@
 #!/bin/sh
 # Yes, that's POSIX sh, not bash!
 
-tmpdir=`mktemp -d`
+if [ -z "$TMPDIR" ]
+then
+	TMPDIR=/tmp
+fi
+tmpdir=`mktemp -d $TMPDIR/tmp.XXXXXX`
 conffile=${tmpdir}/nbd.conf
 pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
 mydir=$(dirname "`readlink -f $0`")
+cleanup="$2"
+PID=""
 
 set -e
+
+trap cleanup EXIT
+
+cleanup() {
+	if [ -f ${pidfile} ]
+	then
+		kill `cat ${pidfile}`
+	else
+		if [ ! -z "$PID" ]
+		then
+			kill $PID
+		fi
+	fi
+	if [ -z "$cleanup" ]
+	then
+		rm -rf $tmpdir
+	fi
+}
 
 ulimit -c unlimited
 
@@ -114,7 +138,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -w
+		./nbd-tester-client -N export1 -w localhost
 		retval=$?
 	;;
 	*/flush)
@@ -130,7 +154,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -w -f
+		./nbd-tester-client -N export1 -w -f localhost
 		retval=$?
 	;;
 	*/dirconfig)
@@ -147,7 +171,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1
+		./nbd-tester-client -N export1 localhost
 		retval=$?
 	;;
 	*/integrity)
@@ -165,7 +189,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrity-test.tr
+		./nbd-tester-client -N export1 -i -t ${mydir}/integrity-test.tr localhost
 		retval=$?
 	;;
 	*/integrityhuge)
@@ -183,7 +207,7 @@ EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1 -i -t ${mydir}/integrityhuge-test.tr
+		./nbd-tester-client -N export1 -i -t ${mydir}/integrityhuge-test.tr localhost
 		retval=$?
 	;;
 	*/list)
@@ -207,6 +231,7 @@ EOF
 			PID=$!
 			sleep 1
 			./nbd-client -l localhost
+			./nbd-tester-client -N export1 localhost
 			retval=$?
 		fi
 		;;
@@ -215,19 +240,6 @@ EOF
 		exit 1
 	;;
 esac
-if [ -f ${pidfile} ]
-then
-	kill `cat ${pidfile}`
-else
-	if [ ! -z "$PID" ]
-	then
-		kill $PID
-	fi
-fi
-if [ -z "$2" ]
-then
-	rm -rf $tmpdir
-fi
 
 if [ $retval -ne 0 ]
 then

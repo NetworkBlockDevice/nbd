@@ -353,7 +353,7 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 	}
 	setmysockopt(sock);
 	if(!(host=gethostbyname(hostname))) {
-		strncpy(errstr, strerror(errno), errstr_len);
+		strncpy(errstr, hstrerror(h_errno), errstr_len);
 		goto err_open;
 	}
 	addr.sin_family=AF_INET;
@@ -1245,6 +1245,24 @@ err:
 	return retval;
 }
 
+void handle_nonopt(char* opt, gchar** hostname, long int* p) {
+	static int nonopt=0;
+
+	switch(nonopt) {
+		case 0:
+			*hostname=g_strdup(opt);
+			nonopt++;
+			break;
+		case 1:
+			*p=(strtol(opt, NULL, 0));
+			if(*p==LONG_MIN||*p==LONG_MAX) {
+				g_critical("Could not parse port number: %s", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			break;
+	}
+}
+
 typedef int (*testfunc)(gchar*, int, char*, int, char, char, int);
 
 int main(int argc, char**argv) {
@@ -1270,19 +1288,7 @@ int main(int argc, char**argv) {
 	while((c=getopt(argc, argv, "-N:t:owfil"))>=0) {
 		switch(c) {
 			case 1:
-				switch(nonopt) {
-					case 0:
-						hostname=g_strdup(optarg);
-						nonopt++;
-						break;
-					case 1:
-						p=(strtol(argv[2], NULL, 0));
-						if(p==LONG_MIN||p==LONG_MAX) {
-							g_critical("Could not parse port number: %s", strerror(errno));
-							exit(EXIT_FAILURE);
-						}
-						break;
-				}
+				handle_nonopt(optarg, &hostname, &p);
 				break;
 			case 'N':
 				name=g_strdup(optarg);
@@ -1309,6 +1315,10 @@ int main(int argc, char**argv) {
 				test=integrity_test;
 				break;
 		}
+	}
+
+	while(optind < argc) {
+		handle_nonopt(argv[optind++], &hostname, &p);
 	}
 
 	if(test(hostname, (int)p, name, sock, FALSE, TRUE, testflags)<0) {

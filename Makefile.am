@@ -1,4 +1,4 @@
-SUBDIRS = man
+SUBDIRS = man doc
 bin_PROGRAMS = nbd-server nbd-trdump
 sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client make-integrityhuge

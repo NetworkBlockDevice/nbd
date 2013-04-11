@@ -1,4 +1,4 @@
-#ifndef NETDB COMPAT_H
+#ifndef NETDB_COMPAT_H
 #define NETDB_COMPAT_H
 
 /* AI_NUMERICSERV as a value for the `ai_flags' member

@@ -116,10 +116,6 @@
 /** Where our config file actually is */
 gchar* config_file_pos;
 
-/** What user we're running as */
-gchar* runuser=NULL;
-/** What group we're running as */
-gchar* rungroup=NULL;
 /** global flags */
 int glob_flags=0;
 
@@ -128,13 +124,9 @@ int dontfork = 0;
 
 /** Logging macros, now nothing goes to syslog unless you say ISSERVER */
 #ifdef ISSERVER
-#define msg2(a,b) syslog(a,b)
-#define msg3(a,b,c) syslog(a,b,c)
-#define msg4(a,b,c,d) syslog(a,b,c,d)
+#define msg(prio, ...) syslog(prio, __VA_ARGS__)
 #else
-#define msg2(a,b) g_message((char*)b)
-#define msg3(a,b,c) g_message((char*)b,c)
-#define msg4(a,b,c,d) g_message((char*)b,c,d)
+#define msg(prio, ...) g_log(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, __VA_ARGS__)
 #endif
 
 /* Debugging macros */
@@ -185,14 +177,20 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
-int modernsock=-1;	  /**< Socket for the modern handler. Not used
+static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
+                                                    handler to mark a
+                                                    reconfiguration
+                                                    request */
+
+GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       if a client was only specified on the
 			       command line; only port used if
 			       oldstyle is set to false (and then the
-			       command-line client isn't used, gna gna) */
-char* modern_listen;	  /**< listenaddr value for modernsock */
-char* modernport=NBD_DEFAULT_PORT; /**< Port number on which to listen for
-			              new-style nbd-client connections */
+			       command-line client isn't used, gna gna).
+			       This may be more than one socket on
+			       systems that don't support serving IPv4
+			       and IPv6 from the same socket (like,
+			       e.g., FreeBSD) */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -288,6 +286,17 @@ typedef struct {
 } PARAM;
 
 /**
+ * Configuration file values of the "generic" section
+ **/
+struct generic_conf {
+        gchar *user;            /**< user we run the server as    */
+        gchar *group;           /**< group we run running as      */
+        gchar *modernaddr;      /**< address of the modern socket */
+        gchar *modernport;      /**< port of the modern socket    */
+        gint flags;             /**< global flags                 */
+};
+
+/**
  * Translate a command name into human readable form
  *
  * @param command The command number (after applying NBD_CMD_MASK_COMMAND)
@@ -303,10 +312,11 @@ static inline const char * getcommandname(uint64_t command) {
 		return "NBD_CMD_DISC";
 	case NBD_CMD_FLUSH:
 		return "NBD_CMD_FLUSH";
+	case NBD_CMD_TRIM:
+		return "NBD_CMD_TRIM";
 	default:
-		break;
+		return "UNKNOWN";
 	}
-	return "UNKNOWN";
 }
 
 /**
@@ -327,8 +337,8 @@ int authorized_client(CLIENT *opts) {
 	int len;
 
 	if ((f=fopen(opts->server->authname,"r"))==NULL) {
-		msg4(LOG_INFO,"Can't open authorization file %s (%s).",
-		     opts->server->authname,strerror(errno)) ;
+                msg(LOG_INFO, "Can't open authorization file %s (%s).",
+                    opts->server->authname, strerror(errno));
 		return 1 ; 
 	}
   
@@ -336,12 +346,12 @@ int authorized_client(CLIENT *opts) {
 	while (fgets(line,LINELEN,f)!=NULL) {
 		if((tmp=strchr(line, '/'))) {
 			if(strlen(line)<=tmp-line) {
-				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
+				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
 			}
 			*(tmp++)=0;
 			if(!inet_aton(line,&addr)) {
-				msg4(LOG_CRIT, ERRMSG, line, opts->server->authname);
+				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
 				return 0;
 			}
 			len=strtol(tmp, NULL, 0);
@@ -611,50 +621,41 @@ SERVER* cmdline(int argc, char *argv[]) {
 }
 
 /**
- * Error codes for config file parsing
+ * Error domain common for all NBD server errors.
  **/
-typedef enum {
-	CFILE_NOTFOUND,		/**< The configuration file is not found */
-	CFILE_MISSING_GENERIC,	/**< The (required) group "generic" is missing */
-	CFILE_KEY_MISSING,	/**< A (required) key is missing */
-	CFILE_VALUE_INVALID,	/**< A value is syntactically invalid */
-	CFILE_VALUE_UNSUPPORTED,/**< A value is not supported in this build */
-	CFILE_PROGERR,		/**< Programmer error */
-	CFILE_NO_EXPORTS,	/**< A config file was specified that does not
-				     define any exports */
-	CFILE_INCORRECT_PORT,	/**< The reserved port was specified for an
-				     old-style export. */
-	CFILE_DIR_UNKNOWN,	/**< A directory requested does not exist*/
-	CFILE_READDIR_ERR,	/**< Error occurred during readdir() */
-} CFILE_ERRORS;
+#define NBDS_ERR g_quark_from_static_string("server-error-quark")
 
 /**
- * Remove a SERVER from memory. Used from the hash table
+ * NBD server error codes.
  **/
-void remove_server(gpointer s) {
-	SERVER *server;
-
-	server=(SERVER*)s;
-	g_free(server->exportname);
-	if(server->authname)
-		g_free(server->authname);
-	if(server->listenaddr)
-		g_free(server->listenaddr);
-	if(server->prerun)
-		g_free(server->prerun);
-	if(server->postrun)
-		g_free(server->postrun);
-	if(server->transactionlog)
-		g_free(server->transactionlog);
-	g_free(server);
-}
+typedef enum {
+        NBDS_ERR_CFILE_NOTFOUND,          /**< The configuration file is not found */
+        NBDS_ERR_CFILE_MISSING_GENERIC,   /**< The (required) group "generic" is missing */
+        NBDS_ERR_CFILE_KEY_MISSING,       /**< A (required) key is missing */
+        NBDS_ERR_CFILE_VALUE_INVALID,     /**< A value is syntactically invalid */
+        NBDS_ERR_CFILE_VALUE_UNSUPPORTED, /**< A value is not supported in this build */
+        NBDS_ERR_CFILE_NO_EXPORTS,        /**< A config file was specified that does not
+                                               define any exports */
+        NBDS_ERR_CFILE_INCORRECT_PORT,    /**< The reserved port was specified for an
+                                               old-style export. */
+        NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
+        NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
+        NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
+        NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
+        NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
+        NBDS_ERR_GAI,                     /**< Failed to get address info */
+        NBDS_ERR_SOCKET,                  /**< Failed to create a socket */
+        NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
+        NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
+        NBDS_ERR_SYS,                     /**< Underlying system call or library error */
+} NBDS_ERRS;
 
 /**
  * duplicate server
  * @param s the old server we want to duplicate
  * @return new duplicated server
  **/
-SERVER* dup_serve(SERVER *s) {
+SERVER* dup_serve(const SERVER *const s) {
 	SERVER *serve = NULL;
 
 	serve=g_new0(SERVER, 1);
@@ -703,7 +704,7 @@ SERVER* dup_serve(SERVER *s) {
  * @param a server array
  * @return 0 success, -1 error
  */
-int append_serve(SERVER *s, GArray *a) {
+int append_serve(const SERVER *const s, GArray *const a) {
 	SERVER *ns = NULL;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -713,10 +714,7 @@ int append_serve(SERVER *s, GArray *a) {
 	int e;
 	int ret;
 
-	if(!s) {
-		err("Invalid parsing server");
-		return -1;
-	}
+	assert(s != NULL);
 
 	port = g_strdup_printf("%d", s->port);
 
@@ -764,7 +762,7 @@ int append_serve(SERVER *s, GArray *a) {
 }
 
 /* forward definition of parse_cfile */
-GArray* parse_cfile(gchar* f, bool have_global, GError** e);
+GArray* parse_cfile(gchar* f, struct generic_conf *genconf, GError** e);
 
 /**
  * Parse config file snippets in a directory. Uses readdir() and friends
@@ -773,7 +771,6 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e);
  **/
 GArray* do_cfile_dir(gchar* dir, GError** e) {
 	DIR* dirh = opendir(dir);
-	GQuark errdomain = g_quark_from_string("do_cfile_dir");
 	struct dirent* de;
 	gchar* fname;
 	GArray* retval = NULL;
@@ -781,7 +778,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	struct stat stbuf;
 
 	if(!dir) {
-		g_set_error(e, errdomain, CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
 		return NULL;
 	}
 	errno=0;
@@ -805,7 +802,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					goto next;
 				}
-				tmp = parse_cfile(fname, FALSE, e);
+				tmp = parse_cfile(fname, NULL, e);
 				errno=saved_errno;
 				if(*e) {
 					goto err_out;
@@ -821,7 +818,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 		g_free(fname);
 	}
 	if(errno) {
-		g_set_error(e, errdomain, CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_READDIR_ERR, "Error trying to read directory: %s", strerror(errno));
 	err_out:
 		if(retval)
 			g_array_free(retval, TRUE);
@@ -834,13 +831,21 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
  * Parse the config file.
  *
  * @param f the name of the config file
- * @param e a GError. @see CFILE_ERRORS for what error values this function can
- * 	return.
+ *
+ * @param genconf a pointer to generic configuration which will get
+ *        updated with parsed values. If NULL, then parsed generic
+ *        configuration values are safely and silently discarded.
+ *
+ * @param e a GError. Error code can be any of the following:
+ *        NBDS_ERR_CFILE_NOTFOUND, NBDS_ERR_CFILE_MISSING_GENERIC,
+ *        NBDS_ERR_CFILE_VALUE_INVALID, NBDS_ERR_CFILE_VALUE_UNSUPPORTED
+ *        or NBDS_ERR_CFILE_NO_EXPORTS. @see NBDS_ERRS.
+ *
  * @return a Array of SERVER* pointers, If the config file is empty or does not
  *	exist, returns an empty GHashTable; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
+GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	gchar* cfdir = NULL;
@@ -870,21 +875,21 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
+        struct generic_conf genconftmp;
 	PARAM gp[] = {
-		{ "user",	FALSE, PARAM_STRING,	&runuser,	0 },
-		{ "group",	FALSE, PARAM_STRING,	&rungroup,	0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&glob_flags,	F_OLDSTYLE },
-		{ "listenaddr", FALSE, PARAM_STRING,	&modern_listen, 0 },
-		{ "port", 	FALSE, PARAM_STRING,	&modernport, 	0 },
-		{ "includedir", FALSE, PARAM_STRING,	&cfdir,		0 },
-		{ "allowlist",  FALSE, PARAM_BOOL,	&glob_flags,	F_LIST },
+		{ "user",	FALSE, PARAM_STRING,	&(genconftmp.user),       0 },
+		{ "group",	FALSE, PARAM_STRING,	&(genconftmp.group),      0 },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_OLDSTYLE },
+		{ "listenaddr", FALSE, PARAM_STRING,	&(genconftmp.modernaddr), 0 },
+		{ "port", 	FALSE, PARAM_STRING,	&(genconftmp.modernport), 0 },
+		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
+		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
 	GKeyFile *cfile;
 	GError *err = NULL;
 	const char *err_msg=NULL;
-	GQuark errdomain;
 	GArray *retval=NULL;
 	gchar **groups;
 	gboolean bval;
@@ -895,18 +900,27 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	gint i;
 	gint j;
 
-	errdomain = g_quark_from_string("parse_cfile");
+        memset(&genconftmp, 0, sizeof(struct generic_conf));
+
+        if (genconf) {
+                /* Use the passed configuration values as defaults. The
+                 * parsing algorithm below updates all parameter targets
+                 * found from configuration files. */
+                memcpy(&genconftmp, genconf, sizeof(struct generic_conf));
+        }
+
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
-		g_set_error(e, errdomain, CFILE_NOTFOUND, "Could not open config file %s.", f);
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s: %s",
+				f, err->message);
 		g_key_file_free(cfile);
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if((!startgroup || strcmp(startgroup, "generic")) && have_global) {
-		g_set_error(e, errdomain, CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
+	if((!startgroup || strcmp(startgroup, "generic")) && genconf) {
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
 	}
@@ -916,7 +930,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
-		if(i==1 || !have_global) {
+		if(i==1 || !genconf) {
 			p=lp;
 			p_size=lp_size;
 			if(!(glob_flags & F_OLDSTYLE)) {
@@ -979,7 +993,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 				} else {
 					err_msg = DEFAULT_ERROR;
 				}
-				g_set_error(e, errdomain, CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
+				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
 				g_array_free(retval, TRUE);
 				g_error_free(err);
 				g_key_file_free(cfile);
@@ -996,14 +1010,14 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			} else if(!strncmp(virtstyle, "cidrhash", 8)) {
 				s.virtstyle=VIRT_CIDR;
 				if(strlen(virtstyle)<10) {
-					g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
+					g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
 					g_array_free(retval, TRUE);
 					g_key_file_free(cfile);
 					return NULL;
 				}
 				s.cidrlen=strtol(virtstyle+8, NULL, 0);
 			} else {
-				g_set_error(e, errdomain, CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
+				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
 				g_array_free(retval, TRUE);
 				g_key_file_free(cfile);
 				return NULL;
@@ -1018,7 +1032,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0 || !have_global) {
+		if(i>0 || !genconf) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
@@ -1026,7 +1040,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
-			g_set_error(e, errdomain, CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
 			g_array_free(retval, TRUE);
 			g_key_file_free(cfile);
 			return NULL;
@@ -1047,9 +1061,16 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 			}
 		}
 	}
-	if(i==1 && have_global) {
-		g_set_error(e, errdomain, CFILE_NO_EXPORTS, "The config file does not specify any exports");
+	if(i==1 && genconf) {
+		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
+
+        if (genconf) {
+                /* Return the updated generic configuration through the
+                 * pointer parameter. */
+                memcpy(genconf, &genconftmp, sizeof(struct generic_conf));
+        }
+
 	return retval;
 }
 
@@ -1065,11 +1086,11 @@ void sigchld_handler(int s) {
 
 	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
 		if(WIFEXITED(status)) {
-			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+			msg(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
 		}
 		i=g_hash_table_lookup(children, &pid);
 		if(!i) {
-			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
+			msg(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
 		} else {
 			DEBUG("Removing %d from the list of children", pid);
 			g_hash_table_remove(children, &pid);
@@ -1101,6 +1122,19 @@ void sigterm_handler(int s) {
 	unlink(pidfname);
 
 	exit(EXIT_SUCCESS);
+}
+
+/**
+ * Handle SIGHUP by setting atomically a flag which will be evaluated in
+ * the main loop of the root server process. This allows us to separate
+ * the signal catching from th actual task triggered by SIGHUP and hence
+ * processing in the interrupt context is kept as minimial as possible.
+ *
+ * @param s the signal we're handling (must be SIGHUP, or something
+ * is severely wrong).
+ **/
+static void sighup_handler(const int s G_GNUC_UNUSED) {
+        is_sighup_caught = 1;
 }
 
 /**
@@ -1148,7 +1182,6 @@ off_t size_autodetect(int fhandle) {
         }
 
 	err("Could not find size of exported block device: %m");
-	return OFFT_MAX;
 }
 
 /**
@@ -1488,10 +1521,10 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		if(i<client->export->len) {
 			cur = g_array_index(client->export, FILE_INFO, i);
 		}
-		if(prev.startoff < req->from) {
+		if(prev.startoff <= req->from) {
 			off_t curoff = req->from - prev.startoff;
 			off_t curlen = cur.startoff - prev.startoff - curoff;
-			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE, curoff, curlen);
+			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, curoff, curlen);
 		}
 		prev = cur;
 	} while(i < client->export->len && cur.startoff < (req->from + req->len));
@@ -1768,7 +1801,7 @@ int mainloop(CLIENT *client) {
 			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
 				currlen = BUFSIZE - sizeof(struct nbd_reply);
 				if(!logged_oversized) {
-					msg2(LOG_DEBUG, "oversized request (this is not a problem)");
+					msg(LOG_DEBUG, "oversized request (this is not a problem)");
 					logged_oversized = true;
 				}
 			}
@@ -1777,7 +1810,7 @@ int mainloop(CLIENT *client) {
 		switch (command) {
 
 		case NBD_CMD_DISC:
-			msg2(LOG_INFO, "Disconnect request received.");
+			msg(LOG_INFO, "Disconnect request received.");
                 	if (client->server->flags & F_COPYONWRITE) { 
 				if (client->difmap) g_free(client->difmap) ;
                 		close(client->difffile);
@@ -1970,9 +2003,9 @@ void setupexport(CLIENT* client) {
 		client->exportsize = client->server->expected_size;
 	}
 
-	msg3(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
+	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
 	if(multifile) {
-		msg3(LOG_INFO, "Total number of files: %d", i);
+		msg(LOG_INFO, "Total number of files: %d", i);
 	}
 }
 
@@ -1983,7 +2016,7 @@ int copyonwrite_prepare(CLIENT* client) {
 	snprintf(client->difffilename, 1024, "%s-%s-%d.diff",client->exportname,client->clientname,
 		(int)getpid()) ;
 	client->difffilename[1023]='\0';
-	msg3(LOG_INFO,"About to create map and diff file %s",client->difffilename) ;
+	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 	if (client->difffile<0) err("Could not create diff file (%m)") ;
 	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
@@ -2079,13 +2112,13 @@ int set_peername(int net, CLIENT *client) {
 	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0) {
-		msg2(LOG_INFO, "getpeername failed: %m");
+		msg(LOG_INFO, "getpeername failed: %m");
 		return -1;
 	}
 
 	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-		msg3(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+		msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
 		return -1;
 	}
 
@@ -2094,29 +2127,29 @@ int set_peername(int net, CLIENT *client) {
 	e = getaddrinfo(peername, NULL, &hints, &ai);
 
 	if(e != 0) {
-		msg3(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+		msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
 		freeaddrinfo(ai);
 		return -1;
 	}
 
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
-			msg2(LOG_DEBUG, "virtualization is off");
+			msg(LOG_DEBUG, "virtualization is off");
 			client->exportname=g_strdup(client->server->exportname);
 			break;
 		case VIRT_IPHASH:
-			msg2(LOG_DEBUG, "virtstyle iphash");
+			msg(LOG_DEBUG, "virtstyle iphash");
 			for(i=0;i<strlen(peername);i++) {
 				if(peername[i]=='.') {
 					peername[i]='/';
 				}
 			}
 		case VIRT_IPLIT:
-			msg2(LOG_DEBUG, "virststyle ipliteral");
+			msg(LOG_DEBUG, "virststyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
 			break;
 		case VIRT_CIDR:
-			msg3(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
+			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &addrin, addrinlen);
 			if(ai->ai_family == AF_INET) {
 				netaddr4 = (struct sockaddr_in *)&netaddr;
@@ -2151,8 +2184,8 @@ int set_peername(int net, CLIENT *client) {
 	}
 
 	freeaddrinfo(ai);
-	msg4(LOG_INFO, "connect from %s, assigned file is %s", 
-	     peername, client->exportname);
+        msg(LOG_INFO, "connect from %s, assigned file is %s",
+            peername, client->exportname);
 	client->clientname=g_strdup(peername);
 	return 0;
 }
@@ -2173,7 +2206,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 
 	if(serve->max_connections > 0 &&
 	   g_hash_table_size(children) >= serve->max_connections) {
-		msg2(LOG_INFO, "Max connections reached");
+		msg(LOG_INFO, "Max connections reached");
 		goto handle_connection_out;
 	}
 	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
@@ -2195,10 +2228,10 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		goto handle_connection_out;
 	}
 	if (!authorized_client(client)) {
-		msg2(LOG_INFO,"Unauthorized client") ;
+		msg(LOG_INFO, "Unauthorized client");
 		goto handle_connection_out;
 	}
-	msg2(LOG_INFO,"Authorized client") ;
+	msg(LOG_INFO, "Authorized client");
 
 	if (!dontfork) {
 		pid_t pid;
@@ -2211,7 +2244,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		sigaddset(&newset, SIGTERM);
 		sigprocmask(SIG_BLOCK, &newset, &oldset);
 		if ((pid = fork()) < 0) {
-			msg3(LOG_INFO,"Could not fork (%s)",strerror(errno)) ;
+			msg(LOG_INFO, "Could not fork (%s)", strerror(errno));
 			sigprocmask(SIG_SETMASK, &oldset, NULL);
 			goto handle_connection_out;
 		}
@@ -2227,6 +2260,7 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		/* child */
 		signal(SIGCHLD, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
+		signal(SIGHUP, SIG_DFL);
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 
 		g_hash_table_destroy(children);
@@ -2242,10 +2276,13 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 		   data, and otherwise we get a
 		   segfault... */
 		g_array_free(servers, FALSE);
-		close(modernsock);
+		for(i=0;i<modernsocks->len;i++) {
+			close(g_array_index(modernsocks, int, i));
+		}
+		g_array_free(modernsocks, TRUE);
 	}
 
-	msg2(LOG_INFO,"Starting to serve");
+	msg(LOG_INFO, "Starting to serve");
 	serveconnection(client);
 	exit(EXIT_SUCCESS);
 
@@ -2255,9 +2292,75 @@ handle_connection_out:
 }
 
 /**
+ * Return the index of the server whose servename matches the given
+ * name.
+ *
+ * @param servename a string to match
+ * @param servers an array of servers
+ * @return the first index of the server whose servename matches the
+ *         given name or -1 if one cannot be found
+ **/
+static int get_index_by_servename(const gchar *const servename,
+                                  const GArray *const servers) {
+        int i;
+
+        for (i = 0; i < servers->len; ++i) {
+                const SERVER server = g_array_index(servers, SERVER, i);
+
+                if (strcmp(servename, server.servename) == 0)
+                        return i;
+        }
+
+        return -1;
+}
+
+int setup_serve(SERVER *const serve, GError **const gerror);
+
+/**
+ * Parse configuration files and add servers to the array if they don't
+ * already exist there. The existence is tested by comparing
+ * servenames. A server is appended to the array only if its servename
+ * is unique among all other servers.
+ *
+ * @param servers an array of servers
+ * @return the number of new servers appended to the array, or -1 in
+ *         case of an error
+ **/
+static int append_new_servers(GArray *const servers, GError **const gerror) {
+        int i;
+        GArray *new_servers;
+        const int old_len = servers->len;
+        int retval = -1;
+        struct generic_conf genconf;
+
+        new_servers = parse_cfile(config_file_pos, &genconf, gerror);
+        if (!new_servers)
+                goto out;
+
+        for (i = 0; i < new_servers->len; ++i) {
+                SERVER new_server = g_array_index(new_servers, SERVER, i);
+
+                if (new_server.servename
+                    && -1 == get_index_by_servename(new_server.servename,
+                                                    servers)) {
+                        if (setup_serve(&new_server, gerror) == -1)
+                                goto out;
+                        if (append_serve(&new_server, servers) == -1)
+                                goto out;
+                }
+        }
+
+        retval = servers->len - old_len;
+out:
+        g_array_free(new_servers, TRUE);
+
+        return retval;
+}
+
+/**
  * Loop through the available servers, and serve them. Never returns.
  **/
-int serveloop(GArray* servers) {
+void serveloop(GArray* servers) {
 	struct sockaddr_storage addrin;
 	socklen_t addrinlen=sizeof(addrin);
 	int i;
@@ -2276,25 +2379,63 @@ int serveloop(GArray* servers) {
 	max=0;
 	FD_ZERO(&mset);
 	for(i=0;i<servers->len;i++) {
-		if((sock=(g_array_index(servers, SERVER, i)).socket)) {
+		if((sock=(g_array_index(servers, SERVER, i)).socket) >= 0) {
 			FD_SET(sock, &mset);
 			max=sock>max?sock:max;
 		}
 	}
-	if(modernsock >= 0) {
-		FD_SET(modernsock, &mset);
-		max=modernsock>max?modernsock:max;
+	for(i=0;i<modernsocks->len;i++) {
+		int sock = g_array_index(modernsocks, int, i);
+		FD_SET(sock, &mset);
+		max=sock>max?sock:max;
 	}
 	for(;;) {
+                /* SIGHUP causes the root server process to reconfigure
+                 * itself and add new export servers for each newly
+                 * found export configuration group, i.e. spawn new
+                 * server processes for each previously non-existent
+                 * export. This does not alter old runtime configuration
+                 * but just appends new exports. */
+                if (is_sighup_caught) {
+                        int n;
+                        GError *gerror = NULL;
+
+                        msg(LOG_INFO, "reconfiguration request received");
+                        is_sighup_caught = 0; /* Reset to allow catching
+                                               * it again. */
+
+                        n = append_new_servers(servers, &gerror);
+                        if (n == -1)
+                                msg(LOG_ERR, "failed to append new servers: %s",
+                                    gerror->message);
+
+                        for (i = servers->len - n; i < servers->len; ++i) {
+                                const SERVER server = g_array_index(servers,
+                                                                    SERVER, i);
+
+                                if (server.socket >= 0) {
+                                        FD_SET(server.socket, &mset);
+                                        max = server.socket > max ? server.socket : max;
+                                }
+
+                                msg(LOG_INFO, "reconfigured new server: %s",
+                                    server.servename);
+                        }
+                }
+
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
 			int net;
 
 			DEBUG("accept, ");
-			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
+			for(i=0; i < modernsocks->len; i++) {
+				int sock = g_array_index(modernsocks, int, i);
+				if(!FD_ISSET(sock, &rset)) {
+					continue;
+				}
 				CLIENT *client;
 
-				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
+				if((net=accept(sock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 					err_nonfatal("accept: %m");
 					continue;
 				}
@@ -2309,6 +2450,9 @@ int serveloop(GArray* servers) {
 				SERVER *serve;
 
 				serve=&(g_array_index(servers, SERVER, i));
+				if(sock < 0) {
+					continue;
+				}
 				if(FD_ISSET(serve->socket, &rset)) {
 					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
 						err_nonfatal("accept: %m");
@@ -2320,8 +2464,20 @@ int serveloop(GArray* servers) {
 		}
 	}
 }
+void serveloop(GArray* servers) G_GNUC_NORETURN;
 
-void dosockopts(int socket) {
+/**
+ * Set server socket options.
+ *
+ * @param socket a socket descriptor of the server
+ *
+ * @param gerror a pointer to an error object pointer used for reporting
+ *        errors. On error, if gerror is not NULL, *gerror is set and -1
+ *        is returned.
+ *
+ * @return 0 on success, -1 on error
+ **/
+int dosockopts(const int socket, GError **const gerror) {
 #ifndef sun
 	int yes=1;
 #else
@@ -2329,29 +2485,29 @@ void dosockopts(int socket) {
 #endif /* sun */
 	struct linger l;
 
-	//int sock_flags;
-
 	/* lose the pesky "Address already in use" error message */
 	if (setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-	        err("setsockopt SO_REUSEADDR");
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SO_REUSEADDR,
+                            "failed to set socket option SO_REUSEADDR: %s",
+                            strerror(errno));
+                return -1;
 	}
 	l.l_onoff = 1;
 	l.l_linger = 10;
 	if (setsockopt(socket,SOL_SOCKET,SO_LINGER,&l,sizeof(l)) == -1) {
-	        perror("setsockopt SO_LINGER");
-		exit(EXIT_FAILURE);
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SO_LINGER,
+                            "failed to set socket option SO_LINGER: %s",
+                            strerror(errno));
+                return -1;
 	}
 	if (setsockopt(socket,SOL_SOCKET,SO_KEEPALIVE,&yes,sizeof(int)) == -1) {
-		err("setsockopt SO_KEEPALIVE");
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SO_KEEPALIVE,
+                            "failed to set socket option SO_KEEPALIVE: %s",
+                            strerror(errno));
+                return -1;
 	}
 
-	/* make the listening socket non-blocking */
-	/*if ((sock_flags = fcntl(socket, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	if (fcntl(socket, F_SETFL, sock_flags | O_NONBLOCK) == -1) {
-		err("fcntl F_SETFL O_NONBLOCK");
-	}*/
+        return 0;
 }
 
 /**
@@ -2359,11 +2515,28 @@ void dosockopts(int socket) {
  *
  * @param serve the server we want to connect.
  **/
-int setup_serve(SERVER *serve) {
+int setup_serve(SERVER *const serve, GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	gchar *port = NULL;
 	int e;
+        int retval = -1;
+
+        /* Without this, it's possible that socket == 0, even if it's
+         * not initialized at all. And that would be wrong because 0 is
+         * totally legal value for properly initialized descriptor. This
+         * line is required to ensure that unused/uninitialized
+         * descriptors are marked as such (new style configuration
+         * case). Currently, servers are being initialized in multiple
+         * places, and some of the them do the socket initialization
+         * incorrectly. This is the only point common to all code paths,
+         * and therefore setting -1 is put here. However, the whole
+         * server initialization procedure should be extracted to its
+         * own function and all code paths wanting to mess with servers
+         * should initialize servers with that function.
+         * 
+         * TODO: fix server initialization */
+        serve->socket = -1;
 
 	if(!(glob_flags & F_OLDSTYLE)) {
 		return serve->servename ? 1 : 0;
@@ -2373,19 +2546,25 @@ int setup_serve(SERVER *serve) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = serve->socket_family;
 
-	port = g_strdup_printf ("%d", serve->port);
-	if (port == NULL)
-		return 0;
+	port = g_strdup_printf("%d", serve->port);
+	if (!port) {
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SYS,
+                            "failed to open an export socket: "
+                            "failed to convert a port number to a string: %s",
+                            strerror(errno));
+                goto out;
+        }
 
 	e = getaddrinfo(serve->listenaddr,port,&hints,&ai);
 
 	g_free(port);
 
 	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
-		serve->socket = -1;
-		freeaddrinfo(ai);
-		exit(EXIT_FAILURE);
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
+                            "failed to open an export socket: "
+                            "failed to get address info: %s",
+                            gai_strerror(e));
+                goto out;
 	}
 
 	if(serve->socket_family == AF_UNSPEC)
@@ -2399,72 +2578,169 @@ int setup_serve(SERVER *serve) {
 			ai->ai_family = AF_INET6_SDP;
 	}
 #endif
-	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-		err("socket: %m");
+	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0) {
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+                            "failed to open an export socket: "
+                            "failed to create a socket: %s",
+                            strerror(errno));
+                goto out;
+        }
 
-	dosockopts(serve->socket);
+	if (dosockopts(serve->socket, gerror) == -1) {
+                g_prefix_error(gerror, "failed to open an export socket: ");
+                goto out;
+        }
 
 	DEBUG("Waiting for connections... bind, ");
 	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
-	if (e != 0 && errno != EADDRINUSE)
-		err("bind: %m");
+	if (e != 0 && errno != EADDRINUSE) {
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+                            "failed to open an export socket: "
+                            "failed to bind an address to a socket: %s",
+                            strerror(errno));
+                goto out;
+        }
 	DEBUG("listen, ");
-	if (listen(serve->socket, 1) < 0)
-		err("listen: %m");
+	if (listen(serve->socket, 1) < 0) {
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+                            "failed to open an export socket: "
+                            "failed to start listening on a socket: %s",
+                            strerror(errno));
+                goto out;
+        }
 
+        retval = serve->servename ? 1 : 0;
+out:
+
+        if (retval == -1 && serve->socket >= 0) {
+                close(serve->socket);
+                serve->socket = -1;
+        }
 	freeaddrinfo (ai);
-	if(serve->servename) {
-		return 1;
-	} else {
-		return 0;
-	}
+
+        return retval;
 }
 
-void open_modern(void) {
+int open_modern(const gchar *const addr, const gchar *const port,
+                GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo* ai = NULL;
+	struct addrinfo* ai_bak;
 	struct sock_flags;
 	int e;
+        int retval = -1;
+	int i=0;
+	int sock = -1;
 
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_protocol = IPPROTO_TCP;
-	e = getaddrinfo(modern_listen, modernport, &hints, &ai);
+	e = getaddrinfo(addr, port ? port : NBD_DEFAULT_PORT, &hints, &ai);
+	ai_bak = ai;
 	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
-		exit(EXIT_FAILURE);
-	}
-	if((modernsock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
-		err("socket: %m");
-	}
-
-	dosockopts(modernsock);
-
-	if(bind(modernsock, ai->ai_addr, ai->ai_addrlen)) {
-		err("bind: %m");
-	}
-	if(listen(modernsock, 10) <0) {
-		err("listen: %m");
+                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
+                            "failed to open a modern socket: "
+                            "failed to get address info: %s",
+                            gai_strerror(e));
+                goto out;
 	}
 
-	freeaddrinfo(ai);
+	while(ai != NULL) {
+		sock = -1;
+
+		if((sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+				    "failed to open a modern socket: "
+				    "failed to create a socket: %s",
+				    strerror(errno));
+			goto out;
+		}
+
+		if (dosockopts(sock, gerror) == -1) {
+			g_prefix_error(gerror, "failed to open a modern socket: ");
+			goto out;
+		}
+
+		if(bind(sock, ai->ai_addr, ai->ai_addrlen)) {
+			/* This is so wrong. 
+			 * 
+			 * Linux will return multiple entries for the
+			 * same system when we ask it for something
+			 * AF_UNSPEC, even though the first entry will
+			 * listen to both protocols. Other systems will
+			 * return multiple entries too, but we actually
+			 * do need to open both. Sigh.
+			 *
+			 * Handle it by ignoring EADDRINUSE if we've
+			 * already got at least one socket open
+			 */
+			if(errno == EADDRINUSE && modernsocks->len > 0) {
+				goto next;
+			}
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				    "failed to open a modern socket: "
+				    "failed to bind an address to a socket: %s",
+				    strerror(errno));
+			goto out;
+		}
+
+		if(listen(sock, 10) <0) {
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				    "failed to open a modern socket: "
+				    "failed to start listening on a socket: %s",
+				    strerror(errno));
+			goto out;
+		}
+		g_array_append_val(modernsocks, sock);
+	next:
+		ai = ai->ai_next;
+	}
+
+        retval = 0;
+out:
+
+        if (retval == -1 && sock >= 0) {
+                close(sock);
+        }
+	if(ai_bak)
+		freeaddrinfo(ai_bak);
+
+        return retval;
 }
 
 /**
  * Connect our servers.
  **/
-void setup_servers(GArray* servers) {
+void setup_servers(GArray *const servers, const gchar *const modernaddr,
+                   const gchar *const modernport) {
 	int i;
 	struct sigaction sa;
 	int want_modern=0;
 
 	for(i=0;i<servers->len;i++) {
-		want_modern |= setup_serve(&(g_array_index(servers, SERVER, i)));
+                GError *gerror = NULL;
+                SERVER *server = &g_array_index(servers, SERVER, i);
+                int ret;
+
+		ret = setup_serve(server, &gerror);
+                if (ret == -1) {
+                        msg(LOG_ERR, "failed to setup servers: %s",
+                            gerror->message);
+                        g_clear_error(&gerror);
+                        exit(EXIT_FAILURE);
+                }
+                want_modern |= ret;
 	}
 	if(want_modern) {
-		open_modern();
+                GError *gerror = NULL;
+                if (open_modern(modernaddr, modernport, &gerror) == -1) {
+                        msg(LOG_ERR, "failed to setup servers: %s",
+                            gerror->message);
+                        g_clear_error(&gerror);
+                        exit(EXIT_FAILURE);
+                }
 	}
 	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 
@@ -2480,6 +2756,12 @@ void setup_servers(GArray* servers) {
 	sigaddset(&sa.sa_mask, SIGCHLD);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGTERM, &sa, NULL) == -1)
+		err("sigaction: %m");
+
+	sa.sa_handler = sighup_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGHUP, &sa, NULL) == -1)
 		err("sigaction: %m");
 }
 
@@ -2526,35 +2808,27 @@ void daemonize(SERVER* serve) {
  * The stuff above daemonize() isn't.
  */
 
-void serve_err(SERVER* serve, const char* msg) G_GNUC_NORETURN;
-
-void serve_err(SERVER* serve, const char* msg) {
-	g_message("Export of %s on port %d failed:", serve->exportname,
-			serve->port);
-	err(msg);
-}
-
 /**
  * Set up user-ID and/or group-ID
  **/
-void dousers(void) {
+void dousers(const gchar *const username, const gchar *const groupname) {
 	struct passwd *pw;
 	struct group *gr;
 	gchar* str;
-	if(rungroup) {
-		gr=getgrnam(rungroup);
+	if (groupname) {
+		gr = getgrnam(groupname);
 		if(!gr) {
-			str = g_strdup_printf("Invalid group name: %s", rungroup);
+			str = g_strdup_printf("Invalid group name: %s", groupname);
 			err(str);
 		}
 		if(setgid(gr->gr_gid)<0) {
 			err("Could not set GID: %m"); 
 		}
 	}
-	if(runuser) {
-		pw=getpwnam(runuser);
+	if (username) {
+		pw = getpwnam(username);
 		if(!pw) {
-			str = g_strdup_printf("Invalid user name: %s", runuser);
+			str = g_strdup_printf("Invalid user name: %s", username);
 			err(str);
 		}
 		if(setuid(pw->pw_uid)<0) {
@@ -2602,6 +2876,9 @@ int main(int argc, char *argv[]) {
 	SERVER *serve;
 	GArray *servers;
 	GError *err=NULL;
+        struct generic_conf genconf;
+
+        memset(&genconf, 0, sizeof(struct generic_conf));
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
@@ -2610,11 +2887,18 @@ int main(int argc, char *argv[]) {
 
 	memset(pidftemplate, '\0', 256);
 
+	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
+
 	logging();
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
-	servers = parse_cfile(config_file_pos, TRUE, &err);
+
+        servers = parse_cfile(config_file_pos, &genconf, &err);
 	
+        /* Update global variables with parsed values. This will be
+         * removed once we get rid of global configuration variables. */
+        glob_flags   |= genconf.flags;
+
 	if(serve) {
 		serve->socket_family = AF_UNSPEC;
 
@@ -2645,8 +2929,8 @@ int main(int argc, char *argv[]) {
 	}
     
 	if(!servers || !servers->len) {
-		if(err && !(err->domain == g_quark_from_string("parse_cfile")
-				&& err->code == CFILE_NOTFOUND)) {
+                if(err && !(err->domain == NBDS_ERR
+                            && err->code == NBDS_ERR_CFILE_NOTFOUND)) {
 			g_warning("Could not parse config file: %s", 
 					err ? err->message : "Unknown error");
 		}
@@ -2657,13 +2941,14 @@ int main(int argc, char *argv[]) {
 	}
 
 	if((!serve) && (!servers||!servers->len)) {
-		g_message("No configured exports; quitting.");
+		if(err)
+			g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
 	if (!dontfork)
 		daemonize(serve);
-	setup_servers(servers);
-	dousers();
+	setup_servers(servers, genconf.modernaddr, genconf.modernport);
+	dousers(genconf.user, genconf.group);
+
 	serveloop(servers);
-	return 0 ;
 }
