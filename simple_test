@@ -53,12 +53,12 @@ case $1 in
 	;;
 	*/cfgsize)
 		# Test oversized requests
-		./nbd-server -C /dev/null -p ${pidfile} 11111 $tmpnam &
+		./nbd-server -C /dev/null -p ${pidfile} 11112 $tmpnam &
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
 		sleep 1
-		./nbd-tester-client -o 127.0.0.1 11111
+		./nbd-tester-client -o 127.0.0.1 11112
 		retval=$?
 	;;
 	*/cfg1)
@@ -68,12 +68,12 @@ case $1 in
 	oldstyle = true
 [export]
 	exportname = $tmpnam
-	port = 11112
+	port = 11113
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 11112
+		./nbd-tester-client 127.0.0.1 11113
 		retval=$?
 	;;
 	*/cfgmulti)
@@ -84,19 +84,19 @@ EOF
 	oldstyle = true
 [export1]
 	exportname = $tmpnam
-	port = 11113
+	port = 11114
 	copyonwrite = true
 	listenaddr = 127.0.0.1
 [export2]
 	exportname = $tmpnam
-	port = 11114
+	port = 11115
 	readonly = true
 	listenaddr = 127.0.0.1
 EOF
 		./nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost 11113
+		./nbd-tester-client localhost 11114
 		retval=$?
 		if [ $retval -ne 0 ]
 		then
@@ -112,7 +112,7 @@ EOF
 			fi
 			exit $retval
 		fi
-		./nbd-tester-client localhost 11114
+		./nbd-tester-client localhost 11115
 		retval=$?
 	;;
 	*/cfgnew)
