@@ -136,7 +136,8 @@ void ask_list(int sock) {
 	uint32_t len;
 	uint32_t reptype;
 	uint64_t magic;
-	char buf[1024];
+	const int BUF_SIZE = 1024;
+	char buf[BUF_SIZE];
 
 	magic = ntohll(opts_magic);
 	if (write(sock, &magic, sizeof(magic)) < 0)
@@ -200,10 +201,15 @@ void ask_list(int sock) {
 					exit(EXIT_FAILURE);
 				}
 				len=ntohl(len);
+				if (len >= BUF_SIZE) {
+					fprintf(stderr, "\nE: export name on server too long\n");
+					exit(EXIT_FAILURE);
+				}
 				if(read(sock, buf, len) < 0) {
 					fprintf(stderr, "\nE: could not read export name from server\n");
 					exit(EXIT_FAILURE);
 				}
+				buf[len] = 0;
 				printf("%s\n", buf);
 			}
 		}
