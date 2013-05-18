@@ -444,6 +444,7 @@ int main(int argc, char *argv[]) {
 	uint32_t cflags=0;
 	uint32_t opts=0;
 	sigset_t block, old;
+	struct sigaction sa;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
@@ -585,6 +586,10 @@ int main(int argc, char *argv[]) {
 		if (daemon(0,0) < 0)
 			err("Cannot detach from terminal");
 	}
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGCHLD, &a, NULL);
 #endif
 	do {
 #ifndef NOFORK
