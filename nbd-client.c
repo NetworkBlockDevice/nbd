@@ -589,7 +589,7 @@ int main(int argc, char *argv[]) {
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_IGN;
-	sigaction(SIGCHLD, &a, NULL);
+	sigaction(SIGCHLD, &sa, NULL);
 #endif
 	do {
 #ifndef NOFORK
