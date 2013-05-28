@@ -9,8 +9,6 @@ mydir=$(dirname "`readlink -f $0`")
 
 set -e
 
-ulimit -c unlimited
-
 # Create a one-meg device
 dd if=/dev/zero of=$tmpnam bs=1024 count=4096 >/dev/null 2>&1
 
