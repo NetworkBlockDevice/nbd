@@ -1,3 +1,9 @@
+nbd (1:3.2-4~deb7u3) UNRELEASED; urgency=low
+
+  * Clean build directory of unnecessary cruft, and rebuild. Oops.
+
+ -- Wouter Verhelst <wouter@grep.be>  Wed, 29 May 2013 13:22:15 +0200
+
 nbd (1:3.2-4~deb7u2) stable; urgency=low
 
   * Remove superfluous 'ulimit -c' calls from simple_test script, so
