@@ -2450,7 +2450,7 @@ void serveloop(GArray* servers) {
 				SERVER *serve;
 
 				serve=&(g_array_index(servers, SERVER, i));
-				if(sock < 0) {
+				if(serve->socket < 0) {
 					continue;
 				}
 				if(FD_ISSET(serve->socket, &rset)) {
