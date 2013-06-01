@@ -2365,7 +2365,6 @@ void serveloop(GArray* servers) {
 	socklen_t addrinlen=sizeof(addrin);
 	int i;
 	int max;
-	int sock;
 	fd_set mset;
 	fd_set rset;
 
@@ -2379,6 +2378,7 @@ void serveloop(GArray* servers) {
 	max=0;
 	FD_ZERO(&mset);
 	for(i=0;i<servers->len;i++) {
+		int sock;
 		if((sock=(g_array_index(servers, SERVER, i)).socket) >= 0) {
 			FD_SET(sock, &mset);
 			max=sock>max?sock:max;
