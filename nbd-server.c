@@ -2354,8 +2354,9 @@ handler_err:
 }
 
 static void
-handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
+handle_oldstyle_connection(GArray *servers, int net, SERVER *serve)
 {
+	CLIENT *client = NULL;
 	int sock_flags_old;
 	int sock_flags_new;
 
@@ -2372,13 +2373,13 @@ handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 	    fcntl(net, F_SETFL, sock_flags_new) == -1) {
 		err("fcntl F_SETFL ~O_NONBLOCK");
 	}
-	if(!client) {
-		client = g_new0(CLIENT, 1);
-		client->server=serve;
-		client->exportsize=OFFT_MAX;
-		client->net=net;
-		client->transactionlogfd = -1;
-	}
+
+	client = g_new0(CLIENT, 1);
+	client->server=serve;
+	client->exportsize=OFFT_MAX;
+	client->net=net;
+	client->transactionlogfd = -1;
+
 	if (set_peername(net, client)) {
 		goto handle_connection_out;
 	}
@@ -2603,7 +2604,7 @@ void serveloop(GArray* servers) {
 						err_nonfatal("accept: %m");
 						continue;
 					}
-					handle_connection(servers, net, serve, NULL);
+					handle_oldstyle_connection(servers, net, serve);
 				}
 			}
 		}
