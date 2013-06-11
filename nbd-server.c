@@ -2354,14 +2354,14 @@ handler_err:
 }
 
 static void
-handle_oldstyle_connection(GArray *servers, int sock, SERVER *serve)
+handle_oldstyle_connection(GArray *servers, SERVER *serve)
 {
 	int net;
 	CLIENT *client = NULL;
 	int sock_flags_old;
 	int sock_flags_new;
 
-	net = socket_accept(sock);
+	net = socket_accept(serve->socket);
 	if (net < 0)
 		return;
 
@@ -2602,7 +2602,7 @@ void serveloop(GArray* servers) {
 					continue;
 				}
 				if(FD_ISSET(serve->socket, &rset)) {
-					handle_oldstyle_connection(servers, serve->socket, serve);
+					handle_oldstyle_connection(servers, serve);
 				}
 			}
 		}
