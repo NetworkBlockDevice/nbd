@@ -2354,7 +2354,7 @@ handler_err:
 }
 
 static void
-handle_oldstyle_connection(GArray *servers, SERVER *serve)
+handle_oldstyle_connection(GArray *const servers, SERVER *const serve)
 {
 	int net;
 	CLIENT *client = NULL;
@@ -2427,8 +2427,7 @@ handle_oldstyle_connection(GArray *servers, SERVER *serve)
 		g_hash_table_destroy(children);
 		children = NULL;
 		for(i=0;i<servers->len;i++) {
-			serve=&g_array_index(servers, SERVER, i);
-			close(serve->socket);
+			close(g_array_index(servers, SERVER, i).socket);
 		}
 		/* FALSE does not free the
 		   actual data. This is required,
