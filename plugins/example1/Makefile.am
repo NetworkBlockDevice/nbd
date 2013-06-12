@@ -40,3 +40,5 @@ libnbdkit_example1_la_SOURCES = \
 
 libnbdkit_example1_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
+libnbdkit_example1_la_CFLAGS = \
+	$(WARNINGS_CFLAGS)

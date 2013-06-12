@@ -45,6 +45,21 @@ test "x$U" != "x" && AC_MSG_ERROR([Compiler not ANSI compliant])
 
 AM_PROG_CC_C_O
 
+AC_ARG_ENABLE([gcc-warnings],
+    [AS_HELP_STRING([--enable-gcc-warnings],
+                    [turn on lots of GCC warnings (for developers)])],
+     [case $enableval in
+      yes|no) ;;
+      *)      AC_MSG_ERROR([bad value $enableval for gcc-warnings option]) ;;
+      esac
+      gcc_warnings=$enableval],
+      [gcc_warnings=no]
+)
+if test "$gcc_warnings" = "yes"; then
+    WARNINGS_CFLAGS="-Wall -Werror"
+    AC_SUBST([WARNINGS_CFLAGS])
+fi
+
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
