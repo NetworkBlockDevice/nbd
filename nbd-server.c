@@ -2354,11 +2354,16 @@ handler_err:
 }
 
 static void
-handle_oldstyle_connection(GArray *servers, int net, SERVER *serve)
+handle_oldstyle_connection(GArray *servers, int sock, SERVER *serve)
 {
+	int net;
 	CLIENT *client = NULL;
 	int sock_flags_old;
 	int sock_flags_new;
+
+	net = socket_accept(sock);
+	if (net < 0)
+		return;
 
 	if(serve->max_connections > 0 &&
 	   g_hash_table_size(children) >= serve->max_connections) {
@@ -2517,8 +2522,6 @@ out:
  * Loop through the available servers, and serve them. Never returns.
  **/
 void serveloop(GArray* servers) {
-	struct sockaddr_storage addrin;
-	socklen_t addrinlen=sizeof(addrin);
 	int i;
 	int max;
 	fd_set mset;
@@ -2592,7 +2595,6 @@ void serveloop(GArray* servers) {
 				handle_modern_connection(servers, sock);
 			}
 			for(i=0; i < servers->len; i++) {
-				int net;
 				SERVER *serve;
 
 				serve=&(g_array_index(servers, SERVER, i));
@@ -2600,11 +2602,7 @@ void serveloop(GArray* servers) {
 					continue;
 				}
 				if(FD_ISSET(serve->socket, &rset)) {
-					if ((net=accept(serve->socket, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
-						err_nonfatal("accept: %m");
-						continue;
-					}
-					handle_oldstyle_connection(servers, net, serve);
+					handle_oldstyle_connection(servers, serve->socket, serve);
 				}
 			}
 		}
