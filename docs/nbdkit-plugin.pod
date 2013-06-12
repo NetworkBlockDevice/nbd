@@ -1,0 +1,327 @@
+=encoding utf8
+
+=head1 NAME
+
+nbdkit-plugin - How to write nbdkit plugins
+
+=head1 SYNOPSIS
+
+ #include <nbdkit-plugin.h>
+ 
+ static void *
+ myplugin_open (void)
+ {
+   /* create a handle ... */
+   return handle;
+ }
+ 
+ static struct nbdkit_plugin plugin = {
+   .name              = "myplugin",
+   .open              = myplugin_open,
+   .get_size          = myplugin_get_size,
+   .pread             = myplugin_pread,
+   .pwrite            = myplugin_pwrite,
+   /* etc */
+ };
+ 
+ NBDKIT_REGISTER_PLUGIN(plugin)
+
+=head1 DESCRIPTION
+
+An nbdkit plugin is a new source device which can be served using the
+Network Block Device (NBD) protocol.  This manual page describes how
+to create an nbdkit plugin.
+
+For example plugins, take a look at the source of nbdkit, in the
+C<plugins> directory.
+
+=head1 C<nbdkit-plugin.h>
+
+All plugins should start by including this header file:
+
+ #include <nbdkit-plugin.h>
+
+=head1 C<struct nbdkit_plugin>
+
+All plugins must define and register one C<struct nbdkit_plugin>,
+which contains the name of the plugin and pointers to callback
+functions.
+
+ static struct nbdkit_plugin plugin = {
+   .name              = "myplugin",
+   .open              = myplugin_open,
+   .get_size          = myplugin_get_size,
+   .pread             = myplugin_pread,
+   .pwrite            = myplugin_pwrite,
+   /* etc */
+ };
+ 
+ NBDKIT_REGISTER_PLUGIN(plugin)
+
+The callbacks are described below (see C</CALLBACKS>).  Only C<.name>,
+C<.open>, C<.get_size> and C<.pread> are required.  All other
+callbacks can be omitted.  However almost all plugins should have a
+C<.close> callback.  Most real-world plugins will also want to declare
+some of the other callbacks.
+
+The nbdkit server calls the callbacks in the following order over the
+lifetime of the plugin:
+
+=over 4
+
+=item C<.load>
+
+is called once just after the plugin is loaded into memory.
+
+=item C<.open>
+
+A new client has connected.
+
+=item C<.can_write>, C<.get_size> and other configuration callbacks
+
+These are called during option negotiation with the client, but
+before any data is served.
+
+=item C<.pread>, C<.pwrite> and other serving callbacks
+
+After configuration has finished, these may be called to serve data.
+
+=item C<.close>
+
+The client has disconnected.
+
+=item C<.open> ... C<.close>
+
+The sequence C<.open> ... C<.close> can be called repeatedly over the
+lifetime of the plugin, B<and can be called in parallel if the server
+is multithreaded>.
+
+=item C<.unload>
+
+is called once just before the plugin is unloaded from memory.
+
+=back
+
+=head1 ERROR HANDLING
+
+If there is an error in the plugin, the plugin should call
+C<nbdkit_error> with the error message, and then return an error
+indication from the callback, eg. NULL or -1.
+
+=head1 CALLBACKS
+
+=head2 C<.load>
+
+ void load (void);
+
+This is called once just after the plugin is loaded into memory.  You
+can use this to perform any global initialization needed by the
+plugin.
+
+=head2 C<.unload>
+
+ void unload (void);
+
+This may be called once just before the plugin is unloaded from
+memory.  Note that it's not guaranteed that C<.unload> will always be
+called (eg. the server might be killed or segfault), so you should try
+to make the plugin as robust as possible by not requiring cleanup.
+
+=head2 C<.open>
+
+ void *open (void);
+
+This is called when a new client connects to the nbdkit server.  The
+callback should allocate a handle and return it.  This handle
+is passed back to other callbacks and could be freed in the C<.close>
+callback.
+
+Note that the handle is completely opaque to nbdkit, but it must not
+be NULL.
+
+If there is an error, C<.open> should call C<nbdkit_error> with an
+error message and return C<NULL>.
+
+=head2 C<.close>
+
+ void close (void *handle);
+
+This is called when the client closes the connection.  It should clean
+up any per-connection resources.
+
+=head2 C<.get_size>
+
+ off_t get_size (void *handle);
+
+This is called during the option negotiation phase of the protocol
+to get the size (in bytes) of the block device being exported.
+
+If there is an error, C<.get_size> should call C<nbdkit_error> with an
+error message and return C<(off_t)-1>.
+
+=head2 C<.can_write>
+
+ int can_write (void *handle);
+
+This is called during the option negotiation phase to find out if the
+handle supports writes.
+
+If there is an error, C<.can_write> should call C<nbdkit_error> with
+an error message and return C<-1>.
+
+This callback is not required.  If omitted, then we return true iff a
+C<.pwrite> callback has been defined.
+
+=head2 C<.can_flush>
+
+ int can_flush (void *handle);
+
+This is called during the option negotiation phase to find out if the
+handle supports the flush-to-disk operation.
+
+If there is an error, C<.can_flush> should call C<nbdkit_error> with
+an error message and return C<-1>.
+
+This callback is not required.  If omitted, then we return true iff a
+C<.flush> callback has been defined.
+
+=head2 C<.is_rotational>
+
+ int is_rotational (void *handle);
+
+This is called during the option negotiation phase to find out if the
+backing disk is a rotational medium (like a disk) or not (like an
+SSD).  If true, this may cause the client to reorder requests to make
+them more efficient for a slow rotating disk.
+
+If there is an error, C<.is_rotational> should call C<nbdkit_error>
+with an error message and return C<-1>.
+
+This callback is not required.  If omitted, then we return false.
+
+=head2 C<.can_trim>
+
+ int can_trim (void *handle);
+
+This is called during the option negotiation phase to find out if the
+plugin supports the trim/discard operation for punching holes in the
+backing storage.
+
+If there is an error, C<.can_trim> should call C<nbdkit_error> with an
+error message and return C<-1>.
+
+This callback is not required.  If omitted, then we return true iff a
+C<.trim> callback has been defined.
+
+=head2 C<.pread>
+
+ int pread (void *handle, void *buf, size_t count, off_t offset);
+
+During the data serving phase, nbdkit calls this callback to read data
+from the backing store.  C<count> bytes starting at C<offset> in the
+backing store should be read and copied into C<buf>.  nbdkit takes
+care of all bounds- and sanity-checking, so the plugin does not need
+to worry about that.
+
+The callback must read the whole C<count> bytes if it can.  The NBD
+protocol doesn't allow partial reads (instead, these would be errors).
+If the whole C<count> bytes was read, the callback should return C<0>
+to indicate there was I<no> error.
+
+If there is an error (including a short read which couldn't be
+recovered from), C<.pread> should call C<nbdkit_error> with an error
+message and return C<-1>.
+
+=head2 C<.pwrite>
+
+ int pwrite (void *handle, const void *buf, size_t count, off_t offset);
+
+During the data serving phase, nbdkit calls this callback to write
+data to the backing store.  C<count> bytes starting at C<offset> in
+the backing store should be written using the data in C<buf>.  nbdkit
+takes care of all bounds- and sanity-checking, so the plugin does not
+need to worry about that.
+
+The callback must write the whole C<count> bytes if it can.  The NBD
+protocol doesn't allow partial writes (instead, these would be
+errors).  If the whole C<count> bytes was written successfully, the
+callback should return C<0> to indicate there was I<no> error.
+
+If there is an error (including a short write which couldn't be
+recovered from), C<.pwrite> should call C<nbdkit_error> with an error
+message and return C<-1>.
+
+=head2 C<.flush>
+
+ int flush (void *handle);
+
+During the data serving phase, this callback is used to
+L<fdatasync(2)> the backing store, ie. to ensure it has been
+completely written to a permanent medium.  If that is not possible
+then you can omit this callback.
+
+If there is an error, C<.flush> should call C<nbdkit_error> with an
+error message and return C<-1>.
+
+=head2 C<.trim>
+
+ int trim (void *handle, size_t count, off_t offset);
+
+During the data serving phase, this callback is used to "punch holes"
+in the backing store.  If that is not possible then you can omit this
+callback.
+
+If there is an error, C<.trim> should call C<nbdkit_error> with an
+error message and return C<-1>.
+
+=head1 SEE ALSO
+
+L<nbdkit(1)>
+
+=head1 AUTHORS
+
+Richard W.M. Jones
+
+=head1 COPYRIGHT
+
+Copyright (C) 2013 Red Hat Inc.
+
+=head1 LICENSE
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+=over 4
+
+=item *
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+=item *
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+=item *
+
+Neither the name of Red Hat nor the names of its contributors may be
+used to endorse or promote products derived from this software without
+specific prior written permission.
+
+=back
+
+THIS SOFTWARE IS PROVIDED BY RED HAT AND CONTRIBUTORS ''AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL RED HAT OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
