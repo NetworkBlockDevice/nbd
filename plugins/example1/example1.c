@@ -128,9 +128,9 @@ static void *
 example1_open (void)
 {
   /* In this trivial example we don't care about per-connection
-   * handles (every connection serves up the same content), so we just
-   * have to return something that is non-NULL and doesn't need to be
-   * freed.
+   * handles (every connection serves up the same content and there is
+   * no connection state), so we just have to return something that is
+   * non-NULL and doesn't need to be freed.
    */
   return data;
 }
@@ -141,6 +141,12 @@ example1_get_size (void *handle)
 {
   return sizeof (data);
 }
+
+/* In fact NBDKIT_THREAD_MODEL_PARALLEL would work here.  However for
+ * the benefit of people who blindly cut and paste code without
+ * bothering to read any documentation, leave this at a safe default.
+ */
+#define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS
 
 /* Copy the static data at offset to the buffer.  Note that nbdkit
  * takes care of bounds- and sanity-checking the request.

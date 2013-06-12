@@ -8,6 +8,8 @@ nbdkit-plugin - How to write nbdkit plugins
 
  #include <nbdkit-plugin.h>
  
+ #define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS
+ 
  static void *
  myplugin_open (void)
  {
@@ -26,6 +28,10 @@ nbdkit-plugin - How to write nbdkit plugins
  
  NBDKIT_REGISTER_PLUGIN(plugin)
 
+When this has been compiled to a shared library, do:
+
+ nbdkit [--args ...] myplugin.so [key=value ...]
+
 =head1 DESCRIPTION
 
 An nbdkit plugin is a new source device which can be served using the
@@ -41,6 +47,13 @@ All plugins should start by including this header file:
 
  #include <nbdkit-plugin.h>
 
+=head1 C<#define THREAD_MODEL>
+
+All plugins must define a thread model.  See L</THREADS> below for
+details.  It is generally safe to use:
+
+ #define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS
+
 =head1 C<struct nbdkit_plugin>
 
 All plugins must define and register one C<struct nbdkit_plugin>,
@@ -49,6 +62,8 @@ functions.
 
  static struct nbdkit_plugin plugin = {
    .name              = "myplugin",
+   .longname          = "My Plugin",
+   .description       = "This is my great plugin for nbdkit",
    .open              = myplugin_open,
    .get_size          = myplugin_get_size,
    .pread             = myplugin_pread,
@@ -58,7 +73,9 @@ functions.
  
  NBDKIT_REGISTER_PLUGIN(plugin)
 
-The callbacks are described below (see C</CALLBACKS>).  Only C<.name>,
+The C<.name> field is the name of the plugin.
+
+The callbacks are described below (see L</CALLBACKS>).  Only C<.name>,
 C<.open>, C<.get_size> and C<.pread> are required.  All other
 callbacks can be omitted.  However almost all plugins should have a
 C<.close> callback.  Most real-world plugins will also want to declare
@@ -73,18 +90,29 @@ lifetime of the plugin:
 
 is called once just after the plugin is loaded into memory.
 
+=item C<.config> and C<.config_complete>
+
+C<.config> is called zero or more times during command line parsing.
+C<.config_complete> is called once after all configuration information
+has been passed to the plugin.
+
+Both are called after loading the plugin but before any connections
+are accepted.
+
 =item C<.open>
 
 A new client has connected.
 
-=item C<.can_write>, C<.get_size> and other configuration callbacks
+=item C<.can_write>, C<.get_size> and other option negotiation callbacks
 
 These are called during option negotiation with the client, but
 before any data is served.
 
-=item C<.pread>, C<.pwrite> and other serving callbacks
+=item C<.pread>, C<.pwrite> and other data serving callbacks
 
-After configuration has finished, these may be called to serve data.
+After option negotiation has finished, these may be called to serve
+data.  Depending on the thread model chosen, they might be called in
+parallel from multiple threads.
 
 =item C<.close>
 
@@ -93,8 +121,8 @@ The client has disconnected.
 =item C<.open> ... C<.close>
 
 The sequence C<.open> ... C<.close> can be called repeatedly over the
-lifetime of the plugin, B<and can be called in parallel if the server
-is multithreaded>.
+lifetime of the plugin, and can be called in parallel (depending on
+the thread model).
 
 =item C<.unload>
 
@@ -109,6 +137,26 @@ C<nbdkit_error> with the error message, and then return an error
 indication from the callback, eg. NULL or -1.
 
 =head1 CALLBACKS
+
+=head2 C<.name>
+
+ const char *name;
+
+This field (a string) is required, and B<must> contain only ASCII
+alphanumeric characters and be unique amongst all plugins.
+
+=head2 C<.longname>
+
+ const char *longname;
+
+An optional free text name of the plugin.  This field is used in error
+messages.
+
+=head2 C<.description>
+
+ const char *description;
+
+An optional multi-line description of the plugin.
 
 =head2 C<.load>
 
@@ -126,6 +174,54 @@ This may be called once just before the plugin is unloaded from
 memory.  Note that it's not guaranteed that C<.unload> will always be
 called (eg. the server might be killed or segfault), so you should try
 to make the plugin as robust as possible by not requiring cleanup.
+
+=head2 C<.config>
+
+ int config (const char *key, const char *value);
+
+On the nbdkit command line, after the plugin filename, come an
+optional list of C<key=value> arguments.  These are passed to the
+plugin through this callback when the plugin is first loaded and
+before any connections are accepted.
+
+This callback may be called zero or more times.  Both C<key> and
+C<value> parameters will be non-NULL, but it is possible for either to
+be empty strings.  The strings are owned by nbdkit but will remain
+valid for the lifetime of the plugin, so the plugin does not need to
+copy them.
+
+The format of the C<key> accepted by plugins is up to the plugin, but
+you should probably look at other plugins and follow the same
+conventions.
+
+If the C<.config> callback is not provided by the plugin, and the user
+tries to specify any C<key=value> arguments, then nbdkit will exit
+with an error.
+
+If there is an error, C<.config> should call C<nbdkit_error> with an
+error message and return C<-1>.
+
+=head2 C<.config_complete>
+
+ int config_complete (void);
+
+This optional callback is called after all the configuration has been
+passed to the plugin.  It is a good place to do checks, for example
+that the user has passed the required parameters to the plugin.
+
+If there is an error, C<.config_complete> should call C<nbdkit_error>
+with an error message and return C<-1>.
+
+=head2 C<.config_help>
+
+ const char *config_help;
+
+This optional multi-line help message should summarize any
+C<key=value> parameters that it takes.  It does I<not> need to repeat
+what already appears in C<.description>.
+
+If the plugin doesn't take any config parameters you should probably
+omit this.
 
 =head2 C<.open>
 
@@ -273,6 +369,52 @@ callback.
 
 If there is an error, C<.trim> should call C<nbdkit_error> with an
 error message and return C<-1>.
+
+=head1 THREADS
+
+Each nbdkit plugin must declare its thread safety model by defining
+the C<THREAD_MODEL> macro.  (This macro is used by
+C<NBDKIT_REGISTER_PLUGIN>).
+
+The possible settings for C<THREAD_MODEL> are defined below.
+
+=over 4
+
+=item C<#define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_CONNECTIONS>
+
+Only a single handle can be open at any time, and all requests happen
+from one thread.
+
+Note this means only one client can connect to the server at any time.
+If a second client tries to connect it will block waiting for the
+first client to close the connection.
+
+=item C<#define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS>
+
+I<This is a safe default for most plugins>.
+
+Multiple handles can be open at the same time, but data requests are
+serialized so that for the plugin as a whole only one read/write/etc
+request will be in progress at any time.
+
+This is a useful setting if the library you are using is not
+thread-safe.  However performance may not be good.
+
+=item C<#define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS>
+
+Multiple handles can be open and multiple data requests can happen in
+parallel.  However only one request will happen per handle at a time
+(but requests on different handles might happen concurrently).
+
+=item C<#define THREAD_MODEL NBDKIT_THREAD_MODEL_PARALLEL>
+
+Multiple handles can be open and multiple data requests can happen in
+parallel (even on the same handle).
+
+All the libraries you use must be thread-safe and reentrant.  You may
+also need to provide mutexes for fields in your connection handle.
+
+=back
 
 =head1 SEE ALSO
 

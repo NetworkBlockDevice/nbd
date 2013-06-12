@@ -29,3 +29,17 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
+
+if HAVE_POD2MAN
+
+man_MANS = \
+	nbdkit.1 \
+	nbdkit-plugin.3
+
+nbdkit.1: nbdkit.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=nbdkit $< $@
+
+nbdkit-plugin.3: nbdkit-plugin.pod
+	$(POD2MAN) -u --stderr --section=3 --center=nbdkit --release=nbdkit --name=nbdkit-plugin $< $@
+
+endif

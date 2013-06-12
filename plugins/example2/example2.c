@@ -31,21 +31,130 @@
  * SUCH DAMAGE.
  */
 
+/* example2:
+ *
+ * A simple but more realistic read-only file server.
+ */
+
 #include <config.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <nbdkit-plugin.h>
 
-/*
+static const char *filename = NULL;
+
+/* Called for each key=value passed on the command line.  This plugin
+ * only accepts file=<filename>, which is required.
+ */
+static int
+example2_config (const char *key, const char *value)
+{
+  if (strcmp (key, "file") == 0) {
+    filename = value;
+  }
+  else {
+    nbdkit_error ("unknown parameter '%s'", key);
+    return -1;
+  }
+
+  return 0;
+}
+
+/* Check the user did pass a file=<FILENAME> parameter. */
+static int
+example2_config_complete (void)
+{
+  if (filename == NULL) {
+    nbdkit_error ("you must supply the file=<FILENAME> parameter after the plugin name on the command line");
+    return -1;
+  }
+
+  return 0;
+}
+
+#define example2_config_help \
+  "file=<FILENAME>     (required) The filename to serve."
+
+/* The per-connection handle. */
+struct example2_handle {
+  int fd;
+};
+
+/* Create the per-connection handle. */
+static void *
+example2_open (void)
+{
+  struct example2_handle *h;
+
+  h = malloc (sizeof *h);
+  if (h == NULL) {
+    nbdkit_error ("malloc: %m");
+    return NULL;
+  }
+
+  h->fd = open (filename, O_RDONLY|O_CLOEXEC);
+  if (h->fd == -1) {
+    nbdkit_error ("open: %s: %m", filename);
+    free (h);
+    return NULL;
+  }
+
+  return h;
+}
+
+/* Free up the per-connection handle. */
+static void
+example2_close (void *handle)
+{
+  struct example2_handle *h = handle;
+
+  close (h->fd);
+  free (h);
+}
+
+/* In fact NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS would work here.
+ * However for the benefit of people who blindly cut and paste code
+ * without bothering to read any documentation, leave this at a safe
+ * default.
+ */
+#define THREAD_MODEL NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS
+
+/* Read data from the file. */
+static int
+example2_pread (void *handle, void *buf, size_t count, off_t offset)
+{
+  struct example2_handle *h = handle;
+
+  while (count > 0) {
+    ssize_t r = read (h->fd, buf, count);
+    if (r == -1) {
+      nbdkit_error ("read error: %m");
+      return -1;
+    }
+    if (r == 0) {
+      nbdkit_error ("unexpected end of file");
+      return -1;
+    }
+    buf += r;
+    count -= r;
+  }
+
+  return 0;
+}
+
 static struct nbdkit_plugin plugin = {
-  .name              = "example1",
-  .open              = example1_open,
-  .close             = example1_close,
-  .read              = example1_read,
-  .write             = example1_write,
+  .name              = "example2",
+  .config            = example2_config,
+  .config_complete   = example2_config_complete,
+  .config_help       = example2_config_help,
+  .open              = example2_open,
+  .close             = example2_close,
+  .pread             = example2_pread,
 };
 
 NBDKIT_REGISTER_PLUGIN(plugin)
-*/

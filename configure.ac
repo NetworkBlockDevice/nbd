@@ -55,15 +55,20 @@ AC_ARG_ENABLE([gcc-warnings],
       gcc_warnings=$enableval],
       [gcc_warnings=no]
 )
-if test "$gcc_warnings" = "yes"; then
+if test "x$gcc_warnings" = "xyes"; then
     WARNINGS_CFLAGS="-Wall -Werror"
     AC_SUBST([WARNINGS_CFLAGS])
 fi
+
+dnl Check for Perl POD.
+AC_CHECK_PROG([POD2MAN], [pod2man], [pod2man], [no])
+AM_CONDITIONAL([HAVE_POD2MAN], [test "x$POD2MAN" != "xno"])
 
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
                  docs/Makefile
+                 include/Makefile
                  plugins/Makefile
                  plugins/example1/Makefile
                  plugins/example2/Makefile

@@ -30,24 +30,4 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-plugindir = $(libdir)/nbdkit/plugins
-
-plugin_LTLIBRARIES = libnbdkit-example2.la
-
-libnbdkit_example2_la_SOURCES = \
-	example2.c \
-	$(top_srcdir)/include/nbdkit-plugin.h
-
-libnbdkit_example2_la_CPPFLAGS = \
-	-I$(top_srcdir)/include
-libnbdkit_example2_la_CFLAGS = \
-	$(WARNINGS_CFLAGS)
-
-if HAVE_POD2MAN
-
-man_MANS = libnbdkit-example2.1
-
-libnbdkit-example2.1: libnbdkit-example2.pod
-	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-example2 $< $@
-
-endif
+include_HEADERS = nbdkit-plugin.h

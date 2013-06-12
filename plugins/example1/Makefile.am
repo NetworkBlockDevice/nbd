@@ -36,9 +36,18 @@ plugin_LTLIBRARIES = libnbdkit-example1.la
 
 libnbdkit_example1_la_SOURCES = \
 	example1.c \
-	$(top_srcdir)/src/nbdkit-plugin.h
+	$(top_srcdir)/include/nbdkit-plugin.h
 
 libnbdkit_example1_la_CPPFLAGS = \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir)/include
 libnbdkit_example1_la_CFLAGS = \
 	$(WARNINGS_CFLAGS)
+
+if HAVE_POD2MAN
+
+man_MANS = libnbdkit-example1.1
+
+libnbdkit-example1.1: libnbdkit-example1.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-example1 $< $@
+
+endif

@@ -32,4 +32,4 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = docs plugins src
+SUBDIRS = docs plugins include src

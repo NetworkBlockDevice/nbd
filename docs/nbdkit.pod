@@ -1,0 +1,119 @@
+=encoding utf8
+
+=head1 NAME
+
+nbdkit - A toolkit for creating NBD servers
+
+=head1 SYNOPSIS
+
+ nbdkit [--args ...] PLUGIN [key=value [key=value [...]]]
+
+ nbdkit .../plugins/libnbdkit-file.so file=disk.img
+
+=head1 DESCRIPTION
+
+C<nbdkit> is both a toolkit for creating Network Block Device (NBD)
+servers from "unconventional" sources and the name of an NBD server.
+
+To create a new block device source, all you have to do is write a few
+glue functions.  The liberal licensing of nbdkit is meant to allow you
+to link nbdkit with proprietary libraries or include nbdkit in
+proprietary code.
+
+If you want to write an nbdkit plugin, you should read
+L<nbdkit-plugin(3)>.
+
+Several plugins may be found in C<LIBDIR/nbdkit/plugins>.
+
+=head1 GLOBAL OPTIONS
+
+=over 4
+
+=item B<--help>
+
+Display brief command line usage information and exit.
+
+=item B<-p> PORT
+
+=item B<--port> PORT
+
+Change the TCP/IP port number on which nbdkit serves requests.
+The default is C<10809>.
+
+=item B<-v>
+
+=item B<--verbose>
+
+Enable verbose messages.
+
+=item B<-V>
+
+=item B<--version>
+
+Print the version number of nbdkit and exit.
+
+=back
+
+=head1 PLUGIN CONFIGURATION
+
+After specifying the plugin name you can (optionally, it depends
+on the plugin) give plugin configuration on the command line in
+the form of C<key=value>.  For example:
+
+ nbdkit .../plugins/libnbdkit-file.so file=disk.img
+
+To list all the options supported by a plugin, do:
+
+ nbdkit --help .../plugins/libnbdkit-file.so
+
+=head1 SEE ALSO
+
+L<nbdkit-plugin(3)>
+
+=head1 AUTHORS
+
+Richard W.M. Jones
+
+=head1 COPYRIGHT
+
+Copyright (C) 2013 Red Hat Inc.
+
+=head1 LICENSE
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+=over 4
+
+=item *
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+=item *
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+=item *
+
+Neither the name of Red Hat nor the names of its contributors may be
+used to endorse or promote products derived from this software without
+specific prior written permission.
+
+=back
+
+THIS SOFTWARE IS PROVIDED BY RED HAT AND CONTRIBUTORS ''AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL RED HAT OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.

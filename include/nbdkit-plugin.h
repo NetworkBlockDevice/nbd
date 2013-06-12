@@ -38,11 +38,26 @@
 
 #include <stdarg.h>
 
+#define NBDKIT_THREAD_MODEL_SERIALIZE_CONNECTIONS     0
+#define NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS    1
+#define NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS        2
+#define NBDKIT_THREAD_MODEL_PARALLEL                  3
+
 struct nbdkit_plugin {
+  size_t _struct_size;
+  int _version;
+  int _thread_model;
+
   const char *name;
+  const char *longname;
+  const char *description;
 
   void (*load) (void);
   void (*unload) (void);
+
+  int (*config) (const char *key, const char *value);
+  int (*config_complete) (void);
+  const char *config_help;
 
   void * (*open) (void);
   void (*close) (void *handle);
@@ -65,13 +80,13 @@ struct nbdkit_plugin {
 extern void nbdkit_error (char *msg, ...);
 
 #define NBDKIT_REGISTER_PLUGIN(plugin)                                  \
-  static struct nbdkit_plugin *plugin_init (size_t *struct_size, int *version) \
-       __attribute__((constructor));                                    \
+  static struct nbdkit_plugin *plugin_init (void) __attribute__((constructor)); \
   static struct nbdkit_plugin *                                         \
-  plugin_init (size_t *struct_size, int *version)                       \
+  plugin_init (void)                                                    \
   {                                                                     \
-    *struct_size = sizeof (plugin);                                     \
-    *version = 1;                                                       \
+    (plugin)._struct_size = sizeof (plugin);                            \
+    (plugin)._version = 1;                                              \
+    (plugin)._thread_model = THREAD_MODEL;                              \
     return &(plugin);                                                   \
   }
 

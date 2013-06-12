@@ -1,0 +1,9 @@
+Implement the new protocol and export names.  With export names it
+should be possible to have multiple plugins on the command line (each
+responding to a different export of course):
+
+  nbdkit --export /foo plugin.so --export /bar another-plugin.so
+
+Note it should also be possible to either elect one plugin as the
+default that accepts all exportnames, or to divide the export name
+"space" up using regexps or wildcards.
