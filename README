@@ -1,0 +1,12 @@
+NBD is a simple protocol for accessing block devices over the network.
+'nbdkit' is a toolkit for creating NBD servers from "unconventional"
+sources.  All you have to do is write a few glue functions.  The
+liberal licensing of nbdkit is meant to allow you to link nbdkit with
+proprietary libraries or include nbdkit in proprietary code.
+
+For documentation, see the docs/ directory.
+
+For plugins and examples, see the plugins/ directory.
+
+This software is copyright (C) Red Hat Inc. and licensed under a BSD
+license.  See LICENSE for details.
