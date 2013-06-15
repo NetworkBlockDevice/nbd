@@ -32,6 +32,9 @@
 
 AC_INIT([nbdkit], [0.1.0])
 AC_CONFIG_MACRO_DIR([m4])
+AC_USE_SYSTEM_EXTENSIONS
+AC_SYS_LARGEFILE
+
 AM_INIT_AUTOMAKE(foreign) dnl NB: Do not [quote] this parameter.
 LT_INIT
 
@@ -59,6 +62,51 @@ if test "x$gcc_warnings" = "xyes"; then
     WARNINGS_CFLAGS="-Wall -Werror"
     AC_SUBST([WARNINGS_CFLAGS])
 fi
+
+dnl Check if libc has program_invocation_short_name.
+AC_CHECK_DECLS([program_invocation_short_name], [], [], [#include <errno.h>])
+
+dnl Check if __attribute__((cleanup(...))) works.
+dnl XXX It would be nice to use AC_COMPILE_IFELSE here, but gcc just
+dnl emits a warning for attributes that it doesn't understand.
+AC_MSG_CHECKING([if __attribute__((cleanup(...))) works with this compiler])
+AC_RUN_IFELSE([
+AC_LANG_SOURCE([[
+#include <stdio.h>
+#include <stdlib.h>
+
+void
+freep (void *ptr)
+{
+  exit (EXIT_SUCCESS);
+}
+
+void
+test (void)
+{
+  __attribute__((cleanup(freep))) char *ptr = malloc (100);
+}
+
+int
+main (int argc, char *argv[])
+{
+  test ();
+  exit (EXIT_FAILURE);
+}
+]])
+    ],[
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_ATTRIBUTE_CLEANUP],[1],[Define to 1 if '__attribute__((cleanup(...)))' works with this compiler.])
+    ],[
+    AC_MSG_WARN(
+['__attribute__((cleanup(...)))' does not work.
+
+You may not be using a sufficiently recent version of GCC or CLANG, or
+you may be using a C compiler which does not support this attribute,
+or the configure test may be wrong.
+
+The code will still compile, but is likely to leak memory and other
+resources when it runs.])])
 
 dnl Check for Perl POD.
 AC_CHECK_PROG([POD2MAN], [pod2man], [pod2man], [no])

@@ -37,6 +37,7 @@
 #define NBDKIT_PLUGIN_H
 
 #include <stdarg.h>
+#include <stdint.h>
 
 #define NBDKIT_THREAD_MODEL_SERIALIZE_CONNECTIONS     0
 #define NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS    1
@@ -44,12 +45,13 @@
 #define NBDKIT_THREAD_MODEL_PARALLEL                  3
 
 struct nbdkit_plugin {
-  size_t _struct_size;
-  int _version;
+  uint64_t _struct_size;
+  int _api_version;
   int _thread_model;
 
   const char *name;
   const char *longname;
+  const char *version;
   const char *description;
 
   void (*load) (void);
@@ -62,30 +64,32 @@ struct nbdkit_plugin {
   void * (*open) (void);
   void (*close) (void *handle);
 
-  off_t (*get_size) (void *handle);
+  int64_t (*get_size) (void *handle);
 
   int (*can_write) (void *handle);
   int (*can_flush) (void *handle);
   int (*is_rotational) (void *handle);
   int (*can_trim) (void *handle);
 
-  int (*pread) (void *handle, void *buf, size_t count, off_t offset);
-  int (*pwrite) (void *handle, const void *buf, size_t count, off_t offset);
+  int (*pread) (void *handle, void *buf, uint32_t count, uint64_t offset);
+  int (*pwrite) (void *handle, const void *buf, uint32_t count, uint64_t offset);
   int (*flush) (void *handle);
-  int (*trim) (void *handle, size_t count, off_t offset);
+  int (*trim) (void *handle, uint32_t count, uint64_t offset);
 
   /* int (*set_exportname) (void *handle, const char *exportname); */
 };
 
-extern void nbdkit_error (char *msg, ...);
+extern void nbdkit_error (const char *msg, ...);
+extern void nbdkit_debug (const char *msg, ...);
+
+extern char *nbdkit_absolute_path (const char *path);
 
 #define NBDKIT_REGISTER_PLUGIN(plugin)                                  \
-  static struct nbdkit_plugin *plugin_init (void) __attribute__((constructor)); \
-  static struct nbdkit_plugin *                                         \
+  struct nbdkit_plugin *                                                \
   plugin_init (void)                                                    \
   {                                                                     \
     (plugin)._struct_size = sizeof (plugin);                            \
-    (plugin)._version = 1;                                              \
+    (plugin)._api_version = 1;                                          \
     (plugin)._thread_model = THREAD_MODEL;                              \
     return &(plugin);                                                   \
   }

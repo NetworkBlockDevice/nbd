@@ -7,3 +7,9 @@ responding to a different export of course):
 Note it should also be possible to either elect one plugin as the
 default that accepts all exportnames, or to divide the export name
 "space" up using regexps or wildcards.
+
+Implement true parallel request handling.  Currently
+NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS and NBDKIT_THREAD_MODEL_PARALLEL
+are the same, because we handle requests within each connection
+synchronously one at a time.  We could (and should) be able to handle
+them in parallel by having another thread pool for requests.

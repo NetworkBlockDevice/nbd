@@ -28,4 +28,5 @@ Makefile.in
 /libtool
 /ltmain.sh
 /missing
+/src/nbdkit
 /stamp-h1

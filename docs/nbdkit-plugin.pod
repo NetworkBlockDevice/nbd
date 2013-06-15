@@ -32,6 +32,10 @@ When this has been compiled to a shared library, do:
 
  nbdkit [--args ...] myplugin.so [key=value ...]
 
+When debugging, use the I<-fv> options:
+
+ nbdkit -fv myplugin.so [key=value ...]
+
 =head1 DESCRIPTION
 
 An nbdkit plugin is a new source device which can be served using the
@@ -136,6 +140,34 @@ If there is an error in the plugin, the plugin should call
 C<nbdkit_error> with the error message, and then return an error
 indication from the callback, eg. NULL or -1.
 
+C<nbdkit_error> has the following prototype and works like
+L<printf(3)>:
+
+ void nbdkit_error (const char *fs, ...);
+
+=head1 FILENAMES AND PATHS
+
+The server usually (not always) changes directory to C</> before it
+starts serving connections.  This means that any relative paths passed
+during configuration will not work when the server is running
+(example: S<C<nbdkit plugin.so file=disk.img>>).
+
+To avoid problems, prepend relative paths with the current directory
+before storing them in the handle.  Or open files and store the file
+descriptor.
+
+=head2 C<nbdkit_absolute_path>
+
+ char *nbdkit_absolute_path (const char *filename);
+
+The utility function C<nbdkit_absolute_path> converts any path to an
+absolute path.
+
+If conversion was not possible, this calls C<nbdkit_error> and returns
+C<NULL>.  Note that this function does not check that the file exists.
+
+The returned string must be freed by the caller.
+
 =head1 CALLBACKS
 
 =head2 C<.name>
@@ -144,6 +176,13 @@ indication from the callback, eg. NULL or -1.
 
 This field (a string) is required, and B<must> contain only ASCII
 alphanumeric characters and be unique amongst all plugins.
+
+=head2 C<.version>
+
+ const char *version;
+
+Plugins may optionally set a version string which is displayed in help
+and debugging output.
 
 =head2 C<.longname>
 
@@ -193,6 +232,9 @@ copy them.
 The format of the C<key> accepted by plugins is up to the plugin, but
 you should probably look at other plugins and follow the same
 conventions.
+
+If the value is a relative path, then note that the server changes
+directory when it starts up.  See L</FILENAMES AND PATHS> above.
 
 If the C<.config> callback is not provided by the plugin, and the user
 tries to specify any C<key=value> arguments, then nbdkit will exit
@@ -247,13 +289,13 @@ up any per-connection resources.
 
 =head2 C<.get_size>
 
- off_t get_size (void *handle);
+ int64_t get_size (void *handle);
 
 This is called during the option negotiation phase of the protocol
 to get the size (in bytes) of the block device being exported.
 
-If there is an error, C<.get_size> should call C<nbdkit_error> with an
-error message and return C<(off_t)-1>.
+The returned size must be E<ge> 0.  If there is an error, C<.get_size>
+should call C<nbdkit_error> with an error message and return C<-1>.
 
 =head2 C<.can_write>
 
@@ -311,7 +353,7 @@ C<.trim> callback has been defined.
 
 =head2 C<.pread>
 
- int pread (void *handle, void *buf, size_t count, off_t offset);
+ int pread (void *handle, void *buf, uint32_t count, uint64_t offset);
 
 During the data serving phase, nbdkit calls this callback to read data
 from the backing store.  C<count> bytes starting at C<offset> in the
@@ -330,7 +372,7 @@ message and return C<-1>.
 
 =head2 C<.pwrite>
 
- int pwrite (void *handle, const void *buf, size_t count, off_t offset);
+ int pwrite (void *handle, const void *buf, uint32_t count, uint64_t offset);
 
 During the data serving phase, nbdkit calls this callback to write
 data to the backing store.  C<count> bytes starting at C<offset> in
@@ -361,7 +403,7 @@ error message and return C<-1>.
 
 =head2 C<.trim>
 
- int trim (void *handle, size_t count, off_t offset);
+ int trim (void *handle, uint32_t count, uint64_t offset);
 
 During the data serving phase, this callback is used to "punch holes"
 in the backing store.  If that is not possible then you can omit this
@@ -415,6 +457,22 @@ All the libraries you use must be thread-safe and reentrant.  You may
 also need to provide mutexes for fields in your connection handle.
 
 =back
+
+=head1 DEBUGGING
+
+Run the server with I<-f> and I<-v> options so it doesn't fork and you
+can see debugging information:
+
+ nbdkit -fv myplugin.so [key=value [key=value [...]]]
+
+To print debugging information from within the plugin, call
+C<nbdkit_debug>, which has the following prototype and works like
+L<printf(3)>:
+
+ void nbdkit_debug (const char *fs, ...);
+
+Note that C<nbdkit_debug> only prints things when the server is in
+verbose mode (I<-v> option).
 
 =head1 SEE ALSO
 

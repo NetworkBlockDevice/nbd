@@ -31,3 +31,70 @@
  * SUCH DAMAGE.
  */
 
+#include <config.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+
+#include "nbdkit-plugin.h"
+#include "internal.h"
+
+static void
+prologue (const char *type)
+{
+  const char *name = tls_get_name ();
+  size_t instance_num = tls_get_instance_num ();
+
+  fprintf (stderr, "%s: ", program_name);
+
+  if (name) {
+    fprintf (stderr, "%s", name);
+    if (instance_num > 0)
+      fprintf (stderr, "[%zu]", instance_num);
+    fprintf (stderr, ": ");
+  }
+
+  fprintf (stderr, "%s: ", type);
+}
+
+/* Note: preserves the previous value of errno. */
+void
+nbdkit_debug (const char *fs, ...)
+{
+  va_list args;
+  int err = errno;
+
+  if (!verbose)
+    return;
+
+  prologue ("debug");
+
+  va_start (args, fs);
+  vfprintf (stderr, fs, args);
+  va_end (args);
+
+  fprintf (stderr, "\n");
+
+  errno = err;
+}
+
+/* Note: preserves the previous value of errno. */
+void
+nbdkit_error (const char *fs, ...)
+{
+  va_list args;
+  int err = errno;
+
+  prologue ("error");
+
+  va_start (args, fs);
+  vfprintf (stderr, fs, args);
+  va_end (args);
+
+  fprintf (stderr, "\n");
+
+  errno = err;
+}

@@ -136,10 +136,10 @@ example1_open (void)
 }
 
 /* Size of the data we are going to serve. */
-static off_t
+static int64_t
 example1_get_size (void *handle)
 {
-  return sizeof (data);
+  return (int64_t) sizeof (data);
 }
 
 /* In fact NBDKIT_THREAD_MODEL_PARALLEL would work here.  However for
@@ -152,7 +152,7 @@ example1_get_size (void *handle)
  * takes care of bounds- and sanity-checking the request.
  */
 static int
-example1_pread (void *handle, void *buf, size_t count, off_t offset)
+example1_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
 {
   memcpy (buf, data+offset, count);
   return 0;                     /* 0 = success, -1 = error */
@@ -160,6 +160,7 @@ example1_pread (void *handle, void *buf, size_t count, off_t offset)
 
 static struct nbdkit_plugin plugin = {
   .name              = "example1",
+  .version           = PACKAGE_VERSION,
   .load              = example1_load,
   .open              = example1_open,
   .get_size          = example1_get_size,

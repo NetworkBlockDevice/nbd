@@ -6,9 +6,9 @@ nbdkit - A toolkit for creating NBD servers
 
 =head1 SYNOPSIS
 
- nbdkit [--args ...] PLUGIN [key=value [key=value [...]]]
-
- nbdkit .../plugins/libnbdkit-file.so file=disk.img
+ nbdkit [-f] [-g GROUP] [-i IPADDR] [-P PIDFILE] [-p PORT]
+        [-r] [-s] [-U SOCKET] [-u USER] [-v] [-V]
+        PLUGIN.so [key=value [key=value [...]]]
 
 =head1 DESCRIPTION
 
@@ -23,7 +23,24 @@ proprietary code.
 If you want to write an nbdkit plugin, you should read
 L<nbdkit-plugin(3)>.
 
-Several plugins may be found in C<LIBDIR/nbdkit/plugins>.
+Several plugins may be found in C<LIBDIR/nbdkit/plugins> where
+C<LIBDIR> is set at compile time and might be a path such as
+C</usr/lib>, C</usr/lib64> or C</usr/local/lib>.
+
+=head1 EXAMPLES
+
+Serve file C<disk.img> on port 10809:
+
+ nbdkit .../plugins/libnbdkit-file.so file=disk.img
+
+Run the example1 plugin and connect to it using L<guestfish(1)>:
+
+ nbdkit .../plugins/libnbdkit-example1.so
+ guestfish --ro -a nbd://localhost
+
+To display usage information about a specific plugin:
+
+ nbdkit --help .../plugins/libnbdkit-example1.so
 
 =head1 GLOBAL OPTIONS
 
@@ -33,18 +50,116 @@ Several plugins may be found in C<LIBDIR/nbdkit/plugins>.
 
 Display brief command line usage information and exit.
 
+=item B<-f>
+
+=item B<--foreground>
+
+=item B<--no-fork>
+
+I<Don't> fork into the background.
+
+=item B<-g> GROUP
+
+=item B<--group> GROUP
+
+Change group to C<GROUP> after starting up.  A group name or numeric
+group ID can be used.
+
+The server needs sufficient permissions to be able to do this.
+Normally this would mean starting the server up as root.
+
+See also I<-u>.
+
+=item B<-i> IPADDR
+
+=item B<--ip-addr> IPADDR
+
+=item B<--ipaddr> IPADDR
+
+Listen on the specified interface.  The default is to listen on all
+interfaces.  See also I<-p>.
+
+=item B<-P> PIDFILE
+
+=item B<--pid-file> PIDFILE
+
+=item B<--pidfile> PIDFILE
+
+Write C<PIDFILE> (containing the process ID of the server) after
+nbdkit becomes ready to accept connections.
+
+If the file already exists, it is overwritten.  nbdkit I<does not>
+delete the file when it exits.
+
 =item B<-p> PORT
 
 =item B<--port> PORT
 
 Change the TCP/IP port number on which nbdkit serves requests.
-The default is C<10809>.
+The default is C<10809>.  See also I<-i>.
+
+=item B<-r>
+
+=item B<--read-only>
+
+=item B<--readonly>
+
+The export will be read-only.  If a client writes, then it will get an
+error.
+
+Note that some plugins inherently don't support writes.  With those
+plugins the I<-r> option is added implicitly.
+
+Copy-on-write (or "snapshot") functionality is not supported by this
+server.  However if you are using qemu as a client (or indirectly via
+libguestfs) then it supports snapshots.
+
+=item B<-s>
+
+=item B<--single>
+
+=item B<--stdin>
+
+Don't fork.  Handle a single NBD connection on stdin/stdout.  After
+stdin closes, the server exits.
+
+You can use this option to run nbdkit from inetd, systemd or similar
+superservers; or just for testing; or if you want to run nbdkit in a
+non-conventional way.
+
+This option implies I<--foreground>.
+
+=item B<-U> SOCKET
+
+=item B<--unix> SOCKET
+
+Accept connections on the Unix domain socket C<SOCKET> (which is a
+path).
+
+nbdkit neither creates nor deletes this socket.  You should create the
+socket and set the desired permissions and ownership before running
+the server.
+
+=item B<-u> USER
+
+=item B<--user> USER
+
+Change user to C<USER> after starting up.  A user name or numeric user
+ID can be used.
+
+The server needs sufficient permissions to be able to do this.
+Normally this would mean starting the server up as root.
+
+See also I<-g>.
 
 =item B<-v>
 
 =item B<--verbose>
 
 Enable verbose messages.
+
+It's a good idea to use I<-f> as well so the process does not fork
+into the background (but not required).
 
 =item B<-V>
 

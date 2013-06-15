@@ -29,3 +29,28 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
+
+sbin_PROGRAMS = nbdkit
+
+nbdkit_SOURCES = \
+	cleanup.c \
+	connections.c \
+	errors.c \
+	internal.h \
+	main.c \
+	plugins.c \
+	protocol.h \
+	sockets.c \
+	tls.c \
+	utils.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_CFLAGS = \
+	-pthread \
+	$(WARNINGS_CFLAGS)
+nbdkit_LDADD = \
+	-ldl
+nbdkit_LDFLAGS = \
+	-rdynamic

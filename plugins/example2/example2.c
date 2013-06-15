@@ -46,7 +46,13 @@
 
 #include <nbdkit-plugin.h>
 
-static const char *filename = NULL;
+static char *filename = NULL;
+
+static void
+example2_unload (void)
+{
+  free (filename);
+}
 
 /* Called for each key=value passed on the command line.  This plugin
  * only accepts file=<filename>, which is required.
@@ -55,7 +61,10 @@ static int
 example2_config (const char *key, const char *value)
 {
   if (strcmp (key, "file") == 0) {
-    filename = value;
+    /* See FILENAMES AND PATHS in nbdkit-plugin(3). */
+    filename = nbdkit_absolute_path (value);
+    if (!filename)
+      return -1;
   }
   else {
     nbdkit_error ("unknown parameter '%s'", key);
@@ -126,7 +135,7 @@ example2_close (void *handle)
 
 /* Read data from the file. */
 static int
-example2_pread (void *handle, void *buf, size_t count, off_t offset)
+example2_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
 {
   struct example2_handle *h = handle;
 
@@ -149,6 +158,8 @@ example2_pread (void *handle, void *buf, size_t count, off_t offset)
 
 static struct nbdkit_plugin plugin = {
   .name              = "example2",
+  .version           = PACKAGE_VERSION,
+  .unload            = example2_unload,
   .config            = example2_config,
   .config_complete   = example2_config_complete,
   .config_help       = example2_config_help,
