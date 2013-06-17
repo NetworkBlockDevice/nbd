@@ -412,9 +412,6 @@ void disconnect(char* device) {
 
 	if (nbd < 0)
 		err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-	printf("Disconnecting: que, ");
-	if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
-		err("Ioctl failed: %m\n");
 	printf("disconnect, ");
 	if (ioctl(nbd, NBD_DISCONNECT)<0)
 		err("Ioctl failed: %m\n");
