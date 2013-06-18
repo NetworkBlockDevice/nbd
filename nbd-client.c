@@ -659,8 +659,6 @@ int main(int argc, char *argv[]) {
 			cont=0;
 		}
 	} while(cont);
-	printf("Closing: que, ");
-	ioctl(nbd, NBD_CLEAR_QUE);
 	printf("sock, ");
 	ioctl(nbd, NBD_CLEAR_SOCK);
 	printf("done\n");
