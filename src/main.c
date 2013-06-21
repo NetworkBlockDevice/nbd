@@ -250,6 +250,8 @@ main (int argc, char *argv[])
 
       *p = '\0';
       plugin_config (argv[optind], p+1);
+
+      ++optind;
     }
 
     if (help) {
