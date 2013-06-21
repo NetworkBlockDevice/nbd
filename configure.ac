@@ -112,6 +112,23 @@ dnl Check for Perl POD.
 AC_CHECK_PROG([POD2MAN], [pod2man], [pod2man], [no])
 AM_CONDITIONAL([HAVE_POD2MAN], [test "x$POD2MAN" != "xno"])
 
+dnl Check for libvirt (only if you want to compile the libvirt plugin).
+AC_ARG_WITH([libvirt],[
+    AS_HELP_STRING([--without-libvirt],
+                   [disable libvirt plugin @<:@default=check@:>@])],
+    [],
+    [with_libvirt=check])
+AS_IF([test "$with_libvirt" != "no"],[
+    PKG_CHECK_MODULES([LIBVIRT], [libvirt],[
+        AC_SUBST([LIBVIRT_CFLAGS])
+        AC_SUBST([LIBVIRT_LIBS])
+        AC_DEFINE([HAVE_LIBVIRT],[1],[libvirt found at compile time.])
+    ],
+    [AC_MSG_WARN([libvirt not found, libvirt plugin will be disabled])])
+])
+AM_CONDITIONAL([HAVE_LIBVIRT],[test "x$LIBVIRT_LIBS" != "x"])
+
+
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
@@ -121,6 +138,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/example1/Makefile
                  plugins/example2/Makefile
                  plugins/example3/Makefile
+                 plugins/libvirt/Makefile
                  src/Makefile])
 
 AC_OUTPUT

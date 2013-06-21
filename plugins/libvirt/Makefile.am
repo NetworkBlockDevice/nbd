@@ -30,8 +30,37 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	libvirt
+EXTRA_DIST = libnbdkit-libvirt-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_LIBVIRT
+
+plugin_LTLIBRARIES = libnbdkit-libvirt-plugin.la
+
+libnbdkit_libvirt_plugin_la_SOURCES = \
+	libvirt-plugin.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+libnbdkit_libvirt_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+libnbdkit_libvirt_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(LIBVIRT_CFLAGS)
+libnbdkit_libvirt_plugin_la_LIBADD = \
+	$(LIBVIRT_LIBS)
+libnbdkit_libvirt_plugin_la_LDFLAGS = \
+	-avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = libnbdkit-libvirt-plugin.1
+
+libnbdkit-libvirt-plugin.1: libnbdkit-libvirt-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-libvirt-plugin $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~
