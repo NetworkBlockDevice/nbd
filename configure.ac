@@ -138,6 +138,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/example1/Makefile
                  plugins/example2/Makefile
                  plugins/example3/Makefile
+                 plugins/file/Makefile
                  plugins/libvirt/Makefile
                  src/Makefile])
 

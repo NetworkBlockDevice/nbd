@@ -30,9 +30,30 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	libvirt
+EXTRA_DIST = libnbdkit-file.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+plugin_LTLIBRARIES = libnbdkit-file.la
+
+libnbdkit_file_la_SOURCES = \
+	file.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+libnbdkit_file_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+libnbdkit_file_la_CFLAGS = \
+	$(WARNINGS_CFLAGS)
+libnbdkit_file_la_LDFLAGS = \
+	-avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = libnbdkit-file.1
+
+libnbdkit-file.1: libnbdkit-file.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-file $< $@
+
+endif
+
+CLEANFILES = *~
