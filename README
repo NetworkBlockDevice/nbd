@@ -5,7 +5,7 @@ disk-like things) over the network.
 
 The key features are:
 
-* Multithreaded NBD server with good performance.
+* Multithreaded NBD server written in C with good performance.
 
 * Well-documented, simple plugin API with a stable ABI guarantee.
   Let's you export "unconventional" block devices easily.

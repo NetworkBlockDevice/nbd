@@ -38,6 +38,11 @@ Run the example1 plugin and connect to it using L<guestfish(1)>:
  nbdkit .../plugins/libnbdkit-example1.so
  guestfish --ro -a nbd://localhost
 
+Run the example3 plugin and connect to it using L<guestfish(1)>:
+
+ nbdkit .../plugins/libnbdkit-example3.so size=1G
+ guestfish --ro -a nbd://localhost
+
 To display usage information about a specific plugin:
 
  nbdkit --help .../plugins/libnbdkit-example1.so

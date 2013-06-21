@@ -83,6 +83,7 @@ extern void nbdkit_error (const char *msg, ...);
 extern void nbdkit_debug (const char *msg, ...);
 
 extern char *nbdkit_absolute_path (const char *path);
+extern int64_t nbdkit_parse_size (const char *str);
 
 #define NBDKIT_REGISTER_PLUGIN(plugin)                                  \
   struct nbdkit_plugin *                                                \

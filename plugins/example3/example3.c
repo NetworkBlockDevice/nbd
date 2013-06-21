@@ -31,42 +31,41 @@
  * SUCH DAMAGE.
  */
 
-/* example2:
+/* example3:
  *
- * A simple but more realistic read-only file server.
+ * A simple read-write filesystem which stores all changes in
+ * a temporary file that is thrown away after each connection.
  */
 
 #include <config.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 #include <nbdkit-plugin.h>
 
-static char *filename = NULL;
-
-static void
-example2_unload (void)
-{
-  free (filename);
-}
+/* The size of disk in bytes (initialized by size=<SIZE> parameter).
+ * If size parameter is not specified, it defaults to 100M.
+ */
+static uint64_t size = 100 * 1024 * 1024;
 
 /* Called for each key=value passed on the command line.  This plugin
- * only accepts file=<filename>, which is required.
+ * only accepts optional size=<SIZE> parameter.
  */
 static int
-example2_config (const char *key, const char *value)
+example3_config (const char *key, const char *value)
 {
-  if (strcmp (key, "file") == 0) {
-    /* See FILENAMES AND PATHS in nbdkit-plugin(3). */
-    filename = nbdkit_absolute_path (value);
-    if (!filename)
+  int64_t r;
+
+  if (strcmp (key, "size") == 0) {
+    r = nbdkit_parse_size (value);
+    if (r == -1)
       return -1;
+    size = (uint64_t) r;
   }
   else {
     nbdkit_error ("unknown parameter '%s'", key);
@@ -76,31 +75,20 @@ example2_config (const char *key, const char *value)
   return 0;
 }
 
-/* Check the user did pass a file=<FILENAME> parameter. */
-static int
-example2_config_complete (void)
-{
-  if (filename == NULL) {
-    nbdkit_error ("you must supply the file=<FILENAME> parameter after the plugin name on the command line");
-    return -1;
-  }
-
-  return 0;
-}
-
-#define example2_config_help \
-  "file=<FILENAME>     (required) The filename to serve."
+#define example3_config_help \
+  "size=<SIZE>  (optional) Size of the backing disk (default: 100M)"
 
 /* The per-connection handle. */
-struct example2_handle {
+struct example3_handle {
   int fd;
 };
 
 /* Create the per-connection handle. */
 static void *
-example2_open (void)
+example3_open (void)
 {
-  struct example2_handle *h;
+  struct example3_handle *h;
+  char template[] = "/var/tmp/diskXXXXXX";
 
   h = malloc (sizeof *h);
   if (h == NULL) {
@@ -108,9 +96,19 @@ example2_open (void)
     return NULL;
   }
 
-  h->fd = open (filename, O_RDONLY|O_CLOEXEC);
+  h->fd = mkstemp (template);
   if (h->fd == -1) {
-    nbdkit_error ("open: %s: %m", filename);
+    nbdkit_error ("mkstemp: %s: %m", template);
+    free (h);
+    return NULL;
+  }
+
+  unlink (template);
+
+  /* This creates a raw-format sparse file of the required size. */
+  if (ftruncate (h->fd, size) == -1) {
+    nbdkit_error ("ftruncate: %m");
+    close (h->fd);
     free (h);
     return NULL;
   }
@@ -120,9 +118,9 @@ example2_open (void)
 
 /* Free up the per-connection handle. */
 static void
-example2_close (void *handle)
+example3_close (void *handle)
 {
-  struct example2_handle *h = handle;
+  struct example3_handle *h = handle;
 
   close (h->fd);
   free (h);
@@ -137,29 +135,21 @@ example2_close (void *handle)
 
 /* Get the file size. */
 static int64_t
-example2_get_size (void *handle)
+example3_get_size (void *handle)
 {
-  struct example2_handle *h = handle;
-  struct stat statbuf;
-
-  if (fstat (h->fd, &statbuf) == -1) {
-    nbdkit_error ("stat: %m");
-    return -1;
-  }
-
-  return statbuf.st_size;
+  return (int64_t) size;
 }
 
 /* Read data from the file. */
 static int
-example2_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
+example3_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
 {
-  struct example2_handle *h = handle;
+  struct example3_handle *h = handle;
 
   while (count > 0) {
     ssize_t r = pread (h->fd, buf, count, offset);
     if (r == -1) {
-      nbdkit_error ("pread: %m");
+      nbdkit_error ("pead: %m");
       return -1;
     }
     if (r == 0) {
@@ -174,17 +164,51 @@ example2_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
   return 0;
 }
 
+/* Write data to the file. */
+static int
+example3_pwrite (void *handle, const void *buf, uint32_t count, uint64_t offset)
+{
+  struct example3_handle *h = handle;
+
+  while (count > 0) {
+    ssize_t r = pwrite (h->fd, buf, count, offset);
+    if (r == -1) {
+      nbdkit_error ("pwrite: %m");
+      return -1;
+    }
+    buf += r;
+    count -= r;
+    offset += r;
+  }
+
+  return 0;
+}
+
+/* Flush the file to disk. */
+static int
+example3_flush (void *handle)
+{
+  struct example3_handle *h = handle;
+
+  if (fdatasync (h->fd) == -1) {
+    nbdkit_error ("fdatasync: %m");
+    return -1;
+  }
+
+  return 0;
+}
+
 static struct nbdkit_plugin plugin = {
-  .name              = "example2",
+  .name              = "example3",
   .version           = PACKAGE_VERSION,
-  .unload            = example2_unload,
-  .config            = example2_config,
-  .config_complete   = example2_config_complete,
-  .config_help       = example2_config_help,
-  .open              = example2_open,
-  .close             = example2_close,
-  .get_size          = example2_get_size,
-  .pread             = example2_pread,
+  .config            = example3_config,
+  .config_help       = example3_config_help,
+  .open              = example3_open,
+  .close             = example3_close,
+  .get_size          = example3_get_size,
+  .pread             = example3_pread,
+  .pwrite            = example3_pwrite,
+  .flush             = example3_flush,
 };
 
 NBDKIT_REGISTER_PLUGIN(plugin)

@@ -120,6 +120,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/Makefile
                  plugins/example1/Makefile
                  plugins/example2/Makefile
+                 plugins/example3/Makefile
                  src/Makefile])
 
 AC_OUTPUT

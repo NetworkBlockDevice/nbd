@@ -287,6 +287,13 @@ error message and return C<NULL>.
 This is called when the client closes the connection.  It should clean
 up any per-connection resources.
 
+Note there is no way in the NBD protocol to communicate close errors
+back to the client, for example if your plugin calls L<close(2)> and
+you are checking for errors (as you should do).  Therefore the best
+you can do is to log the error on the server.  Well-behaved NBD
+clients I<should> try to flush the connection before it is closed and
+check for errors, but obviously this is outside the scope of nbdkit.
+
 =head2 C<.get_size>
 
  int64_t get_size (void *handle);
@@ -458,6 +465,16 @@ also need to provide mutexes for fields in your connection handle.
 
 =back
 
+=head1 PARSING SIZE PARAMETERS
+
+Use the C<nbdkit_parse_size> utility function to parse human-readable
+size strings such as "100M" into the size in bytes.
+
+ int64_t nbdkit_parse_size (const char *str);
+
+C<str> can be a string in a number of common formats.  The function
+returns the size in bytes.  If there was an error, it returns C<-1>.
+
 =head1 DEBUGGING
 
 Run the server with I<-f> and I<-v> options so it doesn't fork and you
@@ -476,7 +493,10 @@ verbose mode (I<-v> option).
 
 =head1 SEE ALSO
 
-L<nbdkit(1)>
+L<nbdkit(1)>,
+L<libnbdkit-example1(1)>,
+L<libnbdkit-example2(1)>,
+L<libnbdkit-example3(1)>.
 
 =head1 AUTHORS
 

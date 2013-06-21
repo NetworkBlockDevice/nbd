@@ -257,12 +257,12 @@ plugin_lock_request (struct connection *conn)
   assert (dl);
 
   if (plugin._thread_model <= NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS) {
-    debug ("%s: acquire global request lock", filename);
+    debug ("acquire global request lock");
     pthread_mutex_lock (&all_requests_lock);
   }
 
   if (plugin._thread_model <= NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS) {
-    debug ("%s: acquire per-connection request lock", filename);
+    debug ("acquire per-connection request lock");
     pthread_mutex_lock (&conn->request_lock);
   }
 }
@@ -273,12 +273,12 @@ plugin_unlock_request (struct connection *conn)
   assert (dl);
 
   if (plugin._thread_model <= NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS) {
-    debug ("%s: release per-connection request lock", filename);
+    debug ("release per-connection request lock");
     pthread_mutex_unlock (&conn->request_lock);
   }
 
   if (plugin._thread_model <= NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS) {
-    debug ("%s: release global request lock", filename);
+    debug ("release global request lock");
     pthread_mutex_unlock (&all_requests_lock);
   }
 }

@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -75,6 +77,49 @@ nbdkit_absolute_path (const char *path)
   }
 
   return ret;
+}
+
+/* XXX Multiple problems with this function.  Really we should use the
+ * 'human*' functions from gnulib.
+ */
+int64_t
+nbdkit_parse_size (const char *str)
+{
+  uint64_t size;
+  char t;
+
+  if (sscanf (str, "%" SCNu64, &size) == 1)
+    return (int64_t) size;
+  if (sscanf (str, "%" SCNu64 "%c", &size, &t) == 2) {
+    switch (t) {
+    case 'b': case 'B':
+      return (int64_t) size;
+    case 'k': case 'K':
+      return (int64_t) size * 1024;
+    case 'm': case 'M':
+      return (int64_t) size * 1024 * 1024;
+    case 'g': case 'G':
+      return (int64_t) size * 1024 * 1024 * 1024;
+    case 't': case 'T':
+      return (int64_t) size * 1024 * 1024 * 1024 * 1024;
+    case 'p': case 'P':
+      return (int64_t) size * 1024 * 1024 * 1024 * 1024 * 1024;
+    case 'e': case 'E':
+      return (int64_t) size * 1024 * 1024 * 1024 * 1024 * 1024 * 1024;
+
+    case 's': case 'S':         /* "sectors", ie. units of 512 bytes,
+                                 * even if that's not the real sector size
+                                 */
+      return (int64_t) size * 512;
+
+    default:
+      nbdkit_error ("could not parse size: unknown specifier '%c'", t);
+      return -1;
+    }
+  }
+
+  nbdkit_error ("could not parse size string (%s)", str);
+  return -1;
 }
 
 /* Write buffer to socket and either succeed completely (returns 0)
