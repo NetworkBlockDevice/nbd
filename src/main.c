@@ -102,6 +102,7 @@ usage (void)
   printf ("nbdkit [-f] [-g GROUP] [-i IPADDR] [-P PIDFILE] [-p PORT]\n"
           "       [-r] [-s] [-U SOCKET] [-u USER] [-v] [-V]\n"
           "       PLUGIN.so [key=value [key=value [...]]]\n"
+          "\n"
           "Please read the nbdkit(1) manual page for full usage.\n");
 }
 
@@ -256,6 +257,7 @@ main (int argc, char *argv[])
 
     if (help) {
       usage ();
+      printf ("\n%s:\n\n", filename);
       plugin_usage ();
       exit (EXIT_SUCCESS);
     }
