@@ -318,7 +318,10 @@ validate_request (struct connection *conn,
  * data to be returned, and points to a buffer of size 'count' bytes.
  *
  * Only returns -1 if there is a fatal error and the connection cannot
- * continue.  On read/write errors, sets *error to errno and returns 0.
+ * continue.
+ *
+ * On read/write errors, sets *error to errno (or EIO if errno is not
+ * set) and returns 0.
  */
 static int
 _handle_request (struct connection *conn,
@@ -338,7 +341,7 @@ _handle_request (struct connection *conn,
   case NBD_CMD_READ:
     r = plugin_pread (conn, buf, count, offset);
     if (r == -1) {
-      *error = errno;
+      *error = errno ? errno : EIO;
       return 0;
     }
     break;
@@ -346,7 +349,7 @@ _handle_request (struct connection *conn,
   case NBD_CMD_WRITE:
     r = plugin_pwrite (conn, buf, count, offset);
     if (r == -1) {
-      *error = errno;
+      *error = errno ? errno : EIO;
       return 0;
     }
     break;
@@ -354,7 +357,7 @@ _handle_request (struct connection *conn,
   case NBD_CMD_FLUSH:
     r = plugin_flush (conn);
     if (r == -1) {
-      *error = errno;
+      *error = errno ? errno : EIO;
       return 0;
     }
     break;
@@ -362,7 +365,7 @@ _handle_request (struct connection *conn,
   case NBD_CMD_TRIM:
     r = plugin_trim (conn, count, offset);
     if (r == -1) {
-      *error = errno;
+      *error = errno ? errno : EIO;
       return 0;
     }
     break;
@@ -374,7 +377,7 @@ _handle_request (struct connection *conn,
   if (flush_after_command) {
     r = plugin_flush (conn);
     if (r == -1) {
-      *error = errno;
+      *error = errno ? errno : EIO;
       return 0;
     }
   }
