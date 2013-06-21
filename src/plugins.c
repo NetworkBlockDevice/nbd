@@ -284,7 +284,7 @@ plugin_unlock_request (struct connection *conn)
 }
 
 int
-plugin_open (struct connection *conn)
+plugin_open (struct connection *conn, int readonly)
 {
   void *handle;
 
@@ -292,9 +292,9 @@ plugin_open (struct connection *conn)
   assert (conn->handle == NULL);
   assert (plugin.open != NULL);
 
-  debug ("%s: open", filename);
+  debug ("%s: open readonly=%d", filename, readonly);
 
-  handle = plugin.open ();
+  handle = plugin.open (readonly);
   if (!handle)
     return -1;
 

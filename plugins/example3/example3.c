@@ -83,9 +83,14 @@ struct example3_handle {
   int fd;
 };
 
-/* Create the per-connection handle. */
+/* Create the per-connection handle.
+ *
+ * Note we ignore the 'readonly' parameter.  In effect this means that
+ * we ignore the -r option on the nbdkit command line, which sort of
+ * makes sense for this particular plugin.
+ */
 static void *
-example3_open (void)
+example3_open (int readonly)
 {
   struct example3_handle *h;
   char template[] = "/var/tmp/diskXXXXXX";

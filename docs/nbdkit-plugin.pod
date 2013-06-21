@@ -267,7 +267,7 @@ omit this.
 
 =head2 C<.open>
 
- void *open (void);
+ void *open (int readonly);
 
 This is called when a new client connects to the nbdkit server.  The
 callback should allocate a handle and return it.  This handle
@@ -276,6 +276,13 @@ callback.
 
 Note that the handle is completely opaque to nbdkit, but it must not
 be NULL.
+
+The C<readonly> flag informs the plugin that the user requested a
+read-only connection using the I<-r> flag on the command line.  Note
+that the plugin may I<additionally> force the connection to be
+readonly (even if this flag is false) by returning false from the
+C<.can_write> callback.  So if your plugin can only serve read-only,
+you can ignore this parameter.
 
 If there is an error, C<.open> should call C<nbdkit_error> with an
 error message and return C<NULL>.

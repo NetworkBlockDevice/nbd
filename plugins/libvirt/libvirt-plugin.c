@@ -108,7 +108,7 @@ struct virt_handle {
 
 /* Create the per-connection handle. */
 static void *
-virt_open (void)
+virt_open (int readonly)
 {
   struct virt_handle *h;
   virDomainBlockInfo info;

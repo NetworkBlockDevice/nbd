@@ -66,7 +66,7 @@ _handle_single_connection (int sockin, int sockout)
   if (!conn)
     goto err;
 
-  if (plugin_open (conn) == -1)
+  if (plugin_open (conn, readonly) == -1)
     goto err;
 
   tls_set_name (plugin_name ());

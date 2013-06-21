@@ -61,7 +61,7 @@ struct nbdkit_plugin {
   int (*config_complete) (void);
   const char *config_help;
 
-  void * (*open) (void);
+  void * (*open) (int readonly);
   void (*close) (void *handle);
 
   int64_t (*get_size) (void *handle);

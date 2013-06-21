@@ -96,9 +96,13 @@ struct example2_handle {
   int fd;
 };
 
-/* Create the per-connection handle. */
+/* Create the per-connection handle.
+ *
+ * Because this plugin can only serve readonly, we can ignore the
+ * 'readonly' parameter.
+ */
 static void *
-example2_open (void)
+example2_open (int readonly)
 {
   struct example2_handle *h;
 

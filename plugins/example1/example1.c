@@ -124,8 +124,11 @@ example1_load (void)
   memcpy (data, bootsector, sizeof bootsector);
 }
 
+/* Because this plugin can only serve readonly, we can ignore the
+ * 'readonly' parameter.
+ */
 static void *
-example1_open (void)
+example1_open (int readonly)
 {
   /* In this trivial example we don't care about per-connection
    * handles (every connection serves up the same content and there is
