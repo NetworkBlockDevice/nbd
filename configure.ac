@@ -128,6 +128,21 @@ AS_IF([test "$with_libvirt" != "no"],[
 ])
 AM_CONDITIONAL([HAVE_LIBVIRT],[test "x$LIBVIRT_LIBS" != "x"])
 
+dnl Check for zlib (only if you want to compile the gzip plugin).
+AC_ARG_WITH([zlib],[
+    AS_HELP_STRING([--without-zlib],
+                   [disable gzip plugin @<:@default=check@:>@])],
+    [],
+    [with_zlib=check])
+AS_IF([test "$with_zlib" != "no"],[
+    PKG_CHECK_MODULES([ZLIB], [zlib],[
+        AC_SUBST([ZLIB_CFLAGS])
+        AC_SUBST([ZLIB_LIBS])
+        AC_DEFINE([HAVE_ZLIB],[1],[zlib found at compile time.])
+    ],
+    [AC_MSG_WARN([zlib not found, gzip plugin will be disabled])])
+])
+AM_CONDITIONAL([HAVE_ZLIB],[test "x$ZLIB_LIBS" != "x"])
 
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
@@ -139,6 +154,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/example2/Makefile
                  plugins/example3/Makefile
                  plugins/file/Makefile
+                 plugins/gzip/Makefile
                  plugins/libvirt/Makefile
                  src/Makefile])
 

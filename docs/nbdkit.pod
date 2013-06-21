@@ -193,6 +193,7 @@ L<libnbdkit-example1(1)>,
 L<libnbdkit-example2(1)>,
 L<libnbdkit-example3(1)>,
 L<libnbdkit-file(1)>,
+L<libnbdkit-gzip(1)>,
 L<libnbdkit-libvirt-plugin(1)>.
 
 =head1 AUTHORS

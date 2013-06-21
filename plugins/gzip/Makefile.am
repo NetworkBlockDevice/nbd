@@ -30,10 +30,37 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	gzip \
-	libvirt
+EXTRA_DIST = libnbdkit-gzip.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_ZLIB
+
+plugin_LTLIBRARIES = libnbdkit-gzip.la
+
+libnbdkit_gzip_la_SOURCES = \
+	gzip.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+libnbdkit_gzip_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+libnbdkit_gzip_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(ZLIB_CFLAGS)
+libnbdkit_gzip_la_LIBADD = \
+	$(ZLIB_LIBS)
+libnbdkit_gzip_la_LDFLAGS = \
+	-avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = libnbdkit-gzip.1
+
+libnbdkit-gzip.1: libnbdkit-gzip.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-gzip $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~
