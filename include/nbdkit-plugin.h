@@ -80,7 +80,9 @@ struct nbdkit_plugin {
 };
 
 extern void nbdkit_error (const char *msg, ...);
+extern void nbdkit_verror (const char *msg, va_list args);
 extern void nbdkit_debug (const char *msg, ...);
+extern void nbdkit_vdebug (const char *msg, va_list args);
 
 extern char *nbdkit_absolute_path (const char *path);
 extern int64_t nbdkit_parse_size (const char *str);

@@ -62,6 +62,24 @@ prologue (const char *type)
 
 /* Note: preserves the previous value of errno. */
 void
+nbdkit_vdebug (const char *fs, va_list args)
+{
+  int err = errno;
+
+  if (!verbose)
+    return;
+
+  prologue ("debug");
+
+  vfprintf (stderr, fs, args);
+
+  fprintf (stderr, "\n");
+
+  errno = err;
+}
+
+/* Note: preserves the previous value of errno. */
+void
 nbdkit_debug (const char *fs, ...)
 {
   va_list args;
@@ -75,6 +93,21 @@ nbdkit_debug (const char *fs, ...)
   va_start (args, fs);
   vfprintf (stderr, fs, args);
   va_end (args);
+
+  fprintf (stderr, "\n");
+
+  errno = err;
+}
+
+/* Note: preserves the previous value of errno. */
+void
+nbdkit_verror (const char *fs, va_list args)
+{
+  int err = errno;
+
+  prologue ("error");
+
+  vfprintf (stderr, fs, args);
 
   fprintf (stderr, "\n");
 
