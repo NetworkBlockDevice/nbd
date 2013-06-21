@@ -182,7 +182,7 @@ bind_tcpip_socket (size_t *nr_socks)
     exit (EXIT_FAILURE);
   }
 
-  debug ("bound to IP address %s:%s (%d socket(s))",
+  debug ("bound to IP address %s:%s (%zu socket(s))",
          ipaddr ? ipaddr : "<any>", port, *nr_socks);
 
   return socks;

@@ -79,9 +79,11 @@ struct nbdkit_plugin {
   /* int (*set_exportname) (void *handle, const char *exportname); */
 };
 
-extern void nbdkit_error (const char *msg, ...);
+extern void nbdkit_error (const char *msg, ...)
+  __attribute__((format (printf, 1, 2)));
 extern void nbdkit_verror (const char *msg, va_list args);
-extern void nbdkit_debug (const char *msg, ...);
+extern void nbdkit_debug (const char *msg, ...)
+  __attribute__((format (printf, 1, 2)));
 extern void nbdkit_vdebug (const char *msg, va_list args);
 
 extern char *nbdkit_absolute_path (const char *path);
