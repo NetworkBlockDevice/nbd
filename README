@@ -17,5 +17,28 @@ For documentation, see the docs/ directory.
 
 For plugins and examples, see the plugins/ directory.
 
+License
+-------
+
 This software is copyright (C) Red Hat Inc. and licensed under a BSD
 license.  See LICENSE for details.
+
+Packager information
+--------------------
+
+Tarballs are available from:
+http://libguestfs.org/download/nbdkit
+
+Developer information
+---------------------
+
+For development ideas, see the TODO file.
+
+The upstream git repository is:
+https://github.com/libguestfs/nbdkit
+
+Please send patches to the libguestfs mailing list:
+https://www.redhat.com/mailman/listinfo/libguestfs
+
+For further information, see:
+http://libguestfs.org/
