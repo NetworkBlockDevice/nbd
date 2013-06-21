@@ -1,8 +1,17 @@
-NBD is a simple protocol for accessing block devices over the network.
-'nbdkit' is a toolkit for creating NBD servers from "unconventional"
-sources.  All you have to do is write a few glue functions.  The
-liberal licensing of nbdkit is meant to allow you to link nbdkit with
-proprietary libraries or include nbdkit in proprietary code.
+NBD is a protocol for accessing block devices (hard disks and
+disk-like things) over the network.
+
+'nbdkit' is a toolkit for creating NBD servers.
+
+The key features are:
+
+* Multithreaded NBD server with good performance.
+
+* Well-documented, simple plugin API with a stable ABI guarantee.
+  Let's you export "unconventional" block devices easily.
+
+* Liberal license (BSD) allows nbdkit to be linked to proprietary
+  libraries or included in proprietary code.
 
 For documentation, see the docs/ directory.
 
