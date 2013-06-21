@@ -188,7 +188,11 @@ To list all the options supported by a plugin, do:
 
 =head1 SEE ALSO
 
-L<nbdkit-plugin(3)>
+L<nbdkit-plugin(3)>,
+L<libnbdkit-example1(1)>,
+L<libnbdkit-example2(1)>,
+L<libnbdkit-example3(1)>,
+L<libnbdkit-libvirt-plugin(1)>.
 
 =head1 AUTHORS
 
