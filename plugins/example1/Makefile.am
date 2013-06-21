@@ -44,6 +44,8 @@ libnbdkit_example1_la_CPPFLAGS = \
 	-I$(top_srcdir)/include
 libnbdkit_example1_la_CFLAGS = \
 	$(WARNINGS_CFLAGS)
+libnbdkit_example1_la_LDFLAGS = \
+	-avoid-version -shared
 
 if HAVE_POD2MAN
 
