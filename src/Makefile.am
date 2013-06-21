@@ -54,3 +54,5 @@ nbdkit_LDADD = \
 	-ldl
 nbdkit_LDFLAGS = \
 	-rdynamic
+
+CLEANFILES = *~

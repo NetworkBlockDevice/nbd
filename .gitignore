@@ -11,6 +11,7 @@ Makefile
 Makefile.in
 
 /local*
+/nbdkit-*.tar.gz
 
 /aclocal.m4
 /autom4te.cache

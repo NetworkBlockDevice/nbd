@@ -30,6 +30,8 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+EXTRA_DIST = libnbdkit-example3.pod
+
 plugindir = $(libdir)/nbdkit/plugins
 
 plugin_LTLIBRARIES = libnbdkit-example3.la
@@ -51,3 +53,5 @@ libnbdkit-example3.1: libnbdkit-example3.pod
 	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-example3 $< $@
 
 endif
+
+CLEANFILES = *~

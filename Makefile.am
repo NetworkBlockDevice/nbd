@@ -32,4 +32,11 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
+EXTRA_DIST = \
+	.gitignore \
+	LICENSE \
+	m4/.gitignore
+
 SUBDIRS = docs plugins include src
+
+CLEANFILES = *~

@@ -30,6 +30,10 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+EXTRA_DIST = \
+	nbdkit.pod \
+	nbdkit-plugin.pod
+
 if HAVE_POD2MAN
 
 man_MANS = \
@@ -43,3 +47,5 @@ nbdkit-plugin.3: nbdkit-plugin.pod
 	$(POD2MAN) -u --stderr --section=3 --center=nbdkit --release=nbdkit --name=nbdkit-plugin $< $@
 
 endif
+
+CLEANFILES = *~
