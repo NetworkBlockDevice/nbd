@@ -30,11 +30,39 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	gzip \
-	libvirt \
-	xz
+EXTRA_DIST = nbdkit-xz-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_LIBLZMA
+
+plugin_LTLIBRARIES = nbdkit-xz-plugin.la
+
+nbdkit_xz_plugin_la_SOURCES = \
+	xz.c \
+	xzfile.c \
+	xzfile.h \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_xz_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_xz_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(LIBLZMA_CFLAGS)
+nbdkit_xz_plugin_la_LIBADD = \
+	$(LIBLZMA_LIBS)
+nbdkit_xz_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-xz-plugin.1
+
+nbdkit-xz-plugin.1: nbdkit-xz-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~

@@ -15,8 +15,14 @@ C<nbdkit-gzip-plugin> is file serving plugin for L<nbdkit(1)>.
 It serves the named C<FILENAME.gz> over NBD, uncompressing it on the
 fly.  The plugin only supports read-only connections.
 
+B<Note> that gzip files are not very good for random access in large
+files because seeking to a position in the gzip file involves
+uncompressing lots of data.  A more practical method to compress large
+disk images is to use the L<xz(1)> format and L<nbdkit-xz-plugin(1)>.
+
 =head1 SEE ALSO
 
+L<nbdkit-xz-plugin(1)>,
 L<nbdkit(1)>,
 L<nbdkit-plugin(3)>.
 

@@ -1,0 +1,127 @@
+=encoding utf8
+
+=head1 NAME
+
+nbdkit-xz-plugin - nbdkit xz plugin
+
+=head1 SYNOPSIS
+
+ nbdkit .../plugins/nbdkit-xz-plugin.so file=FILENAME.xz
+
+=head1 DESCRIPTION
+
+C<nbdkit-xz-plugin> is file serving plugin for L<nbdkit(1)>.
+
+It serves the named C<FILENAME.xz> over NBD, uncompressing it on the
+fly.  The plugin only supports read-only connections.
+
+=head2 GETTING BEST RANDOM ACCESS PERFORMANCE FROM XZ
+
+L<xz(1)> files are split into streams and blocks.  Most xz files
+contain only one stream which contains one or more blocks.  You can
+find out how many streams and blocks are in an xz file by doing:
+
+ $ xz --list winxp.img.xz
+ Strms  Blocks   Compressed Uncompressed  Ratio  Check   Filename
+     1       1  2,100.0 MiB  6,144.0 MiB  0.342  CRC64   winxp.img.xz
+ =============
+
+xz files are seekable on block boundaries only.  Seeking is done by
+seeking directly to the lower block boundary, then (slowly)
+uncompressing data until the precise byte is reached.
+
+B<To get best random access performance, you must prepare your xz
+files with many small blocks.>
+
+To do this, use the I<--block-size> option with a small-ish block
+size.  For example the same image as above compressed with a 16 MB
+block size:
+
+ $ xz --best --block-size=16777216 winxp.img
+ $ xz --list winxp.img.xz
+ Strms  Blocks   Compressed Uncompressed  Ratio  Check   Filename
+     1     384  2,120.1 MiB  6,144.0 MiB  0.345  CRC64   winxp.img.xz
+
+This file can be accessed randomly, and at most 16 MB of compressed
+data will have to be uncompressed to seek to any byte.
+
+Note as you would expect, xz cannot compress quite as efficiently when
+using a small block size.  The space penalty in the above example is
+S<E<lt> 1%> of the compressed file size.
+
+=head1 PARAMETERS
+
+=over 4
+
+=item B<file=FILENAME.xz>
+
+Serve the file named C<FILENAME.xz>.
+
+This parameter is required.
+
+=item B<maxblock=SIZE>
+
+The maximum block size that the plugin will read.  The plugin will
+refuse to read xz files that contain any block larger than this size.
+
+The plugin may allocate up to this many bytes of memory.  See the
+discussion above about creating xz files with small block sizes in
+order to reduce memory usage and increase performance.
+
+This parameter is optional.  If not specified it defaults to 512M.
+
+=back
+
+=head1 SEE ALSO
+
+L<nbdkit(1)>,
+L<nbdkit-plugin(3)>,
+L<xz(1)>.
+
+=head1 AUTHORS
+
+Richard W.M. Jones
+
+=head1 COPYRIGHT
+
+Copyright (C) 2013 Red Hat Inc.
+
+=head1 LICENSE
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+=over 4
+
+=item *
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+=item *
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+=item *
+
+Neither the name of Red Hat nor the names of its contributors may be
+used to endorse or promote products derived from this software without
+specific prior written permission.
+
+=back
+
+THIS SOFTWARE IS PROVIDED BY RED HAT AND CONTRIBUTORS ''AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL RED HAT OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.

@@ -144,6 +144,22 @@ AS_IF([test "$with_zlib" != "no"],[
 ])
 AM_CONDITIONAL([HAVE_ZLIB],[test "x$ZLIB_LIBS" != "x"])
 
+dnl Check for liblzma (only if you want to compile the xz plugin).
+AC_ARG_WITH([liblzma],[
+    AS_HELP_STRING([--without-liblzma],
+                   [disable xz plugin @<:@default=check@:>@])],
+    [],
+    [with_liblzma=check])
+AS_IF([test "$with_liblzma" != "no"],[
+    PKG_CHECK_MODULES([LIBLZMA], [liblzma],[
+        AC_SUBST([LIBLZMA_CFLAGS])
+        AC_SUBST([LIBLZMA_LIBS])
+        AC_DEFINE([HAVE_LIBLZMA],[1],[liblzma found at compile time.])
+    ],
+    [AC_MSG_WARN([liblzma not found, xz plugin will be disabled])])
+])
+AM_CONDITIONAL([HAVE_LIBLZMA],[test "x$LIBLZMA_LIBS" != "x"])
+
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
@@ -156,6 +172,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/file/Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
+                 plugins/xz/Makefile
                  src/Makefile])
 
 AC_OUTPUT
