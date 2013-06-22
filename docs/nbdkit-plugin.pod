@@ -472,6 +472,10 @@ also need to provide mutexes for fields in your connection handle.
 
 =back
 
+If none of the above thread models are suitable, then use
+C<NBDKIT_THREAD_MODEL_PARALLEL> and implement your own locking using
+C<pthread_mutex_t> etc.
+
 =head1 PARSING SIZE PARAMETERS
 
 Use the C<nbdkit_parse_size> utility function to parse human-readable
