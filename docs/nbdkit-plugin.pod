@@ -505,9 +505,9 @@ verbose mode (I<-v> option).
 =head1 SEE ALSO
 
 L<nbdkit(1)>,
-L<libnbdkit-example1(1)>,
-L<libnbdkit-example2(1)>,
-L<libnbdkit-example3(1)>.
+L<nbdkit-example1-plugin(1)>,
+L<nbdkit-example2-plugin(1)>,
+L<nbdkit-example3-plugin(1)>.
 
 =head1 AUTHORS
 

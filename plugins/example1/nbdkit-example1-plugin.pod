@@ -2,15 +2,15 @@
 
 =head1 NAME
 
-libnbdkit-example1 - A minimal nbdkit plugin
+nbdkit-example1-plugin - A minimal nbdkit plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/libnbdkit-example1.so
+ nbdkit .../plugins/nbdkit-example1-plugin.so
 
 =head1 DESCRIPTION
 
-C<libnbdkit-example1> is a minimal L<nbdkit(1)> plugin.
+C<nbdkit-example1-plugin> is a minimal L<nbdkit(1)> plugin.
 
 It serves, readonly, from memory, a static blob of data which looks a
 little bit like a 100 MB disk image that contains a single empty

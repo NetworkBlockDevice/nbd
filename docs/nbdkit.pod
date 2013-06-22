@@ -31,21 +31,21 @@ C</usr/lib>, C</usr/lib64> or C</usr/local/lib>.
 
 Serve file C<disk.img> on port 10809:
 
- nbdkit .../plugins/libnbdkit-file.so file=disk.img
+ nbdkit .../plugins/nbdkit-file-plugin.so file=disk.img
 
 Run the example1 plugin and connect to it using L<guestfish(1)>:
 
- nbdkit .../plugins/libnbdkit-example1.so
+ nbdkit .../plugins/nbdkit-example1-plugin.so
  guestfish --ro -a nbd://localhost
 
 Run the example3 plugin and connect to it using L<guestfish(1)>:
 
- nbdkit .../plugins/libnbdkit-example3.so size=1G
+ nbdkit .../plugins/nbdkit-example3-plugin.so size=1G
  guestfish --ro -a nbd://localhost
 
 To display usage information about a specific plugin:
 
- nbdkit --help .../plugins/libnbdkit-example1.so
+ nbdkit --help .../plugins/nbdkit-example1-plugin.so
 
 =head1 GLOBAL OPTIONS
 
@@ -180,21 +180,21 @@ After specifying the plugin name you can (optionally, it depends
 on the plugin) give plugin configuration on the command line in
 the form of C<key=value>.  For example:
 
- nbdkit .../plugins/libnbdkit-file.so file=disk.img
+ nbdkit .../plugins/nbdkit-file-plugin.so file=disk.img
 
 To list all the options supported by a plugin, do:
 
- nbdkit --help .../plugins/libnbdkit-file.so
+ nbdkit --help .../plugins/nbdkit-file-plugin.so
 
 =head1 SEE ALSO
 
 L<nbdkit-plugin(3)>,
-L<libnbdkit-example1(1)>,
-L<libnbdkit-example2(1)>,
-L<libnbdkit-example3(1)>,
-L<libnbdkit-file(1)>,
-L<libnbdkit-gzip(1)>,
-L<libnbdkit-libvirt-plugin(1)>.
+L<nbdkit-example1-plugin(1)>,
+L<nbdkit-example2-plugin(1)>,
+L<nbdkit-example3-plugin(1)>,
+L<nbdkit-file-plugin(1)>,
+L<nbdkit-gzip-plugin(1)>,
+L<nbdkit-libvirt-plugin(1)>.
 
 =head1 AUTHORS
 

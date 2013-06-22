@@ -30,29 +30,29 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-EXTRA_DIST = libnbdkit-example2.pod
+EXTRA_DIST = nbdkit-example2-plugin.pod
 
 plugindir = $(libdir)/nbdkit/plugins
 
-plugin_LTLIBRARIES = libnbdkit-example2.la
+plugin_LTLIBRARIES = nbdkit-example2-plugin.la
 
-libnbdkit_example2_la_SOURCES = \
+nbdkit_example2_plugin_la_SOURCES = \
 	example2.c \
 	$(top_srcdir)/include/nbdkit-plugin.h
 
-libnbdkit_example2_la_CPPFLAGS = \
+nbdkit_example2_plugin_la_CPPFLAGS = \
 	-I$(top_srcdir)/include
-libnbdkit_example2_la_CFLAGS = \
+nbdkit_example2_plugin_la_CFLAGS = \
 	$(WARNINGS_CFLAGS)
-libnbdkit_example2_la_LDFLAGS = \
-	-avoid-version -shared
+nbdkit_example2_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
 
 if HAVE_POD2MAN
 
-man_MANS = libnbdkit-example2.1
+man_MANS = nbdkit-example2-plugin.1
 
-libnbdkit-example2.1: libnbdkit-example2.pod
-	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-example2 $< $@
+nbdkit-example2-plugin.1: nbdkit-example2-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
 
 endif
 

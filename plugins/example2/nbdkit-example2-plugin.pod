@@ -2,34 +2,24 @@
 
 =head1 NAME
 
-libnbdkit-example3 - An example nbdkit plugin
+nbdkit-example2-plugin - An example nbdkit plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/libnbdkit-example3.so [size=SIZE]
-
-=head1 EXAMPLE
-
- nbdkit .../plugins/libnbdkit-example3.so size=1G
- guestfish -a nbd://localhost
+ nbdkit .../plugins/nbdkit-example2-plugin.so file=FILENAME
 
 =head1 DESCRIPTION
 
-C<libnbdkit-example3> is an example L<nbdkit(1)> plugin.
+C<nbdkit-example2-plugin> is an example L<nbdkit(1)> plugin.
 
-On each connection, it generates a temporary writable block device of
-size C<SIZE>.  The disk is thrown away when the client disconnects.
-
-The C<size=SIZE> parameter can use a number of common formats to
-specify the size, eg. C<100M>, C<2G>.  If the parameter is omitted, it
-default to 100 megabytes.
+It serves the named C<FILENAME> over NBD, readonly.
 
 Mainly this is useful for testing nbdkit and as an example for writing
 nbdkit plugins (L<nbdkit-plugin(3)>).
 
 =head1 SEE ALSO
 
-L<example3.c> in the nbdkit source tree,
+L<example2.c> in the nbdkit source tree,
 L<nbdkit(1)>,
 L<nbdkit-plugin(3)>
 

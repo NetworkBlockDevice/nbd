@@ -30,29 +30,29 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-EXTRA_DIST = libnbdkit-file.pod
+EXTRA_DIST = nbdkit-file-plugin.pod
 
 plugindir = $(libdir)/nbdkit/plugins
 
-plugin_LTLIBRARIES = libnbdkit-file.la
+plugin_LTLIBRARIES = nbdkit-file-plugin.la
 
-libnbdkit_file_la_SOURCES = \
+nbdkit_file_plugin_la_SOURCES = \
 	file.c \
 	$(top_srcdir)/include/nbdkit-plugin.h
 
-libnbdkit_file_la_CPPFLAGS = \
+nbdkit_file_plugin_la_CPPFLAGS = \
 	-I$(top_srcdir)/include
-libnbdkit_file_la_CFLAGS = \
+nbdkit_file_plugin_la_CFLAGS = \
 	$(WARNINGS_CFLAGS)
-libnbdkit_file_la_LDFLAGS = \
-	-avoid-version -shared
+nbdkit_file_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
 
 if HAVE_POD2MAN
 
-man_MANS = libnbdkit-file.1
+man_MANS = nbdkit-file-plugin.1
 
-libnbdkit-file.1: libnbdkit-file.pod
-	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=libnbdkit-file $< $@
+nbdkit-file-plugin.1: nbdkit-file-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
 
 endif
 

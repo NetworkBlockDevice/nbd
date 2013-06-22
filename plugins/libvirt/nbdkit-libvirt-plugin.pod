@@ -2,26 +2,58 @@
 
 =head1 NAME
 
-libnbdkit-example2 - An example nbdkit plugin
+nbdkit-libvirt-plugin - nbdkit libvirt plugin using virDomainBlockPeek
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/libnbdkit-example2.so file=FILENAME
+ nbdkit .../plugins/nbdkit-libvirt-plugin.so
+   [connect=URI] domain=DOMAIN disk=DISK
+
+=head1 EXAMPLE
+
+ nbdkit .../plugins/nbdkit-libvirt-plugin.so domain=MyGuest disk=sda
+ guestfish -a nbd://localhost
 
 =head1 DESCRIPTION
 
-C<libnbdkit-example2> is an example L<nbdkit(1)> plugin.
+C<nbdkit-libvirt-plugin> is an L<nbdkit(1)> plugin that lets you
+access libvirt guest disks readonly.  It is implemented using the
+libvirt C<virDomainBlockPeek> API.  It can also be used over remote
+libvirt connections.
 
-It serves the named C<FILENAME> over NBD, readonly.
+=head1 PARAMETERS
 
-Mainly this is useful for testing nbdkit and as an example for writing
-nbdkit plugins (L<nbdkit-plugin(3)>).
+=over 4
+
+=item B<connect=URI>
+
+This optional parameter specifies the libvirt connection URI.
+
+=item B<domain=DOMAIN>
+
+This required parameter specifies the libvirt domain name
+(guest name).
+
+=item B<disk=DISK>
+
+This required parameter specifies the guest's disk that we want to
+read.
+
+You can either give the path to the backing device (C</path/to/disk>)
+or the target name (eg. C<sda>).
+
+In either case use C<virsh dumpxml DOMAIN> to list possible disks.
+Look for S<C<E<lt>source dev=...E<gt>>> or
+S<C<E<lt>source file=...E<gt>>> or
+S<C<E<lt>target dev=...E<gt>>> in the XML.
+
+=back
 
 =head1 SEE ALSO
 
-L<example2.c> in the nbdkit source tree,
 L<nbdkit(1)>,
-L<nbdkit-plugin(3)>
+L<nbdkit-plugin(3)>,
+L<http://libvirt.org>.
 
 =head1 AUTHORS
 

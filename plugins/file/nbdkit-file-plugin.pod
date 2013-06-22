@@ -2,18 +2,30 @@
 
 =head1 NAME
 
-libnbdkit-gzip - nbdkit gzip plugin
+nbdkit-file-plugin - nbdkit file plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/libnbdkit-gzip.so file=FILENAME.gz
+ nbdkit .../plugins/nbdkit-file-plugin.so file=FILENAME
 
 =head1 DESCRIPTION
 
-C<libnbdkit-gzip> is file serving plugin for L<nbdkit(1)>.
+C<nbdkit-file-plugin> is a file serving plugin for L<nbdkit(1)>.
 
-It serves the named C<FILENAME.gz> over NBD, uncompressing it on the
-fly.  The plugin only supports read-only connections.
+It serves the named C<FILENAME> over NBD.
+
+=head1 PARAMETERS
+
+=over 4
+
+=item B<file=FILENAME>
+
+Serve the file named C<FILENAME>.  A device path can also be
+used here.
+
+This parameter is required.
+
+=back
 
 =head1 SEE ALSO
 
