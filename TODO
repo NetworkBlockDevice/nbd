@@ -1,5 +1,3 @@
-* Better caching in the xz plugin.
-
 * Add a test suite.  Suggestion: use -s option to run captive server.
 
 * Performance - measure and improve it.
