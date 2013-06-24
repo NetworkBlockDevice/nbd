@@ -30,7 +30,7 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-EXTRA_DIST = nbdkit-example1.pod
+EXTRA_DIST = nbdkit-example1-plugin.pod
 
 plugindir = $(libdir)/nbdkit/plugins
 
