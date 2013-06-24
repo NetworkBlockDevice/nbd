@@ -39,6 +39,8 @@ if HAVE_LIBLZMA
 plugin_LTLIBRARIES = nbdkit-xz-plugin.la
 
 nbdkit_xz_plugin_la_SOURCES = \
+	blkcache.c \
+	blkcache.h \
 	xz.c \
 	xzfile.c \
 	xzfile.h \

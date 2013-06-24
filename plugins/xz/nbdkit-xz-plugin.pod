@@ -64,11 +64,20 @@ This parameter is required.
 The maximum block size that the plugin will read.  The plugin will
 refuse to read xz files that contain any block larger than this size.
 
-The plugin may allocate up to this many bytes of memory.  See the
-discussion above about creating xz files with small block sizes in
-order to reduce memory usage and increase performance.
+See the discussion above about creating xz files with small block
+sizes in order to reduce memory usage and increase performance.
 
 This parameter is optional.  If not specified it defaults to 512M.
+
+=item B<maxdepth=N>
+
+Maximum number of blocks stored in the LRU block cache.
+
+This parameter is optional.  If not specified it defaults to 8.
+
+The plugin may allocate up to
+S<maximum block size in file * maxdepth>
+bytes of memory I<per connection>.
 
 =back
 

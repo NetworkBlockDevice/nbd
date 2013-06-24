@@ -47,9 +47,11 @@
 #include <nbdkit-plugin.h>
 
 #include "xzfile.h"
+#include "blkcache.h"
 
 static char *filename = NULL;
 static uint64_t maxblock = 512 * 1024 * 1024;
+static size_t maxdepth = 8;
 
 static void
 xz_unload (void)
@@ -75,6 +77,20 @@ xz_config (const char *key, const char *value)
       return -1;
     maxblock = (uint64_t) r;
   }
+  else if (strcmp (key, "maxdepth") == 0) {
+    size_t r;
+
+    if (sscanf (value, "%zu", &r) != 1) {
+      nbdkit_error ("could not parse 'maxdepth' parameter");
+      return -1;
+    }
+    if (r == 0) {
+      nbdkit_error ("'maxdepth' parameter must be >= 1");
+      return -1;
+    }
+
+    maxdepth = r;
+  }
   else {
     nbdkit_error ("unknown parameter '%s'", key);
     return -1;
@@ -97,7 +113,8 @@ xz_config_complete (void)
 
 #define xz_config_help \
   "file=<FILENAME>     (required) The filename to serve.\n" \
-  "maxblock=<SIZE>     (optional) Maximum block size allowed (default: 512M)"
+  "maxblock=<SIZE>     (optional) Maximum block size allowed (default: 512M)\n"\
+  "maxdepth=<N>        (optional) Maximum blocks in cache (default: 4)\n"
 
 /* Translate a gzerror to nbdkit_error. */
 #define nbdkit_gzerror(gz, fs, ...)                        \
@@ -115,16 +132,8 @@ xz_config_complete (void)
 struct xz_handle {
   xzfile *xz;
 
-  /* Currently we cache just one block of uncompressed data.  We could
-   * be much smarter! XXX
-   */
-  char *data;
-  uint64_t start, size;
-
-  /* The cache is rubbish, but let's collect stats about how rubbish
-   * it is.
-   */
-  size_t hits, misses;
+  /* Block cache. */
+  blkcache *c;
 };
 
 /* Create the per-connection handle. */
@@ -139,13 +148,13 @@ xz_open (int readonly)
     return NULL;
   }
 
-  h->data = NULL;
-  h->start = h->size = 0;
-  h->hits = h->misses = 0;
+  h->c = new_blkcache (maxdepth);
+  if (h->c == NULL)
+    goto err1;
 
   h->xz = xzfile_open (filename);
   if (!h->xz)
-    goto err1;
+    goto err2;
 
   if (maxblock < xzfile_max_uncompressed_block_size (h->xz)) {
     nbdkit_error ("%s: xz file largest block is bigger than maxblock\n"
@@ -156,11 +165,15 @@ xz_open (int readonly)
                   filename,
                   maxblock,
                   xzfile_max_uncompressed_block_size (h->xz));
-    goto err1;
+    goto err3;
   }
 
   return h;
 
+ err3:
+  xzfile_close (h->xz);
+ err2:
+  free_blkcache (h->c);
  err1:
   free (h);
   return NULL;
@@ -171,12 +184,15 @@ static void
 xz_close (void *handle)
 {
   struct xz_handle *h = handle;
+  blkcache_stats stats;
+
+  blkcache_get_stats (h->c, &stats);
 
   nbdkit_debug ("cache: hits = %" PRIu64 ", misses = %" PRIu64,
-                h->hits, h->misses);
+                stats.hits, stats.misses);
 
-  free (h->data);
   xzfile_close (h->xz);
+  free_blkcache (h->c);
   free (h);
 }
 
@@ -196,41 +212,29 @@ static int
 xz_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
 {
   struct xz_handle *h = handle;
+  char *data;
+  uint64_t start, size;
   uint32_t n;
 
-  /* Does this block lie entirely within the existing cached data? */
-  if (h->data != NULL &&
-      h->start <= offset && offset+count <= h->start + h->size) {
-    h->hits++;
-    nbdkit_debug ("pread: hit: copying data from buffer offset %" PRIu64,
-                  offset - h->start);
-    memcpy (buf, &h->data[offset - h->start], count);
-    return 0;
+  /* Find the block in the cache. */
+  data = get_block (h->c, offset, &start, &size);
+  if (!data) {
+    /* Not in the cache.  We need to read the block from the xz file. */
+    data = xzfile_read_block (h->xz, offset, &start, &size);
+    if (data == NULL)
+      return -1;
+    put_block (h->c, start, size, data);
   }
-
-  h->misses++;
-
-  free (h->data);
-  h->data = xzfile_read_block (h->xz, offset, &h->start, &h->size);
-  if (h->data == NULL)
-    return -1;
-
-  nbdkit_debug ("pread: miss: read block containing offset %" PRIu64
-                " [%" PRIu64 " + %" PRIu64 "]",
-                offset, h->start, h->size);
 
   /* It's possible if the blocks are really small or oddly aligned or
    * if the requests are large that we need to read the following
    * block to satisfy the request.
    */
   n = count;
-  if (h->start + h->size - offset < n)
-    n = h->start + h->size - offset;
+  if (start + size - offset < n)
+    n = start + size - offset;
 
-  nbdkit_debug ("pread: miss: copying data from buffer offset %" PRIu64,
-                offset - h->start);
-
-  memcpy (buf, &h->data[offset - h->start], n);
+  memcpy (buf, &data[offset-start], n);
   buf += n;
   count -= n;
   offset += n;
