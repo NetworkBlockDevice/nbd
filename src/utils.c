@@ -88,8 +88,6 @@ nbdkit_parse_size (const char *str)
   uint64_t size;
   char t;
 
-  if (sscanf (str, "%" SCNu64, &size) == 1)
-    return (int64_t) size;
   if (sscanf (str, "%" SCNu64 "%c", &size, &t) == 2) {
     switch (t) {
     case 'b': case 'B':
@@ -117,6 +115,10 @@ nbdkit_parse_size (const char *str)
       return -1;
     }
   }
+
+  /* bytes */
+  if (sscanf (str, "%" SCNu64, &size) == 1)
+    return (int64_t) size;
 
   nbdkit_error ("could not parse size string (%s)", str);
   return -1;
