@@ -22,7 +22,7 @@ size C<SIZE>.  The disk is thrown away when the client disconnects.
 
 The C<size=SIZE> parameter can use a number of common formats to
 specify the size, eg. C<100M>, C<2G>.  If the parameter is omitted, it
-default to 100 megabytes.
+defaults to 100M.
 
 Mainly this is useful for testing nbdkit and as an example for writing
 nbdkit plugins (L<nbdkit-plugin(3)>).
