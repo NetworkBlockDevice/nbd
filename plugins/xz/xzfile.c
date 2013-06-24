@@ -103,7 +103,7 @@ xzfile_open (const char *filename)
     goto err2;
 
   size = lzma_index_uncompressed_size (xz->idx);
-  nbdkit_error ("%s: size %" PRIu64 " bytes (%.1fM)",
+  nbdkit_debug ("%s: size %" PRIu64 " bytes (%.1fM)",
                 filename, size, size / 1024.0 / 1024.0);
   nbdkit_debug ("%s: %zu streams, %zu blocks", filename,
                 xz->nr_streams, xz->nr_blocks);
