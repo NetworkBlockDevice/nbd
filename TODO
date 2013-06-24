@@ -1,15 +1,22 @@
-Implement the new protocol and export names.  With export names it
-should be possible to have multiple plugins on the command line (each
-responding to a different export of course):
+* Better caching in the xz plugin.
 
-  nbdkit --export /foo plugin.so --export /bar another-plugin.so
+* Add a test suite.  Suggestion: use -s option to run captive server.
 
-Note it should also be possible to either elect one plugin as the
-default that accepts all exportnames, or to divide the export name
-"space" up using regexps or wildcards.
+* Performance - measure and improve it.
 
-Implement true parallel request handling.  Currently
-NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS and NBDKIT_THREAD_MODEL_PARALLEL
-are the same, because we handle requests within each connection
-synchronously one at a time.  We could (and should) be able to handle
-them in parallel by having another thread pool for requests.
+* Implement the new protocol and export names.  With export names it
+  should be possible to have multiple plugins on the command line
+  (each responding to a different export of course):
+
+    nbdkit --export /foo plugin.so --export /bar another-plugin.so
+
+  Note it should also be possible to either elect one plugin as the
+  default that accepts all exportnames, or to divide the export name
+  "space" up using regexps or wildcards.
+
+* Implement true parallel request handling.  Currently
+  NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS and
+  NBDKIT_THREAD_MODEL_PARALLEL are the same, because we handle
+  requests within each connection synchronously one at a time.  We
+  could (and should) be able to handle them in parallel by having
+  another thread pool for requests.
