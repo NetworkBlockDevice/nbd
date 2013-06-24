@@ -459,25 +459,30 @@ xzfile_read_block (xzfile *xz, uint64_t offset,
     goto err1;
   }
 
-  strm.avail_out = block.uncompressed_size;
+  strm.next_in = NULL;
+  strm.avail_in = 0;
   strm.next_out = (uint8_t *) data;
+  strm.avail_out = block.uncompressed_size;
 
   do {
     uint8_t buf[BUFSIZ];
+    lzma_action action = LZMA_RUN;
 
-    n = read (xz->fd, buf, sizeof buf);
-    if (n == -1) {
-      nbdkit_error ("read: %m");
-      goto err2;
-    }
-    if (n == 0) {
-      nbdkit_error ("read: unexpected truncated file while reading data");
-      goto err2;
+    if (strm.avail_in == 0) {
+      strm.next_in = buf;
+      n = read (xz->fd, buf, sizeof buf);
+      if (n == -1) {
+        nbdkit_error ("read: %m");
+        goto err2;
+      }
+      strm.avail_in = n;
+      if (n == 0)
+        action = LZMA_FINISH;
     }
 
     strm.avail_in = n;
     strm.next_in = buf;
-    r = lzma_code (&strm, LZMA_RUN);
+    r = lzma_code (&strm, action);
   } while (r == LZMA_OK);
 
   if (r != LZMA_OK && r != LZMA_STREAM_END) {
