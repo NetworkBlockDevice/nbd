@@ -55,7 +55,6 @@ main (int argc, char *argv[])
                          NULL) == -1)
     exit (EXIT_FAILURE);
 
-  /* Parent (test program). */
   g = guestfs_create ();
   if (g == NULL) {
     perror ("guestfs_create");

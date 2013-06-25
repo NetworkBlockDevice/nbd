@@ -56,7 +56,6 @@ main (int argc, char *argv[])
   if (test_start_nbdkit (NBDKIT_PLUGIN ("example1"), NULL) == -1)
     exit (EXIT_FAILURE);
 
-  /* Parent (test program). */
   g = guestfs_create ();
   if (g == NULL) {
     perror ("guestfs_create");
