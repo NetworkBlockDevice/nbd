@@ -191,6 +191,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
                  plugins/xz/Makefile
-                 src/Makefile])
+                 src/Makefile
+                 tests/Makefile])
 
 AC_OUTPUT

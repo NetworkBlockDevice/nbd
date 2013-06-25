@@ -30,13 +30,24 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-ACLOCAL_AMFLAGS = -I m4
+# Tests need libguestfs, since that is a convenient way to drive qemu.
+if HAVE_LIBGUESTFS
 
-EXTRA_DIST = \
-	.gitignore \
-	LICENSE \
-	m4/.gitignore
+noinst_LTLIBRARIES = libtest.la
+libtest_la_SOURCES = test.c test.h
+libtest_la_CFLAGS = $(WARNINGS_CFLAGS)
 
-SUBDIRS = docs plugins include src tests
+check_PROGRAMS = test-connect
+
+test_connect_SOURCES = test-connect.c test.h
+test_connect_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_connect_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+TESTS = \
+	test-connect
+
+TESTS_ENVIRONMENT = LIBGUESTFS_ATTACH_METHOD=appliance
+
+endif
 
 CLEANFILES = *~

@@ -32,3 +32,4 @@ Makefile.in
 /missing
 /src/nbdkit
 /stamp-h1
+/tests/test-connect
