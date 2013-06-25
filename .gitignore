@@ -32,6 +32,9 @@ Makefile.in
 /missing
 /src/nbdkit
 /stamp-h1
+/tests/disk
 /tests/disk.gz
+/tests/disk.xz
 /tests/test-connect
 /tests/test-gzip
+/tests/test-xz

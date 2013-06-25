@@ -30,6 +30,9 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+CLEANFILES = *~
+MAINTAINERCLEANFILES =
+
 # Tests need libguestfs, since that is a convenient way to drive qemu.
 if HAVE_LIBGUESTFS
 
@@ -55,21 +58,43 @@ if HAVE_GUESTFISH
 
 check_PROGRAMS += test-gzip
 TESTS += test-gzip
-noinst_DATA += disk.gz
+noinst_DATA += disk disk.gz
+MAINTAINERCLEANFILES += disk disk.gz
 
 test_gzip_SOURCES = test-gzip.c test.h
 test_gzip_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
 test_gzip_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
-disk.gz:
-	rm -f $@ test1.img disk
+disk:
+	rm -f $@ test1.img
 	guestfish -N fs -m /dev/sda1 write /hello.txt "hello,world"
 	mv test1.img disk
-	gzip -9 disk
+
+disk.gz: disk
+	rm -f $@
+	gzip -9 -c disk > $@
+
+endif
+endif
+
+# xz plugin test.
+if HAVE_LIBLZMA
+if HAVE_GUESTFISH
+
+check_PROGRAMS += test-xz
+TESTS += test-xz
+noinst_DATA += disk.xz
+MAINTAINERCLEANFILES += disk.xz
+
+test_xz_SOURCES = test-xz.c test.h
+test_xz_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_xz_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+disk.xz: disk
+	rm -f $@
+	xz --best -c disk > $@
 
 endif
 endif
 
 endif
-
-CLEANFILES = *~
