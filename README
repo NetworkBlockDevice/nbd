@@ -1,5 +1,5 @@
-NBD is a protocol for accessing block devices (hard disks and
-disk-like things) over the network.
+NBD is a protocol for accessing Block Devices (hard disks and
+disk-like things) over a Network.
 
 'nbdkit' is a toolkit for creating NBD servers.
 
