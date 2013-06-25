@@ -30,12 +30,37 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	xz
+EXTRA_DIST = nbdkit-guestfs-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_LIBGUESTFS
+
+plugin_LTLIBRARIES = nbdkit-guestfs-plugin.la
+
+nbdkit_guestfs_plugin_la_SOURCES = \
+	guestfs-plugin.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_guestfs_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_guestfs_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(LIBGUESTFS_CFLAGS)
+nbdkit_guestfs_plugin_la_LIBADD = \
+	$(LIBGUESTFS_LIBS)
+nbdkit_guestfs_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-guestfs-plugin.1
+
+nbdkit-guestfs-plugin.1: nbdkit-guestfs-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~

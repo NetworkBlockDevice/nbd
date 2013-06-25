@@ -160,6 +160,23 @@ AS_IF([test "$with_liblzma" != "no"],[
 ])
 AM_CONDITIONAL([HAVE_LIBLZMA],[test "x$LIBLZMA_LIBS" != "x"])
 
+dnl Check for libguestfs (only for the guestfs plugin and the test suite).
+AC_ARG_WITH([libguestfs],[
+    AS_HELP_STRING([--without-libguestfs],
+                   [disable guestfs plugin and tests @<:@default=check@:>@])],
+    [],
+    [with_libguestfs=check])
+AS_IF([test "$with_libguestfs" != "no"],[
+    PKG_CHECK_MODULES([LIBGUESTFS], [libguestfs],[
+        AC_SUBST([LIBGUESTFS_CFLAGS])
+        AC_SUBST([LIBGUESTFS_LIBS])
+        AC_DEFINE([HAVE_LIBGUESTFS],[1],[libguestfs found at compile time.])
+    ],
+    [AC_MSG_WARN([libguestfs not found, guestfs plugin and tests will be disabled])])
+])
+AM_CONDITIONAL([HAVE_LIBGUESTFS],[test "x$LIBGUESTFS_LIBS" != "x"])
+
+
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
@@ -170,6 +187,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/example2/Makefile
                  plugins/example3/Makefile
                  plugins/file/Makefile
+                 plugins/guestfs/Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
                  plugins/xz/Makefile
