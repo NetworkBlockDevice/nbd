@@ -52,6 +52,21 @@ test_connect_SOURCES = test-connect.c test.h
 test_connect_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
 test_connect_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
+# file plugin test.
+check_PROGRAMS += test-file
+TESTS += test-file
+noinst_DATA += file-data
+MAINTAINERCLEANFILES += file-data
+
+test_file_SOURCES = test-file.c test.h
+test_file_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_file_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+file-data:
+	rm -f $@ $@-t
+	for f in `seq 1 512`; do echo -ne '\x01\x02\x03\x04\x05\x06\x07\x08'; done > $@-t
+	mv $@-t $@
+
 # gzip plugin test.
 if HAVE_ZLIB
 if HAVE_GUESTFISH

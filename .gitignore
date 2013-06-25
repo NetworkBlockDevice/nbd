@@ -35,6 +35,8 @@ Makefile.in
 /tests/disk
 /tests/disk.gz
 /tests/disk.xz
+/tests/file-data
 /tests/test-connect
+/tests/test-file
 /tests/test-gzip
 /tests/test-xz
