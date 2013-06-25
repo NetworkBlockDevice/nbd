@@ -176,6 +176,9 @@ AS_IF([test "$with_libguestfs" != "no"],[
 ])
 AM_CONDITIONAL([HAVE_LIBGUESTFS],[test "x$LIBGUESTFS_LIBS" != "x"])
 
+dnl Check for guestfish (only needed for some of the tests).
+AC_CHECK_PROG([GUESTFISH], [guestfish], [guestfish], [no])
+AM_CONDITIONAL([HAVE_GUESTFISH], [test "x$GUESTFISH" != "xno"])
 
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])

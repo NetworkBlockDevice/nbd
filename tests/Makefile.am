@@ -33,20 +33,42 @@
 # Tests need libguestfs, since that is a convenient way to drive qemu.
 if HAVE_LIBGUESTFS
 
+TESTS_ENVIRONMENT = LIBGUESTFS_ATTACH_METHOD=appliance
+
+# Common test library.
 noinst_LTLIBRARIES = libtest.la
 libtest_la_SOURCES = test.c test.h
 libtest_la_CFLAGS = $(WARNINGS_CFLAGS)
 
+# Basic connection test.
 check_PROGRAMS = test-connect
+TESTS = test-connect
+noinst_DATA =
 
 test_connect_SOURCES = test-connect.c test.h
 test_connect_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
 test_connect_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
-TESTS = \
-	test-connect
+# gzip plugin test.
+if HAVE_ZLIB
+if HAVE_GUESTFISH
 
-TESTS_ENVIRONMENT = LIBGUESTFS_ATTACH_METHOD=appliance
+check_PROGRAMS += test-gzip
+TESTS += test-gzip
+noinst_DATA += disk.gz
+
+test_gzip_SOURCES = test-gzip.c test.h
+test_gzip_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_gzip_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+disk.gz:
+	rm -f $@ test1.img disk
+	guestfish -N fs -m /dev/sda1 write /hello.txt "hello,world"
+	mv test1.img disk
+	gzip -9 disk
+
+endif
+endif
 
 endif
 
