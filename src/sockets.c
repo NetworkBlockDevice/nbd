@@ -76,7 +76,7 @@ bind_unix_socket (size_t *nr_socks)
   }
 
   addr.sun_family = AF_UNIX;
-  memcpy (addr.sun_path, unixsocket, len);
+  memcpy (addr.sun_path, unixsocket, len+1 /* trailing \0 */);
 
   if (bind (sock, (struct sockaddr *) &addr, sizeof addr) == -1) {
     perror (unixsocket);
