@@ -41,6 +41,8 @@ for the plugins:
 
  - libguestfs: to build the libguestfs plugin, and to run the test suite
 
+ - guestfish (from libguestfs): to run parts of the test suite
+
 After installing any dependencies:
 
   To build from tarball:         To build from git:
