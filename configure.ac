@@ -180,6 +180,33 @@ dnl Check for guestfish (only needed for some of the tests).
 AC_CHECK_PROG([GUESTFISH], [guestfish], [guestfish], [no])
 AM_CONDITIONAL([HAVE_GUESTFISH], [test "x$GUESTFISH" != "xno"])
 
+dnl See plugins/vddk/README.VDDK.
+AC_CHECK_SIZEOF([size_t])
+AS_IF([test "x$ac_cv_sizeof_size_t" = "x4"],[bits=32],[bits=64])
+AC_ARG_WITH([vddk],[
+    AS_HELP_STRING([--with-vddk],
+                   [enable VMware VDDK plugin @<:@default=no@:>@])],
+    [],
+    [with_vddk=no])
+AS_IF([test "$with_vddk" = "yes"],[
+    VDDK_CFLAGS=
+    VDDK_LIBS="-lvixDiskLib"
+    # XXX Warning: stupid VMware API.
+    VDDK_LIBDIR="$libdir/vmware-vix-disklib"
+    ],[
+    AS_IF([test "$with_vddk" != "no"], [
+        VDDK_CFLAGS="-I$with_vddk/include"
+        VDDK_LIBS="-L$with_vddk/lib$bits -lvixDiskLib"
+        VDDK_LIBDIR="$with_vddk"
+        ],
+        [AC_MSG_NOTICE([VDDK plugin disabled])
+    ])
+])
+AC_SUBST([VDDK_CFLAGS])
+AC_SUBST([VDDK_LIBS])
+AC_DEFINE_UNQUOTED([VDDK_LIBDIR],["$VDDK_LIBDIR"],[VDDK 'libDir'.])
+AM_CONDITIONAL([HAVE_VDDK],[test "x$VDDK_LIBS" != "x"])
+
 dnl Produce output files.
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
@@ -193,6 +220,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/guestfs/Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
+                 plugins/vddk/Makefile
                  plugins/xz/Makefile
                  src/Makefile
                  tests/Makefile])

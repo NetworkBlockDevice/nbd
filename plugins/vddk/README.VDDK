@@ -1,0 +1,43 @@
+VDDK (Virtual Disk Development Kit) is a proprietary VMware library
+for accessing VMDK files and VMware ESX servers.  Note that the
+license of the VDDK library is highly restrictive, preventing any
+commercial usage without negotiating a separate license from VMware.
+
+In order to obtain the VDDK library you have to register for an
+account and download it from:
+
+  https://www.vmware.com/support/developer/vddk/
+
+This directory contains an nbdkit plugin which uses this library to
+export VMDK files and VMware disks over NBD.
+
+Note: VDDK can do NBD on its own, so nbdkit might not be needed unless
+you want the extra features and flexibility of nbdkit.
+
+Note: this is intended more as an example or starting point, rather
+than a fully functional VDDK plugin.  In particular the current
+implementation can only access local VMDK files.
+
+It is never compiled by default.  To enable it you have to do:
+
+  ./configure --with-vddk
+
+If the VDDK library is located in a non-standard location, use this
+instead:
+
+  ./configure --with-vddk=/path/to/vmware-vix-disklib-distrib
+
+(This looks for include/ and lib{32,64}/ subdirectories of the given
+path for header files and libraries respectively.)
+
+After building nbdkit-vddk-plugin.so, read the man page to find out
+how to use it (nbdkit-vddk-plugin(1)).
+
+You'll probably also want to look at the source code (vddk.c) and
+customize it, and read the VDDK developer documentation.
+
+Bugs
+----
+
+Write calls sometimes return VIX_E_DISK_OUTOFRANGE even for write
+requests which are well inside the disk.

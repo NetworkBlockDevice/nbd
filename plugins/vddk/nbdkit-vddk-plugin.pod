@@ -1,0 +1,116 @@
+=encoding utf8
+
+=head1 NAME
+
+nbdkit-vddk-plugin - VMware VDDK plugin for nbdkit
+
+=head1 SYNOPSIS
+
+ nbdkit .../plugins/nbdkit-vddk-plugin.so file=FILENAME
+
+=head1 DESCRIPTION
+
+C<nbdkit-vddk-plugin> is a L<nbdkit(1)> plugin that serves files from
+VMware VMDK and other sources by using VMware's proprietary VDDK
+library.
+
+Currently it can only serve local VMDK files.  The required
+C<file=FILENAME> parameter should point to a VMDK file.  It would be
+relatively simple to extend this plugin to access ESX servers or
+Virtual Center.
+
+The plugin can serve read-only (if the I<-r> option is used) or
+read/write.
+
+=head1 LIBRARY LOCATION
+
+If the VDDK library (C<libvixDiskLib.so>) is located on a non-standard
+path, you may need to set C<LD_LIBRARY_PATH> or modify
+C</etc/ld.so.conf> before this plugin will work.
+
+The VDDK library may depend on C<libexpat.so.0> which you may have to
+install yourself.
+
+=head1 PARAMETERS
+
+=over 4
+
+=item B<config=FILENAME>
+
+This optional parameter lets you specify the name of the VDDK
+configuration file.
+
+=item B<file=FILENAME>
+
+Set the name of the VMDK file to serve.  This parameter is required.
+
+=item B<libdir=PATHNAME>
+
+This sets the path of the VMware VDDK library.  It must be an
+absolute path.
+
+If the parameter is not given, then a hard-coded path determined at
+compile time is used.
+
+=back
+
+=head1 DEBUGGING VDDK
+
+Run nbdkit like this to see all debugging messages:
+
+ nbdkit -f -v .../plugins/nbdkit-vddk-plugin.so file=FILENAME
+
+=head1 SEE ALSO
+
+L<vddk.c> in the nbdkit source tree,
+L<nbdkit(1)>,
+L<nbdkit-plugin(3)>,
+L<https://www.vmware.com/support/developer/vddk/>
+
+=head1 AUTHORS
+
+Richard W.M. Jones
+
+=head1 COPYRIGHT
+
+Copyright (C) 2013 Red Hat Inc.
+
+=head1 LICENSE
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+=over 4
+
+=item *
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+=item *
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+=item *
+
+Neither the name of Red Hat nor the names of its contributors may be
+used to endorse or promote products derived from this software without
+specific prior written permission.
+
+=back
+
+THIS SOFTWARE IS PROVIDED BY RED HAT AND CONTRIBUTORS ''AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL RED HAT OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.

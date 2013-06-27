@@ -43,6 +43,8 @@ for the plugins:
 
  - guestfish (from libguestfs): to run parts of the test suite
 
+ - VDDK: see plugins/vddk/README.VDDK
+
 After installing any dependencies:
 
   To build from tarball:         To build from git:

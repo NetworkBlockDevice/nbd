@@ -30,13 +30,37 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	vddk \
-	xz
+EXTRA_DIST = nbdkit-vddk-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_VDDK
+
+plugin_LTLIBRARIES = nbdkit-vddk-plugin.la
+
+nbdkit_vddk_plugin_la_SOURCES = \
+	vddk.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_vddk_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_vddk_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(VDDK_CFLAGS)
+nbdkit_vddk_plugin_la_LIBADD = \
+	$(VDDK_LIBS)
+nbdkit_vddk_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-vddk-plugin.1
+
+nbdkit-vddk-plugin.1: nbdkit-vddk-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~
