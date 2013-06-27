@@ -23,6 +23,37 @@ License
 This software is copyright (C) Red Hat Inc. and licensed under a BSD
 license.  See LICENSE for details.
 
+Building from source
+--------------------
+
+By default nbdkit needs nothing except Linux and reasonably recent gcc.
+
+However there are some *optional* libraries you may want to install
+for the plugins:
+
+ - pod2man (from perl): to build the manual pages
+
+ - zlib: to build the gzip plugin
+
+ - liblzma: to build the xz plugin
+
+ - libvirt: to build the libvirt plugin
+
+ - libguestfs: to build the libguestfs plugin, and to run the test suite
+
+After installing any dependencies:
+
+  To build from tarball:         To build from git:
+  ----------------------         ------------------
+                                 autoreconf -i
+  ./configure                    ./configure
+  make                           make
+  make check                     make check
+
+Optionally run this as root to install everything:
+
+  make install
+
 Packager information
 --------------------
 
