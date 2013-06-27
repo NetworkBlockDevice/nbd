@@ -1,5 +1,3 @@
-* Add a test suite.  Suggestion: use -s option to run captive server.
-
 * Performance - measure and improve it.
 
 * Implement the new protocol and export names.  With export names it
