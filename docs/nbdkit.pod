@@ -194,7 +194,9 @@ L<nbdkit-example2-plugin(1)>,
 L<nbdkit-example3-plugin(1)>,
 L<nbdkit-file-plugin(1)>,
 L<nbdkit-gzip-plugin(1)>,
-L<nbdkit-libvirt-plugin(1)>.
+L<nbdkit-libvirt-plugin(1)>,
+L<nbdkit-vddk-plugin(1)>.
+L<nbdkit-xz-plugin(1)>.
 
 =head1 AUTHORS
 
