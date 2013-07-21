@@ -54,7 +54,7 @@
 struct tls {
   const char *name;             /* Can be NULL. */
   size_t instance_num;          /* Can be 0. */
-  struct sockaddr addr;
+  struct sockaddr *addr;
   socklen_t addrlen;
 };
 
@@ -65,6 +65,7 @@ free_tls (void *tlsv)
 {
   struct tls *tls = tlsv;
 
+  free (tls->addr);
   free (tls);
 }
 
@@ -118,8 +119,13 @@ tls_set_sockaddr (struct sockaddr *addr, socklen_t addrlen)
   struct tls *tls = pthread_getspecific (tls_key);
 
   if (tls) {
-    tls->addrlen = addrlen;
-    memcpy (&tls->addr, addr, addrlen);
+    free(tls->addr);
+    tls->addr = calloc (1, addrlen);
+    if (tls->addr == NULL) {
+      perror ("calloc");
+      exit (EXIT_FAILURE);
+    }
+    memcpy(tls->addr, addr, addrlen);
   }
 }
 
