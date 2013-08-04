@@ -46,7 +46,7 @@ libtest_la_CFLAGS = $(WARNINGS_CFLAGS)
 # Basic connection test.
 check_PROGRAMS = test-connect
 TESTS = test-connect
-noinst_DATA =
+check_DATA =
 
 test_connect_SOURCES = test-connect.c test.h
 test_connect_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
@@ -55,7 +55,7 @@ test_connect_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 # file plugin test.
 check_PROGRAMS += test-file
 TESTS += test-file
-noinst_DATA += file-data
+check_DATA += file-data
 MAINTAINERCLEANFILES += file-data
 
 test_file_SOURCES = test-file.c test.h
@@ -73,7 +73,7 @@ if HAVE_GUESTFISH
 
 check_PROGRAMS += test-gzip
 TESTS += test-gzip
-noinst_DATA += disk disk.gz
+check_DATA += disk disk.gz
 MAINTAINERCLEANFILES += disk disk.gz
 
 test_gzip_SOURCES = test-gzip.c test.h
@@ -98,7 +98,7 @@ if HAVE_GUESTFISH
 
 check_PROGRAMS += test-xz
 TESTS += test-xz
-noinst_DATA += disk.xz
+check_DATA += disk.xz
 MAINTAINERCLEANFILES += disk.xz
 
 test_xz_SOURCES = test-xz.c test.h
