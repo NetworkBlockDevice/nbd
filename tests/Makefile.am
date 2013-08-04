@@ -39,7 +39,7 @@ if HAVE_LIBGUESTFS
 TESTS_ENVIRONMENT = LIBGUESTFS_ATTACH_METHOD=appliance
 
 # Common test library.
-noinst_LTLIBRARIES = libtest.la
+check_LTLIBRARIES = libtest.la
 libtest_la_SOURCES = test.c test.h
 libtest_la_CFLAGS = $(WARNINGS_CFLAGS)
 
