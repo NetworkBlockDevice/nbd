@@ -3,7 +3,9 @@
 *.3
 *.la
 *.lo
+*.log
 *.o
+*.trs
 
 .deps
 .gdb_history
@@ -40,3 +42,4 @@ Makefile.in
 /tests/test-file
 /tests/test-gzip
 /tests/test-xz
+/test-driver
