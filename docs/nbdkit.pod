@@ -141,9 +141,15 @@ This option implies I<--foreground>.
 Accept connections on the Unix domain socket C<SOCKET> (which is a
 path).
 
-nbdkit neither creates nor deletes this socket.  You should create the
-socket and set the desired permissions and ownership before running
-the server.
+nbdkit creates this socket, but it will probably have incorrect
+permissions (too permissive).  If it is a problem that some
+unauthorized user could connect to this socket between the time that
+nbdkit starts up and the authorized user connects, then put the socket
+into a directory that has restrictive permissions.
+
+nbdkit does B<not> delete the socket file when it exits.  The caller
+should delete the socket file after use (else if you try to start
+nbdkit up again you will get an C<Address already in use> error).
 
 =item B<-u> USER
 
