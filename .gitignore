@@ -38,3 +38,4 @@ man/*.sh
 man/*.sh.in
 make-integrityhuge
 nbd-trdump
+missing

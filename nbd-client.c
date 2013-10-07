@@ -136,7 +136,8 @@ void ask_list(int sock) {
 	uint32_t len;
 	uint32_t reptype;
 	uint64_t magic;
-	char buf[1024];
+	const int BUF_SIZE = 1024;
+	char buf[BUF_SIZE];
 
 	magic = ntohll(opts_magic);
 	if (write(sock, &magic, sizeof(magic)) < 0)
@@ -200,10 +201,15 @@ void ask_list(int sock) {
 					exit(EXIT_FAILURE);
 				}
 				len=ntohl(len);
+				if (len >= BUF_SIZE) {
+					fprintf(stderr, "\nE: export name on server too long\n");
+					exit(EXIT_FAILURE);
+				}
 				if(read(sock, buf, len) < 0) {
 					fprintf(stderr, "\nE: could not read export name from server\n");
 					exit(EXIT_FAILURE);
 				}
+				buf[len] = 0;
 				printf("%s\n", buf);
 			}
 		}
@@ -406,9 +412,6 @@ void disconnect(char* device) {
 
 	if (nbd < 0)
 		err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-	printf("Disconnecting: que, ");
-	if (ioctl(nbd, NBD_CLEAR_QUE)< 0)
-		err("Ioctl failed: %m\n");
 	printf("disconnect, ");
 	if (ioctl(nbd, NBD_DISCONNECT)<0)
 		err("Ioctl failed: %m\n");
@@ -438,6 +441,7 @@ int main(int argc, char *argv[]) {
 	uint32_t cflags=0;
 	uint32_t opts=0;
 	sigset_t block, old;
+	struct sigaction sa;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
@@ -579,6 +583,10 @@ int main(int argc, char *argv[]) {
 		if (daemon(0,0) < 0)
 			err("Cannot detach from terminal");
 	}
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGCHLD, &sa, NULL);
 #endif
 	do {
 #ifndef NOFORK
@@ -651,8 +659,6 @@ int main(int argc, char *argv[]) {
 			cont=0;
 		}
 	} while(cont);
-	printf("Closing: que, ");
-	ioctl(nbd, NBD_CLEAR_QUE);
 	printf("sock, ");
 	ioctl(nbd, NBD_CLEAR_SOCK);
 	printf("done\n");

@@ -14,9 +14,5 @@ meet...
 - Performance improvements: nbd-server should use sendfile() and/or
   libevent to make things go faster. This should be extensively tested
   so we're sure things *are* actually going faster.
-- Need to fix open_modern(): on FreeBSD, getaddrinfo() with AF_UNSPEC
-  returns two addresses, one for AF_INET and one for AF_INET6. We need
-  to initialize two sockets, there.
-  Should be fairly straightforward, but I just ran out of time.
 - ... probably more, but I can't remember much of them right now. I'll
   add to this list as I remember things.
