@@ -288,7 +288,7 @@ int authorized_client(CLIENT *opts) {
 				return 1;
 			}
 		}
-		if (strncmp(line,opts->clientname,strlen(opts->clientname))==0) {
+		if (strcmp(line,opts->clientname)==0) {
 			fclose(f);
 			return 1;
 		}
