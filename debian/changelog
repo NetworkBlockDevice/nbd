@@ -1,3 +1,10 @@
+nbd (1:2.9.16-8+squeeze1) oldstable-security; urgency=low
+
+  * Cherry-pick df890c99337a255979e608d71f42401c0cddd5e0 from git HEAD
+    to fix parsing of authfile files.
+
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 26 Nov 2013 22:27:36 +0100
+
 nbd (1:2.9.16-8) unstable; urgency=high
 
   * Cherry-pick 3ef52043861ab16352d49af89e048ba6339d6df8 from git HEAD
