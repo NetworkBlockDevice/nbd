@@ -257,8 +257,7 @@ manpage.1: manpage.sgml
 	<term><option>authfile</option></term>
 	<listitem>
 	  <para>
-	    Optional; string; default
-	    <filename>$sysconfdir/nbd-server/allow</filename>.
+	    Optional; string; default empty
 	  </para>
 	  <para>
 	    The name of the authorization file for this export. This
@@ -273,7 +272,9 @@ manpage.1: manpage.sgml
 	    this file.
 	  </para>
 	  <para>Corresponds to the <option>-l</option> option on the
-	  command line</para>
+	  command line. However, note that for the command line, the default is
+	  <filename>$sysconfdir/nbd-server/allow</filename>.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>
