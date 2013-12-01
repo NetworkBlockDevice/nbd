@@ -3,7 +3,7 @@ nbd (1:3.4-3) UNRELEASED; urgency=low
   * Really add Japanese translation, by "victory" and the Japanese
     translation team. I had intended to add that for 3.4-1, but
     apparently I did something wrong, and the file ended up being empty.
-    Not anymore. Closes: #718996.
+    Not so anymore. Closes: #718996, really this time.
 
  -- Wouter Verhelst <wouter@debian.org>  Tue, 26 Nov 2013 14:10:44 +0100
 
