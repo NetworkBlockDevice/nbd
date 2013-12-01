@@ -1,5 +1,8 @@
-nbd (1:3.4-3) UNRELEASED; urgency=low
+nbd (1:3.5-1) unstable; urgency=low
 
+  * New upstream release
+    - Closes CVE-2013-6410: incorrect parsing of the authfile access
+      list (also DSA-2806-1).
   * Really add Japanese translation, by "victory" and the Japanese
     translation team. I had intended to add that for 3.4-1, but
     apparently I did something wrong, and the file ended up being empty.
