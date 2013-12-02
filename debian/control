@@ -2,7 +2,8 @@ Source: nbd
 Section: admin
 Priority: optional
 Maintainer: Wouter Verhelst <wouter@debian.org>
-Build-Depends: debhelper (>= 7.4.0), libglib2.0-dev
+Uploaders: Vagrant Cascadian <vagrant@debian.org>
+Build-Depends: debhelper (>= 7.4.0), libglib2.0-dev (>=2.24.2)
 Standards-Version: 3.9.2
 Vcs-Git: git://anonscm.debian.org/users/wouter/nbd.git
 Vcs-Browser: http://git.debian.org/?p=users/wouter/nbd.git;a=summary
@@ -26,7 +27,7 @@ Description: Network Block Device protocol - server
 
 Package: nbd-client
 Architecture: linux-any
-Depends: ${shlibs:Depends}, ${misc:Depends}, debconf | debconf-2.0, initscripts (>= 2.88dsf-13.3)
+Depends: ${shlibs:Depends}, ${misc:Depends}, debconf | debconf-2.0
 Description: Network Block Device protocol - client
  Network Block Device (NBD) is a client/server protocol that
  emulates a block device (such as a hard disk, a floppy, or a CD-ROM)

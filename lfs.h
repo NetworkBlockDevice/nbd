@@ -7,9 +7,6 @@
 # ifndef _LARGEFILE_SOURCE
 #  define _LARGEFILE_SOURCE
 # endif
-# define PARAM_OFFT PARAM_INT64
-#else
-# define PARAM_OFFT PARAM_INT
 #endif /* NBD_LFS */
 #ifdef HAVE_SYNC_FILE_RANGE
 # define USE_SYNC_FILE_RANGE

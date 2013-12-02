@@ -87,6 +87,7 @@ AC_PROG_CPP
 AC_PROG_INSTALL
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
+AM_CONDITIONAL(INT_XFAIL, [test "$ac_cv_c_bigendian" = "yes"])
 AC_C_INLINE
 AC_C_CONST
 AC_CHECK_SIZEOF(unsigned short int)
@@ -133,7 +134,7 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h])
-AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+AM_PATH_GLIB_2_0(2.24.2, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T

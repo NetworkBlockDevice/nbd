@@ -6,8 +6,27 @@ conffile=${tmpdir}/nbd.conf
 pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
 mydir=$(dirname "`readlink -f $0`")
+PID=""
 
 set -e
+
+trap cleanup EXIT
+
+cleanup() {
+	if [ -f ${pidfile} ]
+	then
+		kill `cat ${pidfile}`
+	else
+		if [ ! -z "$PID" ]
+		then
+			kill $PID
+		fi
+	fi
+	if [ -z "$2" ]
+	then
+		rm -rf $tmpdir
+	fi
+}
 
 ulimit -c unlimited
 
@@ -215,19 +234,6 @@ EOF
 		exit 1
 	;;
 esac
-if [ -f ${pidfile} ]
-then
-	kill `cat ${pidfile}`
-else
-	if [ ! -z "$PID" ]
-	then
-		kill $PID
-	fi
-fi
-if [ -z "$2" ]
-then
-	rm -rf $tmpdir
-fi
 
 if [ $retval -ne 0 ]
 then

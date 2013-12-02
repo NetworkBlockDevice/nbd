@@ -265,7 +265,6 @@ typedef struct {
  **/
 typedef enum {
 	PARAM_INT,		/**< This parameter is an integer */
-	PARAM_INT64,		/**< This parameter is an integer */
 	PARAM_STRING,		/**< This parameter is a string */
 	PARAM_BOOL,		/**< This parameter is a boolean */
 } PARAM_TYPE;
@@ -354,7 +353,7 @@ int authorized_client(CLIENT *opts) {
 				return 1;
 			}
 		}
-		if (strncmp(line,opts->clientname,strlen(opts->clientname))==0) {
+		if (strcmp(line,opts->clientname)==0) {
 			fclose(f);
 			return 1;
 		}
@@ -850,7 +849,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		{ "exportname", TRUE,	PARAM_STRING, 	&(s.exportname),	0 },
 		{ "port", 	TRUE,	PARAM_INT, 	&(s.port),		0 },
 		{ "authfile",	FALSE,	PARAM_STRING,	&(s.authname),		0 },
-		{ "filesize",	FALSE,	PARAM_OFFT,	&(s.expected_size),	0 },
+		{ "filesize",	FALSE,	PARAM_INT,	&(s.expected_size),	0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	&(virtstyle),		0 },
 		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
 		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
@@ -889,7 +888,6 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 	gchar **groups;
 	gboolean bval;
 	gint ival;
-	gint64 i64val;
 	gchar* sval;
 	gchar* startgroup;
 	gint i;
@@ -925,7 +923,7 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 		} 
 		for(j=0;j<p_size;j++) {
 			assert(p[j].target != NULL);
-			assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL||p[j].ptype==PARAM_INT64);
+			assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL);
 			switch(p[j].ptype) {
 				case PARAM_INT:
 					ival = g_key_file_get_integer(cfile,
@@ -934,15 +932,6 @@ GArray* parse_cfile(gchar* f, bool have_global, GError** e) {
 								&err);
 					if(!err) {
 						*((gint*)p[j].target) = ival;
-					}
-					break;
-				case PARAM_INT64:
-					i64val = g_key_file_get_int64(cfile,
-								groups[i],
-								p[j].paramname,
-								&err);
-					if(!err) {
-						*((gint64*)p[j].target) = i64val;
 					}
 					break;
 				case PARAM_STRING:
