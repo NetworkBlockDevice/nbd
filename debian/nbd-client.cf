@@ -18,8 +18,12 @@ NBD_TYPE[0]=
 # The host on which the nbd-server process is running
 NBD_HOST[0]=
 #
-# The port on which this client needs to connect
+# The port on which this client needs to connect. Optional for
+# new-style exports (which use a single port, and export names).
 NBD_PORT[0]=
+#
+# The name of the export. Required for new-style exports.
+NBD_NAME[0]=
 #
 # Any extra parameters you would want to specify
 NBD_EXTRA[0]=
@@ -27,7 +31,7 @@ NBD_EXTRA[0]=
 # NBD_DEVICE[1]=/dev/nbd1
 # NBD_TYPE[1]="f"
 # NBD_HOST[1]="localhost"
-# NBD_PORT[1]="1235"
+# NBD_NAME[1]="disk1"
 #
 # You can add as many as you want, but don't skip any number in the variable
 # names, or the initscript will fail.

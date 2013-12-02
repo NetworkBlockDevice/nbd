@@ -1,3 +1,72 @@
+nbd (1:3.2-4~deb7u4~bpo60+1) squeeze-backports; urgency=low
+
+  * Re-upload to squeeze-backports.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 02 Dec 2013 11:10:30 +0100
+
+nbd (1:3.2-4~deb7u4) stable-security; urgency=low
+
+  * Cherry-pick df890c99337a255979e608d71f42401c0cddd5e0 from git HEAD
+    to fix parsing of authfile files.
+
+ -- Wouter Verhelst <wouter@grep.be>  Thu, 28 Nov 2013 13:38:17 +0100
+
+nbd (1:3.2-4~deb7u3) stable; urgency=low
+
+  * Clean build directory of unnecessary cruft, and rebuild. Oops.
+
+ -- Wouter Verhelst <wouter@grep.be>  Wed, 29 May 2013 13:29:50 +0200
+
+nbd (1:3.2-4~deb7u2) stable; urgency=low
+
+  * Remove superfluous 'ulimit -c' calls from simple_test script, so
+    that things will build on buildd machines that have hard limits set
+    for those things, like the mips{,el} buildds.
+
+ -- Wouter Verhelst <wouter@grep.be>  Tue, 28 May 2013 11:56:59 +0200
+
+nbd (1:3.2-4~deb7u1) stable; urgency=low
+
+  * Re-upload to Wheezy.
+
+ -- Wouter Verhelst <wouter@grep.be>  Tue, 14 May 2013 14:18:06 +0200
+
+nbd (1:3.2-4) unstable; urgency=low
+
+  * Unbreak 'nbd-client -l' behaviour; patch by Rogier
+    <rogier777@gmail.com>. Closes: #699374. Why oh why did I forget that
+    with the previous upload? Oh well.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 28 Mar 2013 21:58:35 +0100
+
+nbd (1:3.2-3) unstable; urgency=low
+
+  * Fix handling of NBD_NAME variable in nbd-client initscript. Patch by
+    Rogier <rogier777@gmail.com>. Closes: #699372.
+  * Steal stability fixes from git head:
+      - fix for handling of zero-sized read request
+      - fix for integer output format string
+      - fix for 64-bit offset wrapover.
+      - remove double cast which results in data loss
+  * Change Standards-Version: to 3.9.4. The only change relevant to nbd
+    is the /run transition, but as we were already compliant with that
+    since 1:2.9.23-3, nothing relevant is left.
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 06 Mar 2013 12:21:03 +0100
+
+nbd (1:3.2-2) unstable; urgency=low
+
+  * Update build-dependencies: Build-depend on debhelper 9 (we already
+    say 9 in debian/compat, so this is just stating what's effectively
+    already the case), and tighten libglib2.0-dev dependency, since
+    nbd-server requires at least 2.26 these days.
+  * Change nbd-client-udeb from Architecture: <long list> to
+    Architecture: linux-any, similarly to how it's done for nbd-client.
+    I keep forgetting about this teensie tiny thing here. Oh well.
+  * Ack NMU
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 08 Sep 2012 19:38:02 +0200
+
 nbd (1:3.2-1.1~bpo60+2) squeeze-backports; urgency=low
 
   * Mark the "integrity" test as an expected failure, since it requires

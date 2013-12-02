@@ -1510,13 +1510,18 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 	char* name;
 	int i;
 
-	if (read(net, &namelen, sizeof(namelen)) < 0)
+	if (read(net, &namelen, sizeof(namelen)) < 0) {
 		err("Negotiation failed/7: %m");
+		return NULL;
+	}
 	namelen = ntohl(namelen);
 	name = malloc(namelen+1);
 	name[namelen]=0;
-	if (read(net, name, namelen) < 0)
+	if (read(net, name, namelen) < 0) {
 		err("Negotiation failed/8: %m");
+		free(name);
+		return NULL;
+	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
 		if(!strcmp(serve->servename, name)) {
@@ -1531,6 +1536,7 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 			return client;
 		}
 	}
+	err("Negotiation failed/8a: Requested export not found");
 	free(name);
 	return NULL;
 }
@@ -1617,7 +1623,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 				err_nonfatal("Negotiation failed/5: %m");
 			magic = ntohll(magic);
 			if(magic != opts_magic) {
-				close(net);
+				err_nonfatal("Negotiation failed/5a: magic mismatch");
 				return NULL;
 			}
 			if (read(net, &opt, sizeof(opt)) < 0)
@@ -1642,7 +1648,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 			}
 		} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
 		if(opt == NBD_OPT_ABORT) {
-			close(net);
+			err_nonfatal("Session terminated by client");
 			return NULL;
 		}
 	}
@@ -1725,9 +1731,9 @@ int mainloop(CLIENT *client) {
 		command = request.type & NBD_CMD_MASK_COMMAND;
 		len = ntohl(request.len);
 
-		DEBUG("%s from %llu (%llu) len %d, ", getcommandname(command),
+		DEBUG("%s from %llu (%llu) len %u, ", getcommandname(command),
 				(unsigned long long)request.from,
-				(unsigned long long)request.from / 512, (unsigned int)len);
+				(unsigned long long)request.from / 512, len);
 
 		if (request.magic != htonl(NBD_REQUEST_MAGIC))
 			err("Not enough magic.");
@@ -1735,13 +1741,13 @@ int mainloop(CLIENT *client) {
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
 		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
-			if ((request.from + len) > (OFFT_MAX)) {
+			if (request.from + len < request.from) { // 64 bit overflow!!
 				DEBUG("[Number too large!]");
 				ERROR(client, reply, EINVAL);
 				continue;
 			}
 
-			if (((ssize_t)((off_t)request.from + len) > client->exportsize)) {
+			if (((off_t)request.from + len) > client->exportsize) {
 				DEBUG("[RANGE!]");
 				ERROR(client, reply, EINVAL);
 				continue;
@@ -1810,11 +1816,11 @@ int mainloop(CLIENT *client) {
 
 		case NBD_CMD_READ:
 			DEBUG("exp->buf, ");
-			memcpy(buf, &reply, sizeof(struct nbd_reply));
 			if (client->transactionlogfd != -1)
 				writeit(client->transactionlogfd, &reply, sizeof(reply));
-			p = buf + sizeof(struct nbd_reply);
-			writelen = currlen + sizeof(struct nbd_reply);
+			writeit(client->net, &reply, sizeof(reply));
+			p = buf;
+			writelen = currlen;
 			while(len > 0) {
 				if (expread(request.from, p, currlen, client)) {
 					DEBUG("Read failed: %m");
@@ -2283,7 +2289,6 @@ int serveloop(GArray* servers) {
 				}
 				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
 				if(!client) {
-					err_nonfatal("negotiation failed");
 					close(net);
 					continue;
 				}
