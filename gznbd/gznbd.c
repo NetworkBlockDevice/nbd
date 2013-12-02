@@ -68,7 +68,7 @@ int main(int argc, char **argv)
   int pr[2];
   int sk;
   int nbd;
-  gzFile *gz;
+  gzFile gz;
   int gzerr;
 
   char chunk[CHUNK];
