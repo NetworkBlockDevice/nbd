@@ -240,7 +240,8 @@ typedef struct {
 
 typedef struct {
 	off_t exportsize;    /**< size of the file we're exporting */
-	char *clientname;    /**< peer */
+	char *clientname;    /**< peer, in human-readable format */
+	struct sockaddr_storage clientaddr; /**< peer, in binary format, network byte order */
 	char *exportname;    /**< (processed) filename of the file we're exporting */
 	GArray *export;    /**< array of FILE_INFO of exported files;
 			       array size is always 1 unless we're
@@ -319,15 +320,137 @@ static inline const char * getcommandname(uint64_t command) {
 	}
 }
 
+inline uint8_t getmaskbyte(int masklen) G_GNUC_PURE;
+
+/**
+ * Error domain common for all NBD server errors.
+ **/
+#define NBDS_ERR g_quark_from_static_string("server-error-quark")
+
+/**
+ * NBD server error codes.
+ **/
+typedef enum {
+        NBDS_ERR_CFILE_NOTFOUND,          /**< The configuration file is not found */
+        NBDS_ERR_CFILE_MISSING_GENERIC,   /**< The (required) group "generic" is missing */
+        NBDS_ERR_CFILE_KEY_MISSING,       /**< A (required) key is missing */
+        NBDS_ERR_CFILE_VALUE_INVALID,     /**< A value is syntactically invalid */
+        NBDS_ERR_CFILE_VALUE_UNSUPPORTED, /**< A value is not supported in this build */
+        NBDS_ERR_CFILE_NO_EXPORTS,        /**< A config file was specified that does not
+                                               define any exports */
+        NBDS_ERR_CFILE_INCORRECT_PORT,    /**< The reserved port was specified for an
+                                               old-style export. */
+        NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
+        NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
+        NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
+        NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
+        NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
+        NBDS_ERR_GAI,                     /**< Failed to get address info */
+        NBDS_ERR_SOCKET,                  /**< Failed to create a socket */
+        NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
+        NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
+        NBDS_ERR_SYS,                     /**< Underlying system call or library error */
+} NBDS_ERRS;
+
+inline uint8_t getmaskbyte(int masklen) {
+	if(masklen >= 8) {
+		return 0xFF;
+	}
+	uint8_t retval = 0;
+	for(int i = 7; i + masklen > 7; i--) {
+		retval |= 1 << i;
+	}
+
+	return retval;
+}
+
+/**
+  * Check whether a given address matches a given netmask.
+  *
+  * @param mask the address or netmask to check against, in ASCII representation
+  * @param addr the address to check, in network byte order
+  * @param af the address family of the passed address (AF_INET or AF_INET6)
+  *
+  * @return true if the address matches the mask, false otherwise; in case of
+  * failure to parse netmask, returns false with err set appropriately.
+  * @todo decide what to do with v6-mapped IPv4 addresses.
+  */
+bool address_matches(const char* mask, const void* addr, int af, GError** err) {
+	struct addrinfo *res, *aitmp, hints;
+	char *masksep;
+	char privmask[strlen(mask)+1];
+	int masklen;
+	int addrlen = af == AF_INET ? 4 : 16;
+
+	assert(af == AF_INET || af == AF_INET6);
+
+	strcpy(privmask, mask);
+
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = 0;
+	hints.ai_protocol = 0;
+	hints.ai_flags = AI_NUMERICHOST;
+
+	if((masksep = strchr(privmask, '/'))) {
+		*masksep = '\0';
+		masklen = strtol(++masksep, NULL, 10);
+	} else {
+		masklen = addrlen * 8;
+	}
+
+	int e;
+	if((e = getaddrinfo(privmask, NULL, &hints, &res))) {
+		g_set_error(err, NBDS_ERR, NBDS_ERR_GAI, "could not parse netmask line: %s", gai_strerror(e));
+		return false;
+	}
+	aitmp = res;
+	while(res) {
+		const uint8_t* byte_s = addr;
+		uint8_t* byte_t;
+		uint8_t mask = 0;
+		int len_left = masklen;
+		if(res->ai_family != af) {
+			goto next;
+		}
+		switch(af) {
+			case AF_INET:
+				byte_t = (uint8_t*)(&(((struct sockaddr_in*)(res->ai_addr))->sin_addr));
+				break;
+			case AF_INET6:
+				byte_t = (uint8_t*)(&(((struct sockaddr_in6*)(res->ai_addr))->sin6_addr));
+				break;
+		}
+		while(len_left >= 8) {
+			if(*byte_s != *byte_t) {
+				goto next;
+			}
+			byte_s++; byte_t++;
+			len_left -= 8;
+		}
+		if(len_left) {
+			mask = getmaskbyte(len_left);
+			if((*byte_s & mask) != (*byte_t & mask)) {
+				goto  next;
+			}
+		}
+		freeaddrinfo(aitmp);
+		return true;
+	next:
+		res = res->ai_next;
+	}
+	freeaddrinfo(aitmp);
+	return false;
+}
+
 /**
  * Check whether a client is allowed to connect. Works with an authorization
- * file which contains one line per machine, no wildcards.
+ * file which contains one line per machine or network, with CIDR-style
+ * netmasks.
  *
  * @param opts The client who's trying to connect.
  * @return 0 - authorization refused, 1 - OK
  **/
 int authorized_client(CLIENT *opts) {
-	const char *ERRMSG="Invalid entry '%s' in authfile '%s', so, refusing all connections.";
 	FILE *f ;
 	char line[LINELEN]; 
 	char *tmp;
@@ -342,30 +465,9 @@ int authorized_client(CLIENT *opts) {
 		return 1 ; 
 	}
   
-  	inet_aton(opts->clientname, &client);
 	while (fgets(line,LINELEN,f)!=NULL) {
-		if((tmp=strchr(line, '/'))) {
-			if(strlen(line)<=tmp-line) {
-				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
-				return 0;
-			}
-			*(tmp++)=0;
-			if(!inet_aton(line,&addr)) {
-				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
-				return 0;
-			}
-			len=strtol(tmp, NULL, 0);
-			addr.s_addr>>=32-len;
-			addr.s_addr<<=32-len;
-			memcpy(&cltemp,&client,sizeof(client));
-			cltemp.s_addr>>=32-len;
-			cltemp.s_addr<<=32-len;
-			if(addr.s_addr == cltemp.s_addr) {
-				return 1;
-			}
-		}
-		if (strcmp(line,opts->clientname)==0) {
-			fclose(f);
+		struct sockaddr* sa = (struct sockaddr*)&opts->clientaddr;
+		if(address_matches(line, sa->sa_data, sa->sa_family, NULL)) {
 			return 1;
 		}
 	}
@@ -619,36 +721,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 	}
 	return serve;
 }
-
-/**
- * Error domain common for all NBD server errors.
- **/
-#define NBDS_ERR g_quark_from_static_string("server-error-quark")
-
-/**
- * NBD server error codes.
- **/
-typedef enum {
-        NBDS_ERR_CFILE_NOTFOUND,          /**< The configuration file is not found */
-        NBDS_ERR_CFILE_MISSING_GENERIC,   /**< The (required) group "generic" is missing */
-        NBDS_ERR_CFILE_KEY_MISSING,       /**< A (required) key is missing */
-        NBDS_ERR_CFILE_VALUE_INVALID,     /**< A value is syntactically invalid */
-        NBDS_ERR_CFILE_VALUE_UNSUPPORTED, /**< A value is not supported in this build */
-        NBDS_ERR_CFILE_NO_EXPORTS,        /**< A config file was specified that does not
-                                               define any exports */
-        NBDS_ERR_CFILE_INCORRECT_PORT,    /**< The reserved port was specified for an
-                                               old-style export. */
-        NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
-        NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
-        NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
-        NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
-        NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
-        NBDS_ERR_GAI,                     /**< Failed to get address info */
-        NBDS_ERR_SOCKET,                  /**< Failed to create a socket */
-        NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
-        NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
-        NBDS_ERR_SYS,                     /**< Underlying system call or library error */
-} NBDS_ERRS;
 
 /**
  * duplicate server
@@ -2097,11 +2169,10 @@ void serveconnection(CLIENT *client) {
  * @return: 0 - OK, -1 - failed.
  **/
 int set_peername(int net, CLIENT *client) {
-	struct sockaddr_storage addrin;
 	struct sockaddr_storage netaddr;
 	struct sockaddr_in  *netaddr4 = NULL;
 	struct sockaddr_in6 *netaddr6 = NULL;
-	socklen_t addrinlen = sizeof( addrin );
+	socklen_t addrinlen = sizeof( struct sockaddr_storage );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	char peername[NI_MAXHOST];
@@ -2111,12 +2182,12 @@ int set_peername(int net, CLIENT *client) {
 	int e;
 	int shift;
 
-	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0) {
+	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
 		msg(LOG_INFO, "getpeername failed: %m");
 		return -1;
 	}
 
-	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
+	if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
 		msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
 		return -1;
@@ -2150,7 +2221,7 @@ int set_peername(int net, CLIENT *client) {
 			break;
 		case VIRT_CIDR:
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
-			memcpy(&netaddr, &addrin, addrinlen);
+			memcpy(&netaddr, &(client->clientaddr), addrinlen);
 			if(ai->ai_family == AF_INET) {
 				netaddr4 = (struct sockaddr_in *)&netaddr;
 				(netaddr4->sin_addr).s_addr>>=32-(client->server->cidrlen);
