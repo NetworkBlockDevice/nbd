@@ -2222,31 +2222,23 @@ int set_peername(int net, CLIENT *client) {
 		case VIRT_CIDR:
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &(client->clientaddr), addrinlen);
+			int addrbits;
 			if(ai->ai_family == AF_INET) {
-				netaddr4 = (struct sockaddr_in *)&netaddr;
-				(netaddr4->sin_addr).s_addr>>=32-(client->server->cidrlen);
-				(netaddr4->sin_addr).s_addr<<=32-(client->server->cidrlen);
-
-				getnameinfo((struct sockaddr *) netaddr4, addrinlen,
-							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
-				tmp=g_strdup_printf("%s/%s", netname, peername);
-			}else if(ai->ai_family == AF_INET6) {
-				netaddr6 = (struct sockaddr_in6 *)&netaddr;
-
-				shift = 128-(client->server->cidrlen);
-				i = 3;
-				while(shift >= 8) {
-					((netaddr6->sin6_addr).s6_addr[i])=0;
-					shift-=8;
-					i--;
-				}
-				(netaddr6->sin6_addr).s6_addr[i]>>=shift;
-				(netaddr6->sin6_addr).s6_addr[i]<<=shift;
-
-				getnameinfo((struct sockaddr *)netaddr6, addrinlen,
-					    netname, sizeof(netname), NULL, 0, NI_NUMERICHOST);
-				tmp=g_strdup_printf("%s/%s", netname, peername);
+				addrbits = 32;
+			} else if(ai->ai_family == AF_INET6) {
+				addrbits = 128;
 			}
+			uint8_t* addrptr = ((struct sockaddr*)&netaddr)->sa_data;
+			for(int i = 0; i < addrbits; i+=8) {
+				int masklen = client->server->cidrlen - i;
+				masklen = masklen > 0 ? masklen : 0;
+				uint8_t mask = getmaskbyte(masklen);
+				*addrptr &= mask;
+				addrptr++;
+			}
+			getnameinfo((struct sockaddr *) &netaddr, addrinlen,
+							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
+			tmp=g_strdup_printf("%s/%s", netname, peername);
 
 			if(tmp != NULL)
 			  client->exportname=g_strdup_printf(client->server->exportname, tmp);
