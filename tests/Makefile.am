@@ -1,1 +1,1 @@
-SUBDIRS = run
+SUBDIRS = code run
