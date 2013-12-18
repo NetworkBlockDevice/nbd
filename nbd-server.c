@@ -123,13 +123,6 @@ int glob_flags=0;
 /* Whether we should avoid forking */
 int dontfork = 0;
 
-/** Logging macros, now nothing goes to syslog unless you say ISSERVER */
-#ifdef ISSERVER
-#define msg(prio, ...) syslog(prio, __VA_ARGS__)
-#else
-#define msg(prio, ...) g_log(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, __VA_ARGS__)
-#endif
-
 /* Debugging macros */
 //#define DODBG
 #ifdef DODBG
@@ -145,8 +138,6 @@ int dontfork = 0;
  * integer, so set all bits except for the leftmost one.
  **/
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
-#define LINELEN 256	  /**< Size of static buffer used to read the
-			       authorization file (yuck) */
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 
@@ -178,6 +169,8 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
+#include <nbdsrv.h>
+
 static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
                                                     handler to mark a
                                                     reconfiguration
@@ -196,69 +189,12 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
 /**
- * Types of virtuatlization
- **/
-typedef enum {
-	VIRT_NONE=0,	/**< No virtualization */
-	VIRT_IPLIT,	/**< Literal IP address as part of the filename */
-	VIRT_IPHASH,	/**< Replacing all dots in an ip address by a / before
-			     doing the same as in IPLIT */
-	VIRT_CIDR,	/**< Every subnet in its own directory */
-} VIRT_STYLE;
-
-/**
- * Variables associated with a server.
- **/
-typedef struct {
-	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
-	off_t expected_size; /**< size of the exported file as it was told to
-			       us through configuration */
-	gchar* listenaddr;   /**< The IP address we're listening on */
-	unsigned int port;   /**< port we're exporting this file at */
-	char* authname;      /**< filename of the authorization file */
-	int flags;           /**< flags associated with this exported file */
-	int socket;	     /**< The socket of this server. */
-	int socket_family;   /**< family of the socket */
-	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
-	uint8_t cidrlen;     /**< The length of the mask when we use
-				  CIDR-style virtualization */
-	gchar* prerun;	     /**< command to be ran after connecting a client,
-				  but before starting to serve */
-	gchar* postrun;	     /**< command that will be ran after the client
-				  disconnects */
-	gchar* servename;    /**< name of the export as selected by nbd-client */
-	int max_connections; /**< maximum number of opened connections */
-	gchar* transactionlog;/**< filename for transaction log */
-} SERVER;
-
-/**
- * Variables associated with a client socket.
+ * Variables associated with an open file
  **/
 typedef struct {
 	int fhandle;      /**< file descriptor */
 	off_t startoff;   /**< starting offset of this file */
 } FILE_INFO;
-
-typedef struct {
-	off_t exportsize;    /**< size of the file we're exporting */
-	char *clientname;    /**< peer, in human-readable format */
-	struct sockaddr_storage clientaddr; /**< peer, in binary format, network byte order */
-	char *exportname;    /**< (processed) filename of the file we're exporting */
-	GArray *export;    /**< array of FILE_INFO of exported files;
-			       array size is always 1 unless we're
-			       doing the multiple file option */
-	int net;	     /**< The actual client socket */
-	SERVER *server;	     /**< The server this client is getting data from */
-	char* difffilename;  /**< filename of the copy-on-write file, if any */
-	int difffile;	     /**< filedescriptor of copyonwrite file. @todo
-			       shouldn't this be an array too? (cfr export) Or
-			       make -m and -c mutually exclusive */
-	u32 difffilelen;     /**< number of pages in difffile */
-	u32 *difmap;	     /**< see comment on the global difmap for this one */
-	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
-	int transactionlogfd;/**< fd for transaction log */
-	int clientfeats;     /**< Features supported by this client */
-} CLIENT;
 
 /**
  * Type of configuration file values
@@ -319,175 +255,6 @@ static inline const char * getcommandname(uint64_t command) {
 	default:
 		return "UNKNOWN";
 	}
-}
-
-inline uint8_t getmaskbyte(int masklen) G_GNUC_PURE;
-
-/**
- * Error domain common for all NBD server errors.
- **/
-#define NBDS_ERR g_quark_from_static_string("server-error-quark")
-
-/**
- * NBD server error codes.
- **/
-typedef enum {
-        NBDS_ERR_CFILE_NOTFOUND,          /**< The configuration file is not found */
-        NBDS_ERR_CFILE_MISSING_GENERIC,   /**< The (required) group "generic" is missing */
-        NBDS_ERR_CFILE_KEY_MISSING,       /**< A (required) key is missing */
-        NBDS_ERR_CFILE_VALUE_INVALID,     /**< A value is syntactically invalid */
-        NBDS_ERR_CFILE_VALUE_UNSUPPORTED, /**< A value is not supported in this build */
-        NBDS_ERR_CFILE_NO_EXPORTS,        /**< A config file was specified that does not
-                                               define any exports */
-        NBDS_ERR_CFILE_INCORRECT_PORT,    /**< The reserved port was specified for an
-                                               old-style export. */
-        NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
-        NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
-        NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
-        NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
-        NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
-        NBDS_ERR_GAI,                     /**< Failed to get address info */
-        NBDS_ERR_SOCKET,                  /**< Failed to create a socket */
-        NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
-        NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
-        NBDS_ERR_SYS,                     /**< Underlying system call or library error */
-} NBDS_ERRS;
-
-inline uint8_t getmaskbyte(int masklen) {
-	if(masklen >= 8) {
-		return 0xFF;
-	}
-	uint8_t retval = 0;
-	for(int i = 7; i + masklen > 7; i--) {
-		retval |= 1 << i;
-	}
-
-	return retval;
-}
-
-/**
-  * Check whether a given address matches a given netmask.
-  *
-  * @param mask the address or netmask to check against, in ASCII representation
-  * @param addr the address to check, in network byte order
-  * @param af the address family of the passed address (AF_INET or AF_INET6)
-  *
-  * @return true if the address matches the mask, false otherwise; in case of
-  * failure to parse netmask, returns false with err set appropriately.
-  * @todo decide what to do with v6-mapped IPv4 addresses.
-  */
-bool address_matches(const char* mask, const void* addr, int af, GError** err) {
-	struct addrinfo *res, *aitmp, hints;
-	char *masksep;
-	char privmask[strlen(mask)+1];
-	int masklen;
-	int addrlen = af == AF_INET ? 4 : 16;
-
-	assert(af == AF_INET || af == AF_INET6);
-
-	strcpy(privmask, mask);
-
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = 0;
-	hints.ai_protocol = 0;
-	hints.ai_flags = AI_NUMERICHOST;
-
-	if((masksep = strchr(privmask, '/'))) {
-		*masksep = '\0';
-		masklen = strtol(++masksep, NULL, 10);
-	} else {
-		masklen = addrlen * 8;
-	}
-
-	int e;
-	if((e = getaddrinfo(privmask, NULL, &hints, &res))) {
-		g_set_error(err, NBDS_ERR, NBDS_ERR_GAI, "could not parse netmask line: %s", gai_strerror(e));
-		return false;
-	}
-	aitmp = res;
-	while(res) {
-		const uint8_t* byte_s = addr;
-		uint8_t* byte_t;
-		uint8_t mask = 0;
-		int len_left = masklen;
-		if(res->ai_family != af) {
-			goto next;
-		}
-		switch(af) {
-			case AF_INET:
-				byte_t = (uint8_t*)(&(((struct sockaddr_in*)(res->ai_addr))->sin_addr));
-				break;
-			case AF_INET6:
-				byte_t = (uint8_t*)(&(((struct sockaddr_in6*)(res->ai_addr))->sin6_addr));
-				break;
-		}
-		while(len_left >= 8) {
-			if(*byte_s != *byte_t) {
-				goto next;
-			}
-			byte_s++; byte_t++;
-			len_left -= 8;
-		}
-		if(len_left) {
-			mask = getmaskbyte(len_left);
-			if((*byte_s & mask) != (*byte_t & mask)) {
-				goto  next;
-			}
-		}
-		freeaddrinfo(aitmp);
-		return true;
-	next:
-		res = res->ai_next;
-	}
-	freeaddrinfo(aitmp);
-	return false;
-}
-
-/**
- * Check whether a client is allowed to connect. Works with an authorization
- * file which contains one line per machine or network, with CIDR-style
- * netmasks.
- *
- * @param opts The client who's trying to connect.
- * @return 0 - authorization refused, 1 - OK
- **/
-int authorized_client(CLIENT *opts) {
-	FILE *f ;
-	char line[LINELEN]; 
-	char *tmp;
-	struct in_addr addr;
-	struct in_addr client;
-	struct in_addr cltemp;
-	int len;
-
-	if ((f=fopen(opts->server->authname,"r"))==NULL) {
-                msg(LOG_INFO, "Can't open authorization file %s (%s).",
-                    opts->server->authname, strerror(errno));
-		return 1 ; 
-	}
-  
-	while (fgets(line,LINELEN,f)!=NULL) {
-		char* pos;
-		/* Drop comments */
-		if((pos = strchr(line, '#'))) {
-			*pos = '\0';
-		}
-		/* Skip whitespace */
-		pos = line;
-		while((*pos) && isspace(*pos)) {
-			pos++;
-		}
-		/* Skip content-free lines */
-		if(!(*pos)) {
-			continue;
-		}
-		struct sockaddr* sa = (struct sockaddr*)&opts->clientaddr;
-		if(address_matches(line, sa->sa_data, sa->sa_family, NULL)) {
-			return 1;
-		}
-	}
-	fclose(f);
-	return 0;
 }
 
 /**

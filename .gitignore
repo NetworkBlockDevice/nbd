@@ -39,3 +39,8 @@ man/*.sh.in
 make-integrityhuge
 nbd-trdump
 missing
+libtool
+*.lo
+ltmain.sh
+.libs/
+*.la

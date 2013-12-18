@@ -54,14 +54,14 @@ typedef unsigned long long u64;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-u64 cliserv_magic = 0x00420281861253LL;
-u64 opts_magic = 0x49484156454F5054LL;
-u64 rep_magic = 0x3e889045565a9LL;
+static u64 cliserv_magic = 0x00420281861253LL;
+static u64 opts_magic = 0x49484156454F5054LL;
+static u64 rep_magic = 0x3e889045565a9LL;
 #define INIT_PASSWD "NBDMAGIC"
 
 #define INFO(a) do { } while(0)
 
-void setmysockopt(int sock) {
+inline void setmysockopt(int sock) {
 	int size = 1;
 #if 0
 	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(int)) < 0)
@@ -89,7 +89,7 @@ void setmysockopt(int sock) {
 #endif
 #endif
 
-void err_nonfatal(const char *s) {
+inline void err_nonfatal(const char *s) {
 	char s1[150], *s2;
 
 	strncpy(s1, s, sizeof(s1));
@@ -115,14 +115,14 @@ void err_nonfatal(const char *s) {
 	fprintf(stderr, "Error: %s\nExiting.\n", s1);
 }
 
-void err(const char *s) G_GNUC_NORETURN;
+inline void err(const char *s) G_GNUC_NORETURN;
 
-void err(const char *s) {
+inline void err(const char *s) {
 	err_nonfatal(s);
 	exit(EXIT_FAILURE);
 }
 
-void logging(void) {
+inline void logging(void) {
 #ifdef ISSERVER
 	openlog(MY_NAME, LOG_PID, LOG_DAEMON);
 #endif
@@ -131,11 +131,11 @@ void logging(void) {
 }
 
 #ifdef WORDS_BIGENDIAN
-u64 ntohll(u64 a) {
+inline u64 ntohll(u64 a) {
 	return a;
 }
 #else
-u64 ntohll(u64 a) {
+inline u64 ntohll(u64 a) {
 	u32 lo = a & 0xffffffff;
 	u32 hi = a >> 32U;
 	lo = ntohl(lo);
