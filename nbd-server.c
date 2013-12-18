@@ -95,6 +95,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <dirent.h>
+#include <ctype.h>
 
 #include <glib.h>
 
@@ -466,6 +467,20 @@ int authorized_client(CLIENT *opts) {
 	}
   
 	while (fgets(line,LINELEN,f)!=NULL) {
+		char* pos;
+		/* Drop comments */
+		if((pos = strchr(line, '#'))) {
+			*pos = '\0';
+		}
+		/* Skip whitespace */
+		pos = line;
+		while((*pos) && isspace(*pos)) {
+			pos++;
+		}
+		/* Skip content-free lines */
+		if(!(*pos)) {
+			continue;
+		}
 		struct sockaddr* sa = (struct sockaddr*)&opts->clientaddr;
 		if(address_matches(line, sa->sa_data, sa->sa_family, NULL)) {
 			return 1;
