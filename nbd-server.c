@@ -1393,6 +1393,7 @@ static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasi
 	uint64_t magic = htonll(0x3e889045565a9LL);
 	reply_type = htonl(reply_type);
 	uint32_t datsize = htonl(datasize);
+	opt = htonl(opt);
 	struct iovec v_data[] = {
 		{ &magic, sizeof(magic) },
 		{ &opt, sizeof(opt) },
