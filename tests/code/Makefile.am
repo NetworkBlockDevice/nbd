@@ -1,5 +1,10 @@
-TESTS = clientacl
-check_PROGRAMS = clientacl
+TESTS = clientacl dup
+check_PROGRAMS = clientacl dup
+
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
+
 clientacl_SOURCES = clientacl.c
-clientacl_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
-clientacl_LDADD = $(top_srcdir)/libnbdsrv.la @GLIB_LIBS@
+clientacl_LDADD = $(top_builddir)/libnbdsrv.la @GLIB_LIBS@
+
+dup_SOURCES = dup.c
+dup_LDADD = $(top_builddir)/libnbdsrv.la @GLIB_LIBS@
