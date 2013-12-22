@@ -149,4 +149,11 @@ uint8_t getmaskbyte(int masklen) G_GNUC_PURE;
  **/
 int authorized_client(CLIENT *opts);
 
+/**
+ * duplicate server
+ * @param s the old server we want to duplicate
+ * @return new duplicated server
+ **/
+SERVER* dup_serve(const SERVER *const s);
+
 #endif //NBDSRV_H
