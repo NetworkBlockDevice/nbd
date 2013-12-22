@@ -3,7 +3,7 @@ dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],[3.5],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-bzip2 serial-tests)
-AM_MAINTAINER_MODE
+AM_MAINTAINER_MODE([enable])
 LT_INIT
 
 AC_ARG_ENABLE(
