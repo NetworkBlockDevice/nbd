@@ -1,8 +1,25 @@
 #include <nbdsrv.h>
+#include <assert.h>
+#include <string.h>
 
+inline int stringcmp(const char* a, const char* b) {
+	if(a == NULL && b == NULL) {
+		return 0;
+	}
+	if(a == NULL) {
+		return 1;
+	}
+	if(b == NULL) {
+		return -1;
+	}
+	return strcmp(a, b);
+}
+
+#define count_assert(EXPR) { printf("%d\n", ++count); assert(EXPR); }
 int main(void) {
+	int count=0;
 	SERVER *srvd;
-	SERVER *srvs = {
+	SERVER srvs = {
 		.exportname = "foo",
 		.expected_size = 0,
 		.listenaddr = "0.0.0.0",
@@ -20,22 +37,22 @@ int main(void) {
 		.transactionlog = "/etc/foo",
 	};
 
-	srvd = dup_serve(srvs);
+	srvd = dup_serve(&srvs);
 
-	assert(srvs != srvd);
-	assert(strcmp(srvs->exportname, srvd->exportname) == 0);
-	assert(srvs->expected_size == srvd->expected_size);
-	assert(strcmp(srvs->listenaddr, srvd->listenaddr) == 0);
-	assert(srvs->port == srvd->port);
-	assert(strcmp(srvs->authname, srvd->listenaddr) == 0);
-	assert(srvs->flags == srvd->flags);
-	assert(srvs->socket == srvd->socket);
-	assert(srvs->socket_family == srvd->socket_family);
-	assert(srvs->virtstyle == srvd->virtstyle);
-	assert(srvs->cidrlen == srvd->cidrlen);
-	assert(strcmp(srvs->prerun, srvd->prerun) == 0);
-	assert(strcmp(srvs->postrun, srvs->postrun) == 0);
-	assert(strcmp(srvs->servename, srvd->servename) == 0);
-	assert(srvs->max_connections == srvd->max_connections);
-	assert(strcmp(srvs->transactionlog, srvd->transactionlog) == 0);
+	count_assert(&srvs != srvd);
+	count_assert(stringcmp(srvs.exportname, srvd->exportname) == 0);
+	count_assert(srvs.expected_size == srvd->expected_size);
+	count_assert(stringcmp(srvs.listenaddr, srvd->listenaddr) == 0);
+	count_assert(srvs.port == srvd->port);
+	count_assert(stringcmp(srvs.authname, srvd->authname) == 0);
+	count_assert(srvs.flags == srvd->flags);
+	count_assert(srvs.socket == srvd->socket);
+	count_assert(srvs.socket_family == srvd->socket_family);
+	count_assert(srvs.virtstyle == srvd->virtstyle);
+	count_assert(srvs.cidrlen == srvd->cidrlen);
+	count_assert(stringcmp(srvs.prerun, srvd->prerun) == 0);
+	count_assert(stringcmp(srvs.postrun, srvs.postrun) == 0);
+	count_assert(stringcmp(srvs.servename, srvd->servename) == 0);
+	count_assert(srvs.max_connections == srvd->max_connections);
+	count_assert(stringcmp(srvs.transactionlog, srvd->transactionlog) == 0);
 }
