@@ -1,4 +1,4 @@
-SUBDIRS = man doc tests
+SUBDIRS = . man doc tests
 bin_PROGRAMS = nbd-server nbd-trdump
 sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client make-integrityhuge
@@ -12,4 +12,4 @@ libnbdsrv_la_SOURCES = nbdsrv.c nbdsrv.h
 libnbdsrv_la_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@ libnbdsrv.la
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h
-EXTRA_DIST = gznbd simple_test maketr CodingStyle autogen.sh
+EXTRA_DIST = gznbd maketr CodingStyle autogen.sh
