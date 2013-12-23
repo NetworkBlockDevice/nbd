@@ -978,9 +978,7 @@ int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* m
  * seek to a position in a file, with error handling.
  * @param handle a filedescriptor
  * @param a position to seek to
- * @todo get rid of this; lastpoint is a global variable right now, but it
- * shouldn't be. If we pass it on as a parameter, that makes things a *lot*
- * easier.
+ * @todo get rid of this.
  **/
 void myseek(int handle,off_t a) {
 	if (lseek(handle, a, SEEK_SET) < 0) {
