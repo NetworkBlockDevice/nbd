@@ -1,6 +1,7 @@
 #include <nbdsrv.h>
 #include <assert.h>
 #include <string.h>
+#include "macro.h"
 
 inline int stringcmp(const char* a, const char* b) {
 	if(a == NULL && b == NULL) {
@@ -15,7 +16,6 @@ inline int stringcmp(const char* a, const char* b) {
 	return strcmp(a, b);
 }
 
-#define count_assert(EXPR) { printf("%d\n", ++count); assert(EXPR); }
 int main(void) {
 	int count=0;
 	SERVER *srvd;
