@@ -296,7 +296,6 @@ static inline void consume(int f, void * buf, size_t len, size_t bufsiz) {
 	}
 }
 
-
 /**
  * Write data from a buffer into a filedescriptor
  *
