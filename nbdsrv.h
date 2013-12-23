@@ -156,4 +156,11 @@ int authorized_client(CLIENT *opts);
  **/
 SERVER* dup_serve(const SERVER *const s);
 
+/**
+ * append new server to array
+ * @param s server
+ * @param a server array
+ * @return 0 success, -1 error
+ */
+int append_serve(const SERVER *const s, GArray *const a);
 #endif //NBDSRV_H
