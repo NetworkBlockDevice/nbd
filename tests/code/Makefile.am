@@ -1,5 +1,6 @@
 TESTS = clientacl dup append
 check_PROGRAMS = clientacl dup append
+EXTRA_DIST = macro.h
 
 AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 AM_CPPFLAGS = -I$(top_srcdir)
