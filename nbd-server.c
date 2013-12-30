@@ -102,6 +102,7 @@
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
+#include "nbd-debug.h"
 #include "netdb-compat.h"
 
 #ifdef WITH_SDP
@@ -123,16 +124,6 @@ int glob_flags=0;
 /* Whether we should avoid forking */
 int dontfork = 0;
 
-/* Debugging macros */
-//#define DODBG
-#ifdef DODBG
-#define DEBUG(...) printf(__VA_ARGS__)
-#else
-#define DEBUG(...)
-#endif
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION ""
-#endif
 /**
  * The highest value a variable of type off_t can reach. This is a signed
  * integer, so set all bits except for the leftmost one.
@@ -877,53 +868,6 @@ void sigterm_handler(int s) {
  **/
 static void sighup_handler(const int s G_GNUC_UNUSED) {
         is_sighup_caught = 1;
-}
-
-/**
- * Detect the size of a file.
- *
- * @param fhandle An open filedescriptor
- * @return the size of the file, or OFFT_MAX if detection was
- * impossible.
- **/
-off_t size_autodetect(int fhandle) {
-	off_t es;
-	u64 bytes __attribute__((unused));
-	struct stat stat_buf;
-	int error;
-
-#ifdef HAVE_SYS_MOUNT_H
-#ifdef HAVE_SYS_IOCTL_H
-#ifdef BLKGETSIZE64
-	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
-	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
-		return (off_t)bytes;
-	}
-#endif /* BLKGETSIZE64 */
-#endif /* HAVE_SYS_IOCTL_H */
-#endif /* HAVE_SYS_MOUNT_H */
-
-	DEBUG("looking for fhandle size with fstat\n");
-	stat_buf.st_size = 0;
-	error = fstat(fhandle, &stat_buf);
-	if (!error) {
-		/* always believe stat if a regular file as it might really
-		 * be zero length */
-		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
-			return (off_t)stat_buf.st_size;
-        } else {
-                err("fstat failed: %m");
-        }
-
-	DEBUG("looking for fhandle size with lseek SEEK_END\n");
-	es = lseek(fhandle, (off_t)0, SEEK_END);
-	if (es > ((off_t)0)) {
-		return es;
-        } else {
-                DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
-        }
-
-	err("Could not find size of exported block device: %m");
 }
 
 /**

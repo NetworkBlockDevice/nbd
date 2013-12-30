@@ -163,4 +163,13 @@ SERVER* dup_serve(const SERVER *const s);
  * @return 0 success, -1 error
  */
 int append_serve(const SERVER *const s, GArray *const a);
+
+/**
+ * Detect the size of a file.
+ *
+ * @param fhandle An open filedescriptor
+ * @return the size of the file, or OFFT_MAX if detection was
+ * impossible.
+ **/
+off_t size_autodetect(int fhandle);
 #endif //NBDSRV_H
