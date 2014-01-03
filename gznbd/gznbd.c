@@ -40,6 +40,7 @@
 #include <fcntl.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
   int pr[2];
   int sk;
   int nbd;
-  gzFile *gz;
+  gzFile gz;
   int gzerr;
 
   char chunk[CHUNK];
@@ -95,7 +96,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: %s does not appear to be a valid size\n",argv[0],argv[3]);
       exit(1);
     }
-    printf("%s: file=%s, size=%Ld\n",argv[0],argv[2],size);
+    printf("%s: file=%s, size=%"PRId64"\n",argv[0],argv[2],size);
   } else {
     char buffer[BLOCK];
     int result;
@@ -110,7 +111,7 @@ int main(int argc, char **argv)
     }
 
     if(result==0){
-      printf("size=%Ld\n",size);
+      printf("size=%"PRId64"\n",size);
     } else {
       printf("failed\n");
       if(result<0){
@@ -195,7 +196,7 @@ int main(int argc, char **argv)
     from=ntohll(request.from);
 
 #ifdef TRACE
-fprintf(stderr,"%s: len=%d, from=%Ld\n",argv[0],len,from);
+fprintf(stderr,"%s: len=%d, from=%"PRId64"\n",argv[0],len,from);
 #endif
 
     if(request.magic!=htonl(NBD_REQUEST_MAGIC)){

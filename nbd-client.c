@@ -117,6 +117,8 @@ int opennet(char *name, char* portstr, int sdp) {
 
 		if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
 			break;		/* success */
+			
+		close(sock);
 	}
 
 	if (rp == NULL) {

@@ -95,12 +95,14 @@
 #include <pwd.h>
 #include <grp.h>
 #include <dirent.h>
+#include <ctype.h>
 
 #include <glib.h>
 
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
+#include "nbd-debug.h"
 #include "netdb-compat.h"
 
 #ifdef WITH_SDP
@@ -122,30 +124,11 @@ int glob_flags=0;
 /* Whether we should avoid forking */
 int dontfork = 0;
 
-/** Logging macros, now nothing goes to syslog unless you say ISSERVER */
-#ifdef ISSERVER
-#define msg(prio, ...) syslog(prio, __VA_ARGS__)
-#else
-#define msg(prio, ...) g_log(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, __VA_ARGS__)
-#endif
-
-/* Debugging macros */
-//#define DODBG
-#ifdef DODBG
-#define DEBUG(...) printf(__VA_ARGS__)
-#else
-#define DEBUG(...)
-#endif
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION ""
-#endif
 /**
  * The highest value a variable of type off_t can reach. This is a signed
  * integer, so set all bits except for the leftmost one.
  **/
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
-#define LINELEN 256	  /**< Size of static buffer used to read the
-			       authorization file (yuck) */
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
 
@@ -177,6 +160,8 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
+#include <nbdsrv.h>
+
 static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
                                                     handler to mark a
                                                     reconfiguration
@@ -195,68 +180,12 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
 /**
- * Types of virtuatlization
- **/
-typedef enum {
-	VIRT_NONE=0,	/**< No virtualization */
-	VIRT_IPLIT,	/**< Literal IP address as part of the filename */
-	VIRT_IPHASH,	/**< Replacing all dots in an ip address by a / before
-			     doing the same as in IPLIT */
-	VIRT_CIDR,	/**< Every subnet in its own directory */
-} VIRT_STYLE;
-
-/**
- * Variables associated with a server.
- **/
-typedef struct {
-	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
-	off_t expected_size; /**< size of the exported file as it was told to
-			       us through configuration */
-	gchar* listenaddr;   /**< The IP address we're listening on */
-	unsigned int port;   /**< port we're exporting this file at */
-	char* authname;      /**< filename of the authorization file */
-	int flags;           /**< flags associated with this exported file */
-	int socket;	     /**< The socket of this server. */
-	int socket_family;   /**< family of the socket */
-	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
-	uint8_t cidrlen;     /**< The length of the mask when we use
-				  CIDR-style virtualization */
-	gchar* prerun;	     /**< command to be ran after connecting a client,
-				  but before starting to serve */
-	gchar* postrun;	     /**< command that will be ran after the client
-				  disconnects */
-	gchar* servename;    /**< name of the export as selected by nbd-client */
-	int max_connections; /**< maximum number of opened connections */
-	gchar* transactionlog;/**< filename for transaction log */
-} SERVER;
-
-/**
- * Variables associated with a client socket.
+ * Variables associated with an open file
  **/
 typedef struct {
 	int fhandle;      /**< file descriptor */
 	off_t startoff;   /**< starting offset of this file */
 } FILE_INFO;
-
-typedef struct {
-	off_t exportsize;    /**< size of the file we're exporting */
-	char *clientname;    /**< peer */
-	char *exportname;    /**< (processed) filename of the file we're exporting */
-	GArray *export;    /**< array of FILE_INFO of exported files;
-			       array size is always 1 unless we're
-			       doing the multiple file option */
-	int net;	     /**< The actual client socket */
-	SERVER *server;	     /**< The server this client is getting data from */
-	char* difffilename;  /**< filename of the copy-on-write file, if any */
-	int difffile;	     /**< filedescriptor of copyonwrite file. @todo
-			       shouldn't this be an array too? (cfr export) Or
-			       make -m and -c mutually exclusive */
-	u32 difffilelen;     /**< number of pages in difffile */
-	u32 *difmap;	     /**< see comment on the global difmap for this one */
-	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
-	int transactionlogfd;/**< fd for transaction log */
-	int clientfeats;     /**< Features supported by this client */
-} CLIENT;
 
 /**
  * Type of configuration file values
@@ -320,60 +249,6 @@ static inline const char * getcommandname(uint64_t command) {
 }
 
 /**
- * Check whether a client is allowed to connect. Works with an authorization
- * file which contains one line per machine, no wildcards.
- *
- * @param opts The client who's trying to connect.
- * @return 0 - authorization refused, 1 - OK
- **/
-int authorized_client(CLIENT *opts) {
-	const char *ERRMSG="Invalid entry '%s' in authfile '%s', so, refusing all connections.";
-	FILE *f ;
-	char line[LINELEN]; 
-	char *tmp;
-	struct in_addr addr;
-	struct in_addr client;
-	struct in_addr cltemp;
-	int len;
-
-	if ((f=fopen(opts->server->authname,"r"))==NULL) {
-                msg(LOG_INFO, "Can't open authorization file %s (%s).",
-                    opts->server->authname, strerror(errno));
-		return 1 ; 
-	}
-  
-  	inet_aton(opts->clientname, &client);
-	while (fgets(line,LINELEN,f)!=NULL) {
-		if((tmp=strchr(line, '/'))) {
-			if(strlen(line)<=tmp-line) {
-				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
-				return 0;
-			}
-			*(tmp++)=0;
-			if(!inet_aton(line,&addr)) {
-				msg(LOG_CRIT, ERRMSG, line, opts->server->authname);
-				return 0;
-			}
-			len=strtol(tmp, NULL, 0);
-			addr.s_addr>>=32-len;
-			addr.s_addr<<=32-len;
-			memcpy(&cltemp,&client,sizeof(client));
-			cltemp.s_addr>>=32-len;
-			cltemp.s_addr<<=32-len;
-			if(addr.s_addr == cltemp.s_addr) {
-				return 1;
-			}
-		}
-		if (strcmp(line,opts->clientname)==0) {
-			fclose(f);
-			return 1;
-		}
-	}
-	fclose(f);
-	return 0;
-}
-
-/**
  * Read data from a file descriptor into a buffer
  *
  * @param f a file descriptor
@@ -411,7 +286,6 @@ static inline void consume(int f, void * buf, size_t len, size_t bufsiz) {
 		len -= curlen;
 	}
 }
-
 
 /**
  * Write data from a buffer into a filedescriptor
@@ -618,147 +492,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 		dump_section(serve, section_header);
 	}
 	return serve;
-}
-
-/**
- * Error domain common for all NBD server errors.
- **/
-#define NBDS_ERR g_quark_from_static_string("server-error-quark")
-
-/**
- * NBD server error codes.
- **/
-typedef enum {
-        NBDS_ERR_CFILE_NOTFOUND,          /**< The configuration file is not found */
-        NBDS_ERR_CFILE_MISSING_GENERIC,   /**< The (required) group "generic" is missing */
-        NBDS_ERR_CFILE_KEY_MISSING,       /**< A (required) key is missing */
-        NBDS_ERR_CFILE_VALUE_INVALID,     /**< A value is syntactically invalid */
-        NBDS_ERR_CFILE_VALUE_UNSUPPORTED, /**< A value is not supported in this build */
-        NBDS_ERR_CFILE_NO_EXPORTS,        /**< A config file was specified that does not
-                                               define any exports */
-        NBDS_ERR_CFILE_INCORRECT_PORT,    /**< The reserved port was specified for an
-                                               old-style export. */
-        NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
-        NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
-        NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
-        NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
-        NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
-        NBDS_ERR_GAI,                     /**< Failed to get address info */
-        NBDS_ERR_SOCKET,                  /**< Failed to create a socket */
-        NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
-        NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
-        NBDS_ERR_SYS,                     /**< Underlying system call or library error */
-} NBDS_ERRS;
-
-/**
- * duplicate server
- * @param s the old server we want to duplicate
- * @return new duplicated server
- **/
-SERVER* dup_serve(const SERVER *const s) {
-	SERVER *serve = NULL;
-
-	serve=g_new0(SERVER, 1);
-	if(serve == NULL)
-		return NULL;
-
-	if(s->exportname)
-		serve->exportname = g_strdup(s->exportname);
-
-	serve->expected_size = s->expected_size;
-
-	if(s->listenaddr)
-		serve->listenaddr = g_strdup(s->listenaddr);
-
-	serve->port = s->port;
-
-	if(s->authname)
-		serve->authname = strdup(s->authname);
-
-	serve->flags = s->flags;
-	serve->socket = s->socket;
-	serve->socket_family = s->socket_family;
-	serve->virtstyle = s->virtstyle;
-	serve->cidrlen = s->cidrlen;
-
-	if(s->prerun)
-		serve->prerun = g_strdup(s->prerun);
-
-	if(s->postrun)
-		serve->postrun = g_strdup(s->postrun);
-
-	if(s->transactionlog)
-		serve->transactionlog = g_strdup(s->transactionlog);
-	
-	if(s->servename)
-		serve->servename = g_strdup(s->servename);
-
-	serve->max_connections = s->max_connections;
-
-	return serve;
-}
-
-/**
- * append new server to array
- * @param s server
- * @param a server array
- * @return 0 success, -1 error
- */
-int append_serve(const SERVER *const s, GArray *const a) {
-	SERVER *ns = NULL;
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	struct addrinfo *rp = NULL;
-	char   host[NI_MAXHOST];
-	gchar  *port = NULL;
-	int e;
-	int ret;
-
-	assert(s != NULL);
-
-	port = g_strdup_printf("%d", s->port);
-
-	memset(&hints,'\0',sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
-	hints.ai_protocol = IPPROTO_TCP;
-
-	e = getaddrinfo(s->listenaddr, port, &hints, &ai);
-
-	if (port)
-		g_free(port);
-
-	if(e == 0) {
-		for (rp = ai; rp != NULL; rp = rp->ai_next) {
-			e = getnameinfo(rp->ai_addr, rp->ai_addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
-
-			if (e != 0) { // error
-				fprintf(stderr, "getnameinfo: %s\n", gai_strerror(e));
-				continue;
-			}
-
-			// duplicate server and set listenaddr to resolved IP address
-			ns = dup_serve (s);
-			if (ns) {
-				ns->listenaddr = g_strdup(host);
-				ns->socket_family = rp->ai_family;
-				g_array_append_val(a, *ns);
-				free(ns);
-				ns = NULL;
-			}
-		}
-
-		ret = 0;
-	} else {
-		fprintf(stderr, "getaddrinfo failed on listen host/address: %s (%s)\n", s->listenaddr ? s->listenaddr : "any", gai_strerror(e));
-		ret = -1;
-	}
-
-	if (ai)
-		freeaddrinfo(ai);
-
-	return ret;
 }
 
 /* forward definition of parse_cfile */
@@ -1138,53 +871,6 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
 }
 
 /**
- * Detect the size of a file.
- *
- * @param fhandle An open filedescriptor
- * @return the size of the file, or OFFT_MAX if detection was
- * impossible.
- **/
-off_t size_autodetect(int fhandle) {
-	off_t es;
-	u64 bytes __attribute__((unused));
-	struct stat stat_buf;
-	int error;
-
-#ifdef HAVE_SYS_MOUNT_H
-#ifdef HAVE_SYS_IOCTL_H
-#ifdef BLKGETSIZE64
-	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
-	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
-		return (off_t)bytes;
-	}
-#endif /* BLKGETSIZE64 */
-#endif /* HAVE_SYS_IOCTL_H */
-#endif /* HAVE_SYS_MOUNT_H */
-
-	DEBUG("looking for fhandle size with fstat\n");
-	stat_buf.st_size = 0;
-	error = fstat(fhandle, &stat_buf);
-	if (!error) {
-		/* always believe stat if a regular file as it might really
-		 * be zero length */
-		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
-			return (off_t)stat_buf.st_size;
-        } else {
-                err("fstat failed: %m");
-        }
-
-	DEBUG("looking for fhandle size with lseek SEEK_END\n");
-	es = lseek(fhandle, (off_t)0, SEEK_END);
-	if (es > ((off_t)0)) {
-		return es;
-        } else {
-                DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
-        }
-
-	err("Could not find size of exported block device: %m");
-}
-
-/**
  * Get the file handle and offset, given an export offset.
  *
  * @param export An array of export files
@@ -1236,9 +922,7 @@ int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* m
  * seek to a position in a file, with error handling.
  * @param handle a filedescriptor
  * @param a position to seek to
- * @todo get rid of this; lastpoint is a global variable right now, but it
- * shouldn't be. If we pass it on as a parameter, that makes things a *lot*
- * easier.
+ * @todo get rid of this.
  **/
 void myseek(int handle,off_t a) {
 	if (lseek(handle, a, SEEK_SET) < 0) {
@@ -1539,6 +1223,7 @@ static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasi
 	uint64_t magic = htonll(0x3e889045565a9LL);
 	reply_type = htonl(reply_type);
 	uint32_t datsize = htonl(datasize);
+	opt = htonl(opt);
 	struct iovec v_data[] = {
 		{ &magic, sizeof(magic) },
 		{ &opt, sizeof(opt) },
@@ -2097,11 +1782,10 @@ void serveconnection(CLIENT *client) {
  * @return: 0 - OK, -1 - failed.
  **/
 int set_peername(int net, CLIENT *client) {
-	struct sockaddr_storage addrin;
 	struct sockaddr_storage netaddr;
 	struct sockaddr_in  *netaddr4 = NULL;
 	struct sockaddr_in6 *netaddr6 = NULL;
-	socklen_t addrinlen = sizeof( addrin );
+	socklen_t addrinlen = sizeof( struct sockaddr_storage );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	char peername[NI_MAXHOST];
@@ -2111,12 +1795,12 @@ int set_peername(int net, CLIENT *client) {
 	int e;
 	int shift;
 
-	if (getpeername(net, (struct sockaddr *) &addrin, &addrinlen) < 0) {
+	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
 		msg(LOG_INFO, "getpeername failed: %m");
 		return -1;
 	}
 
-	if((e = getnameinfo((struct sockaddr *)&addrin, addrinlen,
+	if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
 			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
 		msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
 		return -1;
@@ -2150,32 +1834,24 @@ int set_peername(int net, CLIENT *client) {
 			break;
 		case VIRT_CIDR:
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
-			memcpy(&netaddr, &addrin, addrinlen);
+			memcpy(&netaddr, &(client->clientaddr), addrinlen);
+			int addrbits;
 			if(ai->ai_family == AF_INET) {
-				netaddr4 = (struct sockaddr_in *)&netaddr;
-				(netaddr4->sin_addr).s_addr>>=32-(client->server->cidrlen);
-				(netaddr4->sin_addr).s_addr<<=32-(client->server->cidrlen);
-
-				getnameinfo((struct sockaddr *) netaddr4, addrinlen,
-							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
-				tmp=g_strdup_printf("%s/%s", netname, peername);
-			}else if(ai->ai_family == AF_INET6) {
-				netaddr6 = (struct sockaddr_in6 *)&netaddr;
-
-				shift = 128-(client->server->cidrlen);
-				i = 3;
-				while(shift >= 8) {
-					((netaddr6->sin6_addr).s6_addr[i])=0;
-					shift-=8;
-					i--;
-				}
-				(netaddr6->sin6_addr).s6_addr[i]>>=shift;
-				(netaddr6->sin6_addr).s6_addr[i]<<=shift;
-
-				getnameinfo((struct sockaddr *)netaddr6, addrinlen,
-					    netname, sizeof(netname), NULL, 0, NI_NUMERICHOST);
-				tmp=g_strdup_printf("%s/%s", netname, peername);
+				addrbits = 32;
+			} else if(ai->ai_family == AF_INET6) {
+				addrbits = 128;
 			}
+			uint8_t* addrptr = ((struct sockaddr*)&netaddr)->sa_data;
+			for(int i = 0; i < addrbits; i+=8) {
+				int masklen = client->server->cidrlen - i;
+				masklen = masklen > 0 ? masklen : 0;
+				uint8_t mask = getmaskbyte(masklen);
+				*addrptr &= mask;
+				addrptr++;
+			}
+			getnameinfo((struct sockaddr *) &netaddr, addrinlen,
+							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
+			tmp=g_strdup_printf("%s/%s", netname, peername);
 
 			if(tmp != NULL)
 			  client->exportname=g_strdup_printf(client->server->exportname, tmp);

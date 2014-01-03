@@ -261,19 +261,23 @@ manpage.1: manpage.sgml
 	  </para>
 	  <para>
 	    The name of the authorization file for this export. This
-	    file should contain one line per IP-address, or per
-	    network (which must be specified in CIDR-style
-	    <option><replaceable>network</replaceable>/<replaceable>masklen</replaceable></option>)
-	    and must not contain empty lines. If the file
-	    does not exist, everyone is allowed to connect. If the
-	    file exists but is empty, nobody is allowed to
-	    connect. Otherwise, <command>nbd-server</command> will
-	    only allow clients to connect whose IP-adres is listed in
-	    this file.
+	    file should contain one line per IP-address, or per network
+	    (which must be specified in CIDR-style
+	    <option><replaceable>network</replaceable>/<replaceable>masklen</replaceable></option>).
+	    Empty lines are skipped, as is any content behind a hashmark
+	    ('#') on any line.
+	  </para>
+	  <para>
+	    If the file does not exist, everyone is allowed to connect.
+	    If the file exists but is empty, nobody is allowed to
+	    connect. Otherwise, <command>nbd-server</command> will only
+	    allow clients to connect whose IP-adres is listed in this
+	    file.
 	  </para>
 	  <para>Corresponds to the <option>-l</option> option on the
-	  command line. However, note that for the command line, the default is
-	  <filename>$sysconfdir/nbd-server/allow</filename>.
+	    command line. However, note that for the command line, the
+	    default is
+	    <filename>$sysconfdir/nbd-server/allow</filename>.
 	  </para>
 	</listitem>
       </varlistentry>
