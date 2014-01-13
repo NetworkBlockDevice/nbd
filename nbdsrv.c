@@ -33,9 +33,8 @@ bool address_matches(const char* mask, const void* addr, int af, GError** err) {
 
 	strcpy(privmask, mask);
 
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = 0;
-	hints.ai_protocol = 0;
 	hints.ai_flags = AI_NUMERICHOST;
 
 	if((masksep = strchr(privmask, '/'))) {

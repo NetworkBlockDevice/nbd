@@ -17,9 +17,8 @@ bool do_test(char* address, char* netmask) {
 	int err;
 
 	printf("Doing test for %s, netmask %s\n", address, netmask);
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = 0;
-	hints.ai_protocol = 0;
 	hints.ai_flags = AI_NUMERICHOST;
 
 	if((err = getaddrinfo(address, NULL, &hints, &res))) {
