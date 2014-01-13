@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <netinet/in.h>
 
 bool do_test(char* address, char* netmask) {
 	struct addrinfo hints;
