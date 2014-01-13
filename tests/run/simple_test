@@ -20,11 +20,11 @@ trap cleanup EXIT
 cleanup() {
 	if [ -f ${pidfile} ]
 	then
-		kill `cat ${pidfile}`
+		kill `cat ${pidfile}` || true
 	else
 		if [ ! -z "$PID" ]
 		then
-			kill $PID
+			kill $PID || true
 		fi
 	fi
 	if [ -z "$cleanup" ]
