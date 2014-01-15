@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "lfs.h"
+
 #include <sys/socket.h>
 #include <sys/types.h>
 
