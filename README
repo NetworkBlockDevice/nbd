@@ -152,4 +152,3 @@ from the Linux kernel. Compiling it can be done as follows:
   <linux/types.h>' (on non-Linux systems, the userland source is smart
   enough to figure out how this works by itself)
 - now it's just a regular './configure && make && sudo make install'
-
