@@ -2770,3 +2770,4 @@ int main(int argc, char *argv[]) {
 	dousers(genconf.user, genconf.group);
 
 	serveloop(servers);
+}
