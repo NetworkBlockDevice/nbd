@@ -272,7 +272,7 @@ uint64_t size_autodetect(int fhandle) {
 		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
 			return (uint64_t)stat_buf.st_size;
         } else {
-                err("fstat failed: %m");
+                DEBUG("fstat failed: %s", strerror(errno));
         }
 
 	DEBUG("looking for fhandle size with lseek SEEK_END\n");
@@ -283,6 +283,7 @@ uint64_t size_autodetect(int fhandle) {
                 DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
 
-	err("Could not find size of exported block device: %m");
+	DEBUG("Could not find size of exported block device: %s", strerror(errno));
+	return UINT64_MAX;
 }
 
