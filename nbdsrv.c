@@ -1,8 +1,6 @@
 #include "config.h"
 #include "nbd-debug.h"
 
-#define ISSERVER
-
 #include <nbdsrv.h>
 
 #include <assert.h>
