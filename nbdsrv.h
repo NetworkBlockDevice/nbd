@@ -28,7 +28,7 @@ typedef enum {
  **/
 typedef struct {
 	gchar* exportname;    /**< (unprocessed) filename of the file we're exporting */
-	off_t expected_size; /**< size of the exported file as it was told to
+	uint64_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
 	gchar* listenaddr;   /**< The IP address we're listening on */
 	unsigned int port;   /**< port we're exporting this file at */
@@ -52,7 +52,7 @@ typedef struct {
   * Variables associated with a client connection
   */
 typedef struct {
-	off_t exportsize;    /**< size of the file we're exporting */
+	uint64_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer, in human-readable format */
 	struct sockaddr_storage clientaddr; /**< peer, in binary format, network byte order */
 	char *exportname;    /**< (processed) filename of the file we're exporting */
@@ -170,8 +170,8 @@ int append_serve(const SERVER *const s, GArray *const a);
  * Detect the size of a file.
  *
  * @param fhandle An open filedescriptor
- * @return the size of the file, or OFFT_MAX if detection was
+ * @return the size of the file, or UINT64_MAX if detection was
  * impossible.
  **/
-off_t size_autodetect(int fhandle);
+uint64_t size_autodetect(int fhandle);
 #endif //NBDSRV_H

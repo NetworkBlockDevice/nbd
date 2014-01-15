@@ -246,7 +246,7 @@ int append_serve(const SERVER *const s, GArray *const a) {
 	return ret;
 }
 
-off_t size_autodetect(int fhandle) {
+uint64_t size_autodetect(int fhandle) {
 	off_t es;
 	u64 bytes __attribute__((unused));
 	struct stat stat_buf;
@@ -257,7 +257,7 @@ off_t size_autodetect(int fhandle) {
 #ifdef BLKGETSIZE64
 	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
 	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
-		return (off_t)bytes;
+		return bytes;
 	}
 #endif /* BLKGETSIZE64 */
 #endif /* HAVE_SYS_IOCTL_H */
@@ -270,7 +270,7 @@ off_t size_autodetect(int fhandle) {
 		/* always believe stat if a regular file as it might really
 		 * be zero length */
 		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
-			return (off_t)stat_buf.st_size;
+			return (uint64_t)stat_buf.st_size;
         } else {
                 err("fstat failed: %m");
         }
@@ -278,7 +278,7 @@ off_t size_autodetect(int fhandle) {
 	DEBUG("looking for fhandle size with lseek SEEK_END\n");
 	es = lseek(fhandle, (off_t)0, SEEK_END);
 	if (es > ((off_t)0)) {
-		return es;
+		return (uint64_t)es;
         } else {
                 DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
