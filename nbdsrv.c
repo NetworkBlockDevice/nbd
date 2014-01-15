@@ -3,9 +3,10 @@
 
 #define ISSERVER
 
+#include <nbdsrv.h>
+
 #include <assert.h>
 #include <ctype.h>
-#include <nbdsrv.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <stdio.h>
