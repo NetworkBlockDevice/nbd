@@ -131,6 +131,7 @@ int authorized_client(CLIENT *opts) {
 		}
 		struct sockaddr* sa = (struct sockaddr*)&opts->clientaddr;
 		if(address_matches(line, sa->sa_data, sa->sa_family, NULL)) {
+			fclose(f);
 			return 1;
 		}
 	}
