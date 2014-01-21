@@ -510,7 +510,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	GArray* tmp;
 	struct stat stbuf;
 
-	if(!dir) {
+	if(!dirh) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_DIR_UNKNOWN, "Invalid directory specified: %s", strerror(errno));
 		return NULL;
 	}
