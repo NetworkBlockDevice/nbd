@@ -1,11 +1,10 @@
 #include "config.h"
 #include "nbd-debug.h"
 
-#define ISSERVER
+#include <nbdsrv.h>
 
 #include <assert.h>
 #include <ctype.h>
-#include <nbdsrv.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,9 +32,8 @@ bool address_matches(const char* mask, const void* addr, int af, GError** err) {
 
 	strcpy(privmask, mask);
 
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = 0;
-	hints.ai_protocol = 0;
 	hints.ai_flags = AI_NUMERICHOST;
 
 	if((masksep = strchr(privmask, '/'))) {
@@ -133,6 +131,7 @@ int authorized_client(CLIENT *opts) {
 		}
 		struct sockaddr* sa = (struct sockaddr*)&opts->clientaddr;
 		if(address_matches(line, sa->sa_data, sa->sa_family, NULL)) {
+			fclose(f);
 			return 1;
 		}
 	}
@@ -248,7 +247,7 @@ int append_serve(const SERVER *const s, GArray *const a) {
 	return ret;
 }
 
-off_t size_autodetect(int fhandle) {
+uint64_t size_autodetect(int fhandle) {
 	off_t es;
 	u64 bytes __attribute__((unused));
 	struct stat stat_buf;
@@ -259,7 +258,7 @@ off_t size_autodetect(int fhandle) {
 #ifdef BLKGETSIZE64
 	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
 	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
-		return (off_t)bytes;
+		return bytes;
 	}
 #endif /* BLKGETSIZE64 */
 #endif /* HAVE_SYS_IOCTL_H */
@@ -272,19 +271,20 @@ off_t size_autodetect(int fhandle) {
 		/* always believe stat if a regular file as it might really
 		 * be zero length */
 		if (S_ISREG(stat_buf.st_mode) || (stat_buf.st_size > 0))
-			return (off_t)stat_buf.st_size;
+			return (uint64_t)stat_buf.st_size;
         } else {
-                err("fstat failed: %m");
+                DEBUG("fstat failed: %s", strerror(errno));
         }
 
 	DEBUG("looking for fhandle size with lseek SEEK_END\n");
 	es = lseek(fhandle, (off_t)0, SEEK_END);
 	if (es > ((off_t)0)) {
-		return es;
+		return (uint64_t)es;
         } else {
                 DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
 
-	err("Could not find size of exported block device: %m");
+	DEBUG("Could not find size of exported block device: %s", strerror(errno));
+	return UINT64_MAX;
 }
 
