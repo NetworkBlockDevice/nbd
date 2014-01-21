@@ -12,4 +12,4 @@ libnbdsrv_la_SOURCES = nbdsrv.c nbdsrv.h
 libnbdsrv_la_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_server_LDADD = @GLIB_LIBS@ libnbdsrv.la
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h nbd-debug.h
-EXTRA_DIST = gznbd maketr CodingStyle autogen.sh
+EXTRA_DIST = gznbd maketr CodingStyle autogen.sh README.md
