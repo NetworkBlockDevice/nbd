@@ -6,6 +6,10 @@ NBD README
          src="https://scan.coverity.com/projects/1243/badge.svg"/>
 </a>
 
+<a href='http://barbershop.grep.be:8010/'>
+  <img alt='build status' src='http://barbershop.grep.be/cgi-bin/buildstatus'>
+</a>
+
 Welcome to the NBD userland support files!
 
 This package contains nbd-server and nbd-client.
