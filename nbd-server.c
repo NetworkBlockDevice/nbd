@@ -1231,7 +1231,11 @@ static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasi
 		{ &datsize, sizeof(datsize) },
 		{ data, datasize },
 	};
-	writev(net, v_data, 5);
+	size_t total = sizeof(magic) + sizeof(opt) + sizeof(reply_type) + sizeof(datsize) + datasize;
+	ssize_t sent = writev(net, v_data, 5);
+	if(sent != total) {
+		perror("E: couldn't write enough data:");
+	}
 }
 
 static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
