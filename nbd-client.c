@@ -396,7 +396,7 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 	}
-	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
+	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 	fprintf(stderr, "Or   : nbd-client -name|-N name host [port] nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
@@ -455,6 +455,7 @@ int main(int argc, char *argv[]) {
 		{ "persist", no_argument, NULL, 'p' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
+		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ 0, 0, 0, 0 }, 
 	};
@@ -523,6 +524,9 @@ int main(int argc, char *argv[]) {
 			name="";
 			nbddev="";
 			port = NBD_DEFAULT_PORT;
+			break;
+		case 'm':
+			argv[0][0] = '@';
 			break;
 		case 'n':
 			nofork=1;
