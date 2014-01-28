@@ -198,7 +198,9 @@ int append_serve(const SERVER *const s, GArray *const a) {
 	int ret;
 
 	assert(s != NULL);
-	assert(a != NULL);
+	if(a == NULL) {
+		return -1;
+	}
 
 	port = g_strdup_printf("%d", s->port);
 
