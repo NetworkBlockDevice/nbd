@@ -272,11 +272,22 @@ main (int argc, char *argv[])
 }
 
 static void
-open_plugin_so (const char *filename)
+open_plugin_so (const char *name)
 {
+  char *filename = (char *) name;
+  int free_filename = 0;
   void *dl;
   struct nbdkit_plugin *(*plugin_init) (void);
   char *error;
+
+  if (strchr (name, '.') == NULL && strchr (name, '/') == NULL) {
+    /* Short names are rewritten relative to libdir. */
+    if (asprintf (&filename, "%s/nbdkit-%s-plugin.so", plugindir, name) == -1) {
+      perror ("asprintf");
+      exit (EXIT_FAILURE);
+    }
+    free_filename = 1;
+  }
 
   dl = dlopen (filename, RTLD_NOW|RTLD_LOCAL);
   if (dl == NULL) {
@@ -288,16 +299,19 @@ open_plugin_so (const char *filename)
   dlerror ();
   *(void **) (&plugin_init) = dlsym (dl, "plugin_init");
   if ((error = dlerror ()) != NULL) {
-    fprintf (stderr, "%s: %s: %s\n", program_name, filename, dlerror ());
+    fprintf (stderr, "%s: %s: %s\n", program_name, name, dlerror ());
     exit (EXIT_FAILURE);
   }
   if (!plugin_init) {
-    fprintf (stderr, "%s: %s: invalid plugin_init\n", program_name, filename);
+    fprintf (stderr, "%s: %s: invalid plugin_init\n", program_name, name);
     exit (EXIT_FAILURE);
   }
 
   /* Register the plugin. */
   plugin_register (filename, dl, plugin_init);
+
+  if (free_filename)
+    free (filename);
 }
 
 static void

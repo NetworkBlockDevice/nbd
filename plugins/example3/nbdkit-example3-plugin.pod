@@ -6,11 +6,11 @@ nbdkit-example3-plugin - An example nbdkit plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-example3-plugin.so [size=SIZE]
+ nbdkit example3 [size=SIZE]
 
 =head1 EXAMPLE
 
- nbdkit .../plugins/nbdkit-example3-plugin.so size=1G
+ nbdkit example3 size=1G
  guestfish -a nbd://localhost
 
 =head1 DESCRIPTION

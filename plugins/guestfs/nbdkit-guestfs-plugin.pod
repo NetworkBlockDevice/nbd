@@ -6,7 +6,7 @@ nbdkit-guestfs-plugin - nbdkit libguestfs plugin
 
 =head1 SYNOPSIS
 
- nbdkit [-r] .../plugins/nbdkit-guestfs-plugin.so
+ nbdkit [-r] guestfs
    [disk=DISK] [domain=DOMAIN] [format=FORMAT] [connect=URI]
    [mount=inspect|MOUNT] [trace=1] [debug=1] export=DEVICE|FILE
 
@@ -22,14 +22,12 @@ image or virtual machine might be live.
 Export the first partition I<inside> a disk image called C<disk.img>,
 and allow writes:
 
- nbdkit .../plugins/nbdkit-guestfs-plugin.so \
-   disk=disk.img export=/dev/sda1
+ nbdkit guestfs disk=disk.img export=/dev/sda1
 
 Export a disk image which is located I<inside> a libvirt guest called
 C<Guest>, read-only (I<-r> option):
 
- nbdkit -r .../plugins/nbdkit-guestfs-plugin.so \
-   domain=Guest mount=inspect export=/images/disk.img
+ nbdkit -r guestfs domain=Guest mount=inspect export=/images/disk.img
 
 =head1 DESCRIPTION
 
@@ -138,11 +136,9 @@ volumes.  Use the C<disk=disk.img> option to add the disk.  Because
 you don't want to access filesystem contents, C<mount=...> is not
 needed.
 
- nbdkit .../plugins/nbdkit-guestfs-plugin.so \
-   disk=disk.img export=/dev/sda1
+ nbdkit guestfs disk=disk.img export=/dev/sda1
 
- nbdkit .../plugins/nbdkit-guestfs-plugin.so \
-   disk=disk.img export=/dev/VG/LV
+ nbdkit guestfs disk=disk.img export=/dev/VG/LV
 
 Use L<virt-filesystems(1)> to find out what devices, partitions, LVs,
 filesystems etc a disk image contains.
@@ -154,11 +150,9 @@ be live, we use the I<-r> option to open the guest read-only.  Because
 you don't want to access filesystem contents, C<mount=...> is not
 needed.
 
- nbdkit -r .../plugins/nbdkit-guestfs-plugin.so \
-   domain=Guest export=/dev/sda1
+ nbdkit -r guestfs domain=Guest export=/dev/sda1
 
- nbdkit -r .../plugins/nbdkit-guestfs-plugin.so \
-   domain=Guest export=/dev/VG/LV
+ nbdkit -r guestfs domain=Guest export=/dev/VG/LV
 
 =head2 Exporting a file inside a disk image
 
@@ -168,8 +162,7 @@ option to add the disk, and C<mount=/dev/sda1> to specify the
 filesystem in the disk image.  Use C<export=/image> to specify the
 name of the file in that filesystem that we want to export.
 
- nbdkit .../plugins/nbdkit-guestfs-plugin.so \
-   disk=disk.img mount=/dev/sda1 export=/image
+ nbdkit guestfs disk=disk.img mount=/dev/sda1 export=/image
 
 =head2 Exporting a file inside a virtual machine disk image
 
@@ -179,14 +172,14 @@ auto-mount the filesystem(s) in the disk image.  Use
 C<export=/Users/rich/AppData/image> to specify the name of the file
 from the guest that we want to export.
 
- nbdkit .../plugins/nbdkit-guestfs-plugin.so \
-   disk=windows.img mount=inspect export=/Users/rich/AppData/image
+ nbdkit guestfs disk=windows.img mount=inspect \
+   export=/Users/rich/AppData/image
 
 =head1 DEBUGGING
 
 To debug this plugin, use the following options:
 
- nbdkit -f -v .../plugins/nbdkit-guestfs-plugin.so debug=1 trace=1 [...]
+ nbdkit -f -v guestfs debug=1 trace=1 [...]
 
 This enables libguestfs debugging and tracing (see L<guestfs-faq(1)>).
 It also ensures that the messages are displayed by nbdkit (because of

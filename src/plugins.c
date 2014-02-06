@@ -51,7 +51,7 @@ static pthread_mutex_t all_requests_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Currently the server can only load one plugin (see TODO).  Hence we
  * can just use globals to store these.
  */
-static const char *filename;
+static char *filename;
 static void *dl;
 static struct nbdkit_plugin plugin;
 
@@ -62,7 +62,11 @@ plugin_register (const char *_filename,
   const struct nbdkit_plugin *_plugin;
   size_t i, len, size;
 
-  filename = _filename;
+  filename = strdup (_filename);
+  if (filename == NULL) {
+    perror ("strdup");
+    exit (EXIT_FAILURE);
+  }
   dl = _dl;
 
   debug ("registering %s", filename);
@@ -153,6 +157,8 @@ plugin_cleanup (void)
 
     dlclose (dl);
     dl = NULL;
+    free (filename);
+    filename = NULL;
   }
 }
 

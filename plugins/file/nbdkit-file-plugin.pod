@@ -6,7 +6,7 @@ nbdkit-file-plugin - nbdkit file plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-file-plugin.so file=FILENAME
+ nbdkit file file=FILENAME
 
 =head1 DESCRIPTION
 

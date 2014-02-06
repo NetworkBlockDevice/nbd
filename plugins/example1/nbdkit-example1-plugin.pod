@@ -6,7 +6,7 @@ nbdkit-example1-plugin - A minimal nbdkit plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-example1-plugin.so
+ nbdkit example1
 
 =head1 DESCRIPTION
 

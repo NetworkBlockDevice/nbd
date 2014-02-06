@@ -30,11 +30,11 @@ nbdkit-plugin - How to write nbdkit plugins
 
 When this has been compiled to a shared library, do:
 
- nbdkit [--args ...] myplugin.so [key=value ...]
+ nbdkit [--args ...] ./myplugin.so [key=value ...]
 
 When debugging, use the I<-fv> options:
 
- nbdkit -fv myplugin.so [key=value ...]
+ nbdkit -fv ./myplugin.so [key=value ...]
 
 =head1 DESCRIPTION
 
@@ -491,7 +491,7 @@ returns the size in bytes.  If there was an error, it returns C<-1>.
 Run the server with I<-f> and I<-v> options so it doesn't fork and you
 can see debugging information:
 
- nbdkit -fv myplugin.so [key=value [key=value [...]]]
+ nbdkit -fv ./myplugin.so [key=value [key=value [...]]]
 
 To print debugging information from within the plugin, call
 C<nbdkit_debug>, which has the following prototype and works like

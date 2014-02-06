@@ -6,7 +6,7 @@ nbdkit-example2-plugin - An example nbdkit plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-example2-plugin.so file=FILENAME
+ nbdkit example2 file=FILENAME
 
 =head1 DESCRIPTION
 

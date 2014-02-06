@@ -6,12 +6,11 @@ nbdkit-libvirt-plugin - nbdkit libvirt plugin using virDomainBlockPeek
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-libvirt-plugin.so
-   [connect=URI] domain=DOMAIN disk=DISK
+ nbdkit libvirt [connect=URI] domain=DOMAIN disk=DISK
 
 =head1 EXAMPLE
 
- nbdkit .../plugins/nbdkit-libvirt-plugin.so domain=MyGuest disk=sda
+ nbdkit libvirt domain=MyGuest disk=sda
  guestfish -a nbd://localhost
 
 =head1 DESCRIPTION

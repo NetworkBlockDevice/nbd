@@ -6,7 +6,7 @@ nbdkit-vddk-plugin - VMware VDDK plugin for nbdkit
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-vddk-plugin.so file=FILENAME
+ nbdkit vddk file=FILENAME
 
 =head1 DESCRIPTION
 
@@ -58,7 +58,7 @@ compile time is used.
 
 Run nbdkit like this to see all debugging messages:
 
- nbdkit -f -v .../plugins/nbdkit-vddk-plugin.so file=FILENAME
+ nbdkit -f -v vddk file=FILENAME
 
 =head1 SEE ALSO
 

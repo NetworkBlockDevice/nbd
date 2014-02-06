@@ -6,7 +6,7 @@ nbdkit-gzip-plugin - nbdkit gzip plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-gzip-plugin.so file=FILENAME.gz
+ nbdkit gzip file=FILENAME.gz
 
 =head1 DESCRIPTION
 

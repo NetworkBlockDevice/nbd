@@ -30,6 +30,8 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+plugindir = $(libdir)/nbdkit/plugins
+
 sbin_PROGRAMS = nbdkit
 
 nbdkit_SOURCES = \
@@ -46,6 +48,8 @@ nbdkit_SOURCES = \
 	$(top_srcdir)/include/nbdkit-plugin.h
 
 nbdkit_CPPFLAGS = \
+	-Dlibdir=\"$(libdir)\" \
+	-Dplugindir=\"$(plugindir)\" \
 	-I$(top_srcdir)/include
 nbdkit_CFLAGS = \
 	-pthread \

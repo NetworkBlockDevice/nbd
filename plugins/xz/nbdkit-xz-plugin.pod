@@ -6,7 +6,7 @@ nbdkit-xz-plugin - nbdkit xz plugin
 
 =head1 SYNOPSIS
 
- nbdkit .../plugins/nbdkit-xz-plugin.so file=FILENAME.xz
+ nbdkit xz file=FILENAME.xz
 
 =head1 DESCRIPTION
 
