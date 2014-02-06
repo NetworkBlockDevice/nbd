@@ -1,10 +1,13 @@
+* Can we do language bindings using #!'s?
+  You would enter:
+    nbdkit foo [args]
+  where nbdkit-foo-plugin is a Perl script starting:
+    #!perl
+  which causes nbdkit to load the perl plugin wrapper.
+
 * syslog? journal?
 
 * An easy way to run nbdkit captive under libguestfs.
-
-* Language bindings.  It should be possible to write plugins in other
-  languages apart from C:
-  nbdkit perl =/path/to/script.pl [other parameters ...]
 
 * Glance and/or cinder plugins.
 

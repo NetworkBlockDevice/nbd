@@ -30,14 +30,39 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	perl \
-	vddk \
-	xz
+EXTRA_DIST = nbdkit-perl-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_PERL
+
+plugin_LTLIBRARIES = nbdkit-perl-plugin.la
+
+nbdkit_perl_plugin_la_SOURCES = \
+	perl.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_perl_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_perl_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(PERL_CFLAGS) \
+	-I$(PERL_ARCHLIB)/CORE
+nbdkit_perl_plugin_la_LIBADD = \
+	-lperl $(PERL_LIBS)
+nbdkit_perl_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared \
+	$(PERL_LDFLAGS)
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-perl-plugin.1
+
+nbdkit-perl-plugin.1: nbdkit-perl-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~

@@ -33,6 +33,8 @@ for the plugins:
 
  - pod2man (from perl): to build the manual pages
 
+ - perl development libraries: to build the embedded perl plugin
+
  - zlib: to build the gzip plugin
 
  - liblzma: to build the xz plugin

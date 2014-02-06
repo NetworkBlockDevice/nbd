@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013 Red Hat Inc.
+# Copyright (C) 2013-2014 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -112,6 +112,49 @@ dnl Check for Perl POD.
 AC_CHECK_PROG([POD2MAN], [pod2man], [pod2man], [no])
 AM_CONDITIONAL([HAVE_POD2MAN], [test "x$POD2MAN" != "xno"])
 
+dnl Check for Perl, for embedding in the perl plugin.
+AC_CHECK_PROG([PERL],[perl],[perl],[no])
+AC_ARG_ENABLE([perl],
+    AS_HELP_STRING([--disable-perl], [disable Perl embed plugin]),
+    [],
+    [enable_perl=yes])
+AS_IF([test "x$PERL" != "xno" && test "x$enable_perl" != "xno"],[
+    dnl Check for Perl archlib.
+    AC_MSG_CHECKING([for Perl embed archlib])
+    PERL_ARCHLIB="$($PERL -MConfig -e 'print $Config{archlib}')"
+    AS_IF([ test -n "$PERL_ARCHLIB" ],[
+        AC_MSG_RESULT([$PERL_ARCHLIB])
+    ],[
+        AC_MSG_NOTICE([Perl embed module disabled])
+        enable_perl=no
+    ])
+
+    dnl Check for Perl CFLAGS.
+    AC_MSG_CHECKING([for Perl embed CFLAGS])
+    PERL_CFLAGS="$($PERL -MConfig -e 'print $Config{ccflags}')"
+    AS_IF([ test -n "$PERL_CFLAGS" ],[
+        AC_MSG_RESULT([$PERL_CFLAGS])
+    ],[
+        AC_MSG_NOTICE([Perl embed module disabled])
+        enable_perl=no
+    ])
+
+    dnl Check for Perl LIBS.
+    AC_MSG_CHECKING([for Perl embed LIBS])
+    PERL_LIBS="$($PERL -MConfig -e 'print $Config{libs}')"
+
+    dnl Check for Perl LDFLAGS.
+    AC_MSG_CHECKING([for Perl embed LDFLAGS])
+    PERL_LDFLAGS="$($PERL -MConfig -e 'print $Config{ldflags}')"
+
+    dnl XXX Could check these actually work.
+])
+AM_CONDITIONAL([HAVE_PERL],[test "x$enable_perl" != "xno" && test "x$PERL" != "xno"])
+AC_SUBST([PERL_ARCHLIB])
+AC_SUBST([PERL_CFLAGS])
+AC_SUBST([PERL_LIBS])
+AC_SUBST([PERL_LDFLAGS])
+
 dnl Check for libvirt (only if you want to compile the libvirt plugin).
 AC_ARG_WITH([libvirt],[
     AS_HELP_STRING([--without-libvirt],
@@ -220,6 +263,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/guestfs/Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
+                 plugins/perl/Makefile
                  plugins/vddk/Makefile
                  plugins/xz/Makefile
                  src/Makefile
