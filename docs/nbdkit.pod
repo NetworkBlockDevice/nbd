@@ -6,8 +6,9 @@ nbdkit - A toolkit for creating NBD servers
 
 =head1 SYNOPSIS
 
- nbdkit [-f] [-g GROUP] [-i IPADDR] [-P PIDFILE] [-p PORT]
-        [-r] [-s] [-U SOCKET] [-u USER] [-v] [-V]
+ nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]
+        [-P PIDFILE] [-p PORT] [-r] [-s]
+        [-U SOCKET] [-u USER] [-v] [-V]
         PLUGIN [key=value [key=value [...]]]
 
 =head1 DESCRIPTION
@@ -23,16 +24,18 @@ proprietary code.
 If you want to write an nbdkit plugin, you should read
 L<nbdkit-plugin(3)>.
 
-Several plugins may be found in C<$LIBDIR/nbdkit/plugins> where
-C<$LIBDIR> is set at compile time and might be a path such as
-C</usr/lib>, C</usr/lib64> or C</usr/local/lib>.  You can give the
-full path to the plugin, like this:
+Several plugins may be found in C<$libdir/nbdkit/plugins>.  You can
+give the full path to the plugin, like this:
 
- nbdkit $LIBDIR/nbdkit/plugins/nbdkit-file-plugin.so [...]
+ nbdkit $libdir/nbdkit/plugins/nbdkit-file-plugin.so [...]
 
 but it is usually more convenient to use this equivalent syntax:
 
  nbdkit file [...]
+
+C<$libdir> is set at compile time.  To print it out, do:
+
+ nbdkit --dump-config
 
 =head1 EXAMPLES
 
@@ -61,6 +64,10 @@ To display usage information about a specific plugin:
 =item B<--help>
 
 Display brief command line usage information and exit.
+
+=item B<--dump-config>
+
+Dump out the compile-time configuration values and exit.
 
 =item B<-f>
 

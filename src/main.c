@@ -79,6 +79,7 @@ enum { HELP_OPTION = CHAR_MAX + 1 };
 static const char *short_options = "fg:i:p:P:rsu:U:vV";
 static const struct option long_options[] = {
   { "help",       0, NULL, HELP_OPTION },
+  { "dump-config",0, NULL, 0 },
   { "foreground", 0, NULL, 'f' },
   { "no-fork",    0, NULL, 'f' },
   { "group",      1, NULL, 'g' },
@@ -100,8 +101,9 @@ static const struct option long_options[] = {
 static void
 usage (void)
 {
-  printf ("nbdkit [-f] [-g GROUP] [-i IPADDR] [-P PIDFILE] [-p PORT]\n"
-          "       [-r] [-s] [-U SOCKET] [-u USER] [-v] [-V]\n"
+  printf ("nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]\n"
+          "       [-P PIDFILE] [-p PORT] [-r] [-s]\n"
+          "       [-U SOCKET] [-u USER] [-v] [-V]\n"
           "       PLUGIN [key=value [key=value [...]]]\n"
           "\n"
           "Please read the nbdkit(1) manual page for full usage.\n");
@@ -111,6 +113,13 @@ static void
 display_version (void)
 {
   printf ("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+}
+
+static void
+dump_config (void)
+{
+  printf ("%s=%s\n", "libdir", libdir);
+  printf ("%s=%s\n", "plugindir", plugindir);
 }
 
 int
@@ -129,9 +138,15 @@ main (int argc, char *argv[])
 
     switch (c) {
     case 0:                     /* options which are long only */
-      fprintf (stderr, "%s: unknown long option: %s (%d)\n",
-               program_name, long_options[option_index].name, option_index);
-      exit (EXIT_FAILURE);
+      if (strcmp (long_options[option_index].name, "dump-config") == 0) {
+        dump_config ();
+        exit (EXIT_SUCCESS);
+      }
+      else {
+        fprintf (stderr, "%s: unknown long option: %s (%d)\n",
+                 program_name, long_options[option_index].name, option_index);
+        exit (EXIT_FAILURE);
+      }
 
     case 'f':
       foreground = 1;
