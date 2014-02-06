@@ -10,7 +10,7 @@ nbdkit-xz-plugin - nbdkit xz plugin
 
 =head1 DESCRIPTION
 
-C<nbdkit-xz-plugin> is file serving plugin for L<nbdkit(1)>.
+C<nbdkit-xz-plugin> is a file serving plugin for L<nbdkit(1)>.
 
 It serves the named C<FILENAME.xz> over NBD, uncompressing it on the
 fly.  The plugin only supports read-only connections.
