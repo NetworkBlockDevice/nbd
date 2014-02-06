@@ -1,5 +1,5 @@
 /* nbdkit
- * Copyright (C) 2013 Red Hat Inc.
+ * Copyright (C) 2013-2014 Red Hat Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,6 +53,7 @@
 #include "nbdkit-plugin.h"
 #include "internal.h"
 
+static void open_plugin_so (const char *filename);
 static void start_serving (void);
 static void set_up_signals (void);
 static void change_user (void);
@@ -101,7 +102,7 @@ usage (void)
 {
   printf ("nbdkit [-f] [-g GROUP] [-i IPADDR] [-P PIDFILE] [-p PORT]\n"
           "       [-r] [-s] [-U SOCKET] [-u USER] [-v] [-V]\n"
-          "       PLUGIN.so [key=value [key=value [...]]]\n"
+          "       PLUGIN [key=value [key=value [...]]]\n"
           "\n"
           "Please read the nbdkit(1) manual page for full usage.\n");
 }
@@ -217,31 +218,9 @@ main (int argc, char *argv[])
    */
   while (optind < argc) {
     const char *filename = argv[optind];
-    void *dl;
-    struct nbdkit_plugin *(*plugin_init) (void);
-    char *error;
     char *p;
 
-    dl = dlopen (filename, RTLD_NOW|RTLD_LOCAL);
-    if (dl == NULL) {
-      fprintf (stderr, "%s: %s: %s\n", program_name, filename, dlerror ());
-      exit (EXIT_FAILURE);
-    }
-
-    /* Initialize the plugin.  See dlopen(3) to understand C weirdness. */
-    dlerror ();
-    *(void **) (&plugin_init) = dlsym (dl, "plugin_init");
-    if ((error = dlerror ()) != NULL) {
-      fprintf (stderr, "%s: %s: %s\n", program_name, filename, dlerror ());
-      exit (EXIT_FAILURE);
-    }
-    if (!plugin_init) {
-      fprintf (stderr, "%s: %s: invalid plugin_init\n", program_name, filename);
-      exit (EXIT_FAILURE);
-    }
-
-    /* Register the plugin. */
-    plugin_register (filename, dl, plugin_init);
+    open_plugin_so (filename);
 
     /* Find key=value configuration parameters for this plugin. */
     ++optind;
@@ -290,6 +269,35 @@ main (int argc, char *argv[])
   free (pidfile);
 
   exit (EXIT_SUCCESS);
+}
+
+static void
+open_plugin_so (const char *filename)
+{
+  void *dl;
+  struct nbdkit_plugin *(*plugin_init) (void);
+  char *error;
+
+  dl = dlopen (filename, RTLD_NOW|RTLD_LOCAL);
+  if (dl == NULL) {
+    fprintf (stderr, "%s: %s: %s\n", program_name, filename, dlerror ());
+    exit (EXIT_FAILURE);
+  }
+
+  /* Initialize the plugin.  See dlopen(3) to understand C weirdness. */
+  dlerror ();
+  *(void **) (&plugin_init) = dlsym (dl, "plugin_init");
+  if ((error = dlerror ()) != NULL) {
+    fprintf (stderr, "%s: %s: %s\n", program_name, filename, dlerror ());
+    exit (EXIT_FAILURE);
+  }
+  if (!plugin_init) {
+    fprintf (stderr, "%s: %s: invalid plugin_init\n", program_name, filename);
+    exit (EXIT_FAILURE);
+  }
+
+  /* Register the plugin. */
+  plugin_register (filename, dl, plugin_init);
 }
 
 static void
