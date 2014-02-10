@@ -46,7 +46,8 @@ For example plugins, take a look at the source of nbdkit, in the
 C<plugins> directory.
 
 To write plugins in other languages, see:
-L<nbdkit-perl-plugin(3)>.
+L<nbdkit-perl-plugin(3)>,
+L<nbdkit-python-plugin(3)>.
 
 =head1 C<nbdkit-plugin.h>
 
@@ -511,7 +512,8 @@ L<nbdkit(1)>,
 L<nbdkit-example1-plugin(1)>,
 L<nbdkit-example2-plugin(1)>,
 L<nbdkit-example3-plugin(1)>,
-L<nbdkit-perl-plugin(3)>.
+L<nbdkit-perl-plugin(3)>,
+L<nbdkit-python-plugin(3)>.
 
 =head1 AUTHORS
 

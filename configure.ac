@@ -151,6 +151,51 @@ AC_SUBST([PERL_ARCHLIB])
 AC_SUBST([PERL_CFLAGS])
 AC_SUBST([PERL_LDOPTS])
 
+dnl Check for Python, for embedding in the python plugin.
+AC_CHECK_PROG([PYTHON],[python],[python],[no])
+AC_ARG_ENABLE([python],
+    AS_HELP_STRING([--disable-python], [disable Python embed plugin]),
+    [],
+    [enable_python=yes])
+AS_IF([test "x$PYTHON" != "xno" && test "x$enable_python" != "xno"],[
+    AC_MSG_CHECKING([version of $PYTHON])
+    PYTHON_VERSION_MAJOR=`$PYTHON -c "import sys; print (sys.version_info@<:@0@:>@)"`
+    PYTHON_VERSION_MINOR=`$PYTHON -c "import sys; print (sys.version_info@<:@1@:>@)"`
+    PYTHON_VERSION="$PYTHON_VERSION_MAJOR.$PYTHON_VERSION_MINOR"
+    AS_IF([test -n "$PYTHON_VERSION"],[
+        AC_MSG_RESULT([$PYTHON_VERSION])
+    ],[
+        AC_MSG_NOTICE([Python embed module disabled])
+        enable_python=no
+    ])
+
+    dnl Check for Python CFLAGS, libraries.
+    dnl On Debian: python-X.Y.pc
+    PKG_CHECK_MODULES([PYTHON], [python-"$PYTHON_VERSION"], [
+        AC_SUBST([PYTHON_CFLAGS])
+        AC_SUBST([PYTHON_LIBS])
+        AC_SUBST([PYTHON_VERSION])
+        AC_DEFINE([HAVE_PYTHON],[1],[Python library found at compile time])
+    ],[
+        dnl On Fedora: python.pc
+        PKG_CHECK_MODULES([PYTHON], [python], [
+            AC_SUBST([PYTHON_CFLAGS])
+            AC_SUBST([PYTHON_LIBS])
+            AC_SUBST([PYTHON_VERSION])
+            AC_DEFINE([HAVE_PYTHON],[1],[Python library found at compile time])
+        ],[
+            AC_MSG_WARN([python $PYTHON_VERSION not found])
+            enable_python=no
+        ])
+    ])
+
+    dnl XXX Could check these actually work.
+])
+AM_CONDITIONAL([HAVE_PYTHON],[test "x$enable_python" != "xno" && test "x$PYTHON" != "xno"])
+AC_SUBST([PYTHON_CFLAGS])
+AC_SUBST([PYTHON_LIBS])
+AC_SUBST([PYTHON_LDFLAGS])
+
 dnl Check for libvirt (only if you want to compile the libvirt plugin).
 AC_ARG_WITH([libvirt],[
     AS_HELP_STRING([--without-libvirt],
@@ -260,6 +305,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
                  plugins/perl/Makefile
+                 plugins/python/Makefile
                  plugins/vddk/Makefile
                  plugins/xz/Makefile
                  src/Makefile

@@ -1,0 +1,266 @@
+=encoding utf8
+
+=head1 NAME
+
+nbdkit-python-plugin - nbdkit python plugin
+
+=head1 SYNOPSIS
+
+ nbdkit python script=/path/to/plugin.py [arguments...]
+
+=head1 DESCRIPTION
+
+C<nbdkit-python-plugin> is an embedded Python interpreter for
+L<nbdkit(1)>, allowing you to write nbdkit plugins in Python.
+
+Broadly speaking, Python nbdkit plugins work like C ones, so you should
+read L<nbdkit-plugin(3)> first.
+
+=head2 USING A PYTHON NBDKIT PLUGIN
+
+Assuming you have a Python script which is an nbdkit plugin, you run it
+like this:
+
+ nbdkit python script=/path/to/plugin.py
+
+You may have to add further C<key=value> arguments to the command
+line.  Read the Python script to see if it requires any.  C<script=...>
+I<must> come first on the command line.
+
+=head1 WRITING A PYTHON NBDKIT PLUGIN
+
+There is an example Python nbdkit plugin called C<example.py> which
+ships with the nbdkit source.
+
+To write a Python nbdkit plugin, you create a Python file which
+contains at least the following required functions (in the top level
+C<__main__> module):
+
+ def open(readonly):
+   # see below
+ def get_size(h):
+   # see below
+ def pread(h, count, offset):
+   # see below
+
+Note that the subroutines must have those literal names (like C<open>),
+because the C part looks up and calls those functions directly.  You
+may want to include documentation and globals (eg. for storing global
+state).  Any other top level statements are run when the script is
+loaded, just like ordinary Python.
+
+The file does not need to include a C<#!> (hash-bang) at the top, and
+does not need to be executable.  In fact it's a good idea not to do
+that, because running the plugin directly as a Python script won't
+work.
+
+=head2 EXCEPTIONS
+
+Python callbacks should throw exceptions to indicate errors.
+
+=head2 PYTHON CALLBACKS
+
+This just documents the arguments to the callbacks in Python, and any
+way that they differ from the C callbacks.  In all other respects they
+work the same way as the C callbacks, so you should go and read
+nbdkit-plugin(3).
+
+=over 4
+
+=item C<config>
+
+(Optional)
+
+ def config(key, value):
+   # no return value
+
+=item C<config_complete>
+
+(Optional)
+
+There are no arguments or return value.
+
+=item C<open>
+
+(Required)
+
+ def open(readonly):
+   # return handle
+
+You can return any non-NULL Python value as the handle.  It is passed
+back in subsequent calls.
+
+=item C<close>
+
+(Optional)
+
+ def close(h):
+   # no return value
+
+After C<close> returns, the reference count of the handle is
+decremented in the C part, which usually means that the handle and its
+contents will be garbage collected.
+
+=item C<get_size>
+
+(Required)
+
+ def get_size(h):
+   # return the size of the disk
+
+=item C<can_write>
+
+(Optional)
+
+ def can_write(h):
+   # return a boolean
+
+=item C<can_flush>
+
+(Optional)
+
+ def can_flush(h):
+   # return a boolean
+
+=item C<is_rotational>
+
+(Optional)
+
+ def is_rotational(h):
+   # return a boolean
+
+=item C<can_trim>
+
+(Optional)
+
+ def can_trim(h):
+   # return a boolean
+
+=item C<pread>
+
+(Required)
+
+ def pread(h, count, offset):
+   # construct a bytearray of length count bytes and return it
+
+The body of your C<pread> function should construct a buffer of length
+(at least) C<count> bytes.  You should read C<count> bytes from the
+disk starting at C<offset>.
+
+NBD only supports whole reads, so your function should try to read
+the whole region (perhaps requiring a loop).  If the read fails or
+is partial, your function should throw an exception.
+
+=item C<pwrite>
+
+(Optional)
+
+ def pwrite(h, buf, offset):
+   length = len (buf)
+   # no return value
+
+The body of your C<pwrite> function should write the C<buf> string to
+the disk.  You should write C<count> bytes to the disk starting at
+C<offset>.
+
+NBD only supports whole writes, so your function should try to
+write the whole region (perhaps requiring a loop).  If the write
+fails or is partial, your function should throw an exception.
+
+=item C<flush>
+
+(Optional)
+
+ def flush(h):
+   # no return value
+
+The body of your C<flush> function should do a L<sync(2)> or
+L<fdatasync(2)> or equivalent on the backing store.
+
+=item C<trim>
+
+(Optional)
+
+ def trim(h, count, offset):
+   # no return value
+
+The body of your C<trim> function should "punch a hole" in the
+backing store.
+
+=back
+
+=head2 MISSING CALLBACKS
+
+=over 4
+
+=item Missing: C<load> and C<unload>
+
+These are not needed because you can just use ordinary Python
+constructs.
+
+=item Missing: C<name>, C<version>, C<longname>, C<description>, C<config_help>
+
+These are not yet supported.
+
+=back
+
+=head2 THREADS
+
+The thread model for Python callbacks currently cannot be set from
+Python.  It is hard-coded in the C part to
+C<NBDKIT_THREAD_MODEL_SERIALIZE_ALL_REQUESTS>.  This may change or be
+settable in future.
+
+=head1 SEE ALSO
+
+L<nbdkit(1)>,
+L<nbdkit-plugin(3)>,
+L<python(1)>.
+
+=head1 AUTHORS
+
+Richard W.M. Jones
+
+=head1 COPYRIGHT
+
+Copyright (C) 2013-2014 Red Hat Inc.
+
+=head1 LICENSE
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+=over 4
+
+=item *
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+=item *
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+=item *
+
+Neither the name of Red Hat nor the names of its contributors may be
+used to endorse or promote products derived from this software without
+specific prior written permission.
+
+=back
+
+THIS SOFTWARE IS PROVIDED BY RED HAT AND CONTRIBUTORS ''AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL RED HAT OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.

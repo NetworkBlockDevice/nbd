@@ -30,15 +30,40 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	perl \
-	python \
-	vddk \
-	xz
+EXTRA_DIST = \
+	nbdkit-python-plugin.pod \
+	example.pl
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_PYTHON
+
+plugin_LTLIBRARIES = nbdkit-python-plugin.la
+
+nbdkit_python_plugin_la_SOURCES = \
+	python.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_python_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_python_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(PYTHON_CFLAGS)
+nbdkit_python_plugin_la_LIBADD = \
+	$(PYTHON_LIBS)
+nbdkit_python_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared \
+	$(PYTHON_LDFLAGS)
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-python-plugin.3
+
+nbdkit-python-plugin.3: nbdkit-python-plugin.pod
+	$(POD2MAN) -u --stderr --section=3 --center=nbdkit --release=nbdkit --name=`basename $@ .3` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~
