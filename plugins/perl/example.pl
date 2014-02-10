@@ -9,13 +9,28 @@ use strict;
 #   ./src/nbdkit -f -v ./plugins/perl/.libs/nbdkit-perl-plugin.so  \
 #       script=./plugins/perl/example.pl test1=foo test2=bar
 #
-# You can connect to the server using guestfish or qemu:
+# Or run it after installing nbdkit like this:
 #
-#   guestfish --format=raw -a nbd://localhost run
+#   nbdkit -f -v perl script=./plugins/perl/example.pl test1=foo test2=bar
+#
+# The -f -v arguments are optional.  They cause the server to stay in
+# the foreground and print debugging, which is useful when testing.
+#
+# You can connect to the server using guestfish or qemu, eg:
+#
+#   guestfish --format=raw -a nbd://localhost
+#   ><fs> run
+#   ><fs> part-disk /dev/sda mbr
+#   ><fs> mkfs ext2 /dev/sda1
+#   ><fs> list-filesystems
+#   ><fs> mount /dev/sda1 /
+#   ><fs> [etc]
 
 # This is the string used to store the emulated disk (initially all
-# zero bytes).  There is one disk per nbdkit instance.  You could also
-# put this into the handle, so there would be a fresh disk per handle.
+# zero bytes).  There is one disk per nbdkit instance, so if you
+# reconnect to the same server you should see the same disk.  You
+# could also put this into the handle, so there would be a fresh disk
+# per handle.
 my $disk = "\0" x (1024*1024);
 
 # This just prints the extra command line parameters, but real plugins
