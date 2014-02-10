@@ -58,10 +58,10 @@ nbdkit_perl_plugin_la_LDFLAGS = \
 
 if HAVE_POD2MAN
 
-man_MANS = nbdkit-perl-plugin.1
+man_MANS = nbdkit-perl-plugin.3
 
-nbdkit-perl-plugin.1: nbdkit-perl-plugin.pod
-	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
+nbdkit-perl-plugin.3: nbdkit-perl-plugin.pod
+	$(POD2MAN) -u --stderr --section=3 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
 
 endif
 
