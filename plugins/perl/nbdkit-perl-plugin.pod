@@ -10,11 +10,11 @@ nbdkit-perl-plugin - nbdkit perl plugin
 
 =head1 DESCRIPTION
 
-C<nbdkit-perl-plugin> is an embedded Perl interpreter for L<nbdkit(1)>,
-allowing you to write nbdkit plugins in Perl.
+C<nbdkit-perl-plugin> is an embedded Perl interpreter for
+L<nbdkit(1)>, allowing you to write nbdkit plugins in Perl.
 
 Broadly speaking, Perl nbdkit plugins work like C ones, so you should
-probably read L<nbdkit-plugin(3)> first.
+read L<nbdkit-plugin(3)> first.
 
 =head2 USING A PERL NBDKIT PLUGIN
 
@@ -23,9 +23,9 @@ like this:
 
  nbdkit perl script=/path/to/plugin.pl
 
-You may have to add further key=value arguments to the command line.
-Read the Perl script to see if it requires any.  C<script=...> I<must>
-come first on the command line.
+You may have to add further C<key=value> arguments to the command
+line.  Read the Perl script to see if it requires any.  C<script=...>
+I<must> come first on the command line.
 
 =head1 WRITING A PERL NBDKIT PLUGIN
 
@@ -62,7 +62,7 @@ script won't work.
 
 =head2 EXCEPTIONS
 
-Instead of returning error codes, as in C, Perl callbacks should
+Instead of returning error codes as in C, Perl callbacks should
 indicate problems by throwing Perl exceptions (ie. C<die>, C<croak>
 etc).  The Perl error message is captured and printed by nbdkit.
 
