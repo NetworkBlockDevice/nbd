@@ -57,7 +57,7 @@ if HAVE_POD2MAN
 man_MANS = nbdkit-vddk-plugin.1
 
 nbdkit-vddk-plugin.1: nbdkit-vddk-plugin.pod
-	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@` $< $@
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@ .1` $< $@
 
 endif
 
