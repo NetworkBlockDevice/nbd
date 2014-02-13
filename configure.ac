@@ -132,7 +132,7 @@ AS_IF([test "x$PERL" != "xno" && test "x$enable_perl" != "xno"],[
 
     dnl Check for Perl CFLAGS.
     AC_MSG_CHECKING([for Perl embed CFLAGS])
-    PERL_CFLAGS="$($PERL -MConfig -e 'print $Config{ccflags}')"
+    PERL_CFLAGS="$($PERL -MExtUtils::Embed -e 'ccflags')"
     AS_IF([ test -n "$PERL_CFLAGS" ],[
         AC_MSG_RESULT([$PERL_CFLAGS])
     ],[
@@ -140,21 +140,16 @@ AS_IF([test "x$PERL" != "xno" && test "x$enable_perl" != "xno"],[
         enable_perl=no
     ])
 
-    dnl Check for Perl LIBS.
-    AC_MSG_CHECKING([for Perl embed LIBS])
-    PERL_LIBS="$($PERL -MConfig -e 'print $Config{libs}')"
-
-    dnl Check for Perl LDFLAGS.
-    AC_MSG_CHECKING([for Perl embed LDFLAGS])
-    PERL_LDFLAGS="$($PERL -MConfig -e 'print $Config{ldflags}')"
+    dnl Check for Perl LDOPTS.
+    AC_MSG_CHECKING([for Perl embed LDOPTS])
+    PERL_LDOPTS="$($PERL -MExtUtils::Embed -e 'ldopts')"
 
     dnl XXX Could check these actually work.
 ])
 AM_CONDITIONAL([HAVE_PERL],[test "x$enable_perl" != "xno" && test "x$PERL" != "xno"])
 AC_SUBST([PERL_ARCHLIB])
 AC_SUBST([PERL_CFLAGS])
-AC_SUBST([PERL_LIBS])
-AC_SUBST([PERL_LDFLAGS])
+AC_SUBST([PERL_LDOPTS])
 
 dnl Check for libvirt (only if you want to compile the libvirt plugin).
 AC_ARG_WITH([libvirt],[

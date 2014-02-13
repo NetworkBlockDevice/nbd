@@ -50,11 +50,9 @@ nbdkit_perl_plugin_la_CFLAGS = \
 	$(WARNINGS_CFLAGS) \
 	$(PERL_CFLAGS) \
 	-I$(PERL_ARCHLIB)/CORE
-nbdkit_perl_plugin_la_LIBADD = \
-	-lperl $(PERL_LIBS)
 nbdkit_perl_plugin_la_LDFLAGS = \
 	-module -avoid-version -shared \
-	$(PERL_LDFLAGS)
+	$(PERL_LDOPTS)
 
 if HAVE_POD2MAN
 
