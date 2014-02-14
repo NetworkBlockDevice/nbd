@@ -258,7 +258,7 @@ If there is an error, the function should call C<die>.
 
 (Optional)
 
- sub flush
+ sub trim
  {
      my $handle = shift;
      my $count = shift;
