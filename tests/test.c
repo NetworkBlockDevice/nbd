@@ -45,10 +45,11 @@
 
 #include "test.h"
 
-static char tmpdir[] = "/tmp/nbdkitXXXXXX";
-static char sockpath[] = "/tmp/nbdkitXXXXXX/sock";
+/* test_start_nbdkit below makes assumptions about the format of these strings */
+static char tmpdir[] =            "/tmp/nbdkitXXXXXX";
+static char sockpath[] =          "/tmp/nbdkitXXXXXX/sock";
 static char unixsockpath[] = "unix:/tmp/nbdkitXXXXXX/sock";
-static char pidpath[] = "/tmp/nbdkitXXXXXX/pid";
+static char pidpath[] =           "/tmp/nbdkitXXXXXX/pid";
 
 pid_t pid = 0;
 const char *server[2] = { unixsockpath, NULL };
