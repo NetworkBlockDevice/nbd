@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013 Red Hat Inc.
+# Copyright (C) 2013-2014 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,8 @@
 
 CLEANFILES = *~
 MAINTAINERCLEANFILES =
+
+EXTRA_DIST = test.pl
 
 # Tests need libguestfs, since that is a convenient way to drive qemu.
 if HAVE_LIBGUESTFS
@@ -110,6 +112,20 @@ disk.xz: disk
 	xz --best -c disk > $@
 
 endif
+endif
+
+# perl plugin test.
+if HAVE_PERL
+
+check_PROGRAMS += test-perl
+TESTS += test-perl
+
+test_perl_SOURCES = test-lang-plugins.c test.h
+test_perl_CFLAGS = \
+	-DLANG='"perl"' -DSCRIPT='"test.pl"' \
+	$(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_perl_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
 endif
 
 endif

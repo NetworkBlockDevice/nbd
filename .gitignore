@@ -41,5 +41,6 @@ Makefile.in
 /tests/test-connect
 /tests/test-file
 /tests/test-gzip
+/tests/test-perl
 /tests/test-xz
 /test-driver
