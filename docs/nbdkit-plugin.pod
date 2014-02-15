@@ -506,6 +506,34 @@ L<printf(3)>:
 Note that C<nbdkit_debug> only prints things when the server is in
 verbose mode (I<-v> option).
 
+=head1 INSTALLING THE PLUGIN
+
+The plugin is a C<*.so> file and possibly a manual page.  You can of
+course install the plugin C<*.so> file wherever you want, and users
+will be able to use it by running:
+
+ nbdkit /path/to/plugin.so [args]
+
+However B<if> the shared library has a name of the form
+C<nbdkit-I<name>-plugin.so> B<and if> the library is installed in the
+C<$plugindir> directory, then users can be run it by only typing:
+
+ nbdkit name [args]
+
+The location of the C<$plugindir> directory is set when nbdkit is
+compiled and can be found by doing:
+
+ nbdkit --dump-config
+
+=head1 WRITING PLUGINS IN OTHER PROGRAMMING LANGUAGES
+
+You can also write nbdkit plugins in Perl or Python.  Other
+programming languages may be offered in future.
+
+For more information see:
+L<nbdkit-perl-plugin(3)>,
+L<nbdkit-python-plugin(3)>.
+
 =head1 SEE ALSO
 
 L<nbdkit(1)>,
