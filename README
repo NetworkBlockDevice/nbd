@@ -28,24 +28,44 @@ Building from source
 
 By default nbdkit needs nothing except Linux and reasonably recent gcc.
 
-However there are some *optional* libraries you may want to install
-for the plugins:
+To build the man pages, you will need to install:
 
- - pod2man (from perl): to build the manual pages
+ - pod2man (included with perl)
 
- - perl development libraries: to build the embedded perl plugin
+There are some *optional* libraries you may want to install for the
+plugins.
 
- - zlib: to build the gzip plugin
+For the gzip plugin:
 
- - liblzma: to build the xz plugin
+ - zlib
 
- - libvirt: to build the libvirt plugin
+For the xz plugin:
 
- - libguestfs: to build the libguestfs plugin, and to run the test suite
+ - liblzma
 
- - guestfish (from libguestfs): to run parts of the test suite
+For the libvirt plugin:
 
- - VDDK: see plugins/vddk/README.VDDK
+ - libvirt
+
+For the libguestfs plugin, and to run the test suite:
+
+ - libguestfs
+
+ - guestfish (from libguestfs)
+
+For the VDDK plugin:
+
+ - VDDK (see plugins/vddk/README.VDDK)
+
+For the Perl plugin:
+
+ - perl development libraries
+
+ - perl module ExtUtils::Embed
+
+For the Python plugin:
+
+ - python development libraries
 
 After installing any dependencies:
 
