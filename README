@@ -80,6 +80,18 @@ Optionally run this as root to install everything:
 
   make install
 
+Tests
+-----
+
+You will need to install libguestfs to run the test suite.
+
+The test suite ('make check') is fairly comprehensive.  It runs the
+newly built nbdkit + plugin as a captive process, and tests it using
+libguestfs.
+
+If there is a failure, look at the corresponding tests/*.log file for
+debug information.
+
 Packager information
 --------------------
 

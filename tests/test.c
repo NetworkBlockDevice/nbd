@@ -92,8 +92,9 @@ test_start_nbdkit (const char *plugin, ...)
     argv[3] = "-P";
     argv[4] = pidpath;
     argv[5] = "-f";
-    argv[6] = plugin;
-    i = 7;
+    argv[6] = "-v";
+    argv[7] = plugin;
+    i = 8;
 
     va_start (args, plugin);
     while ((p = va_arg (args, const char *)) != NULL) {

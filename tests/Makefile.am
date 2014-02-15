@@ -38,7 +38,12 @@ EXTRA_DIST = test.pl test.py
 # Tests need libguestfs, since that is a convenient way to drive qemu.
 if HAVE_LIBGUESTFS
 
-TESTS_ENVIRONMENT = LIBGUESTFS_ATTACH_METHOD=appliance
+# Use the 'direct' backend, and ensure maximum libguestfs debugging is
+# written to the *.log files in case there is a problem.
+TESTS_ENVIRONMENT = \
+	LIBGUESTFS_ATTACH_METHOD=appliance \
+	LIBGUESTFS_DEBUG=1 \
+	LIBGUESTFS_TRACE=1
 
 # Common test library.
 check_LTLIBRARIES = libtest.la
