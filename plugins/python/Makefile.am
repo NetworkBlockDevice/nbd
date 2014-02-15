@@ -32,7 +32,7 @@
 
 EXTRA_DIST = \
 	nbdkit-python-plugin.pod \
-	example.pl
+	example.py
 
 plugindir = $(libdir)/nbdkit/plugins
 
