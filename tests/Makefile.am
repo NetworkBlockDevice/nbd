@@ -33,7 +33,7 @@
 CLEANFILES = *~
 MAINTAINERCLEANFILES =
 
-EXTRA_DIST = test.pl
+EXTRA_DIST = test.pl test.py
 
 # Tests need libguestfs, since that is a convenient way to drive qemu.
 if HAVE_LIBGUESTFS
@@ -125,6 +125,20 @@ test_perl_CFLAGS = \
 	-DLANG='"perl"' -DSCRIPT='"test.pl"' \
 	$(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
 test_perl_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+endif
+
+# python plugin test.
+if HAVE_PYTHON
+
+check_PROGRAMS += test-python
+TESTS += test-python
+
+test_python_SOURCES = test-lang-plugins.c test.h
+test_python_CFLAGS = \
+	-DLANG='"python"' -DSCRIPT='"test.py"' \
+	$(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_python_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
 endif
 
