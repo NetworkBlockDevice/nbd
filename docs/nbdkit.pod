@@ -7,7 +7,7 @@ nbdkit - A toolkit for creating NBD servers
 =head1 SYNOPSIS
 
  nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]
-        [-P PIDFILE] [-p PORT] [-r] [-s]
+        [-P PIDFILE] [-p PORT] [-r] [--run CMD] [-s]
         [-U SOCKET] [-u USER] [-v] [-V]
         PLUGIN [key=value [key=value [...]]]
 
@@ -133,6 +133,13 @@ Copy-on-write (or "snapshot") functionality is not supported by this
 server.  However if you are using qemu as a client (or indirectly via
 libguestfs) then it supports snapshots.
 
+=item B<--run> CMD
+
+Run nbdkit as a captive subprocess of C<CMD>.  When C<CMD> exits,
+nbdkit is killed.  See L</CAPTIVE NBDKIT> below.
+
+This option implies I<--foreground>.
+
 =item B<-s>
 
 =item B<--single>
@@ -205,6 +212,62 @@ the form of C<key=value>.  For example:
 To list all the options supported by a plugin, do:
 
  nbdkit --help file
+
+=head1 CAPTIVE NBDKIT
+
+You can run nbdkit as a "captive process", using the I<--run> option.
+This means that nbdkit runs as long as (for example) L<qemu(1)> or
+L<guestfish(1)> is running.  When those exit, nbdkit is killed.
+
+Some examples should make this clear.
+
+To run nbdkit captive under qemu:
+
+ nbdkit file file=disk.img --run 'qemu -drive file=$nbd,if=virtio'
+
+On the qemu command line, C<$nbd> is substituted automatically with
+the right NBD path so it can connect to nbdkit.  When qemu exits,
+nbdkit is killed and cleaned up automatically.
+
+Running nbdkit captive under guestfish:
+
+ nbdkit file file=disk.img --run 'guestfish --format=raw -a $nbd -i'
+
+When guestfish exits, nbdkit is killed.
+
+The following shell variables are available in the I<--run> argument:
+
+=over 4
+
+=item C<$nbd>
+
+A URL that refers to the nbdkit port or socket.
+
+Note there is some magic here, since qemu and guestfish URLs have a
+different format, so nbdkit tries to guess which you are running.  If
+the magic doesn't work, try using the variables below instead.
+
+=item C<$port>
+
+If E<ne> "", the port number that nbdkit is listening on.
+
+=item C<$unixsocket>
+
+If E<ne> "", the Unix domain socket that nbdkit is listening on.
+
+=back
+
+I<--run> implies I<--foreground>.  It is not possible, and probably
+not desirable, to have nbdkit fork into the background when using
+I<--run>.
+
+Even when running captive, nbdkit still listens on the regular TCP/IP
+port, unless you specify the I<-p>/I<-U> options.  If you want a truly
+private captive nbdkit, then you should create a private temporary
+directory, and arrange to put nbdkit's socket there:
+
+ d="$(mktemp -d)"
+ nbdkit -U "$d/socket" plugin [args] --run '...'
 
 =head1 SEE ALSO
 

@@ -44,6 +44,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <errno.h>
 
 #include <pthread.h>
@@ -56,6 +57,7 @@
 static void open_plugin_so (const char *filename);
 static void start_serving (void);
 static void set_up_signals (void);
+static void run_command (void);
 static void change_user (void);
 static void write_pidfile (void);
 static void fork_into_background (void);
@@ -68,6 +70,7 @@ int listen_stdin;               /* -s */
 char *pidfile;                  /* -P */
 const char *port;               /* -p */
 int readonly;                   /* -r */
+char *run;                      /* --run */
 char *unixsocket;               /* -U */
 const char *user, *group;       /* -u & -g */
 int verbose;                    /* -v */
@@ -90,6 +93,7 @@ static const struct option long_options[] = {
   { "port",       1, NULL, 'p' },
   { "read-only",  0, NULL, 'r' },
   { "readonly",   0, NULL, 'r' },
+  { "run",        1, NULL, 0 },
   { "single",     0, NULL, 's' },
   { "stdin",      0, NULL, 's' },
   { "unix",       1, NULL, 'U' },
@@ -102,7 +106,7 @@ static void
 usage (void)
 {
   printf ("nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]\n"
-          "       [-P PIDFILE] [-p PORT] [-r] [-s]\n"
+          "       [-P PIDFILE] [-p PORT] [-r] [--run CMD] [-s]\n"
           "       [-U SOCKET] [-u USER] [-v] [-V]\n"
           "       PLUGIN [key=value [key=value [...]]]\n"
           "\n"
@@ -142,11 +146,16 @@ main (int argc, char *argv[])
         dump_config ();
         exit (EXIT_SUCCESS);
       }
+      else if (strcmp (long_options[option_index].name, "run") == 0) {
+        run = optarg;
+        foreground = 1;
+      }
       else {
         fprintf (stderr, "%s: unknown long option: %s (%d)\n",
                  program_name, long_options[option_index].name, option_index);
         exit (EXIT_FAILURE);
       }
+      break;
 
     case 'f':
       foreground = 1;
@@ -341,8 +350,9 @@ start_serving (void)
    * TCP/IP and Unix sockets, or even multiple TCP/IP ports.
    */
   if ((port && unixsocket) || (port && listen_stdin) ||
-      (unixsocket && listen_stdin)) {
-    fprintf (stderr, "%s: -p, -U and -s options cannot appear at the same time\n",
+      (unixsocket && listen_stdin) || (listen_stdin && run)) {
+    fprintf (stderr,
+             "%s: -p, -U and -s options cannot appear at the same time\n",
              program_name);
     exit (EXIT_FAILURE);
   }
@@ -365,6 +375,7 @@ start_serving (void)
   else
     socks = bind_tcpip_socket (&nr_socks);
 
+  run_command ();
   change_user ();
   fork_into_background ();
   write_pidfile ();
@@ -488,6 +499,89 @@ fork_into_background (void)
   /* If not verbose, set stderr to the same as stdout as well. */
   if (!verbose)
     dup2 (1, 2);
+
+  debug ("forked into background (new pid = %d)", getpid ());
+}
+
+static void
+run_command (void)
+{
+  char *url;
+  char *cmd;
+  int r;
+  pid_t pid;
+
+  if (!run)
+    return;
+
+  /* Construct an nbd "URL".  Unfortunately guestfish and qemu take
+   * different syntax, so try to guess which one we need.
+   */
+  if (strstr (run, "guestfish")) {
+    if (port)
+      r = asprintf (&url, "nbd://localhost:%s", port);
+    else if (unixsocket)
+      /* XXX escaping? */
+      r = asprintf (&url, "nbd://?socket=%s", unixsocket);
+    else
+      abort ();
+  }
+  else /* qemu */ {
+    if (port)
+      r = asprintf (&url, "nbd:localhost:%s", port);
+    else if (unixsocket)
+      r = asprintf (&url, "nbd:unix:%s", unixsocket);
+    else
+      abort ();
+  }
+  if (r == -1) {
+    perror ("asprintf");
+    exit (EXIT_FAILURE);
+  }
+
+  /* Construct the final command including shell variables. */
+  /* XXX Escaping again. */
+  r = asprintf (&cmd,
+                "nbd='%s'\n"
+                "port='%s'\n"
+                "unixsocket='%s'\n"
+                "%s",
+                url, port, unixsocket, run);
+  if (r == -1) {
+    perror ("asprintf");
+    exit (EXIT_FAILURE);
+  }
+
+  free (url);
+
+  /* Fork.  Captive nbdkit runs as the child process. */
+  pid = fork ();
+  if (pid == -1) {
+    perror ("fork");
+    exit (EXIT_FAILURE);
+  }
+
+  if (pid > 0) {              /* Parent process is the run command. */
+    r = system (cmd);
+    if (WIFEXITED (r))
+      r = WEXITSTATUS (r);
+    else if (WIFSIGNALED (r)) {
+      fprintf (stderr, "%s: external command was killed by signal %d\n",
+               program_name, WTERMSIG (r));
+      r = 1;
+    }
+    else if (WIFSTOPPED (r)) {
+      fprintf (stderr, "%s: external command was stopped by signal %d\n",
+               program_name, WSTOPSIG (r));
+      r = 1;
+    }
+
+    kill (pid, SIGTERM);        /* Kill captive nbdkit. */
+
+    _exit (r);
+  }
+
+  free (cmd);
 
   debug ("forked into background (new pid = %d)", getpid ());
 }

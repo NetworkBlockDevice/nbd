@@ -7,8 +7,6 @@
 
 * syslog? journal?
 
-* An easy way to run nbdkit captive under libguestfs.
-
 * Glance and/or cinder plugins.
 
 * Performance - measure and improve it.
