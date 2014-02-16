@@ -546,7 +546,7 @@ run_command (void)
                 "port='%s'\n"
                 "unixsocket='%s'\n"
                 "%s",
-                url, port, unixsocket, run);
+                url, port ? port : "", unixsocket ? unixsocket : "", run);
   if (r == -1) {
     perror ("asprintf");
     exit (EXIT_FAILURE);
