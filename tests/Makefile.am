@@ -33,9 +33,31 @@
 CLEANFILES = *~
 MAINTAINERCLEANFILES =
 
-EXTRA_DIST = test.pl test.py
+EXTRA_DIST = \
+	test-captive.sh \
+	test-dump-config.sh \
+	test-foreground.sh \
+	test-help.sh \
+	test-help-plugin.sh \
+	test.pl \
+	test.py \
+	test-single.sh \
+	test-start.sh
 
-# Tests need libguestfs, since that is a convenient way to drive qemu.
+# Basic server command line and start-up tests.
+
+TESTS = \
+	test-help.sh \
+	test-help-plugin.sh \
+	test-dump-config.sh \
+	test-start.sh \
+	test-foreground.sh \
+	test-single.sh \
+	test-captive.sh
+
+# In-depth tests need libguestfs, since that is a convenient way to
+# drive qemu.
+
 if HAVE_LIBGUESTFS
 
 # Use the 'direct' backend, and ensure maximum libguestfs debugging is
@@ -52,7 +74,7 @@ libtest_la_CFLAGS = $(WARNINGS_CFLAGS)
 
 # Basic connection test.
 check_PROGRAMS = test-connect
-TESTS = test-connect
+TESTS += test-connect
 check_DATA =
 
 test_connect_SOURCES = test-connect.c test.h
