@@ -72,7 +72,7 @@ int check_conn(char* devname, int do_print) {
 		}
 	}
 	len=read(fd, buf, 256);
-	buf[len-1]='\0';
+	buf[len]='\0';
 	if(do_print) printf("%s\n", buf);
 	return 0;
 }
@@ -187,9 +187,10 @@ void ask_list(int sock) {
 					break;
 			}
 			if(len) {
-				if(read(sock, buf, len) < 0) {
+				if(len=read(sock, buf, len) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
 				}
+				buf[len] = '\0';
 				fprintf(stderr, "Server said: %s\n", buf);
 			}
 			exit(EXIT_FAILURE);
