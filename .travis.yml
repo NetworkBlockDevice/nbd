@@ -1,0 +1,6 @@
+language: c
+compiler:
+  - clang
+  - gcc
+before-install: sudo apt-get update
+install: sudo apt-get build-dep nbd-server
