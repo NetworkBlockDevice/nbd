@@ -6,4 +6,6 @@ before-install: sudo apt-get update
 install: 
  - sudo apt-get build-dep nbd-server
  - sudo apt-get install autotools-dev
+ - apt-cache policy automake
+ - automake --version
 script: autoreconf -f -i && ./configure && make && make check
