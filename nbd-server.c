@@ -1840,6 +1840,7 @@ int set_peername(int net, CLIENT *client) {
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &(client->clientaddr), addrinlen);
 			int addrbits;
+			assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
 			if(ai->ai_family == AF_INET) {
 				addrbits = 32;
 			} else if(ai->ai_family == AF_INET6) {
