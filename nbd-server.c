@@ -555,6 +555,8 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	err_out:
 		if(retval)
 			g_array_free(retval, TRUE);
+		if(dirh)
+			closedir(dirh);
 		return NULL;
 	}
 	return retval;
