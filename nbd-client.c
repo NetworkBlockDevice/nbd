@@ -72,7 +72,8 @@ int check_conn(char* devname, int do_print) {
 		}
 	}
 	len=read(fd, buf, 256);
-	buf[len]='\0';
+	if(len >= 0)
+		buf[len]='\0';
 	if(do_print) printf("%s\n", buf);
 	return 0;
 }
@@ -186,7 +187,7 @@ void ask_list(int sock) {
 					fprintf(stderr, "\nE: unexpected error from server.\n");
 					break;
 			}
-			if(len) {
+			if(len > 0 && len < BUF_SIZE) {
 				if(len=read(sock, buf, len) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
 				}
