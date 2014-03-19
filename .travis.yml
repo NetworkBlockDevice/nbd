@@ -2,10 +2,13 @@ language: c
 compiler:
   - clang
   - gcc
-before-install: sudo apt-get update
+before-install: 
+  - echo 'deb http://ftp.ubuntu.com/ubuntu trusty main' > automake.list
+  - sudo mv automake.list /etc/apt/sources.list.d/
+  - echo -e 'Package: *\nPin: release a=trusty\nPin-Priority: 200' > automake.conf
+  - sudo mv automake.pref /etc/apt/preferences.d/
+  - sudo apt-get update
 install: 
- - sudo apt-get build-dep nbd-server
- - sudo apt-get install autotools-dev
- - apt-cache policy automake
- - automake --version
+  - sudo apt-get -t trusty install automake
+  - automake --version
 script: autoreconf -f -i && ./configure && make && make check
