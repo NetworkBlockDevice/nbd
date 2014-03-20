@@ -9,3 +9,15 @@ install:
   - sudo apt-get install docbook-utils
   - automake --version
 script: ./autogen.sh && ./configure && make && make check
+env:
+  global:
+   - secure: "cDahKVwhMIaj2nzcZOfgmzrpnF6JW96adc+DmA+iVhvklB+SgQ72rjzKLVb6vDttArwqLIF4/z1iCkdm6hI5n/osEyDqsC0LI+8MTXp2v3niXjHjno7i7zRvSMw1+e3x7QOu67TWJEcxx97JRHPmPcqKBQNqAZCri3ZUGE+tNUE="
+addons:
+  coverity_scan:
+    project:
+      name: "yoe/nbd"
+      description: "Network Block Device"
+    notification_email: w@uter.be
+    build_command_prepend:
+    build_command:
+    branch_pattern: coverity_scan
