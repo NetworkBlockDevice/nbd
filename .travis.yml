@@ -2,13 +2,10 @@ language: c
 compiler:
   - clang
   - gcc
-before-install: 
-  - echo 'deb http://ftp.ubuntu.com/ubuntu trusty main' > automake.list
-  - sudo mv automake.list /etc/apt/sources.list.d/
-  - echo -e 'Package: *\nPin: release a=trusty\nPin-Priority: 200' > automake.conf
-  - sudo mv automake.pref /etc/apt/preferences.d/
-  - sudo apt-get update
 install: 
+  - sudo sh .travis/add-trusty
+  - sudo apt-get update
   - sudo apt-get -t trusty install automake
+  - sudo apt-get install docbook-utils
   - automake --version
-script: autoreconf -f -i && ./configure && make && make check
+script: ./autogen.sh && ./configure && make && make check
