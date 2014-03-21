@@ -62,6 +62,7 @@ manpage.1: manpage.sgml
       <arg>-swap</arg>
       <arg>-persist</arg>
       <arg>-nofork</arg>
+      <arg>-systemd-mark</arg>
       <arg>-block-size <replaceable>block size</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
       <arg>-name <replaceable>name</replaceable></arg>
@@ -221,6 +222,20 @@ manpage.1: manpage.sgml
 	  performing mlockall() and adjusting the oom-killer score
 	  at an appropriate time. It does not however guarantee
 	  that such deadlocks can be avoided.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-systemd-mark</option></term>
+	<term><option>-m</option></term>
+	<listitem>
+	  <para>The systemd init system requires that processes which
+	    should not be killed at shutdown time be marked appropriately
+	    by replacing the first letter of their argv[0] with an '@'
+	    sign.</para>
+	  <para>This option will cause nbd-client to do so.</para>
+	  <para>Note that this only works if nbd-client is run from an
+	    initrd; i.e., systemd will ignore such a mark if run from a
+	    systemd unit file or from the command line.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

@@ -72,7 +72,8 @@ int check_conn(char* devname, int do_print) {
 		}
 	}
 	len=read(fd, buf, 256);
-	buf[len-1]='\0';
+	if(len >= 0)
+		buf[len]='\0';
 	if(do_print) printf("%s\n", buf);
 	return 0;
 }
@@ -186,10 +187,11 @@ void ask_list(int sock) {
 					fprintf(stderr, "\nE: unexpected error from server.\n");
 					break;
 			}
-			if(len) {
-				if(read(sock, buf, len) < 0) {
+			if(len > 0 && len < BUF_SIZE) {
+				if(len=read(sock, buf, len) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
 				}
+				buf[len] = '\0';
 				fprintf(stderr, "Server said: %s\n", buf);
 			}
 			exit(EXIT_FAILURE);
@@ -396,7 +398,7 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 	}
-	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
+	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 	fprintf(stderr, "Or   : nbd-client -name|-N name host [port] nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
@@ -455,6 +457,7 @@ int main(int argc, char *argv[]) {
 		{ "persist", no_argument, NULL, 'p' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
+		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ 0, 0, 0, 0 }, 
 	};
@@ -523,6 +526,9 @@ int main(int argc, char *argv[]) {
 			name="";
 			nbddev="";
 			port = NBD_DEFAULT_PORT;
+			break;
+		case 'm':
+			argv[0][0] = '@';
 			break;
 		case 'n':
 			nofork=1;
