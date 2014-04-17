@@ -5,6 +5,7 @@ nbd (1:3.8-2) UNRELEASED; urgency=medium
     - Call nbd-client with the -systemd-mark option from initramfs, to make
       sure root-on-NBD continues working properly even if the user is running
       systemd
+  * debian/pre{inst,rm}: remove, no content
 
  -- Wouter Verhelst <wouter@debian.org>  Fri, 21 Mar 2014 11:48:29 +0100
 
