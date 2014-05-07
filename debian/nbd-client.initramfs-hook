@@ -9,6 +9,6 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions
 
-force_load nbd
+manual_add_modules nbd
 auto_add_modules net
 copy_exec /sbin/nbd-client /sbin
