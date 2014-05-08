@@ -108,6 +108,11 @@ int authorized_client(CLIENT *opts) {
 	struct in_addr cltemp;
 	int len;
 
+	if (opts->server->authname == NULL) {
+		msg(LOG_INFO, "No authorization file, granting access.");
+		return 1;
+	}
+
 	if ((f=fopen(opts->server->authname,"r"))==NULL) {
                 msg(LOG_INFO, "Can't open authorization file %s (%s).",
                     opts->server->authname, strerror(errno));
