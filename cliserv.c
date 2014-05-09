@@ -1,6 +1,7 @@
 #include <config.h>
 #include <cliserv.h>
 #include <stdio.h>
+#include <syslog.h>
 
 void setmysockopt(int sock) {
 	int size = 1;
