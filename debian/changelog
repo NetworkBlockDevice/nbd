@@ -1,4 +1,4 @@
-nbd (1:3.8-2) UNRELEASED; urgency=medium
+nbd (1:3.8-2) unstable; urgency=medium
 
   * The "deal with 727708" release
   * Add proper support for systemd:
@@ -9,7 +9,7 @@ nbd (1:3.8-2) UNRELEASED; urgency=medium
   * debian/nbd-client.initr{amfs-hook,d}: don't force-load nbd, instead
     only load the module if we're actually doing root-on-NBD.
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 21 Mar 2014 11:48:29 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 19 May 2014 08:41:54 +0200
 
 nbd (1:3.8-1) unstable; urgency=medium
 
