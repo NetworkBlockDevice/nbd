@@ -269,6 +269,26 @@ directory, and arrange to put nbdkit's socket there:
  d="$(mktemp -d)"
  nbdkit -U "$d/socket" plugin [args] --run '...'
 
+=head1 SIGNALS
+
+C<nbdkit> responds to the following signals:
+
+=over 4
+
+=item C<SIGINT>
+
+=item C<SIGQUIT>
+
+=item C<SIGTERM>
+
+The server exits cleanly.
+
+=item C<SIGPIPE>
+
+This signal is ignored.
+
+=back
+
 =head1 SEE ALSO
 
 L<nbdkit-plugin(3)>,
