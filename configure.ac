@@ -196,6 +196,22 @@ AC_SUBST([PYTHON_CFLAGS])
 AC_SUBST([PYTHON_LIBS])
 AC_SUBST([PYTHON_LDFLAGS])
 
+dnl Check for curl (only if you want to compile the curl plugin).
+AC_ARG_WITH([curl],[
+    AS_HELP_STRING([--without-curl],
+                   [disable curl plugin @<:@default=check@:>@])],
+    [],
+    [with_curl=check])
+AS_IF([test "$with_curl" != "no"],[
+    PKG_CHECK_MODULES([CURL], [libcurl],[
+        AC_SUBST([CURL_CFLAGS])
+        AC_SUBST([CURL_LIBS])
+        AC_DEFINE([HAVE_CURL],[1],[curl found at compile time.])
+    ],
+    [AC_MSG_WARN([curl not found, curl plugin will be disabled])])
+])
+AM_CONDITIONAL([HAVE_CURL],[test "x$CURL_LIBS" != "x"])
+
 dnl Check for libvirt (only if you want to compile the libvirt plugin).
 AC_ARG_WITH([libvirt],[
     AS_HELP_STRING([--without-libvirt],
@@ -297,6 +313,7 @@ AC_CONFIG_FILES([Makefile
                  docs/Makefile
                  include/Makefile
                  plugins/Makefile
+                 plugins/curl/Makefile
                  plugins/example1/Makefile
                  plugins/example2/Makefile
                  plugins/example3/Makefile

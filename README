@@ -43,6 +43,10 @@ For the xz plugin:
 
  - liblzma
 
+For the curl (HTTP/FTP) plugin:
+
+ - libcurl
+
 For the libvirt plugin:
 
  - libvirt

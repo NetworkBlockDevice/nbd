@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013-2014 Red Hat Inc.
+# Copyright (C) 2014 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,16 +30,37 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	curl \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	perl \
-	python \
-	vddk \
-	xz
+EXTRA_DIST = nbdkit-curl-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_CURL
+
+plugin_LTLIBRARIES = nbdkit-curl-plugin.la
+
+nbdkit_curl_plugin_la_SOURCES = \
+	curl.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_curl_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_curl_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(CURL_CFLAGS)
+nbdkit_curl_plugin_la_LIBADD = \
+	$(CURL_LIBS)
+nbdkit_curl_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-curl-plugin.1
+
+nbdkit-curl-plugin.1: nbdkit-curl-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@ .1` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~

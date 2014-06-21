@@ -292,6 +292,7 @@ This signal is ignored.
 =head1 SEE ALSO
 
 L<nbdkit-plugin(3)>,
+L<nbdkit-curl-plugin(1)>,
 L<nbdkit-example1-plugin(1)>,
 L<nbdkit-example2-plugin(1)>,
 L<nbdkit-example3-plugin(1)>,
