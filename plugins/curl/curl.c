@@ -31,6 +31,14 @@
  * SUCH DAMAGE.
  */
 
+/* NB: The terminology used by libcurl is confusing!
+ *
+ * WRITEFUNCTION / write_cb is used when reading from the remote server
+ * READFUNCTION / read_cb is used when writing to the remote server.
+ *
+ * We use the same terminology as libcurl here.
+ */
+
 #include <config.h>
 
 #include <stdio.h>
@@ -145,6 +153,8 @@ struct curl_handle {
   char errbuf[CURL_ERROR_SIZE];
   char *write_buf;
   uint32_t write_count;
+  const char *read_buf;
+  uint32_t read_count;
 };
 
 /* Translate CURLcode to nbdkit_error. */
@@ -156,6 +166,7 @@ struct curl_handle {
 
 static size_t header_cb (void *ptr, size_t size, size_t nmemb, void *opaque);
 static size_t write_cb (char *ptr, size_t size, size_t nmemb, void *opaque);
+static size_t read_cb (void *ptr, size_t size, size_t nmemb, void *opaque);
 
 /* Create the per-connection handle. */
 static void *
@@ -241,12 +252,15 @@ CURLOPT_PROXY
     nbdkit_debug ("accept range supported (for HTTP/HTTPS)");
   }
 
-  /* Get set up for reading. */
+  /* Get set up for reading and writing. */
   curl_easy_setopt (h->c, CURLOPT_HEADERFUNCTION, NULL);
   curl_easy_setopt (h->c, CURLOPT_HEADERDATA, NULL);
-  curl_easy_setopt (h->c, CURLOPT_NOBODY, 0); /* No Body, not nobody! */
   curl_easy_setopt (h->c, CURLOPT_WRITEFUNCTION, write_cb);
   curl_easy_setopt (h->c, CURLOPT_WRITEDATA, h);
+  if (!readonly) {
+    curl_easy_setopt (h->c, CURLOPT_READFUNCTION, read_cb);
+    curl_easy_setopt (h->c, CURLOPT_READDATA, h);
+  }
 
   nbdkit_debug ("returning new handle %p", h);
 
@@ -307,7 +321,7 @@ curl_get_size (void *handle)
   return h->exportsize;
 }
 
-/* Read data from the file. */
+/* Read data from the remote server. */
 static int
 curl_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
 {
@@ -320,6 +334,8 @@ curl_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
    */
   h->write_buf = buf;
   h->write_count = count;
+
+  curl_easy_setopt (h->c, CURLOPT_HTTPGET, 1);
 
   /* Make an HTTP range request. */
   snprintf (range, sizeof range, "%" PRIu64 "-%" PRIu64,
@@ -366,6 +382,62 @@ write_cb (char *ptr, size_t size, size_t nmemb, void *opaque)
   return orig_realsize;
 }
 
+/* Write data to the remote server. */
+static int
+curl_pwrite (void *handle, const void *buf, uint32_t count, uint64_t offset)
+{
+  struct curl_handle *h = handle;
+  CURLcode r;
+  char range[128];
+
+  /* Tell the read_cb where we want the data to be read from.  read_cb
+   * will update this if the data comes in multiple sections.
+   */
+  h->read_buf = buf;
+  h->read_count = count;
+
+  curl_easy_setopt (h->c, CURLOPT_UPLOAD, 1);
+
+  /* Make an HTTP range request. */
+  snprintf (range, sizeof range, "%" PRIu64 "-%" PRIu64,
+            offset, offset + count);
+  curl_easy_setopt (h->c, CURLOPT_RANGE, range);
+
+  /* The assumption here is that curl will look after timeouts. */
+  r = curl_easy_perform (h->c);
+  if (r != CURLE_OK) {
+    display_curl_error (h, r, "pwrite: curl_easy_perform");
+    return -1;
+  }
+
+  /* Could use curl_easy_getinfo here to obtain further information
+   * about the connection.
+   */
+
+  /* As far as I understand the cURL API, this should never happen. */
+  assert (h->read_count == 0);
+
+  return 0;
+}
+
+static size_t
+read_cb (void *ptr, size_t size, size_t nmemb, void *opaque)
+{
+  struct curl_handle *h = opaque;
+  size_t realsize = size * nmemb;
+
+  assert (h->read_buf);
+  if (realsize > h->read_count)
+    realsize = h->read_count;
+
+  memcpy (ptr, h->read_buf, realsize);
+
+  h->read_count -= realsize;
+  h->read_buf += realsize;
+
+  return realsize;
+}
+
 static struct nbdkit_plugin plugin = {
   .name              = "curl",
   .version           = PACKAGE_VERSION,
@@ -378,6 +450,7 @@ static struct nbdkit_plugin plugin = {
   .close             = curl_close,
   .get_size          = curl_get_size,
   .pread             = curl_pread,
+  .pwrite            = curl_pwrite,
 };
 
 NBDKIT_REGISTER_PLUGIN(plugin)

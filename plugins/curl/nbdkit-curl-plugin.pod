@@ -20,7 +20,23 @@ how it was compiled, but most versions will handle HTTP, HTTPS, FTP,
 FTPS and SFTP (see: S<C<curl -V>>).  For more information about
 libcurl, see L<http://curl.haxx.se>.
 
-This plugin can B<only> handle B<readonly> connections.
+B<Note:> This plugin supports writes.  However:
+
+=over 4
+
+=item *
+
+For HTTP, you may not want nbdkit to issue PUT requests to the remote server
+(which probably doesn't understand them).
+
+=item *
+
+SFTP helpfully truncates the target file when you open it for writing.
+Not useful!
+
+=back
+
+B<To force nbdkit to use a readonly connection, pass the I<-r> flag>.
 
 =head2 EXAMPLES
 
