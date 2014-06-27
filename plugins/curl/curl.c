@@ -327,13 +327,18 @@ curl_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
   curl_easy_setopt (h->c, CURLOPT_RANGE, range);
 
   /* The assumption here is that curl will look after timeouts. */
-  while (h->write_count > 0) {
-    r = curl_easy_perform (h->c);
-    if (r != CURLE_OK) {
-      display_curl_error (h, r, "pread: curl_easy_perform");
-      return -1;
-    }
+  r = curl_easy_perform (h->c);
+  if (r != CURLE_OK) {
+    display_curl_error (h, r, "pread: curl_easy_perform");
+    return -1;
   }
+
+  /* Could use curl_easy_getinfo here to obtain further information
+   * about the connection.
+   */
+
+  /* As far as I understand the cURL API, this should never happen. */
+  assert (h->write_count == 0);
 
   return 0;
 }
