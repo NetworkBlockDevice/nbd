@@ -562,6 +562,18 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 	return retval;
 }
 
+static bool want_oldstyle(struct generic_conf gct, struct generic_conf* gc) {
+	if(gct.flags & F_OLDSTYLE) {
+		return true;
+	}
+	if(gc == NULL) {
+		return false;
+	}
+	if(gc->flags & F_OLDSTYLE) {
+		return true;
+	}
+	return false;
+}
 /**
  * Parse the config file.
  *
@@ -671,7 +683,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i==1 || !expect_generic) {
 			p=lp;
 			p_size=lp_size;
-			if(!(glob_flags & F_OLDSTYLE)) {
+			if(!want_oldstyle(genconftmp, genconf)) {
 				lp[1].required = FALSE;
 			}
 		} 
@@ -763,7 +775,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
-		if(s.port && !(glob_flags & F_OLDSTYLE)) {
+		if(s.port && !want_oldstyle(genconftmp, genconf)) {
 			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
 			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
 		}
