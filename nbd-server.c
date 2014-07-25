@@ -495,14 +495,14 @@ SERVER* cmdline(int argc, char *argv[]) {
 }
 
 /* forward definition of parse_cfile */
-GArray* parse_cfile(gchar* f, struct generic_conf *genconf, GError** e);
+GArray* parse_cfile(gchar* f, struct generic_conf *genconf, bool expect_generic, GError** e);
 
 /**
  * Parse config file snippets in a directory. Uses readdir() and friends
  * to find files and open them, then passes them on to parse_cfile
  * with have_global set false
  **/
-GArray* do_cfile_dir(gchar* dir, GError** e) {
+GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e) {
 	DIR* dirh = opendir(dir);
 	struct dirent* de;
 	gchar* fname;
@@ -535,7 +535,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					goto next;
 				}
-				tmp = parse_cfile(fname, NULL, e);
+				tmp = parse_cfile(fname, genconf, false, e);
 				errno=saved_errno;
 				if(*e) {
 					goto err_out;
@@ -576,11 +576,14 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
  *        NBDS_ERR_CFILE_VALUE_INVALID, NBDS_ERR_CFILE_VALUE_UNSUPPORTED
  *        or NBDS_ERR_CFILE_NO_EXPORTS. @see NBDS_ERRS.
  *
- * @return a Array of SERVER* pointers, If the config file is empty or does not
- *	exist, returns an empty GHashTable; if the config file contains an
+ * @param expect_generic if true, we expect a configuration file that
+ * 	  contains a [generic] section. If false, we don't.
+ *
+ * @return a GArray of SERVER* pointers. If the config file is empty or does not
+ *	exist, returns an empty GArray; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
+GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_generic, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	gchar* cfdir = NULL;
@@ -654,7 +657,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if((!startgroup || strcmp(startgroup, "generic")) && genconf) {
+	if((!startgroup || strcmp(startgroup, "generic")) && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
@@ -665,7 +668,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
-		if(i==1 || !genconf) {
+		if(i==1 || !expect_generic) {
 			p=lp;
 			p_size=lp_size;
 			if(!(glob_flags & F_OLDSTYLE)) {
@@ -767,7 +770,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0 || !genconf) {
+		if(i>0 || !expect_generic) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
@@ -784,7 +787,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	}
 	g_key_file_free(cfile);
 	if(cfdir) {
-		GArray* extra = do_cfile_dir(cfdir, e);
+		GArray* extra = do_cfile_dir(cfdir, &genconftmp, e);
 		if(extra) {
 			retval = g_array_append_vals(retval, extra->data, extra->len);
 			i+=extra->len;
@@ -796,7 +799,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 			}
 		}
 	}
-	if(i==1 && genconf) {
+	if(i==1 && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
 
@@ -2176,7 +2179,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
         int retval = -1;
         struct generic_conf genconf;
 
-        new_servers = parse_cfile(config_file_pos, &genconf, gerror);
+        new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
         if (!new_servers)
                 goto out;
 
@@ -2719,7 +2722,7 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 
-        servers = parse_cfile(config_file_pos, &genconf, &err);
+        servers = parse_cfile(config_file_pos, &genconf, true, &err);
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
