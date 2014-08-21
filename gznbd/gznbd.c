@@ -91,7 +91,7 @@ int main(int argc, char **argv)
   }
 
   if(argc>3){
-    size=atol(argv[3]);
+    size=atoll(argv[3]);
     if((size==0)||(size%BLOCK)){
       fprintf(stderr,"%s: %s does not appear to be a valid size\n",argv[0],argv[3]);
       exit(1);
