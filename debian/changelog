@@ -8,6 +8,11 @@ nbd (1:3.8-2) unstable; urgency=medium
   * debian/pre{inst,rm}: remove, no content
   * debian/nbd-client.initr{amfs-hook,d}: don't force-load nbd, instead
     only load the module if we're actually doing root-on-NBD.
+  * debian/nbd-server.init.d: add reload target, which sends SIGHUP to
+    nbd-server. This allows partial reconfiguration from the config
+    file; however, since it doesn't change existing configurations nor
+    remove configurations that are no longer active, it's not a full
+    reload, so leave force-reload as restart. LP:1359799
 
  -- Wouter Verhelst <wouter@debian.org>  Mon, 19 May 2014 08:41:54 +0200
 

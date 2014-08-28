@@ -40,6 +40,12 @@ case "$1" in
 	start-stop-daemon --stop --quiet --exec /bin/nbd-server --oknodo --pidfile /var/run/nbd-server.pid --retry 1
 	echo " $NAME."
 	;;
+    reload)
+    	echo -n "Reloading $DESC:"
+	if [ -f /var/run/nbd-server.pid ]
+	then
+		kill -HUP $(cat /var/run/nbd-server.pid)
+	fi
     restart|force-reload)
 	echo "Restarting the $DESC is pretty harsh on clients still using it."
 	echo -n "waiting 5 seconds..."
