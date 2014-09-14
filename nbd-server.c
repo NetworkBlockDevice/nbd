@@ -452,6 +452,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'p':
 			strncpy(pidftemplate, optarg, 256);
+			pidftemplate[256]='\0';
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
