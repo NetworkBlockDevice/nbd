@@ -42,7 +42,7 @@
 #include "cliserv.h"
 
 static gchar errstr[1024];
-const static int errstr_len=1024;
+const static int errstr_len=1023;
 
 static uint64_t size;
 
@@ -1284,6 +1284,8 @@ int main(int argc, char**argv) {
 
 	/* Ignore SIGPIPE as we want to pick up the error from write() */
 	signal (SIGPIPE, SIG_IGN);
+
+	errstr[errstr_len]='\0';
 
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
