@@ -126,11 +126,12 @@ int opennet(char *name, char* portstr, int sdp) {
 
 	if (rp == NULL) {
 		err_nonfatal("Socket failed: %m");
-		return -1;
+		sock = -1;
+		goto err;
 	}
 
 	setmysockopt(sock);
-
+err:
 	freeaddrinfo(ai);
 	return sock;
 }
