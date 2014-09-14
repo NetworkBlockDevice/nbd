@@ -21,14 +21,14 @@
 
 #include <cliserv.h>
 
-bool address_matches(const char* mask, const void* addr, int af, GError** err) {
+bool address_matches(const char* mask, const struct sockaddr* addr, GError** err) {
 	struct addrinfo *res, *aitmp, hints;
 	char *masksep;
 	char privmask[strlen(mask)+1];
 	int masklen;
-	int addrlen = af == AF_INET ? 4 : 16;
+	int addrlen = addr->sa_family == AF_INET ? 4 : 16;
 
-	assert(af == AF_INET || af == AF_INET6);
+	assert(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
 
 	strcpy(privmask, mask);
 
@@ -50,18 +50,20 @@ bool address_matches(const char* mask, const void* addr, int af, GError** err) {
 	}
 	aitmp = res;
 	while(res) {
-		const uint8_t* byte_s = addr;
+		const uint8_t* byte_s;
 		uint8_t* byte_t;
 		uint8_t mask = 0;
 		int len_left = masklen;
-		if(res->ai_family != af) {
+		if(res->ai_family != addr->sa_family) {
 			goto next;
 		}
-		switch(af) {
+		switch(addr->sa_family) {
 			case AF_INET:
+				byte_s = (const uint8_t*)(&(((struct sockaddr_in*)addr)->sin_addr));
 				byte_t = (uint8_t*)(&(((struct sockaddr_in*)(res->ai_addr))->sin_addr));
 				break;
 			case AF_INET6:
+				byte_s = (const uint8_t*)(&(((struct sockaddr_in6*)addr)->sin6_addr));
 				byte_t = (uint8_t*)(&(((struct sockaddr_in6*)(res->ai_addr))->sin6_addr));
 				break;
 		}
@@ -134,8 +136,7 @@ int authorized_client(CLIENT *opts) {
 		if(!(*pos)) {
 			continue;
 		}
-		struct sockaddr* sa = (struct sockaddr*)&opts->clientaddr;
-		if(address_matches(line, sa->sa_data, sa->sa_family, NULL)) {
+		if(address_matches(line, (struct sockaddr*)&opts->clientaddr, NULL)) {
 			fclose(f);
 			return 1;
 		}
