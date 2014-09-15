@@ -46,6 +46,7 @@ typedef struct {
 	gchar* servename;    /**< name of the export as selected by nbd-client */
 	int max_connections; /**< maximum number of opened connections */
 	gchar* transactionlog;/**< filename for transaction log */
+	gchar* cowdir;	     /**< directory for copy-on-write diff files. */
 } SERVER;
 
 /**

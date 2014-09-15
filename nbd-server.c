@@ -74,6 +74,7 @@
 #endif
 #include <signal.h>
 #include <errno.h>
+#include <libgen.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -611,6 +612,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
 		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
 		{ "transactionlog", FALSE, PARAM_STRING, &(s.transactionlog),	0 },
+		{ "cowdir",	FALSE,	PARAM_STRING,	&(s.cowdir),		0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
@@ -1718,11 +1720,18 @@ void setupexport(CLIENT* client) {
 
 int copyonwrite_prepare(CLIENT* client) {
 	off_t i;
-	if ((client->difffilename = malloc(1024))==NULL)
-		err("Failed to allocate string for diff file name");
-	snprintf(client->difffilename, 1024, "%s-%s-%d.diff",client->exportname,client->clientname,
-		(int)getpid()) ;
-	client->difffilename[1023]='\0';
+	gchar* dir;
+	gchar* export_base;
+	if (client->server->cowdir != NULL) {
+		dir = g_strdup(client->server->cowdir);
+	} else {
+		dir = g_strdup(dirname(client->exportname));
+	}
+	export_base = g_strdup(basename(client->exportname));
+	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
+		(int)getpid());
+	g_free(dir);
+	g_free(export_base);
 	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 	if (client->difffile<0) err("Could not create diff file (%m)") ;
