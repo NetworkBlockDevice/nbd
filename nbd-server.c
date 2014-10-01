@@ -477,7 +477,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'V':
 			printf("This is nbd-server version " VERSION "\n");
 			exit(EXIT_SUCCESS);
-			return;
+			break;
 		default:
 			usage();
 			exit(EXIT_FAILURE);
