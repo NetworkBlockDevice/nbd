@@ -312,7 +312,7 @@ static inline void writeit(int f, void *buf, size_t len) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections] [-V]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -320,7 +320,8 @@ void usage() {
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
-	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
+	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n"
+	       "\t-V|--version\toutput the version and exit\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -372,6 +373,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
 		{"max-connection", required_argument, NULL, 'M'},
+		{"version", no_argument, NULL, 'V'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -472,6 +474,10 @@ SERVER* cmdline(int argc, char *argv[]) {
 		case 'M':
 			serve->max_connections = strtol(optarg, NULL, 0);
 			break;
+		case 'V':
+			printf("This is nbd-server version " VERSION "\n");
+			exit(EXIT_SUCCESS);
+			return;
 		default:
 			usage();
 			exit(EXIT_FAILURE);
