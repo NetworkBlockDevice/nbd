@@ -390,7 +390,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
