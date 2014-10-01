@@ -64,9 +64,10 @@ typedef unsigned long long u64;
 #endif
 #endif
 
-static u64 cliserv_magic = 0x00420281861253LL;
-static u64 opts_magic = 0x49484156454F5054LL;
-static u64 rep_magic = 0x3e889045565a9LL;
+extern const u64 cliserv_magic;
+extern const u64 opts_magic;
+extern const u64 rep_magic;
+
 #define INIT_PASSWD "NBDMAGIC"
 
 #define INFO(a) do { } while(0)

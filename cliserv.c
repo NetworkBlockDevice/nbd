@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <syslog.h>
 
+const u64 cliserv_magic = 0x00420281861253LL;
+const u64 opts_magic = 0x49484156454F5054LL;
+const u64 rep_magic = 0x3e889045565a9LL;
+
 void setmysockopt(int sock) {
 	int size = 1;
 #if 0

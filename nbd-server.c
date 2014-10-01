@@ -1820,8 +1820,6 @@ void serveconnection(CLIENT *client) {
  **/
 int set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage netaddr;
-	struct sockaddr_in  *netaddr4 = NULL;
-	struct sockaddr_in6 *netaddr6 = NULL;
 	socklen_t addrinlen = sizeof( struct sockaddr_storage );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -1830,7 +1828,6 @@ int set_peername(int net, CLIENT *client) {
 	char *tmp = NULL;
 	int i;
 	int e;
-	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
 		msg(LOG_INFO, "getpeername failed: %m");
@@ -1879,7 +1876,7 @@ int set_peername(int net, CLIENT *client) {
 			} else if(ai->ai_family == AF_INET6) {
 				addrbits = 128;
 			}
-			uint8_t* addrptr = ((struct sockaddr*)&netaddr)->sa_data;
+			uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
 			for(int i = 0; i < addrbits; i+=8) {
 				int masklen = client->server->cidrlen - i;
 				masklen = masklen > 0 ? masklen : 0;
@@ -2486,7 +2483,6 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	struct sock_flags;
 	int e;
         int retval = -1;
-	int i=0;
 	int sock = -1;
 
 	memset(&hints, '\0', sizeof(hints));

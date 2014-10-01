@@ -104,11 +104,6 @@ uint8_t getmaskbyte(int masklen) {
 int authorized_client(CLIENT *opts) {
 	FILE *f ;
 	char line[LINELEN]; 
-	char *tmp;
-	struct in_addr addr;
-	struct in_addr client;
-	struct in_addr cltemp;
-	int len;
 
 	if (opts->server->authname == NULL) {
 		msg(LOG_INFO, "No authorization file, granting access.");
