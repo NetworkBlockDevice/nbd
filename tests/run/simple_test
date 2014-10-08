@@ -233,6 +233,18 @@ EOF
 			retval=$?
 		fi
 		;;
+	*/rowrite)
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = $tmpnam
+	readonly = true
+EOF
+			../../nbd-server -C ${conffile} -p ${pidfile} &
+			PID=$!
+			sleep 1
+			./nbd-tester-client -N export1 -w localhost
+	;;
 	*)
 		echo "E: unknown test $1"
 		exit 1
