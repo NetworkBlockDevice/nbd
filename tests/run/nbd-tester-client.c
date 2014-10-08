@@ -266,6 +266,7 @@ int writebuffer(int fd, struct chunklist * l) {
 
 #define TEST_WRITE (1<<0)
 #define TEST_FLUSH (1<<1)
+#define TEST_EXPECT_ERROR (1<<2)
 
 int timeval_subtract (struct timeval *result, struct timeval *x,
 		      struct timeval *y) {
@@ -463,7 +464,7 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	}
 	if(rep.error) {
 		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", (long int)rep.error, (long unsigned int)rep.error, (long long int)(*((u64*)rep.handle)), (long long unsigned int)*((u64*)rep.handle));
-		retval=-1;
+		retval=-2;
 		goto end;
 	}
 	if (datasize)
@@ -628,9 +629,19 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 			if(FD_ISSET(sock, &set)) {
 				/* Okay, there's something ready for
 				 * reading here */
-				if(read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i)<0) {
-					retval=-1;
+				int rv;
+				if((rv=read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i))<0) {
+					if(!(testflags & TEST_EXPECT_ERROR) || rv != -2) {
+						retval=-1;
+					} else {
+						printf("\n");
+					}
 					goto err_open;
+				} else {
+					if(testflags & TEST_EXPECT_ERROR) {
+						retval=-1;
+						goto err_open;
+					}
 				}
 				--requests;
 			}
@@ -1294,7 +1305,7 @@ int main(int argc, char**argv) {
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	while((c=getopt(argc, argv, "-N:t:owfil"))>=0) {
+	while((c=getopt(argc, argv, "-N:Ft:owfil"))>=0) {
 		switch(c) {
 			case 1:
 				handle_nonopt(optarg, &hostname, &p);
@@ -1304,6 +1315,9 @@ int main(int argc, char**argv) {
 				if(!p) {
 					p = 10809;
 				}
+				break;
+			case 'F':
+				testflags|=TEST_EXPECT_ERROR;
 				break;
 			case 't':
 				transactionlog=g_strdup(optarg);

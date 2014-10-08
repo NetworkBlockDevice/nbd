@@ -240,11 +240,12 @@ EOF
 	exportname = $tmpnam
 	readonly = true
 EOF
-			../../nbd-server -C ${conffile} -p ${pidfile} &
-			PID=$!
-			sleep 1
-			./nbd-tester-client -N export1 -w localhost
-	;;
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -w localhost -F
+		retval=$?
+		;;
 	*)
 		echo "E: unknown test $1"
 		exit 1
