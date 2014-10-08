@@ -244,6 +244,9 @@ Option types
   haggling. Data: name of the export, free-form UTF8 text (subject to
   limitations by server implementation). If the chosen export does not
   exist, the server closes the connection.
+  A special, "empty", name (i.e., the length field is zero and no name
+  is specified), is reserved for a "default" export, to be used in cases
+  where explicitly specifying an export name makes no sense.
 
 * NBD_OPT_ABORT (2)
   Abort negotiation and close the connection. Optional.
