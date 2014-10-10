@@ -107,6 +107,7 @@ AC_CHECK_SIZEOF(unsigned short int)
 AC_CHECK_SIZEOF(unsigned int)
 AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
+AC_STRUCT_DIRENT_D_TYPE
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
 AC_CHECK_HEADERS([linux/falloc.h])
 HAVE_FL_PH=no

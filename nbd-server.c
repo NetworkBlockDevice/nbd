@@ -505,6 +505,14 @@ SERVER* cmdline(int argc, char *argv[]) {
 /* forward definition of parse_cfile */
 GArray* parse_cfile(gchar* f, struct generic_conf *genconf, bool expect_generic, GError** e);
 
+#ifdef HAVE_STRUCT_DIRENT_D_TYPE
+#define NBD_D_TYPE de->d_type
+#else
+#define NBD_D_TYPE 0
+#define DT_UNKNOWN 0
+#define DT_REG 1
+#endif
+
 /**
  * Parse config file snippets in a directory. Uses readdir() and friends
  * to find files and open them, then passes them on to parse_cfile
@@ -526,7 +534,7 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 	while((de = readdir(dirh))) {
 		int saved_errno=errno;
 		fname = g_build_filename(dir, de->d_name, NULL);
-		switch(de->d_type) {
+		switch(NBD_D_TYPE) {
 			case DT_UNKNOWN:
 				/* Filesystem doesn't return type of
 				 * file through readdir. Run stat() on
