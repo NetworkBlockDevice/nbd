@@ -85,7 +85,7 @@ AC_ARG_ENABLE(
 
 AC_ARG_ENABLE(
   [gznbd],
-  [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images)])],
+  [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images. NOTE: no support for newstyle protocol.)])],
   [
     AS_IF(
       [test "x$enableval" = "xyes"],
