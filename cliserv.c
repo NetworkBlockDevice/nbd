@@ -65,11 +65,11 @@ void logging(void) {
 }
 
 #ifdef WORDS_BIGENDIAN
-inline u64 ntohll(u64 a) {
+u64 ntohll(u64 a) {
 	return a;
 }
 #else
-inline u64 ntohll(u64 a) {
+u64 ntohll(u64 a) {
 	u32 lo = a & 0xffffffff;
 	u32 hi = a >> 32U;
 	lo = ntohl(lo);

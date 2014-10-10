@@ -83,6 +83,19 @@ AC_ARG_ENABLE(
   ]
 )
 
+AC_ARG_ENABLE(
+  [gznbd],
+  [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images)])],
+  [
+    AS_IF(
+      [test "x$enableval" = "xyes"],
+      [ENABLE_GZNBD=yes],
+      [ENABLE_GZNBD=no]
+    )
+  ],
+  [ENABLE_GZNBD=no]
+)
+
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -140,11 +153,13 @@ AC_TYPE_OFF_T
 AC_TYPE_PID_T
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
+AM_CONDITIONAL(GZNBD, [test "x$ENABLE_GZNBD" = "xyes"])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
 		 doc/Doxyfile
 		 doc/Makefile
 		 man/Makefile
+		 gznbd/Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile
