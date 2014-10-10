@@ -1346,11 +1346,12 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
 	uint16_t smallflags = 0;
 	uint64_t magic;
+	uint32_t cflags;
 
 	memset(zeros, '\0', sizeof(zeros));
 	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
 	if(phase & NEG_MODERN) {
-		smallflags |= NBD_FLAG_FIXED_NEWSTYLE;
+		smallflags |= NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	}
 	if(phase & NEG_INIT) {
 		/* common */
@@ -1374,7 +1375,6 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	}
 	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
 		/* modern */
-		uint32_t cflags;
 		uint32_t opt;
 
 		if(!servers)
@@ -1447,9 +1447,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		}
 	}
 	/* common */
-	if (write(client->net, zeros, 124) < 0)
-		err("Negotiation failed/12: %m");
-	return NULL;
+	if (!(cflags & NBD_FLAG_C_NO_ZEROES)) {
+		if (write(client->net, zeros, 124) < 0)
+			err("Negotiation failed/12: %m");
+		return NULL;
+	}
 }
 
 /** sending macro. */

@@ -101,5 +101,7 @@ uint64_t ntohll(uint64_t a);
 
 /* Global flags */
 #define NBD_FLAG_FIXED_NEWSTYLE (1 << 0)	/* new-style export that actually supports extending */
+#define NBD_FLAG_NO_ZEROES	(1 << 1)	/* we won't send the 128 bits of zeroes if the client sends NBD_FLAG_C_NO_ZEROES */
 /* Flags from client to server. Only one such option currently. */
 #define NBD_FLAG_C_FIXED_NEWSTYLE NBD_FLAG_FIXED_NEWSTYLE
+#define NBD_FLAG_C_NO_ZEROES	NBD_FLAG_NO_ZEROES

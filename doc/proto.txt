@@ -228,6 +228,11 @@ Flag bits
   bit 0 - NBD_FLAG_FIXED_NEWSTYLE
   should be set by servers that support the fixed newstyle protocol
 
+  bit 1 - NBD_FLAG_NO_ZEROES
+  If set, and if the client sets NBD_FLAG_C_NO_ZEROES, then the 124
+  bytes of zero at the end of the negotiation will not be sent by the
+  server.
+
 * Client (after initial connection and after receiving flags from
   server):
 
@@ -235,6 +240,11 @@ Flag bits
   Should be set by clients that support the fixed newstyle protocol.
   Servers may choose to honour fixed newstyle from clients that didn't
   set this bit, but relying on this isn't recommended.
+
+  bit 1 - NBD_FLAG_C_NO_ZEROES
+  MUST only be set if the server also sets NBD_FLAG_NO_ZEROES. If set,
+  the server MUST NOT send the 124 bytes of zeroes at the end of the
+  negotiation.
 
 Option types
 - - - - - - -

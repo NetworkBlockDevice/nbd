@@ -270,6 +270,9 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 			exit(EXIT_FAILURE);
 		}
 
+		if (*flags & NBD_FLAG_NO_ZEROES) {
+			client_flags |= NBD_FLAG_C_NO_ZEROES;
+		}
 		client_flags = htonl(client_flags);
 		if (write(sock, &client_flags, sizeof(client_flags)) < 0)
 			err("Failed/2.1: %m");
@@ -326,8 +329,10 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 		*flags |= (uint32_t)ntohs(tmp);
 	}
 
-	if (read(sock, &buf, 124) < 0)
-		err("Failed/5: %m\n");
+	if (!(*flags & NBD_FLAG_NO_ZEROES)) {
+		if (read(sock, &buf, 124) < 0)
+			err("Failed/5: %m\n");
+	}
 	printf("\n");
 
 	*rsize64 = size64;
@@ -445,7 +450,7 @@ int main(int argc, char *argv[]) {
 	int nonspecial=0;
 	char* name=NULL;
 	uint32_t needed_flags=0;
-	uint32_t cflags=0;
+	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
 	sigset_t block, old;
 	struct sigaction sa;
@@ -524,7 +529,6 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_SUCCESS);
 		case 'l':
 			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
-			cflags |= NBD_FLAG_C_FIXED_NEWSTYLE;
 			opts |= NBDC_DO_LIST;
 			name="";
 			nbddev="";
