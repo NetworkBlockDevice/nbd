@@ -23,6 +23,7 @@
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
@@ -80,59 +81,84 @@ int check_conn(char* devname, int do_print) {
 	return 0;
 }
 
-int opennet(char *name, char* portstr, int sdp) {
+int opennet(char *name, char* portstr, int sdp, int b_unix) {
 	int sock;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	struct addrinfo *rp = NULL;
 	int e;
+	struct sockaddr_un un_addr;
 
-	memset(&hints,'\0',sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
-	hints.ai_protocol = IPPROTO_TCP;
+	if (!b_unix) {
 
-	e = getaddrinfo(name, portstr, &hints, &ai);
+		memset(&hints,'\0',sizeof(hints));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
+		hints.ai_protocol = IPPROTO_TCP;
 
-	if(e != 0) {
-		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
-		freeaddrinfo(ai);
-		return -1;
-	}
+		e = getaddrinfo(name, portstr, &hints, &ai);
 
-	if(sdp) {
+		if(e != 0) {
+			fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+			freeaddrinfo(ai);
+			return -1;
+		}
+
+		if(sdp) {
 #ifdef WITH_SDP
-		if (ai->ai_family == AF_INET)
-			ai->ai_family = AF_INET_SDP;
-		else (ai->ai_family == AF_INET6)
-			ai->ai_family = AF_INET6_SDP;
+			if (ai->ai_family == AF_INET)
+				ai->ai_family = AF_INET_SDP;
+			else (ai->ai_family == AF_INET6)
+				ai->ai_family = AF_INET6_SDP;
 #else
-		err("Can't do SDP: I was not compiled with SDP support!");
+			err("Can't do SDP: I was not compiled with SDP support!");
 #endif
-	}
+		}
 
-	for(rp = ai; rp != NULL; rp = rp->ai_next) {
-		sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		for(rp = ai; rp != NULL; rp = rp->ai_next) {
+			sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-		if(sock == -1)
-			continue;	/* error */
+			if(sock == -1)
+				continue;	/* error */
 
-		if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
-			break;		/* success */
+			if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
+				break;		/* success */
 			
-		close(sock);
-	}
+			close(sock);
+		}
 
-	if (rp == NULL) {
-		err_nonfatal("Socket failed: %m");
-		sock = -1;
-		goto err;
+		if (rp == NULL) {
+			err_nonfatal("Socket failed: %m");
+			sock = -1;
+			goto err;
+		}
+	} else { /* UNIX SOCKET */
+		memset(&un_addr, 0, sizeof(un_addr));
+
+		un_addr.sun_family = AF_UNIX;
+		if (strnlen(name, sizeof(un_addr.sun_path)) == sizeof(un_addr.sun_path)) {
+			err_nonfatal("UNIX socket path too long");
+			sock = -1;
+			goto err;
+
+		}
+
+		strncpy(un_addr.sun_path, name, sizeof(un_addr.sun_path) - 1);
+
+		sock = socket(AF_UNIX, SOCK_STREAM, 0);
+
+		if (connect(sock, &un_addr, sizeof(un_addr)) == -1)
+			err_nonfatal("CONNECT failed");
+			sock = -1;
+			goto err;
+		}
 	}
 
 	setmysockopt(sock);
 err:
-	freeaddrinfo(ai);
+	if (ai)
+		freeaddrinfo(ai);
 	return sock;
 }
 
@@ -448,6 +474,7 @@ int main(int argc, char *argv[]) {
 	u32 flags;
 	int c;
 	int nonspecial=0;
+	int b_unix=0;
 	char* name=NULL;
 	uint32_t needed_flags=0;
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
@@ -467,6 +494,7 @@ int main(int argc, char *argv[]) {
 		{ "swap", no_argument, NULL, 's' },
 		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
+		{ "unix", no_argument, NULL, 'u' },
 		{ 0, 0, 0, 0 }, 
 	};
 
@@ -559,6 +587,9 @@ int main(int argc, char *argv[]) {
 		      timeout:
 			timeout=strtol(optarg, NULL, 0);
 			break;
+		case 'u':
+			b_unix = 1;
+			break;
 		default:
 			fprintf(stderr, "E: option eaten by 42 mice\n");
 			exit(EXIT_FAILURE);
@@ -570,7 +601,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	sock = opennet(hostname, port, sdp);
+	sock = opennet(hostname, port, sdp, b_unix);
 	if (sock < 0)
 		exit(EXIT_FAILURE);
 
@@ -647,7 +678,7 @@ int main(int argc, char *argv[]) {
 					close(sock); close(nbd);
 					for (;;) {
 						fprintf(stderr, " Reconnecting\n");
-						sock = opennet(hostname, port, sdp);
+						sock = opennet(hostname, port, sdp, b_unix);
 						if (sock >= 0)
 							break;
 						sleep (1);
