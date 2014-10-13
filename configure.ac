@@ -323,6 +323,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/libvirt/Makefile
                  plugins/perl/Makefile
                  plugins/python/Makefile
+                 plugins/streaming/Makefile
                  plugins/vddk/Makefile
                  plugins/xz/Makefile
                  src/Makefile

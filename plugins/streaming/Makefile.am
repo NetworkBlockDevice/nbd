@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013-2014 Red Hat Inc.
+# Copyright (C) 2014 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,17 +30,30 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	curl \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	perl \
-	python \
-	streaming \
-	vddk \
-	xz
+EXTRA_DIST = nbdkit-streaming-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+plugin_LTLIBRARIES = nbdkit-streaming-plugin.la
+
+nbdkit_streaming_plugin_la_SOURCES = \
+	streaming.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_streaming_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_streaming_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS)
+nbdkit_streaming_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-streaming-plugin.1
+
+nbdkit-streaming-plugin.1: nbdkit-streaming-plugin.pod
+	$(POD2MAN) -u --stderr --section=1 --center=nbdkit --release=nbdkit --name=`basename $@ .1` $< $@
+
+endif
+
+CLEANFILES = *~
