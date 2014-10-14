@@ -172,18 +172,12 @@ test_python_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 endif
 
 # streaming plugin test.
-
-# This is disabled at the moment because the libguestfs appliance
-# kernel tries to read from the device (eg to read the partition
-# table) and the current streaming plugin cannot handle this.
-# Implementing a sliding window in the plugin would fix this. (XXX)
-EXTRA_DIST += test-streaming.c
-
-#check_PROGRAMS += test-streaming
+check_PROGRAMS += test-streaming
+# Doesn't work:
 #TESTS += test-streaming
-#
-#test_streaming_SOURCES = test-streaming.c test.h
-#test_streaming_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
-#test_streaming_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+test_streaming_SOURCES = test-streaming.c test.h
+test_streaming_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_streaming_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
 endif

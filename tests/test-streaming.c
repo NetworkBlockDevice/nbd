@@ -48,7 +48,7 @@
 
 #include "test.h"
 
-static char data[4096];
+static char data[65536];
 
 int
 main (int argc, char *argv[])
@@ -69,6 +69,7 @@ main (int argc, char *argv[])
 
   if (test_start_nbdkit (NBDKIT_PLUGIN ("streaming"),
                          "pipe=streaming.fifo",
+                         "size=640k",
                          NULL) == -1)
     exit (EXIT_FAILURE);
 
@@ -121,14 +122,10 @@ main (int argc, char *argv[])
     exit (EXIT_FAILURE);
 
   /* Write linearly to the virtual disk. */
+  memset (data, 1, sizeof data);
   for (i = 0; i < 10; ++i) {
-    memset (data, i+1, sizeof data);
-
-    /* Note that we deliberately skip forwards, in order to
-     * exercise seeking code in the streaming plugin.
-     */
     guestfs_pwrite_device (g, "/dev/sda", data, sizeof data,
-                           (2 * i) * sizeof data);
+                           i * sizeof data);
   }
 
   if (guestfs_shutdown (g) == -1)
@@ -148,7 +145,7 @@ main (int argc, char *argv[])
   }
   md5[32] = '\0';
 
-  if (strcmp (md5, "0123456789abcdef0123456789abcdef") != 0) {
+  if (strcmp (md5, "2c7f81c580f7f9eb52c1bd2f6f493b6f") != 0) {
     fprintf (stderr, "unexpected hash: %s\n", md5);
     exit (EXIT_FAILURE);
   }
