@@ -148,7 +148,7 @@ int opennet(char *name, char* portstr, int sdp, int b_unix) {
 
 		sock = socket(AF_UNIX, SOCK_STREAM, 0);
 
-		if (connect(sock, &un_addr, sizeof(un_addr)) == -1)
+		if (connect(sock, &un_addr, sizeof(un_addr)) == -1) {
 			err_nonfatal("CONNECT failed");
 			sock = -1;
 			goto err;
@@ -500,7 +500,7 @@ int main(int argc, char *argv[]) {
 
 	logging();
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:u", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
