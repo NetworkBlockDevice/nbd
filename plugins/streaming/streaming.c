@@ -202,6 +202,7 @@ streaming_pwrite (void *handle, const void *buf,
       errorstate = 1;
       return -1;
     }
+    buf += r;
     highestwrite += r;
     count -= r;
   }
