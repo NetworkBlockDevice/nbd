@@ -47,6 +47,9 @@
 static char *filename = NULL;
 static int fd = -1;
 
+/* In theory INT64_MAX, but it breaks qemu's NBD driver. */
+static int64_t size = INT64_MAX/2;
+
 /* Flag if we have entered the unrecoverable error state because of
  * a seek backwards.
  */
@@ -63,6 +66,11 @@ streaming_config (const char *key, const char *value)
     /* See FILENAMES AND PATHS in nbdkit-plugin(3). */
     filename = nbdkit_absolute_path (value);
     if (!filename)
+      return -1;
+  }
+  else if (strcmp (key, "size") == 0) {
+    size = nbdkit_parse_size (value);
+    if (size == -1)
       return -1;
   }
   else {
@@ -112,7 +120,8 @@ streaming_unload (void)
 }
 
 #define streaming_config_help \
-  "pipe=<FILENAME>     (required) The filename to serve."
+  "pipe=<FILENAME>     (required) The filename to serve.\n" \
+  "size=<SIZE>         (optional) Stream size."
 
 /* Create the per-connection handle. */
 static void *
@@ -148,9 +157,7 @@ streaming_close (void *handle)
 static int64_t
 streaming_get_size (void *handle)
 {
-  /* In theory this, but it breaks qemu's NBD driver.
-     return INT64_MAX; */
-  return INT64_MAX/2;
+  return size;
 }
 
 /* Write data to the stream. */

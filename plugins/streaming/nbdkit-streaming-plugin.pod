@@ -6,7 +6,7 @@ nbdkit-streaming-plugin - nbdkit streaming plugin
 
 =head1 SYNOPSIS
 
- nbdkit streaming pipe=FILENAME
+ nbdkit streaming pipe=FILENAME [size=SIZE]
 
 =head1 DESCRIPTION
 
@@ -39,6 +39,16 @@ exist, then it is created (as a named FIFO), otherwise the existing
 pipe or socket is opened and used.
 
 This parameter is required.
+
+=item B<size=SIZE>
+
+Specify the virtual size of the stream.
+
+This parameter is optional.  If not specified, then the virtual disk
+appears to the client to be very large (effectively infinite).
+Whether you need to specify this parameter depends on the client.
+Some clients don't check the size and just write/stream, others do
+checks or calculations based on the apparent size.
 
 =back
 
