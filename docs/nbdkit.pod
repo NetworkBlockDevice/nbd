@@ -159,6 +159,10 @@ This option implies I<--foreground>.
 
 =item B<--unix> SOCKET
 
+=item B<-U ->
+
+=item B<--unix ->
+
 Accept connections on the Unix domain socket C<SOCKET> (which is a
 path).
 
@@ -171,6 +175,9 @@ into a directory that has restrictive permissions.
 nbdkit does B<not> delete the socket file when it exits.  The caller
 should delete the socket file after use (else if you try to start
 nbdkit up again you will get an C<Address already in use> error).
+
+If the socket name is I<-> then nbdkit generates a randomly named
+private socket.  This is useful with L</CAPTIVE NBDKIT>.
 
 =item B<-u> USER
 
@@ -263,11 +270,10 @@ I<--run>.
 
 Even when running captive, nbdkit still listens on the regular TCP/IP
 port, unless you specify the I<-p>/I<-U> options.  If you want a truly
-private captive nbdkit, then you should create a private temporary
-directory, and arrange to put nbdkit's socket there:
+private captive nbdkit, then you should create a private random
+Unix socket, like this:
 
- d="$(mktemp -d)"
- nbdkit -U "$d/socket" plugin [args] --run '...'
+ nbdkit -U - plugin [args] --run '...'
 
 =head1 SIGNALS
 

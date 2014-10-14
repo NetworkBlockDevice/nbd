@@ -54,6 +54,7 @@
 #include "nbdkit-plugin.h"
 #include "internal.h"
 
+static char *make_random_fifo (void);
 static void open_plugin_so (const char *filename);
 static void start_serving (void);
 static void set_up_signals (void);
@@ -76,6 +77,9 @@ const char *user, *group;       /* -u & -g */
 int verbose;                    /* -v */
 
 volatile int quit;
+
+static char *random_fifo_dir = NULL;
+static char *random_fifo = NULL;
 
 enum { HELP_OPTION = CHAR_MAX + 1 };
 
@@ -189,7 +193,10 @@ main (int argc, char *argv[])
       break;
 
     case 'U':
-      unixsocket = nbdkit_absolute_path (optarg);
+      if (strcmp (optarg, "-") == 0)
+        unixsocket = make_random_fifo ();
+      else
+        unixsocket = nbdkit_absolute_path (optarg);
       if (unixsocket == NULL)
         exit (EXIT_FAILURE);
       break;
@@ -293,7 +300,49 @@ main (int argc, char *argv[])
   free (unixsocket);
   free (pidfile);
 
+  if (random_fifo) {
+    unlink (random_fifo);
+    free (random_fifo);
+  }
+
+  if (random_fifo_dir) {
+    rmdir (random_fifo_dir);
+    free (random_fifo_dir);
+  }
+
   exit (EXIT_SUCCESS);
+}
+
+/* Implementation of '-U -' */
+static char *
+make_random_fifo (void)
+{
+  char template[] = "/tmp/nbdkitXXXXXX";
+  char *unixsocket;
+
+  if (mkdtemp (template) == NULL) {
+    perror ("mkdtemp");
+    return NULL;
+  }
+
+  random_fifo_dir = strdup (template);
+  if (random_fifo_dir == NULL) {
+    perror ("strdup");
+    return NULL;
+  }
+
+  if (asprintf (&random_fifo, "%s/socket", template) == -1) {
+    perror ("asprintf");
+    return NULL;
+  }
+
+  unixsocket = strdup (random_fifo);
+  if (unixsocket == NULL) {
+    perror ("strdup");
+    return NULL;
+  }
+
+  return unixsocket;
 }
 
 static void
