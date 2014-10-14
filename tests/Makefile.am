@@ -42,7 +42,8 @@ EXTRA_DIST = \
 	test.pl \
 	test.py \
 	test-single.sh \
-	test-start.sh
+	test-start.sh \
+	test-random-sock.sh
 
 # Basic server command line and start-up tests.
 
@@ -53,7 +54,8 @@ TESTS = \
 	test-start.sh \
 	test-foreground.sh \
 	test-single.sh \
-	test-captive.sh
+	test-captive.sh \
+	test-random-sock.sh
 
 # In-depth tests need libguestfs, since that is a convenient way to
 # drive qemu.
