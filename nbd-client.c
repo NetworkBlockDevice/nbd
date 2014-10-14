@@ -81,84 +81,85 @@ int check_conn(char* devname, int do_print) {
 	return 0;
 }
 
-int opennet(char *name, char* portstr, int sdp, int b_unix) {
+int opennet(char *name, char* portstr, int sdp) {
 	int sock;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	struct addrinfo *rp = NULL;
 	int e;
-	struct sockaddr_un un_addr;
 
-	if (!b_unix) {
+	memset(&hints,'\0',sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
+	hints.ai_protocol = IPPROTO_TCP;
 
-		memset(&hints,'\0',sizeof(hints));
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
-		hints.ai_protocol = IPPROTO_TCP;
+	e = getaddrinfo(name, portstr, &hints, &ai);
 
-		e = getaddrinfo(name, portstr, &hints, &ai);
+	if(e != 0) {
+		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
+		freeaddrinfo(ai);
+		return -1;
+	}
 
-		if(e != 0) {
-			fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
-			freeaddrinfo(ai);
-			return -1;
-		}
-
-		if(sdp) {
+	if(sdp) {
 #ifdef WITH_SDP
-			if (ai->ai_family == AF_INET)
-				ai->ai_family = AF_INET_SDP;
-			else (ai->ai_family == AF_INET6)
-				ai->ai_family = AF_INET6_SDP;
+		if (ai->ai_family == AF_INET)
+			ai->ai_family = AF_INET_SDP;
+		else (ai->ai_family == AF_INET6)
+			ai->ai_family = AF_INET6_SDP;
 #else
-			err("Can't do SDP: I was not compiled with SDP support!");
+		err("Can't do SDP: I was not compiled with SDP support!");
 #endif
-		}
+	}
 
-		for(rp = ai; rp != NULL; rp = rp->ai_next) {
-			sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+	for(rp = ai; rp != NULL; rp = rp->ai_next) {
+		sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
-			if(sock == -1)
-				continue;	/* error */
+		if(sock == -1)
+			continue;	/* error */
 
-			if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
-				break;		/* success */
+		if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
+			break;		/* success */
 			
-			close(sock);
-		}
+		close(sock);
+	}
 
-		if (rp == NULL) {
-			err_nonfatal("Socket failed: %m");
-			sock = -1;
-			goto err;
-		}
-	} else { /* UNIX SOCKET */
-		memset(&un_addr, 0, sizeof(un_addr));
-
-		un_addr.sun_family = AF_UNIX;
-		if (strnlen(name, sizeof(un_addr.sun_path)) == sizeof(un_addr.sun_path)) {
-			err_nonfatal("UNIX socket path too long");
-			sock = -1;
-			goto err;
-
-		}
-
-		strncpy(un_addr.sun_path, name, sizeof(un_addr.sun_path) - 1);
-
-		sock = socket(AF_UNIX, SOCK_STREAM, 0);
-
-		if (connect(sock, &un_addr, sizeof(un_addr)) == -1) {
-			err_nonfatal("CONNECT failed");
-			sock = -1;
-			goto err;
-		}
+	if (rp == NULL) {
+		err_nonfatal("Socket failed: %m");
+		sock = -1;
+		goto err;
 	}
 
 	setmysockopt(sock);
 err:
-	if (ai)
-		freeaddrinfo(ai);
+	freeaddrinfo(ai);
+	return sock;
+}
+
+int openunix(const char *path) {
+	int sock;
+	struct sockaddr_un un_addr;
+	memset(&un_addr, 0, sizeof(un_addr));
+
+	un_addr.sun_family = AF_UNIX;
+	if (strnlen(path, sizeof(un_addr.sun_path)) == sizeof(un_addr.sun_path)) {
+		err_nonfatal("UNIX socket path too long");
+		return -1;
+	}
+
+	strncpy(un_addr.sun_path, path, sizeof(un_addr.sun_path) - 1);
+
+	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		err_nonfatal("SOCKET failed");
+		return -1;
+	};
+
+	if (connect(sock, &un_addr, sizeof(un_addr)) == -1) {
+		err_nonfatal("CONNECT failed");
+		close(sock);
+		return -1;
+	}
 	return sock;
 }
 
@@ -601,7 +602,10 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	sock = opennet(hostname, port, sdp, b_unix);
+	if (b_unix)
+		sock = openunix(hostname);
+	else
+		sock = opennet(hostname, port, sdp);
 	if (sock < 0)
 		exit(EXIT_FAILURE);
 
@@ -678,7 +682,10 @@ int main(int argc, char *argv[]) {
 					close(sock); close(nbd);
 					for (;;) {
 						fprintf(stderr, " Reconnecting\n");
-						sock = opennet(hostname, port, sdp, b_unix);
+						if (b_unix)
+							sock = openunix(hostname);
+						else
+							sock = opennet(hostname, port, sdp);
 						if (sock >= 0)
 							break;
 						sleep (1);
