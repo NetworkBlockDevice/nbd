@@ -43,5 +43,6 @@ Makefile.in
 /tests/test-gzip
 /tests/test-perl
 /tests/test-python
+/tests/test-streaming
 /tests/test-xz
 /test-driver
