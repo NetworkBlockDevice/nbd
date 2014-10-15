@@ -52,11 +52,6 @@ checks or calculations based on the apparent size.
 
 =back
 
-=head1 TO DO
-
-This plugin would be much nicer if it supported the concept of a
-"window" of data, allowing limited reverse seeks and reads.
-
 =head1 SEE ALSO
 
 L<nbdkit(1)>,
