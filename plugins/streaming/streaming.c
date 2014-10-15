@@ -227,6 +227,12 @@ streaming_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
     return -1;
   }
 
+  /* Allow reads which are entirely >= highestwrite.  These return zeroes. */
+  if (offset >= highestwrite) {
+    memset (buf, 0, count);
+    return 0;
+  }
+
   nbdkit_error ("client tried to read: the streaming plugin does not currently support this");
   errorstate = 1;
   errno = EIO;
