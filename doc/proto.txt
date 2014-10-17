@@ -308,3 +308,45 @@ case that data is an error message suitable for display to the user.
 * NBD_REP_ERR_PLATFORM (2^31 + 4)
   The option sent by the client is not supported on the platform on
   which the server is running. Not currently used.
+
+Request types
+- - - - - - -
+
+The following request types exist:
+
+* NBD_CMD_READ (0)
+  A read request. Length and offset define the data to be read. The
+  server MUST reply with a reply header, followed immediately by len
+  bytes of data, read offset bytes into the file, unless an error
+  condition has occurred.
+
+* NBD_CMD_WRITE (1)
+  A write request. Length and offset define the location and amount of
+  data to be written. The server should write the data to disk, and then
+  send the reply header. However, the server does not need to ensure
+  that all data has hit the disk, unless the NBD_CMD_FLAG_FUA flag is
+  set (bit 16).
+
+* NBD_CMD_DISC (2)
+  A disconnect request. The server MUST handle all outstanding
+  requests, and then close the connection.
+  A client MUST NOT send anything to the server after sending an
+  NBD_CMD_DISC command.
+
+* NBD_CMD_FLUSH (3)
+  A flush request; a write barrier. The server MUST NOT send the reply
+  header to this request before all outstanding write requests that were
+  sent before this command have hit the disk (using fsync() or similar).
+  In this command, "len" and "offset" are reserved, and should be set to
+  all-zero.
+
+* NBD_CMD_TRIM (4)
+  A hint to the server that the data defined by len and offset is no
+  longer needed. A server MAY discard len bytes starting at offset, but
+  is not required to.
+  After issuing this command, a client MUST NOT make any assumptions
+  about the contents of the export affected by this command, until
+  overwriting it again with NBD_CMD_WRITE.
+
+* NBD_CMD_BGCOPY (10)
+  This command is defined by xnbd.
