@@ -253,7 +253,9 @@ Option types
   Choose the export which the client would like to use, and end option
   haggling. Data: name of the export, free-form UTF8 text (subject to
   limitations by server implementation). If the chosen export does not
-  exist, the server closes the connection.
+  exist or requirements for the chosen export are not met (e.g., the
+  client did not negotiate TLS for an export where the server requires
+  it), the server should close the connection.
   A special, "empty", name (i.e., the length field is zero and no name
   is specified), is reserved for a "default" export, to be used in cases
   where explicitly specifying an export name makes no sense.
@@ -263,7 +265,19 @@ Option types
 
 * NBD_OPT_LIST (3)
   Returns a number of NBD_REP_SERVER replies, one for each export,
-  followed by an NBD_REP_ACK.
+  followed by an NBD_REP_ACK. No data should be sent.
+
+* NBD_OPT_PEEK_EXPORT (4)
+  Request one NBD_REP_SERVER packet with flags. The server SHOULD NOT
+  finish with an NBD_REP_ACK packet.
+
+* NBD_OPT_STARTTLS (5)
+  The client wishes to initiate TLS. XXX Data. If the server replies
+  with NBD_REP_STARTTLS, then the client should immediately initiate a
+  TLS handshake and continue the negotiation in the encrypted channel.
+  If the server is unwilling to perform TLS, it should reply with
+  NBD_REP_ERR_POLICY. For backwards compatibility, a client should also
+  be prepared to handle NBD_REP_ERR_UNSUP.
 
 Reply types
 - - - - - -
@@ -284,6 +298,23 @@ Reply types
     along some details about the export. If the client did not
     explicitly request otherwise, these details are defined to be UTF-8
     encoded data suitable for direct display to a human being.
+  - If this packet was sent in reply to an NBD_OPT_PEEK_EXPORT command,
+    then the name of the export is followed by a 32-bit "flags" field,
+    describing properties about the export:
+    - NBD_F_EXP_RO (0): if set, this export is read-only
+    - NBD_F_EXP_COW (1): if set, the export has copy-on-write semantics;
+      writes are lost after disconnect, and writes to this device will
+      not be seen by other clients. SHOULD NOT be set if NBD_F_EXP_RO is
+      set.
+    - NBD_F_EXP_TLS_OK (2): if set, the export allows TLS.
+    - NBD_F_EXP_TLS_REQ (3): if set, the export requires TLS. MUST NOT
+      be set unless NBD_F_EXP_TLS_OK is also set.
+    It follows that an NBD_REP_SERVER packet with flags should have
+    the "length of name" field be equal to "length of reply - 8".
+
+* NBD_REP_STARTTLS (3)
+  An affirmative reply to NBD_OPT_STARTTLS. The very next byte read from
+  the client should be assumed to be the first byte in a TLS handshake.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies may have some data set, in which
@@ -308,6 +339,13 @@ case that data is an error message suitable for display to the user.
 * NBD_REP_ERR_PLATFORM (2^31 + 4)
   The option sent by the client is not supported on the platform on
   which the server is running. Not currently used.
+
+* NBD_REP_ERR_TLS_REQD (2^31 + 5)
+  The server is unwilling to continue negotiation unless TLS is
+  negotiated first. A server MUST NOT send this error if it has one or
+  more exports that do not require TLS; not even if the client indicated
+  interest (by way of NBD_OPT_PEEK_EXPORT) in an export which requires
+  TLS.
 
 Request types
 - - - - - - -
