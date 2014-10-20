@@ -348,5 +348,5 @@ The following request types exist:
   about the contents of the export affected by this command, until
   overwriting it again with NBD_CMD_WRITE.
 
-* NBD_CMD_BGCOPY (10)
+* NBD_CMD_BGCOPY (5)
   This command is defined by xnbd.
