@@ -265,7 +265,7 @@ Option types
 
 * NBD_OPT_LIST (3)
   Returns a number of NBD_REP_SERVER replies, one for each export,
-  followed by an NBD_REP_ACK. No data should be sent.
+  followed by an NBD_REP_ACK. No flags should be sent.
 
 * NBD_OPT_PEEK_EXPORT (4)
   Request one NBD_REP_SERVER packet with flags. The server SHOULD NOT
@@ -308,7 +308,11 @@ Reply types
       set.
     - NBD_F_EXP_TLS_OK (2): if set, the export allows TLS.
     - NBD_F_EXP_TLS_REQ (3): if set, the export requires TLS. MUST NOT
-      be set unless NBD_F_EXP_TLS_OK is also set.
+      be set unless NBD_F_EXP_TLS_OK is also set. If this flag is set, a
+      server MAY vary the state of the other flags in this flags field
+      depending on whether TLS is enabled; a client SHOULD NOT assume
+      that the other data is correct until TLS has been negotiated and
+      this command re-issued.
     It follows that an NBD_REP_SERVER packet with flags should have
     the "length of name" field be equal to "length of reply - 8".
 
@@ -346,6 +350,8 @@ case that data is an error message suitable for display to the user.
   more exports that do not require TLS; not even if the client indicated
   interest (by way of NBD_OPT_PEEK_EXPORT) in an export which requires
   TLS.
+  If this reply is used, servers SHOULD send it in reply to each and every
+  unencrypted NBD_OPT_* message (apart from NBD_OPT_STARTTLS).
 
 Request types
 - - - - - - -
