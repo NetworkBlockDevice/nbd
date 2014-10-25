@@ -403,8 +403,10 @@ void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
 
+#ifndef __ANDROID__
 	if (swap)
 		mlockall(MCL_CURRENT | MCL_FUTURE);
+#endif
 }
 
 static int
@@ -596,6 +598,11 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 	}
+
+#ifdef __ANDROID__
+  if (swap)
+    err("swap option unsupported on Android because mlockall is unsupported.");
+#endif
 
 	if((!port && !name) || !hostname || !nbddev) {
 		usage("not enough information specified");
