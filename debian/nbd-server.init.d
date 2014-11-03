@@ -46,6 +46,7 @@ case "$1" in
 	then
 		kill -HUP $(cat /var/run/nbd-server.pid)
 	fi
+	;;
     restart|force-reload)
 	echo "Restarting the $DESC is pretty harsh on clients still using it."
 	echo -n "waiting 5 seconds..."
