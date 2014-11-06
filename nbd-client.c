@@ -75,6 +75,7 @@ int check_conn(char* devname, int do_print) {
 	len=read(fd, buf, 256);
 	if(len < 0) {
 		perror("could not read from server");
+		return 2;
 	}
 	buf[(len < 256) ? len : 255]='\0';
 	if(do_print) printf("%s\n", buf);
