@@ -2,6 +2,8 @@
 #include <cliserv.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 const u64 cliserv_magic = 0x00420281861253LL;
 const u64 opts_magic = 0x49484156454F5054LL;
