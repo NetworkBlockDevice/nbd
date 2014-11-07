@@ -75,8 +75,9 @@ int check_conn(char* devname, int do_print) {
 	len=read(fd, buf, 256);
 	if(len < 0) {
 		perror("could not read from server");
+		return 2;
 	}
-	buf[len]='\0';
+	buf[(len < 256) ? len : 255]='\0';
 	if(do_print) printf("%s\n", buf);
 	return 0;
 }
@@ -403,8 +404,10 @@ void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
 
+#ifndef __ANDROID__
 	if (swap)
 		mlockall(MCL_CURRENT | MCL_FUTURE);
+#endif
 }
 
 static int
@@ -596,6 +599,11 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 	}
+
+#ifdef __ANDROID__
+  if (swap)
+    err("swap option unsupported on Android because mlockall is unsupported.");
+#endif
 
 	if((!port && !name) || !hostname || !nbddev) {
 		usage("not enough information specified");

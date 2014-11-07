@@ -1346,7 +1346,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
 	uint16_t smallflags = 0;
 	uint64_t magic;
-	uint32_t cflags;
+	uint32_t cflags = 0;
 
 	memset(zeros, '\0', sizeof(zeros));
 	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
