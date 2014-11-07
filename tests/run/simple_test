@@ -236,6 +236,7 @@ EOF
 	*/rowrite)
 		cat >${conffile} <<EOF
 [generic]
+	listenaddr = 127.0.0.1
 [export1]
 	exportname = $tmpnam
 	readonly = true
