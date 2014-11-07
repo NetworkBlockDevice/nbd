@@ -350,3 +350,25 @@ The following request types exist:
 
 * NBD_CMD_CACHE (5)
   This command is defined by xnbd.
+
+About this file
+---------------
+
+This file tries to document the NBD protocol as it is currently
+implemented in the Linux kernel and in the reference implementation. The
+purpose of this file is to allow people to understand the protocol
+without having to read the code. However, the description above does not
+come with any form of warranty; while every effort has been taken to
+avoid them, mistakes are possible.
+
+In contrast to the other files in this repository, this file is not
+licensed under the GPLv2. To the extent possible by applicable law, I
+hereby waive all copyright and related or neighboring rights to this
+file and release it into the public domain.
+
+The purpose of releasing this into the public domain is to allow
+competing implementations of the NBD protocol without those
+implementations being considered derivative implementations; but please
+note that changing this document, while allowed by its public domain
+status, does not make an incompatible implementation suddenly speak the
+NBD protocol.
