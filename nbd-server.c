@@ -1376,7 +1376,7 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 			return 0;
 
 		off_t min= (req->from / TREEPAGESIZE) * TREEPAGESIZE; // start address of to be trimmed block
-		if (min!=req_from)
+		if (min!=req->from)
 			min+=TREEPAGESIZE; // we shall not trim partially used blocks
 		off_t max= ((req->from+req->len)/TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
 		while (min<max) {
