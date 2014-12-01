@@ -1375,8 +1375,10 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		if (client->server->flags & F_READONLY)
 			return 0;
 
-		off_t min= 1 + (req->from / TREEPAGESIZE);
-		off_t max= (req->from+req->len)/TREEPAGESIZE;
+		off_t min= (req->from / TREEPAGESIZE) * TREEPAGESIZE; // start address of to be trimmed block
+		if (min!=req_from)
+			min+=TREEPAGESIZE; // we shall not trim partially used blocks
+		off_t max= ((req->from+req->len)/TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
 		while (min<max) {
 			delete_treefile(client->exportname,client->exportsize,min);
 			min+=TREEPAGESIZE;
