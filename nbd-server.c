@@ -351,13 +351,13 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 	off_t ppos;
 	addToTreePath(filename+strlen(name),256,size,pos,&ppos);
 
-	DEBUG("Accessing treefile %s ( offset %llu of %llu)\n",filename,(unsigned long long)pos,(unsigned long long)size);
+	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 
 	int handle=open(filename, mode, 0600);
 	if (handle<0) {
 		if (errno==ENOENT && (mode & O_RDWR)) {
 
-			DEBUG("Creating new treepath\n");
+			DEBUG("Creating new treepath");
 
 			createTreePath(filename);
 			handle=open(filename, O_RDWR|O_CREAT, 0600);
@@ -368,7 +368,7 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 			myseek(handle,TREEPAGESIZE-1);
 			ssize_t c=write(handle,n,1);
 			if (c<1) {
-				err("Error creating block file in tree %m");
+				err("Error setting tree block file size %m");
 			}
 		}
 	}
@@ -381,8 +381,11 @@ static void delete_treefile(char* name,off_t size,off_t pos) {
 	size_t psize=size;
 	off_t ppos;
 	addToTreePath(filename+strlen(name),256,size,pos,&ppos);
+
+	DEBUG("Deleting treefile: %s",filename);
+
 	if (unlink(filename)==-1)
-		err ("Error deleting treefile %m");
+		DEBUG("Deleting failed : %s",strerror(errno));
 }
 
 
@@ -1129,13 +1132,13 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		   * problems.
 		   *
 		   */
-	#if 0
+#if 0
 			sync_file_range(fhandle, foffset, len,
 					SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE |
 					SYNC_FILE_RANGE_WAIT_AFTER);
-	#else
+#else
 			fdatasync(fhandle);
-	#endif
+#endif
 		}
 	}
 	return retval;
@@ -1375,10 +1378,8 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		if (client->server->flags & F_READONLY)
 			return 0;
 
-		off_t min= (req->from / TREEPAGESIZE) * TREEPAGESIZE; // start address of to be trimmed block
-		if (min!=req->from)
-			min+=TREEPAGESIZE; // we shall not trim partially used blocks
-		off_t max= ((req->from+req->len)/TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first to be trimmed block
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
 		while (min<max) {
 			delete_treefile(client->exportname,client->exportsize,min);
 			min+=TREEPAGESIZE;
