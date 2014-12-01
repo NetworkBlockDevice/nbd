@@ -74,6 +74,7 @@
 #endif
 #include <signal.h>
 #include <errno.h>
+#include <libgen.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -391,7 +392,7 @@ static void delete_treefile(char* name,off_t size,off_t pos) {
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections] [-V]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-t|--tree-files\t\ttree of subdirectories with one file per block\n"
@@ -400,7 +401,8 @@ void usage() {
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
-	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
+	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n"
+	       "\t-V|--version\toutput the version and exit\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -456,6 +458,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
 		{"max-connection", required_argument, NULL, 'M'},
+		{"version", no_argument, NULL, 'V'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -472,7 +475,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cdl:mto:rp:M:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cdl:mto:rp:M:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -540,6 +543,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'p':
 			strncpy(pidftemplate, optarg, 256);
+			pidftemplate[255]='\0';
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
@@ -557,6 +561,10 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'M':
 			serve->max_connections = strtol(optarg, NULL, 0);
+			break;
+		case 'V':
+			printf("This is nbd-server version " VERSION "\n");
+			exit(EXIT_SUCCESS);
 			break;
 		default:
 			usage();
@@ -583,14 +591,22 @@ SERVER* cmdline(int argc, char *argv[]) {
 }
 
 /* forward definition of parse_cfile */
-GArray* parse_cfile(gchar* f, struct generic_conf *genconf, GError** e);
+GArray* parse_cfile(gchar* f, struct generic_conf *genconf, bool expect_generic, GError** e);
+
+#ifdef HAVE_STRUCT_DIRENT_D_TYPE
+#define NBD_D_TYPE de->d_type
+#else
+#define NBD_D_TYPE 0
+#define DT_UNKNOWN 0
+#define DT_REG 1
+#endif
 
 /**
  * Parse config file snippets in a directory. Uses readdir() and friends
  * to find files and open them, then passes them on to parse_cfile
  * with have_global set false
  **/
-GArray* do_cfile_dir(gchar* dir, GError** e) {
+GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e) {
 	DIR* dirh = opendir(dir);
 	struct dirent* de;
 	gchar* fname;
@@ -606,7 +622,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	while((de = readdir(dirh))) {
 		int saved_errno=errno;
 		fname = g_build_filename(dir, de->d_name, NULL);
-		switch(de->d_type) {
+		switch(NBD_D_TYPE) {
 			case DT_UNKNOWN:
 				/* Filesystem doesn't return type of
 				 * file through readdir. Run stat() on
@@ -623,7 +639,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					goto next;
 				}
-				tmp = parse_cfile(fname, NULL, e);
+				tmp = parse_cfile(fname, genconf, false, e);
 				errno=saved_errno;
 				if(*e) {
 					goto err_out;
@@ -650,6 +666,18 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	return retval;
 }
 
+static bool want_oldstyle(struct generic_conf gct, struct generic_conf* gc) {
+	if(gct.flags & F_OLDSTYLE) {
+		return true;
+	}
+	if(gc == NULL) {
+		return false;
+	}
+	if(gc->flags & F_OLDSTYLE) {
+		return true;
+	}
+	return false;
+}
 /**
  * Parse the config file.
  *
@@ -664,11 +692,14 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
  *        NBDS_ERR_CFILE_VALUE_INVALID, NBDS_ERR_CFILE_VALUE_UNSUPPORTED
  *        or NBDS_ERR_CFILE_NO_EXPORTS. @see NBDS_ERRS.
  *
- * @return a Array of SERVER* pointers, If the config file is empty or does not
- *	exist, returns an empty GHashTable; if the config file contains an
+ * @param expect_generic if true, we expect a configuration file that
+ * 	  contains a [generic] section. If false, we don't.
+ *
+ * @return a GArray of SERVER* pointers. If the config file is empty or does not
+ *	exist, returns an empty GArray; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
+GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_generic, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	gchar* cfdir = NULL;
@@ -683,6 +714,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
 		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
 		{ "transactionlog", FALSE, PARAM_STRING, &(s.transactionlog),	0 },
+		{ "cowdir",	FALSE,	PARAM_STRING,	&(s.cowdir),		0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
 		{ "treefiles",	FALSE,	PARAM_BOOL,	&(s.flags),		F_TREEFILES },
@@ -743,7 +775,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if((!startgroup || strcmp(startgroup, "generic")) && genconf) {
+	if((!startgroup || strcmp(startgroup, "generic")) && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
@@ -754,10 +786,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
-		if(i==1 || !genconf) {
+		if(i==1 || !expect_generic) {
 			p=lp;
 			p_size=lp_size;
-			if(!(glob_flags & F_OLDSTYLE)) {
+			if(!want_oldstyle(genconftmp, genconf)) {
 				lp[1].required = FALSE;
 			}
 		} 
@@ -849,14 +881,14 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
-		if(s.port && !(glob_flags & F_OLDSTYLE)) {
+		if(s.port && !want_oldstyle(genconftmp, genconf)) {
 			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
 			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
 		}
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0 || !genconf) {
+		if(i>0 || !expect_generic) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
@@ -873,7 +905,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	}
 	g_key_file_free(cfile);
 	if(cfdir) {
-		GArray* extra = do_cfile_dir(cfdir, e);
+		GArray* extra = do_cfile_dir(cfdir, &genconftmp, e);
 		if(extra) {
 			retval = g_array_append_vals(retval, extra->data, extra->len);
 			i+=extra->len;
@@ -885,7 +917,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 			}
 		}
 	}
-	if(i==1 && genconf) {
+	if(i==1 && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
 
@@ -1469,11 +1501,12 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
 	uint16_t smallflags = 0;
 	uint64_t magic;
+	uint32_t cflags = 0;
 
 	memset(zeros, '\0', sizeof(zeros));
 	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
 	if(phase & NEG_MODERN) {
-		smallflags |= NBD_FLAG_FIXED_NEWSTYLE;
+		smallflags |= NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	}
 	if(phase & NEG_INIT) {
 		/* common */
@@ -1497,7 +1530,6 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	}
 	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
 		/* modern */
-		uint32_t cflags;
 		uint32_t opt;
 
 		if(!servers)
@@ -1570,9 +1602,11 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		}
 	}
 	/* common */
-	if (write(client->net, zeros, 124) < 0)
-		err("Negotiation failed/12: %m");
-	return NULL;
+	if (!(cflags & NBD_FLAG_C_NO_ZEROES)) {
+		if (write(client->net, zeros, 124) < 0)
+			err("Negotiation failed/12: %m");
+		return NULL;
+	}
 }
 
 /** sending macro. */
@@ -1867,11 +1901,18 @@ void setupexport(CLIENT* client) {
 
 int copyonwrite_prepare(CLIENT* client) {
 	off_t i;
-	if ((client->difffilename = malloc(1024))==NULL)
-		err("Failed to allocate string for diff file name");
-	snprintf(client->difffilename, 1024, "%s-%s-%d.diff",client->exportname,client->clientname,
-		(int)getpid()) ;
-	client->difffilename[1023]='\0';
+	gchar* dir;
+	gchar* export_base;
+	if (client->server->cowdir != NULL) {
+		dir = g_strdup(client->server->cowdir);
+	} else {
+		dir = g_strdup(dirname(client->exportname));
+	}
+	export_base = g_strdup(basename(client->exportname));
+	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
+		(int)getpid());
+	g_free(dir);
+	g_free(export_base);
 	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 	if (client->difffile<0) err("Could not create diff file (%m)") ;
@@ -1954,8 +1995,6 @@ void serveconnection(CLIENT *client) {
  **/
 int set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage netaddr;
-	struct sockaddr_in  *netaddr4 = NULL;
-	struct sockaddr_in6 *netaddr6 = NULL;
 	socklen_t addrinlen = sizeof( struct sockaddr_storage );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -1964,7 +2003,6 @@ int set_peername(int net, CLIENT *client) {
 	char *tmp = NULL;
 	int i;
 	int e;
-	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
 		msg(LOG_INFO, "getpeername failed: %m");
@@ -2000,7 +2038,7 @@ int set_peername(int net, CLIENT *client) {
 				}
 			}
 		case VIRT_IPLIT:
-			msg(LOG_DEBUG, "virststyle ipliteral");
+			msg(LOG_DEBUG, "virtstyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
 			break;
 		case VIRT_CIDR:
@@ -2013,7 +2051,7 @@ int set_peername(int net, CLIENT *client) {
 			} else if(ai->ai_family == AF_INET6) {
 				addrbits = 128;
 			}
-			uint8_t* addrptr = ((struct sockaddr*)&netaddr)->sa_data;
+			uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
 			for(int i = 0; i < addrbits; i+=8) {
 				int masklen = client->server->cidrlen - i;
 				masklen = masklen > 0 ? masklen : 0;
@@ -2341,7 +2379,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
         int retval = -1;
         struct generic_conf genconf;
 
-        new_servers = parse_cfile(config_file_pos, &genconf, gerror);
+        new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
         if (!new_servers)
                 goto out;
 
@@ -2620,7 +2658,6 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	struct sock_flags;
 	int e;
         int retval = -1;
-	int i=0;
 	int sock = -1;
 
 	memset(&hints, '\0', sizeof(hints));
@@ -2884,7 +2921,7 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 
-        servers = parse_cfile(config_file_pos, &genconf, &err);
+        servers = parse_cfile(config_file_pos, &genconf, true, &err);
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */

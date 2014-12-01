@@ -67,6 +67,7 @@ manpage.1: manpage.sgml
       <arg><option>-o <replaceable>section name</replaceable></option></arg>
       <arg><option>-C <replaceable>config file</replaceable></option></arg>
       <arg><option>-M <replaceable>max connections</replaceable></option></arg>
+      <arg><option>-V</option></arg>
       <arg><option>-d</option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
@@ -291,6 +292,12 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Specify the maximum number of opened connections. If this
 	  parameter is not specified, no limit is set.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-V</option></term>
+	<listitem>
+	  <para>Output the version of nbd-server, and exit.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

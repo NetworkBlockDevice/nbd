@@ -228,6 +228,11 @@ Flag bits
   bit 0 - NBD_FLAG_FIXED_NEWSTYLE
   should be set by servers that support the fixed newstyle protocol
 
+  bit 1 - NBD_FLAG_NO_ZEROES
+  If set, and if the client sets NBD_FLAG_C_NO_ZEROES, then the 124
+  bytes of zero at the end of the negotiation will not be sent by the
+  server.
+
 * Client (after initial connection and after receiving flags from
   server):
 
@@ -235,6 +240,11 @@ Flag bits
   Should be set by clients that support the fixed newstyle protocol.
   Servers may choose to honour fixed newstyle from clients that didn't
   set this bit, but relying on this isn't recommended.
+
+  bit 1 - NBD_FLAG_C_NO_ZEROES
+  MUST only be set if the server also sets NBD_FLAG_NO_ZEROES. If set,
+  the server MUST NOT send the 124 bytes of zeroes at the end of the
+  negotiation.
 
 Option types
 - - - - - - -
@@ -244,6 +254,9 @@ Option types
   haggling. Data: name of the export, free-form UTF8 text (subject to
   limitations by server implementation). If the chosen export does not
   exist, the server closes the connection.
+  A special, "empty", name (i.e., the length field is zero and no name
+  is specified), is reserved for a "default" export, to be used in cases
+  where explicitly specifying an export name makes no sense.
 
 * NBD_OPT_ABORT (2)
   Abort negotiation and close the connection. Optional.
@@ -295,3 +308,67 @@ case that data is an error message suitable for display to the user.
 * NBD_REP_ERR_PLATFORM (2^31 + 4)
   The option sent by the client is not supported on the platform on
   which the server is running. Not currently used.
+
+Request types
+- - - - - - -
+
+The following request types exist:
+
+* NBD_CMD_READ (0)
+  A read request. Length and offset define the data to be read. The
+  server MUST reply with a reply header, followed immediately by len
+  bytes of data, read offset bytes into the file, unless an error
+  condition has occurred.
+
+* NBD_CMD_WRITE (1)
+  A write request. Length and offset define the location and amount of
+  data to be written. The server should write the data to disk, and then
+  send the reply header. However, the server does not need to ensure
+  that all data has hit the disk, unless the NBD_CMD_FLAG_FUA flag is
+  set (bit 16).
+
+* NBD_CMD_DISC (2)
+  A disconnect request. The server MUST handle all outstanding
+  requests, and then close the connection.
+  A client MUST NOT send anything to the server after sending an
+  NBD_CMD_DISC command.
+
+* NBD_CMD_FLUSH (3)
+  A flush request; a write barrier. The server MUST NOT send the reply
+  header to this request before all outstanding write requests that were
+  sent before this command have hit the disk (using fsync() or similar).
+  In this command, "len" and "offset" are reserved, and should be set to
+  all-zero.
+
+* NBD_CMD_TRIM (4)
+  A hint to the server that the data defined by len and offset is no
+  longer needed. A server MAY discard len bytes starting at offset, but
+  is not required to.
+  After issuing this command, a client MUST NOT make any assumptions
+  about the contents of the export affected by this command, until
+  overwriting it again with NBD_CMD_WRITE.
+
+* NBD_CMD_CACHE (5)
+  This command is defined by xnbd.
+
+About this file
+---------------
+
+This file tries to document the NBD protocol as it is currently
+implemented in the Linux kernel and in the reference implementation. The
+purpose of this file is to allow people to understand the protocol
+without having to read the code. However, the description above does not
+come with any form of warranty; while every effort has been taken to
+avoid them, mistakes are possible.
+
+In contrast to the other files in this repository, this file is not
+licensed under the GPLv2. To the extent possible by applicable law, I
+hereby waive all copyright and related or neighboring rights to this
+file and release it into the public domain.
+
+The purpose of releasing this into the public domain is to allow
+competing implementations of the NBD protocol without those
+implementations being considered derivative implementations; but please
+note that changing this document, while allowed by its public domain
+status, does not make an incompatible implementation suddenly speak the
+NBD protocol.

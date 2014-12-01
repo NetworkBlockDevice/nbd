@@ -23,6 +23,7 @@
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
@@ -72,8 +73,11 @@ int check_conn(char* devname, int do_print) {
 		}
 	}
 	len=read(fd, buf, 256);
-	if(len >= 0)
-		buf[len]='\0';
+	if(len < 0) {
+		perror("could not read from server");
+		return 2;
+	}
+	buf[(len < 256) ? len : 255]='\0';
 	if(do_print) printf("%s\n", buf);
 	return 0;
 }
@@ -124,12 +128,39 @@ int opennet(char *name, char* portstr, int sdp) {
 
 	if (rp == NULL) {
 		err_nonfatal("Socket failed: %m");
-		return -1;
+		sock = -1;
+		goto err;
 	}
 
 	setmysockopt(sock);
-
+err:
 	freeaddrinfo(ai);
+	return sock;
+}
+
+int openunix(const char *path) {
+	int sock;
+	struct sockaddr_un un_addr;
+	memset(&un_addr, 0, sizeof(un_addr));
+
+	un_addr.sun_family = AF_UNIX;
+	if (strnlen(path, sizeof(un_addr.sun_path)) == sizeof(un_addr.sun_path)) {
+		err_nonfatal("UNIX socket path too long");
+		return -1;
+	}
+
+	strncpy(un_addr.sun_path, path, sizeof(un_addr.sun_path) - 1);
+
+	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		err_nonfatal("SOCKET failed");
+		return -1;
+	};
+
+	if (connect(sock, &un_addr, sizeof(un_addr)) == -1) {
+		err_nonfatal("CONNECT failed");
+		close(sock);
+		return -1;
+	}
 	return sock;
 }
 
@@ -267,6 +298,9 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 			exit(EXIT_FAILURE);
 		}
 
+		if (*flags & NBD_FLAG_NO_ZEROES) {
+			client_flags |= NBD_FLAG_C_NO_ZEROES;
+		}
 		client_flags = htonl(client_flags);
 		if (write(sock, &client_flags, sizeof(client_flags)) < 0)
 			err("Failed/2.1: %m");
@@ -323,8 +357,10 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 		*flags |= (uint32_t)ntohs(tmp);
 	}
 
-	if (read(sock, &buf, 124) < 0)
-		err("Failed/5: %m\n");
+	if (!(*flags & NBD_FLAG_NO_ZEROES)) {
+		if (read(sock, &buf, 124) < 0)
+			err("Failed/5: %m\n");
+	}
 	printf("\n");
 
 	*rsize64 = size64;
@@ -368,8 +404,10 @@ void finish_sock(int sock, int nbd, int swap) {
 	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
 		err("Ioctl NBD_SET_SOCK failed: %m\n");
 
+#ifndef __ANDROID__
 	if (swap)
 		mlockall(MCL_CURRENT | MCL_FUTURE);
+#endif
 }
 
 static int
@@ -440,9 +478,10 @@ int main(int argc, char *argv[]) {
 	u32 flags;
 	int c;
 	int nonspecial=0;
+	int b_unix=0;
 	char* name=NULL;
 	uint32_t needed_flags=0;
-	uint32_t cflags=0;
+	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
 	sigset_t block, old;
 	struct sigaction sa;
@@ -459,12 +498,13 @@ int main(int argc, char *argv[]) {
 		{ "swap", no_argument, NULL, 's' },
 		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
+		{ "unix", no_argument, NULL, 'u' },
 		{ 0, 0, 0, 0 }, 
 	};
 
 	logging();
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:u", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -521,7 +561,6 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_SUCCESS);
 		case 'l':
 			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
-			cflags |= NBD_FLAG_C_FIXED_NEWSTYLE;
 			opts |= NBDC_DO_LIST;
 			name="";
 			nbddev="";
@@ -552,18 +591,29 @@ int main(int argc, char *argv[]) {
 		      timeout:
 			timeout=strtol(optarg, NULL, 0);
 			break;
+		case 'u':
+			b_unix = 1;
+			break;
 		default:
 			fprintf(stderr, "E: option eaten by 42 mice\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
+#ifdef __ANDROID__
+  if (swap)
+    err("swap option unsupported on Android because mlockall is unsupported.");
+#endif
+
 	if((!port && !name) || !hostname || !nbddev) {
 		usage("not enough information specified");
 		exit(EXIT_FAILURE);
 	}
 
-	sock = opennet(hostname, port, sdp);
+	if (b_unix)
+		sock = openunix(hostname);
+	else
+		sock = opennet(hostname, port, sdp);
 	if (sock < 0)
 		exit(EXIT_FAILURE);
 
@@ -640,7 +690,10 @@ int main(int argc, char *argv[]) {
 					close(sock); close(nbd);
 					for (;;) {
 						fprintf(stderr, " Reconnecting\n");
-						sock = opennet(hostname, port, sdp);
+						if (b_unix)
+							sock = openunix(hostname);
+						else
+							sock = opennet(hostname, port, sdp);
 						if (sock >= 0)
 							break;
 						sleep (1);

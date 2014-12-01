@@ -300,6 +300,25 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>cowdir</option></term>
+	<listitem>
+	  <para>
+	    Optional; string.
+	  </para>
+	  <para>
+	    Specifies where to write copy-on-write diff files. If this
+	    option is absent, copy-on-write files will be written in the
+	    same directory as the base export file. Useful for exporting
+	    files in copy-on-write mode from a directory that the user
+	    running nbd-server has no write access to.
+	  </para>
+	  <para>
+	    If the copy-on-write mode is not active, this option has no
+	    effect.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>exportname</option></term>
 	<listitem>
 	  <para>Required; string.</para>

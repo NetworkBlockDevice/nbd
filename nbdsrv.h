@@ -46,6 +46,7 @@ typedef struct {
 	gchar* servename;    /**< name of the export as selected by nbd-client */
 	int max_connections; /**< maximum number of opened connections */
 	gchar* transactionlog;/**< filename for transaction log */
+	gchar* cowdir;	     /**< directory for copy-on-write diff files. */
 } SERVER;
 
 /**
@@ -123,14 +124,13 @@ typedef enum {
   * Check whether a given address matches a given netmask.
   *
   * @param mask the address or netmask to check against, in ASCII representation
-  * @param addr the address to check, in network byte order
-  * @param af the address family of the passed address (AF_INET or AF_INET6)
+  * @param addr the address to check
   *
   * @return true if the address matches the mask, false otherwise; in case of
   * failure to parse netmask, returns false with err set appropriately.
   * @todo decide what to do with v6-mapped IPv4 addresses.
   */
-bool address_matches(const char* mask, const void* addr, int af, GError** err);
+bool address_matches(const char* mask, const struct sockaddr* addr, GError** err);
 
 /**
   * Gets a byte to allow for address masking.
