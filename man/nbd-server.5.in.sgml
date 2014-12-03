@@ -481,9 +481,10 @@ manpage.1: manpage.sgml
             or other network filesytems.
 	  </para>
 	  <para>
-	    Corresponds to the <option>-t</option> option on the
-	    command line. This feature is mutually exclusive with the
+	    This feature is mutually exclusive with the
 	    <option>-m</option> and will take precedence if both are given.
+            There is no corresponding command line option, since command line control is considered
+            deprecated. You can however specify a custom config file with the <option>-C</option> option.
 	    The <option>filesize</option> option <emphasis>must</emphasis> be specified when using this feature!
 	  </para>
 	</listitem>
