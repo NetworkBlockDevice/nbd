@@ -150,7 +150,7 @@ int dontfork = 0;
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
-#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using treefiles */
+#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
@@ -354,8 +354,8 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 
 	int handle=open(filename, mode, 0600);
-	if (handle<0) {
-		if (errno==ENOENT && (mode & O_RDWR)) {
+	if (handle<0 && errno==ENOENT) {
+		if (mode & O_RDWR) {
 
 			DEBUG("Creating new treepath");
 
@@ -364,12 +364,24 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 			if (handle<0) {
 				err("Error opening tree block file %m");
 			}
-			char n[]="\0";
-			myseek(handle,TREEPAGESIZE-1);
-			ssize_t c=write(handle,n,1);
-			if (c<1) {
-				err("Error setting tree block file size %m");
+		} else {
+
+			DEBUG("Creating a dummy tempfile for reading");
+			gchar * tmpname;
+			tmpname = g_strdup_printf("dummy-XXXXXX");
+			handle = mkstemp(tmpname);
+			if (handle>0) {
+				unlink(tmpname); /* File will stick around whilst FD open */
+			} else {
+				err("Error opening tree block file %m");
 			}
+			g_free(tmpname);
+		}
+		char *n = "\0";
+		myseek(handle,TREEPAGESIZE-1);
+		ssize_t c = write(handle,n,1);
+		if (c<1) {
+			err("Error setting tree block file size %m");
 		}
 	}
 	return handle;
@@ -994,7 +1006,7 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
 /**
  * Get the file handle and offset, given an export offset.
  *
- * @param export An array of export files
+ * @param client The client we're serving for
  * @param a The offset to get corresponding file/offset for
  * @param fhandle [out] File descriptor
  * @param foffset [out] Offset into fhandle
@@ -1002,10 +1014,21 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
  * from fhandle starting at foffset (0 if there is no limit)
  * @return 0 on success, -1 on failure
  **/
-int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+
+	GArray * const export = client->export;
+
 	/* Negative offset not allowed */
 	if(a < 0)
 		return -1;
+
+	/* Open separate file for treefiles */
+        if (client->server->flags & F_TREEFILES) {
+		*foffset = a % TREEPAGESIZE;
+		*maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
+		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a);
+		return 0;
+	}
 
 	/* Binary search for last file with starting offset <= a */
 	FILE_INFO fi;
@@ -1063,78 +1086,65 @@ void myseek(int handle,off_t a) {
  * @return The number of bytes actually written, or -1 in case of an error
  **/
 ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
-	ssize_t retval;
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
+	ssize_t retval;
 
-        if (client->server->flags & F_TREEFILES) {
-		foffset = a % TREEPAGESIZE;
-		maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
-		if(len > maxbytes)
-			len = maxbytes;
-		fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a);
-		if (fhandle<0)
-			return -1;
+	if(get_filepos(client, a, &fhandle, &foffset, &maxbytes))
+		return -1;
+	if(maxbytes && len > maxbytes)
+		len = maxbytes;
 
-		DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
+	DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
 
-		myseek(fhandle, foffset);
-		retval = write(fhandle, buf, len);
-		close(fhandle);
+	myseek(fhandle, foffset);
+	retval = write(fhandle, buf, len);
+	if(client->server->flags & F_SYNC) {
+		fsync(fhandle);
+	} else if (fua) {
 
-	} else {
-		if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
-			return -1;
-		if(maxbytes && len > maxbytes)
-			len = maxbytes;
-
-		DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
-
-		myseek(fhandle, foffset);
-		retval = write(fhandle, buf, len);
-		if(client->server->flags & F_SYNC) {
-			fsync(fhandle);
-		} else if (fua) {
-
-		  /* This is where we would do the following
-		   *   #ifdef USE_SYNC_FILE_RANGE
-		   * However, we don't, for the reasons set out below
-		   * by Christoph Hellwig <hch@infradead.org>
-		   *
-		   * [BEGINS]
-		   * fdatasync is equivalent to fsync except that it does not flush
-		   * non-essential metadata (basically just timestamps in practice), but it
-		   * does flush metadata requried to find the data again, e.g. allocation
-		   * information and extent maps.  sync_file_range does nothing but flush
-		   * out pagecache content - it means you basically won't get your data
-		   * back in case of a crash if you either:
-		   *
-		   *  a) have a volatile write cache in your disk (e.g. any normal SATA disk)
-		   *  b) are using a sparse file on a filesystem
-		   *  c) are using a fallocate-preallocated file on a filesystem
-		   *  d) use any file on a COW filesystem like btrfs
-		   *
-		   * e.g. it only does anything useful for you if you do not have a volatile
-		   * write cache, and either use a raw block device node, or just overwrite
-		   * an already fully allocated (and not preallocated) file on a non-COW
-		   * filesystem.
-		   * [ENDS]
-		   *
-		   * What we should do is open a second FD with O_DSYNC set, then write to
-		   * that when appropriate. However, with a Linux client, every REQ_FUA
-		   * immediately follows a REQ_FLUSH, so fdatasync does not cause performance
-		   * problems.
-		   *
-		   */
+	  /* This is where we would do the following
+	   *   #ifdef USE_SYNC_FILE_RANGE
+	   * However, we don't, for the reasons set out below
+	   * by Christoph Hellwig <hch@infradead.org>
+	   *
+	   * [BEGINS] 
+	   * fdatasync is equivalent to fsync except that it does not flush
+	   * non-essential metadata (basically just timestamps in practice), but it
+	   * does flush metadata requried to find the data again, e.g. allocation
+	   * information and extent maps.  sync_file_range does nothing but flush
+	   * out pagecache content - it means you basically won't get your data
+	   * back in case of a crash if you either:
+	   * 
+	   *  a) have a volatile write cache in your disk (e.g. any normal SATA disk)
+	   *  b) are using a sparse file on a filesystem
+	   *  c) are using a fallocate-preallocated file on a filesystem
+	   *  d) use any file on a COW filesystem like btrfs
+	   * 
+	   * e.g. it only does anything useful for you if you do not have a volatile
+	   * write cache, and either use a raw block device node, or just overwrite
+	   * an already fully allocated (and not preallocated) file on a non-COW
+	   * filesystem.
+	   * [ENDS]
+	   *
+	   * What we should do is open a second FD with O_DSYNC set, then write to
+	   * that when appropriate. However, with a Linux client, every REQ_FUA
+	   * immediately follows a REQ_FLUSH, so fdatasync does not cause performance
+	   * problems.
+	   *
+	   */
 #if 0
-			sync_file_range(fhandle, foffset, len,
-					SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE |
-					SYNC_FILE_RANGE_WAIT_AFTER);
+		sync_file_range(fhandle, foffset, len,
+				SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE |
+				SYNC_FILE_RANGE_WAIT_AFTER);
 #else
-			fdatasync(fhandle);
+		fdatasync(fhandle);
 #endif
-		}
+	}
+	/* close file pointer in case of treefiles */
+        if (client->server->flags & F_TREEFILES) {
+		close(fhandle);
 	}
 	return retval;
 }
@@ -1177,34 +1187,17 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	size_t maxbytes;
 	ssize_t retval;
 
+	if(get_filepos(client, a, &fhandle, &foffset, &maxbytes))
+		return -1;
+	if(maxbytes && len > maxbytes)
+		len = maxbytes;
+
+	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
+
+	myseek(fhandle, foffset);
+	retval = read(fhandle, buf, len);
         if (client->server->flags & F_TREEFILES) {
-		foffset = a % TREEPAGESIZE;
-		maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
-		if(len > maxbytes)
-			len = maxbytes;
-		fhandle = open_treefile(client->exportname, O_RDONLY, client->exportsize, a);
-
-		DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
-		if (fhandle<0) {
-			// when in read only mode, non existing tree leafs will not get created, opening fails
-			// read zeroes instead instead
-			memset(buf,0,len);
-			retval = len;
-		} else {
-			myseek(fhandle, foffset);
-			retval = read(fhandle,buf,len);
-			close(fhandle);
-		}
-	} else {
-		if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
-			return -1;
-		if(maxbytes && len > maxbytes)
-			len = maxbytes;
-
-		DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
-
-		myseek(fhandle, foffset);
-		retval = read(fhandle, buf, len);
+		close(fhandle);
 	}
 	return retval;
 }
@@ -1337,22 +1330,16 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 int expflush(CLIENT *client) {
 	gint i;
 
+        if (client->server->flags & F_COPYONWRITE) {
+		return fsync(client->difffile);
+	}
+
         if (client->server->flags & F_TREEFILES ) {
 		// all we can do is force sync the entire filesystem containing the tree
 		if (client->server->flags & F_READONLY)
 			return 0;
-#ifdef _GNU_SOURCE
-		int fhandle = open_treefile(client->exportname,O_RDWR,client->exportsize,0);
-		syncfs(fhandle);
-		close(fhandle);
-#else
 		sync();
-#endif
 		return 0;
-	}
-
-        if (client->server->flags & F_COPYONWRITE) {
-		return fsync(client->difffile);
 	}
 	
 	for (i = 0; i < client->export->len; i++) {
@@ -1380,29 +1367,29 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 			min+=TREEPAGESIZE;
 		}
 		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
-	} else {
-#if HAVE_FALLOC_PH
-		FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
-		FILE_INFO cur = prev;
-		int i = 1;
-		/* We're running on a system that supports the
-		 * FALLOC_FL_PUNCH_HOLE option to re-sparsify a file */
-		do {
-			if(i<client->export->len) {
-				cur = g_array_index(client->export, FILE_INFO, i);
-			}
-			if(prev.startoff <= req->from) {
-				off_t curoff = req->from - prev.startoff;
-				off_t curlen = cur.startoff - prev.startoff - curoff;
-				fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, curoff, curlen);
-			}
-			prev = cur;
-		} while(i < client->export->len && cur.startoff < (req->from + req->len));
-		DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
-#else
-		DEBUG("Ignoring TRIM request (not supported on current platform");
-#endif
+		return 0;
 	}
+#if HAVE_FALLOC_PH
+	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
+	FILE_INFO cur = prev;
+	int i = 1;
+	/* We're running on a system that supports the
+	 * FALLOC_FL_PUNCH_HOLE option to re-sparsify a file */
+	do {
+		if(i<client->export->len) {
+			cur = g_array_index(client->export, FILE_INFO, i);
+		}
+		if(prev.startoff <= req->from) {
+			off_t curoff = req->from - prev.startoff;
+			off_t curlen = cur.startoff - prev.startoff - curoff;
+			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, curoff, curlen);
+		}
+		prev = cur;
+	} while(i < client->export->len && cur.startoff < (req->from + req->len));
+	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+#else
+	DEBUG("Ignoring TRIM request (not supported on current platform");
+#endif
 	return 0;
 }
 
