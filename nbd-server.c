@@ -150,7 +150,7 @@ int dontfork = 0;
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
-#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
+#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using treefiles */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
@@ -398,7 +398,6 @@ void usage() {
 	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections] [-V]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
-	       "\t-t|--tree-files\t\ttree of subdirectories with one file per block\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
@@ -453,7 +452,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 	struct option long_options[] = {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
-		{"tree-files", no_argument, NULL, 't'},
 		{"copy-on-write", no_argument, NULL, 'c'},
 		{"dont-fork", no_argument, NULL, 'd'},
 		{"authorize-file", required_argument, NULL, 'l'},
@@ -478,7 +476,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cdl:mto:rp:M:V", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -536,9 +534,6 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'm':
 			serve->flags |= F_MULTIFILE;
-			break;
-		case 't':
-			serve->flags |= F_TREEFILES;
 			break;
 		case 'o':
 			do_output = TRUE;
