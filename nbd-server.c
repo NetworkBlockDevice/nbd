@@ -315,7 +315,7 @@ void myseek(int handle,off_t a);
  * Tree structure helper functions
  */
 
-static void addToTreePath(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
+static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
 	if (lenmax<10)
 		err("Char buffer overflow. This is likely a bug.");
 
@@ -324,7 +324,7 @@ static void addToTreePath(char* name,int lenmax,off_t size, off_t pos, off_t * p
 		snprintf(name,lenmax,"/FILE%04X",(pos/TREEPAGESIZE) % TREEDIRSIZE);
 		*ppos = pos / (TREEPAGESIZE*TREEDIRSIZE);
 	} else {
-		addToTreePath(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
+		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
 		char buffer[10];
 		snprintf(buffer,sizeof(buffer),"/TREE%04X",*ppos % TREEDIRSIZE);
 		memcpy(name,buffer,9); // copy into string without trailing zero
@@ -332,7 +332,7 @@ static void addToTreePath(char* name,int lenmax,off_t size, off_t pos, off_t * p
 	}
 }
 
-static void createTreePath(char * path) {
+static void mkdir_path(char * path) {
 	char *subpath=path+1;
 	while (subpath=strchr(subpath,'/')) {
 		*subpath='\0'; // path is modified in place with terminating null char instead of slash
@@ -349,7 +349,7 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 	char filename[256+strlen(name)];
 	strcpy(filename,name);
 	off_t ppos;
-	addToTreePath(filename+strlen(name),256,size,pos,&ppos);
+	construct_path(filename+strlen(name),256,size,pos,&ppos);
 
 	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 
@@ -359,7 +359,7 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 
 			DEBUG("Creating new treepath");
 
-			createTreePath(filename);
+			mkdir_path(filename);
 			handle=open(filename, O_RDWR|O_CREAT, 0600);
 			if (handle<0) {
 				err("Error opening tree block file %m");
@@ -392,7 +392,7 @@ static void delete_treefile(char* name,off_t size,off_t pos) {
 	strcpy(filename,name);
 	size_t psize=size;
 	off_t ppos;
-	addToTreePath(filename+strlen(name),256,size,pos,&ppos);
+	construct_path(filename+strlen(name),256,size,pos,&ppos);
 
 	DEBUG("Deleting treefile: %s",filename);
 
