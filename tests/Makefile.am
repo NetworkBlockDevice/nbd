@@ -30,10 +30,11 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-CLEANFILES = *~
+CLEANFILES = *~ *.cmi *.cmx *.cmxa *.so
 MAINTAINERCLEANFILES =
 
 EXTRA_DIST = \
+	ocamltest.ml \
 	test-captive.sh \
 	test-dump-config.sh \
 	test-foreground.sh \
@@ -78,6 +79,7 @@ libtest_la_CFLAGS = $(WARNINGS_CFLAGS)
 check_PROGRAMS = test-connect
 TESTS += test-connect
 check_DATA =
+check_SCRIPTS =
 
 test_connect_SOURCES = test-connect.c test.h
 test_connect_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
@@ -168,6 +170,27 @@ test_python_CFLAGS = \
 	-DLANG='"python"' -DSCRIPT='"test.py"' \
 	$(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
 test_python_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+endif
+
+# OCaml plugin test.
+if HAVE_OCAML
+
+check_PROGRAMS += test-ocaml
+TESTS += test-ocaml
+
+# This is somewhat different from the other tests because we have
+# to build an actual plugin here.
+test_ocaml_SOURCES = test-ocaml.c test.h
+test_ocaml_CFLAGS = \
+	$(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_ocaml_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
+check_SCRIPTS += test-ocaml-plugin.so
+test-ocaml-plugin.so: test_ocaml_plugin.ml ../plugins/ocaml/.libs/nbdkit-ocaml-plugin.a ../plugins/ocaml/NBDKit.cmi ../plugins/ocaml/NBDKit.cmx
+	$(OCAMLOPT) $(OCAMLOPTFLAGS) -I ../plugins/ocaml \
+	  -output-obj -o $@ \
+	  NBDKit.cmx $< ../plugins/ocaml/.libs/nbdkit-ocaml-plugin.a
 
 endif
 

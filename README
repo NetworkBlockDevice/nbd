@@ -71,6 +71,13 @@ For the Python plugin:
 
  - python development libraries
 
+For the OCaml plugin:
+
+ - OCaml native compiler that was compiled using -fPIC, see:
+   http://www.camlcity.org/knowledge/kb_002_shared_library.html
+   Hopefully this will become the default in a future OCaml, see:
+   http://caml.inria.fr/mantis/view.php?id=6693
+
 After installing any dependencies:
 
   To build from tarball:         To build from git:

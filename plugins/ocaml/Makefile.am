@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013-2014 Red Hat Inc.
+# Copyright (C) 2014 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,18 +30,54 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	curl \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	ocaml \
-	perl \
-	python \
-	streaming \
-	vddk \
-	xz
+EXTRA_DIST = \
+	NBDKit.mli \
+	NBDKit.ml \
+	nbdkit-ocaml-plugin.pod
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_OCAML
+
+ocamllibdir = $(OCAMLLIB)
+ocamllib_DATA = NBDKit.mli NBDKit.cmi NBDKit.cmx NBDKit.o
+
+NBDKit.cmi: NBDKit.mli
+	$(OCAMLC) -c $<
+
+NBDKit.cmx NBDKit.o: NBDKit.ml
+	$(OCAMLOPT) $(OCAMLOPTFLAGS) -c $<
+
+# NB: nbdkit-ocaml-plugin is not a self-contained plugin.  It's a
+# static library that you have to link in to the OCaml plugins that
+# you write.  Hence this builds 'nbdkit-ocaml-plugin.a'.  See
+# nbdkit-ocaml-plugin(3) for more details.
+
+plugin_LTLIBRARIES = nbdkit-ocaml-plugin.la
+
+nbdkit_ocaml_plugin_la_SOURCES = \
+	ocaml.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_ocaml_plugin_la_CPPFLAGS = \
+	-I$(OCAMLLIB) \
+	-I$(top_srcdir)/include
+nbdkit_ocaml_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	-fPIC
+nbdkit_ocaml_plugin_la_LDFLAGS = \
+	-module -avoid-version -static
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-ocaml-plugin.3
+
+nbdkit-ocaml-plugin.3: nbdkit-ocaml-plugin.pod
+	$(POD2MAN) -u --stderr --section=3 --center=nbdkit --release=nbdkit --name=`basename $@ .3` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~ *.cmi *.cmx
+

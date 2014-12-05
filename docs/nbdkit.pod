@@ -305,6 +305,7 @@ L<nbdkit-example3-plugin(1)>,
 L<nbdkit-file-plugin(1)>,
 L<nbdkit-gzip-plugin(1)>,
 L<nbdkit-libvirt-plugin(1)>,
+L<nbdkit-ocaml-plugin(3)>,
 L<nbdkit-perl-plugin(3)>,
 L<nbdkit-python-plugin(3)>,
 L<nbdkit-vddk-plugin(1)>.

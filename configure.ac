@@ -196,6 +196,32 @@ AC_SUBST([PYTHON_CFLAGS])
 AC_SUBST([PYTHON_LIBS])
 AC_SUBST([PYTHON_LDFLAGS])
 
+dnl For the OCaml plugin, you can set OCAMLOPTFLAGS before running
+dnl ./configure to specify any extra flags you want to pass to
+dnl ocamlopt.
+AC_SUBST([OCAMLOPTFLAGS])
+
+dnl Check for OCaml, for embedding in the ocaml plugin.
+AC_PROG_OCAML
+AC_ARG_ENABLE([ocaml],
+    AS_HELP_STRING([--disable-ocaml], [disable OCaml embed plugin]),
+    [],
+    [enable_ocaml=yes])
+AS_IF([test "x$OCAMLOPT" != "xno" && test "x$enable_ocaml" != "xno"],[
+    dnl Check OCaml can create a shared library (see README for details).
+    AC_MSG_CHECKING([if $OCAMLOPT can create a shared library])
+    echo 'print_endline "test"' > conftest.ml
+    AS_IF([$OCAMLOPT $OCAMLOPTFLAGS -output-obj -o conftest.so conftest.ml >&AS_MESSAGE_LOG_FD 2>&1],[
+        AC_MSG_RESULT([yes])
+        ocaml_link_shared=yes
+    ],[
+        AC_MSG_RESULT([no])
+    ])
+    rm -f conftest.ml conftest.cmi conftest.cmx conftest.so conftest.o
+])
+AM_CONDITIONAL([HAVE_OCAML],[test "x$OCAMLOPT" != "xno" &&
+                             test "x$ocaml_link_shared" = "xyes"])
+
 dnl Check for curl (only if you want to compile the curl plugin).
 AC_ARG_WITH([curl],[
     AS_HELP_STRING([--without-curl],
@@ -321,6 +347,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/guestfs/Makefile
                  plugins/gzip/Makefile
                  plugins/libvirt/Makefile
+                 plugins/ocaml/Makefile
                  plugins/perl/Makefile
                  plugins/python/Makefile
                  plugins/streaming/Makefile

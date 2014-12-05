@@ -1,6 +1,8 @@
 *~
 *.1
 *.3
+*.cmi
+*.cmx
 *.la
 *.lo
 *.log
@@ -41,6 +43,8 @@ Makefile.in
 /tests/test-connect
 /tests/test-file
 /tests/test-gzip
+/tests/test-ocaml
+/tests/test-ocaml-plugin.so
 /tests/test-perl
 /tests/test-python
 /tests/test-streaming
