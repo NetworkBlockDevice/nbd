@@ -373,7 +373,7 @@ open_plugin_so (const char *name)
   dlerror ();
   *(void **) (&plugin_init) = dlsym (dl, "plugin_init");
   if ((error = dlerror ()) != NULL) {
-    fprintf (stderr, "%s: %s: %s\n", program_name, name, dlerror ());
+    fprintf (stderr, "%s: %s: %s\n", program_name, name, error);
     exit (EXIT_FAILURE);
   }
   if (!plugin_init) {
