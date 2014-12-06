@@ -44,6 +44,8 @@
 #define NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS        2
 #define NBDKIT_THREAD_MODEL_PARALLEL                  3
 
+#define NBDKIT_API_VERSION                            1
+
 struct nbdkit_plugin {
   uint64_t _struct_size;
   int _api_version;
@@ -94,7 +96,7 @@ extern int64_t nbdkit_parse_size (const char *str);
   plugin_init (void)                                                    \
   {                                                                     \
     (plugin)._struct_size = sizeof (plugin);                            \
-    (plugin)._api_version = 1;                                          \
+    (plugin)._api_version = NBDKIT_API_VERSION;                         \
     (plugin)._thread_model = THREAD_MODEL;                              \
     return &(plugin);                                                   \
   }
