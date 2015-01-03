@@ -1305,7 +1305,7 @@ int main(int argc, char**argv) {
 		exit(EXIT_FAILURE);
 	}
 	logging();
-	while((c=getopt(argc, argv, "-N:Ft:owfil"))>=0) {
+	while((c=getopt(argc, argv, "-FN:t:owfil"))>=0) {
 		switch(c) {
 			case 1:
 				handle_nonopt(optarg, &hostname, &p);
