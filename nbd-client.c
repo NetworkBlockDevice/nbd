@@ -502,7 +502,7 @@ int main(int argc, char *argv[]) {
 		{ 0, 0, 0, 0 }, 
 	};
 
-	logging();
+	logging(MY_NAME);
 
 	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:u", long_options, NULL))>=0) {
 		switch(c) {

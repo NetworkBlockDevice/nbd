@@ -2902,7 +2902,7 @@ int main(int argc, char *argv[]) {
 
 	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
-	logging();
+	logging(MY_NAME);
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 

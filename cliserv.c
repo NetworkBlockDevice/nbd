@@ -58,9 +58,9 @@ void err(const char *s) {
 	exit(EXIT_FAILURE);
 }
 
-void logging(void) {
+void logging(const char* name) {
 #ifdef ISSERVER
-	openlog(MY_NAME, LOG_PID, LOG_DAEMON);
+	openlog(name, LOG_PID, LOG_DAEMON);
 #endif
 	setvbuf(stdout, NULL, _IONBF, 0);
 	setvbuf(stderr, NULL, _IONBF, 0);

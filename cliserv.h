@@ -77,7 +77,7 @@ void err_nonfatal(const char *s);
 
 void err(const char *s) G_GNUC_NORETURN;
 
-void logging(void);
+void logging(const char* name);
 
 uint64_t ntohll(uint64_t a);
 #define htonll ntohll
