@@ -167,7 +167,7 @@ EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client -N export1 -w localhost -F
+		./nbd-tester-client -N export1 -w -F localhost
 		retval=$?
 	;;
 	*/flush)
@@ -275,7 +275,7 @@ EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client -N export1 -w localhost -F
+		./nbd-tester-client -N export1 -w -F localhost
 		retval=$?
 		;;
 	*)
