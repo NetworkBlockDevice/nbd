@@ -139,6 +139,37 @@ EOF
 		./nbd-tester-client -N export1 -w localhost
 		retval=$?
 	;;
+	*/tree)
+		# Test treefile mode
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = ${tmpdir}/nbd.tree
+	treefiles = true
+	filesize = 4194304
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -w localhost
+		retval=$?
+	;;
+	*/rotree)
+		# Test treefile mode readonly
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = ${tmpdir}/nbd.tree
+	treefiles = true
+	filesize = 4194304
+	readonly = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -w localhost -F
+		retval=$?
+	;;
 	*/flush)
 		# Test writes with flush
 		cat >${conffile} <<EOF

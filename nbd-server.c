@@ -132,6 +132,8 @@ int dontfork = 0;
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
+#define TREEPAGESIZE 4096 /**< tree (block) files uses those chunks */
+#define TREEDIRSIZE  1024 /**< number of files per subdirectory (or subdirs per subdirectory) */
 
 /** Per-export flags: */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
@@ -148,6 +150,7 @@ int dontfork = 0;
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
+#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
@@ -306,6 +309,98 @@ static inline void writeit(int f, void *buf, size_t len) {
 	}
 }
 
+void myseek(int handle,off_t a);
+
+/**
+ * Tree structure helper functions
+ */
+
+static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
+	if (lenmax<10)
+		err("Char buffer overflow. This is likely a bug.");
+
+	if (size<TREEDIRSIZE*TREEPAGESIZE) {
+		// we are done, add filename
+		snprintf(name,lenmax,"/FILE%04X",(pos/TREEPAGESIZE) % TREEDIRSIZE);
+		*ppos = pos / (TREEPAGESIZE*TREEDIRSIZE);
+	} else {
+		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
+		char buffer[10];
+		snprintf(buffer,sizeof(buffer),"/TREE%04X",*ppos % TREEDIRSIZE);
+		memcpy(name,buffer,9); // copy into string without trailing zero
+		*ppos/=TREEDIRSIZE;
+	}
+}
+
+static void mkdir_path(char * path) {
+	char *subpath=path+1;
+	while (subpath=strchr(subpath,'/')) {
+		*subpath='\0'; // path is modified in place with terminating null char instead of slash
+		if (mkdir(path,0700)==-1) {
+			if (errno!=EEXIST)
+				err("Path access error! %m");
+		}
+		*subpath='/';
+		subpath++;
+	}
+}
+
+static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
+	char filename[256+strlen(name)];
+	strcpy(filename,name);
+	off_t ppos;
+	construct_path(filename+strlen(name),256,size,pos,&ppos);
+
+	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
+
+	int handle=open(filename, mode, 0600);
+	if (handle<0 && errno==ENOENT) {
+		if (mode & O_RDWR) {
+
+			DEBUG("Creating new treepath");
+
+			mkdir_path(filename);
+			handle=open(filename, O_RDWR|O_CREAT, 0600);
+			if (handle<0) {
+				err("Error opening tree block file %m");
+			}
+		} else {
+
+			DEBUG("Creating a dummy tempfile for reading");
+			gchar * tmpname;
+			tmpname = g_strdup_printf("dummy-XXXXXX");
+			handle = mkstemp(tmpname);
+			if (handle>0) {
+				unlink(tmpname); /* File will stick around whilst FD open */
+			} else {
+				err("Error opening tree block file %m");
+			}
+			g_free(tmpname);
+		}
+		char *n = "\0";
+		myseek(handle,TREEPAGESIZE-1);
+		ssize_t c = write(handle,n,1);
+		if (c<1) {
+			err("Error setting tree block file size %m");
+		}
+	}
+	return handle;
+}
+
+static void delete_treefile(char* name,off_t size,off_t pos) {
+	char filename[256+strlen(name)];
+	strcpy(filename,name);
+	size_t psize=size;
+	off_t ppos;
+	construct_path(filename+strlen(name),256,size,pos,&ppos);
+
+	DEBUG("Deleting treefile: %s",filename);
+
+	if (unlink(filename)==-1)
+		DEBUG("Deleting failed : %s",strerror(errno));
+}
+
+
 /**
  * Print out a message about how to use nbd-server. Split out to a separate
  * function so that we can call it from multiple places
@@ -340,6 +435,9 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	}
 	if(serve->flags & F_MULTIFILE) {
 		printf("\tmultifile = true\n");
+	}
+	if(serve->flags & F_TREEFILES) {
+		printf("\ttreefiles = true\n");
 	}
 	if(serve->flags & F_COPYONWRITE) {
 		printf("\tcopyonwrite = true\n");
@@ -629,6 +727,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "cowdir",	FALSE,	PARAM_STRING,	&(s.cowdir),		0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
+		{ "treefiles",	FALSE,	PARAM_BOOL,	&(s.flags),		F_TREEFILES },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
@@ -907,7 +1006,7 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
 /**
  * Get the file handle and offset, given an export offset.
  *
- * @param export An array of export files
+ * @param client The client we're serving for
  * @param a The offset to get corresponding file/offset for
  * @param fhandle [out] File descriptor
  * @param foffset [out] Offset into fhandle
@@ -915,10 +1014,21 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
  * from fhandle starting at foffset (0 if there is no limit)
  * @return 0 on success, -1 on failure
  **/
-int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+
+	GArray * const export = client->export;
+
 	/* Negative offset not allowed */
 	if(a < 0)
 		return -1;
+
+	/* Open separate file for treefiles */
+        if (client->server->flags & F_TREEFILES) {
+		*foffset = a % TREEPAGESIZE;
+		*maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
+		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a);
+		return 0;
+	}
 
 	/* Binary search for last file with starting offset <= a */
 	FILE_INFO fi;
@@ -981,7 +1091,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	size_t maxbytes;
 	ssize_t retval;
 
-	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+	if(get_filepos(client, a, &fhandle, &foffset, &maxbytes))
 		return -1;
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
@@ -1032,6 +1142,10 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		fdatasync(fhandle);
 #endif
 	}
+	/* close file pointer in case of treefiles */
+        if (client->server->flags & F_TREEFILES) {
+		close(fhandle);
+	}
 	return retval;
 }
 
@@ -1071,8 +1185,9 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
+	ssize_t retval;
 
-	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+	if(get_filepos(client, a, &fhandle, &foffset, &maxbytes))
 		return -1;
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
@@ -1080,7 +1195,11 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
 	myseek(fhandle, foffset);
-	return read(fhandle, buf, len);
+	retval = read(fhandle, buf, len);
+        if (client->server->flags & F_TREEFILES) {
+		close(fhandle);
+	}
+	return retval;
 }
 
 /**
@@ -1214,6 +1333,14 @@ int expflush(CLIENT *client) {
         if (client->server->flags & F_COPYONWRITE) {
 		return fsync(client->difffile);
 	}
+
+        if (client->server->flags & F_TREEFILES ) {
+		// all we can do is force sync the entire filesystem containing the tree
+		if (client->server->flags & F_READONLY)
+			return 0;
+		sync();
+		return 0;
+	}
 	
 	for (i = 0; i < client->export->len; i++) {
 		FILE_INFO fi = g_array_index(client->export, FILE_INFO, i);
@@ -1229,6 +1356,19 @@ int expflush(CLIENT *client) {
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
+        if (client->server->flags & F_TREEFILES) {
+		if (client->server->flags & F_READONLY)
+			return 0;
+
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first to be trimmed block
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
+		while (min<max) {
+			delete_treefile(client->exportname,client->exportsize,min);
+			min+=TREEPAGESIZE;
+		}
+		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+		return 0;
+	}
 #if HAVE_FALLOC_PH
 	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
 	FILE_INFO cur = prev;
@@ -1636,101 +1776,111 @@ void setupexport(CLIENT* client) {
 	int i;
 	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
+	int treefile = (client->server->flags & F_TREEFILES);
 	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
 	int cancreate = (client->server->expected_size) && !multifile;
 
-	client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
+	if (treefile) {
+		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
+		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
+	} else {
 
-	/* If multi-file, open as many files as we can.
-	 * If not, open exactly one file.
-	 * Calculate file sizes as we go to get total size. */
-	for(i=0; ; i++) {
-		FILE_INFO fi;
-		gchar *tmpname;
-		gchar* error_string;
+		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
-		if (i)
-		  cancreate = 0;
-		/* if expected_size is specified, and this is the first file, we can create the file */
-		mode_t mode = (client->server->flags & F_READONLY) ?
-		  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+		/* If multi-file, open as many files as we can.
+		 * If not, open exactly one file.
+		 * Calculate file sizes as we go to get total size. */
+		for(i=0; ; i++) {
+			FILE_INFO fi;
+			gchar *tmpname;
+			gchar* error_string;
 
-		if (temporary) {
-			tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
-			DEBUG( "Opening %s\n", tmpname );
-			fi.fhandle = mkstemp(tmpname);
-		} else {
-			if(multifile) {
-				tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+			if (i)
+			  cancreate = 0;
+			/* if expected_size is specified, and this is the first file, we can create the file */
+			mode_t mode = (client->server->flags & F_READONLY) ?
+			  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+
+			if (temporary) {
+				tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
+				DEBUG( "Opening %s\n", tmpname );
+				fi.fhandle = mkstemp(tmpname);
 			} else {
-				tmpname=g_strdup(client->exportname);
-			}
-			DEBUG( "Opening %s\n", tmpname );
-			fi.fhandle = open(tmpname, mode, 0x600);
-			if(fi.fhandle == -1 && mode == O_RDWR) {
-				/* Try again because maybe media was read-only */
-				fi.fhandle = open(tmpname, O_RDONLY);
-				if(fi.fhandle != -1) {
-					/* Opening the base file in copyonwrite mode is
-					 * okay */
-					if(!(client->server->flags & F_COPYONWRITE)) {
-						client->server->flags |= F_AUTOREADONLY;
-						client->server->flags |= F_READONLY;
+				if(multifile) {
+					tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+				} else {
+					tmpname=g_strdup(client->exportname);
+				}
+				DEBUG( "Opening %s\n", tmpname );
+				fi.fhandle = open(tmpname, mode, 0600);
+				if(fi.fhandle == -1 && mode == O_RDWR) {
+					/* Try again because maybe media was read-only */
+					fi.fhandle = open(tmpname, O_RDONLY);
+					if(fi.fhandle != -1) {
+						/* Opening the base file in copyonwrite mode is
+						 * okay */
+						if(!(client->server->flags & F_COPYONWRITE)) {
+							client->server->flags |= F_AUTOREADONLY;
+							client->server->flags |= F_READONLY;
+						}
 					}
 				}
 			}
-		}
-		if(fi.fhandle == -1) {
-			if(multifile && i>0)
-				break;
-			error_string=g_strdup_printf(
-				"Could not open exported file %s: %%m",
-				tmpname);
-			err(error_string);
-		}
-
-		if (temporary)
-			unlink(tmpname); /* File will stick around whilst FD open */
-
-		fi.startoff = laststartoff + lastsize;
-		g_array_append_val(client->export, fi);
-		g_free(tmpname);
-
-		/* Starting offset and size of this file will be used to
-		 * calculate starting offset of next file */
-		laststartoff = fi.startoff;
-		lastsize = size_autodetect(fi.fhandle);
-
-		/* If we created the file, it will be length zero */
-		if (!lastsize && cancreate) {
-			assert(!multifile);
-			if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
-				err("Could not expand file: %m");
+			if(fi.fhandle == -1) {
+				if(multifile && i>0)
+					break;
+				error_string=g_strdup_printf(
+					"Could not open exported file %s: %%m",
+					tmpname);
+				err(error_string);
 			}
-			lastsize = client->server->expected_size;
-			break; /* don't look for any more files */
+
+			if (temporary)
+				unlink(tmpname); /* File will stick around whilst FD open */
+
+			fi.startoff = laststartoff + lastsize;
+			g_array_append_val(client->export, fi);
+			g_free(tmpname);
+
+			/* Starting offset and size of this file will be used to
+			 * calculate starting offset of next file */
+			laststartoff = fi.startoff;
+			lastsize = size_autodetect(fi.fhandle);
+
+			/* If we created the file, it will be length zero */
+			if (!lastsize && cancreate) {
+				assert(!multifile);
+				if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
+					err("Could not expand file: %m");
+				}
+				lastsize = client->server->expected_size;
+				break; /* don't look for any more files */
+			}
+
+			if(!multifile || temporary)
+				break;
 		}
 
-		if(!multifile || temporary)
-			break;
-	}
+		/* Set export size to total calculated size */
+		client->exportsize = laststartoff + lastsize;
 
-	/* Set export size to total calculated size */
-	client->exportsize = laststartoff + lastsize;
+		/* Export size may be overridden */
+		if(client->server->expected_size) {
+			/* desired size must be <= total calculated size */
+			if(client->server->expected_size > client->exportsize) {
+				err("Size of exported file is too big\n");
+			}
 
-	/* Export size may be overridden */
-	if(client->server->expected_size) {
-		/* desired size must be <= total calculated size */
-		if(client->server->expected_size > client->exportsize) {
-			err("Size of exported file is too big\n");
+			client->exportsize = client->server->expected_size;
 		}
-
-		client->exportsize = client->server->expected_size;
 	}
 
 	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
 	if(multifile) {
 		msg(LOG_INFO, "Total number of files: %d", i);
+	}
+	if(treefile) {
+		msg(LOG_INFO, "Total number of (potential) files: %d", (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
 	}
 }
 
