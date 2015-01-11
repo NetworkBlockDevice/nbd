@@ -1304,7 +1304,7 @@ int main(int argc, char**argv) {
 		g_message("%d: Or: %s <hostname> -N <exportname> [<port>]", (int)getpid(), argv[0]);
 		exit(EXIT_FAILURE);
 	}
-	logging();
+	logging(MY_NAME);
 	while((c=getopt(argc, argv, "-FN:t:owfil"))>=0) {
 		switch(c) {
 			case 1:
