@@ -669,10 +669,10 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 	err_out:
 		if(retval)
 			g_array_free(retval, TRUE);
-		if(dirh)
-			closedir(dirh);
-		return NULL;
+		retval = NULL;
 	}
+	if(dirh)
+		closedir(dirh);
 	return retval;
 }
 
