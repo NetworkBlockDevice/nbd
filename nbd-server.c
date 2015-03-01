@@ -65,6 +65,7 @@
 #include <sys/stat.h>
 #include <sys/select.h>
 #include <sys/wait.h>
+#include <sys/un.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -226,6 +227,7 @@ struct generic_conf {
         gchar *group;           /**< group we run running as      */
         gchar *modernaddr;      /**< address of the modern socket */
         gchar *modernport;      /**< port of the modern socket    */
+        gchar *unixsock;	/**< file name of the unix domain socket */
         gint flags;             /**< global flags                 */
 };
 
@@ -750,6 +752,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "port", 	FALSE, PARAM_STRING,	&(genconftmp.modernport), 0 },
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
+		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -1980,6 +1983,7 @@ void serveconnection(CLIENT *client) {
  **/
 int set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage netaddr;
+	struct sockaddr* addr = (struct sockaddr*)&netaddr;
 	socklen_t addrinlen = sizeof( struct sockaddr_storage );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -1994,20 +1998,24 @@ int set_peername(int net, CLIENT *client) {
 		return -1;
 	}
 
-	if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
-			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-		msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
-		return -1;
-	}
+	if(addr->sa_family == AF_UNIX) {
+		strcpy(peername, "unix");
+	} else {
+		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
+				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
+			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+			return -1;
+		}
 
-	memset(&hints, '\0', sizeof (hints));
-	hints.ai_flags = AI_ADDRCONFIG;
-	e = getaddrinfo(peername, NULL, &hints, &ai);
+		memset(&hints, '\0', sizeof (hints));
+		hints.ai_flags = AI_ADDRCONFIG;
+		e = getaddrinfo(peername, NULL, &hints, &ai);
 
-	if(e != 0) {
-		msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
-		freeaddrinfo(ai);
-		return -1;
+		if(e != 0) {
+			msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+			freeaddrinfo(ai);
+			return -1;
+		}
 	}
 
 	switch(client->server->virtstyle) {
@@ -2635,6 +2643,45 @@ out:
         return retval;
 }
 
+int open_unix(const gchar *const sockname, GError **const gerror) {
+	struct sockaddr_un sa;
+	int sock=-1;
+	int retval=-1;
+
+	memset(&sa, 0, sizeof(struct sockaddr_un));
+	sa.sun_family = AF_UNIX;
+	strncpy(sa.sun_path, sockname, 107);
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(sock < 0) {
+		g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+				"failed to open a unix socket: "
+				"failed to create socket: %s",
+				strerror(errno));
+		goto out;
+	}
+	if(bind(sock, (struct sockaddr*)&sa, sizeof(struct sockaddr_un))<0) {
+		g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				"failed to open a unix socket: "
+				"failed to bind to address %s: %s",
+				sockname, strerror(errno));
+		goto out;
+	}
+	if(listen(sock, 10)<0) {
+		g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				"failed to open a unix socket: "
+				"failed to start listening: %s",
+				strerror(errno));
+		goto out;
+	}
+	g_array_append_val(modernsocks, sock);
+out:
+	if(retval<0 && sock >= 0) {
+		close(sock);
+	}
+
+	return retval;
+}
+
 int open_modern(const gchar *const addr, const gchar *const port,
                 GError **const gerror) {
 	struct addrinfo hints;
@@ -2727,7 +2774,7 @@ out:
  * Connect our servers.
  **/
 void setup_servers(GArray *const servers, const gchar *const modernaddr,
-                   const gchar *const modernport) {
+                   const gchar *const modernport, const gchar* unixsock) {
 	int i;
 	struct sigaction sa;
 	int want_modern=0;
@@ -2754,6 +2801,15 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
                         g_clear_error(&gerror);
                         exit(EXIT_FAILURE);
                 }
+	}
+	if(unixsock != NULL) {
+		GError* gerror = NULL;
+		if(open_unix(unixsock, &gerror) == -1) {
+			msg(LOG_ERR, "failed to setup servers: %s",
+					gerror->message);
+			g_clear_error(&gerror);
+			exit(EXIT_FAILURE);
+		}
 	}
 	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 
@@ -2960,7 +3016,8 @@ int main(int argc, char *argv[]) {
 	}
 	if (!dontfork)
 		daemonize(serve);
-	setup_servers(servers, genconf.modernaddr, genconf.modernport);
+	setup_servers(servers, genconf.modernaddr, genconf.modernport,
+			genconf.unixsock);
 	dousers(genconf.user, genconf.group);
 
 	serveloop(servers);
