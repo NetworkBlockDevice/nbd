@@ -139,7 +139,7 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term>includedir</term>
+	<term><option>includedir</option></term>
 	<listitem>
 	  <para>
 	    Optional; string
@@ -245,6 +245,22 @@ manpage.1: manpage.sgml
 	    before accepting connections or opening files.
 	  </para>
         </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>unixsock</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>
+	    Path for a UNIX domain socket.
+	  </para>
+	  <para>
+	    If specified, the server will listen on a UNIX domain socket
+	    with the specified name. Only newstyle negotiation is
+	    supported on UNIX domain sockets.
+	  </para>
+	</listitem>
       </varlistentry>
     </variablelist>
   </refsect1>
@@ -751,6 +767,11 @@ manpage.1: manpage.sgml
 	    IP address of the client connecting, in accordance with the
 	    option selected here. The result of this transformation is
 	    then used as the filename to be opened.
+	  </para>
+	  <para>
+	    When a client connects over a UNIX domain socket, the
+	    literal string "unix" is used in lieu of a client IP
+	    address.
 	  </para>
 	  <para>
 	    There are four types of virtualization that
