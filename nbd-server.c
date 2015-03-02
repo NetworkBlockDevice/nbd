@@ -2673,6 +2673,7 @@ int open_unix(const gchar *const sockname, GError **const gerror) {
 				strerror(errno));
 		goto out;
 	}
+	retval=0;
 	g_array_append_val(modernsocks, sock);
 out:
 	if(retval<0 && sock >= 0) {
