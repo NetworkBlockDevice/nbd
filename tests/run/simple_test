@@ -30,6 +30,8 @@ cleanup() {
 	if [ -z "$cleanup" ]
 	then
 		rm -rf $tmpdir
+	else
+		echo "Setup in $tmpdir"
 	fi
 }
 
