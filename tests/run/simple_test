@@ -278,6 +278,20 @@ EOF
 		./nbd-tester-client -N export1 -w -F localhost
 		retval=$?
 		;;
+	*/unix)
+		cat >${conffile} <<EOF
+[generic]
+	unixsock = ${tmpdir}/unix.sock
+	listenaddr = 127.0.0.1
+[export1]
+	exportname = ${tmpnam}
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -u ${tmpdir}/unix.sock
+		retval=$?
+		;;
 	*)
 		echo "E: unknown test $1"
 		exit 1
