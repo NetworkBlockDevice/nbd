@@ -156,6 +156,7 @@ int dontfork = 0;
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
 #define F_LIST 2	  /**< Allow clients to list the exports on a server */
+#define F_NO_ZEROES 4	  /**< Do not send zeros to client */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -1528,6 +1529,9 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		if (read(net, &cflags, sizeof(cflags)) < 0)
 			err_nonfatal("Negotiation failed/4: %m");
 		cflags = htonl(cflags);
+		if (cflags & NBD_FLAG_C_NO_ZEROES) {
+			glob_flags |= F_NO_ZEROES;
+		}
 		do {
 			if (read(net, &magic, sizeof(magic)) < 0)
 				err_nonfatal("Negotiation failed/5: %m");
@@ -1590,7 +1594,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		}
 	}
 	/* common */
-	if (!(cflags & NBD_FLAG_C_NO_ZEROES)) {
+	if (!(glob_flags & F_NO_ZEROES)) {
 		if (write(client->net, zeros, 124) < 0)
 			err("Negotiation failed/12: %m");
 		return NULL;
