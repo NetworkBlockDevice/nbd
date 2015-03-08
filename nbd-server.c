@@ -679,18 +679,6 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 	return retval;
 }
 
-static bool want_oldstyle(struct generic_conf gct, struct generic_conf* gc) {
-	if(gct.flags & F_OLDSTYLE) {
-		return true;
-	}
-	if(gc == NULL) {
-		return false;
-	}
-	if(gc->flags & F_OLDSTYLE) {
-		return true;
-	}
-	return false;
-}
 /**
  * Parse the config file.
  *
@@ -720,7 +708,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	gchar *virtstyle=NULL;
 	PARAM lp[] = {
 		{ "exportname", TRUE,	PARAM_STRING, 	&(s.exportname),	0 },
-		{ "port", 	TRUE,	PARAM_INT, 	&(s.port),		0 },
 		{ "authfile",	FALSE,	PARAM_STRING,	&(s.authname),		0 },
 		{ "filesize",	FALSE,	PARAM_OFFT,	&(s.expected_size),	0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	&(virtstyle),		0 },
@@ -748,7 +735,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&(genconftmp.user),       0 },
 		{ "group",	FALSE, PARAM_STRING,	&(genconftmp.group),      0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_OLDSTYLE },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_OLDSTYLE }, // only left here so we can issue an appropriate error message when the option is used
 		{ "listenaddr", FALSE, PARAM_STRING,	&(genconftmp.modernaddr), 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&(genconftmp.modernport), 0 },
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
@@ -803,9 +790,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i==1 || !expect_generic) {
 			p=lp;
 			p_size=lp_size;
-			if(!want_oldstyle(genconftmp, genconf)) {
-				lp[1].required = FALSE;
-			}
 		} 
 		for(j=0;j<p_size;j++) {
 			assert(p[j].target != NULL);
@@ -895,9 +879,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
-		if(s.port && !want_oldstyle(genconftmp, genconf)) {
-			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
-			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
+		if(genconftmp.flags & F_OLDSTYLE) {
+			g_message("Since 3.10, the oldstyle protocol is no longer supported. Please migrate to the newstyle protocol.");
+			g_message("Exiting.");
+			return NULL;
 		}
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
@@ -1484,91 +1469,69 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
  *
  * @param client The client we're negotiating with.
  **/
-CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
-	char zeros[128];
-	uint64_t size_host;
+CLIENT* negotiate(int net, GArray* servers) {
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
-	uint16_t smallflags = 0;
+	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
 	uint32_t cflags = 0;
+	uint32_t opt;
 
-	memset(zeros, '\0', sizeof(zeros));
-	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
-	if(phase & NEG_MODERN) {
-		smallflags |= NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
-	}
-	if(phase & NEG_INIT) {
-		/* common */
-		if (write(net, INIT_PASSWD, 8) < 0) {
-			err_nonfatal("Negotiation failed/1: %m");
-			if(client)
-				exit(EXIT_FAILURE);
-		}
-		if(phase & NEG_MODERN) {
-			/* modern */
-			magic = htonll(opts_magic);
-		} else {
-			/* oldstyle */
-			magic = htonll(cliserv_magic);
-		}
-		if (write(net, &magic, sizeof(magic)) < 0) {
-			err_nonfatal("Negotiation failed/2: %m");
-			if(phase & NEG_OLD)
-				exit(EXIT_FAILURE);
-		}
-	}
-	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
-		/* modern */
-		uint32_t opt;
+	assert(servers != NULL);
+	if (write(net, INIT_PASSWD, 8) < 0)
+		err_nonfatal("Negotiation failed/1: %m");
+	magic = htonll(opts_magic);
+	if (write(net, &magic, sizeof(magic)) < 0)
+		err_nonfatal("Negotiation failed/2: %m");
 
-		if(!servers)
-			err("programmer error");
-		smallflags = htons(smallflags);
-		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-			err_nonfatal("Negotiation failed/3: %m");
-		if (read(net, &cflags, sizeof(cflags)) < 0)
-			err_nonfatal("Negotiation failed/4: %m");
-		cflags = htonl(cflags);
-		if (cflags & NBD_FLAG_C_NO_ZEROES) {
-			glob_flags |= F_NO_ZEROES;
-		}
-		do {
-			if (read(net, &magic, sizeof(magic)) < 0)
-				err_nonfatal("Negotiation failed/5: %m");
-			magic = ntohll(magic);
-			if(magic != opts_magic) {
-				err_nonfatal("Negotiation failed/5a: magic mismatch");
-				return NULL;
-			}
-			if (read(net, &opt, sizeof(opt)) < 0)
-				err_nonfatal("Negotiation failed/6: %m");
-			opt = ntohl(opt);
-			switch(opt) {
-			case NBD_OPT_EXPORT_NAME:
-				// NBD_OPT_EXPORT_NAME must be the last
-				// selected option, so return from here
-				// if that is chosen.
-				return handle_export_name(opt, net, servers, cflags);
-				break;
-			case NBD_OPT_LIST:
-				handle_list(opt, net, servers, cflags);
-				break;
-			case NBD_OPT_ABORT:
-				// handled below
-				break;
-			default:
-				send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
-				break;
-			}
-		} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
-		if(opt == NBD_OPT_ABORT) {
-			err_nonfatal("Session terminated by client");
+	smallflags = htons(smallflags);
+	if (write(net, &smallflags, sizeof(uint16_t)) < 0)
+		err_nonfatal("Negotiation failed/3: %m");
+	if (read(net, &cflags, sizeof(cflags)) < 0)
+		err_nonfatal("Negotiation failed/4: %m");
+	cflags = htonl(cflags);
+	if (cflags & NBD_FLAG_C_NO_ZEROES) {
+		glob_flags |= F_NO_ZEROES;
+	}
+	do {
+		if (read(net, &magic, sizeof(magic)) < 0)
+			err_nonfatal("Negotiation failed/5: %m");
+		magic = ntohll(magic);
+		if(magic != opts_magic) {
+			err_nonfatal("Negotiation failed/5a: magic mismatch");
 			return NULL;
 		}
+		if (read(net, &opt, sizeof(opt)) < 0)
+			err_nonfatal("Negotiation failed/6: %m");
+		opt = ntohl(opt);
+		switch(opt) {
+		case NBD_OPT_EXPORT_NAME:
+			// NBD_OPT_EXPORT_NAME must be the last
+			// selected option, so return from here
+			// if that is chosen.
+			return handle_export_name(opt, net, servers, cflags);
+			break;
+		case NBD_OPT_LIST:
+			handle_list(opt, net, servers, cflags);
+			break;
+		case NBD_OPT_ABORT:
+			// handled below
+			break;
+		default:
+			send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
+			break;
+		}
+	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
+	if(opt == NBD_OPT_ABORT) {
+		err_nonfatal("Session terminated by client");
+		return NULL;
 	}
-	/* common */
+}
+
+void send_export_info(CLIENT* client) {
+	uint64_t size_host;
+	uint16_t flags;
 	size_host = htonll((u64)(client->exportsize));
-	if (write(net, &size_host, 8) < 0)
+	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed/9: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
@@ -1580,24 +1543,14 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		flags |= NBD_FLAG_ROTATIONAL;
 	if (client->server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
-	if (phase & NEG_OLD) {
-		/* oldstyle */
-		flags = htonl(flags);
-		if (write(client->net, &flags, 4) < 0)
-			err("Negotiation failed/10: %m");
-	} else {
-		/* modern */
-		smallflags = (uint16_t)(flags & ~((uint16_t)0));
-		smallflags = htons(smallflags);
-		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
-			err("Negotiation failed/11: %m");
-		}
-	}
-	/* common */
+	flags = htons(flags);
+	if (write(client->net, &flags, sizeof(flags)) < 0)
+		err("Negotiation failed/11: %m");
 	if (!(glob_flags & F_NO_ZEROES)) {
+		char zeros[128];
+		memset(zeros, '\0', sizeof(zeros));
 		if (write(client->net, zeros, 124) < 0)
 			err("Negotiation failed/12: %m");
-		return NULL;
 	}
 }
 
@@ -1623,7 +1576,7 @@ int mainloop(CLIENT *client) {
 #ifdef DODBG
 	int i = 0;
 #endif
-	negotiate(client->net, client, NULL, client->modern ? NEG_MODERN : (NEG_OLD | NEG_INIT));
+	send_export_info(client);
 	DEBUG("Entering request loop!\n");
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
@@ -2155,7 +2108,7 @@ handle_modern_connection(GArray *const servers, const int sock)
                 /* Child just continues. */
         }
 
-        client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
+        client = negotiate(net, servers);
         if (!client) {
                 msg(LOG_ERR, "Modern initial negotiation failed");
                 goto handler_err;

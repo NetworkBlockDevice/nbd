@@ -260,10 +260,13 @@ void ask_list(int sock) {
 		err("Failed writing length");
 }
 
-void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
+void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
 	u64 magic, size64;
 	uint16_t tmp;
+	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
+	uint32_t opt;
+	uint32_t namesize;
 
 	printf("Negotiation: ");
 	if (read(sock, buf, 8) < 0)
@@ -276,63 +279,50 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 	if (read(sock, &magic, sizeof(magic)) < 0)
 		err("Failed/2: %m");
 	magic = ntohll(magic);
-	if(name) {
-		uint32_t opt;
-		uint32_t namesize;
-
-		if (magic != opts_magic) {
-			if(magic == cliserv_magic) {
-				err("It looks like you're trying to connect to an oldstyle server with a named export. This won't work.");
-			}
+	if (magic != opts_magic) {
+		if(magic == cliserv_magic) {
+			err("It looks like you're trying to connect to an oldstyle server. This is no longer supported since nbd 3.10.");
 		}
-		printf(".");
-		if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
-			err("Failed reading flags: %m");
-		}
-		*flags = ((u32)ntohs(tmp));
-		if((needed_flags & *flags) != needed_flags) {
-			/* There's currently really only one reason why this
-			 * check could possibly fail, but we may need to change
-			 * this error message in the future... */
-			fprintf(stderr, "\nE: Server does not support listing exports\n");
-			exit(EXIT_FAILURE);
-		}
-
-		if (*flags & NBD_FLAG_NO_ZEROES) {
-			client_flags |= NBD_FLAG_C_NO_ZEROES;
-		}
-		client_flags = htonl(client_flags);
-		if (write(sock, &client_flags, sizeof(client_flags)) < 0)
-			err("Failed/2.1: %m");
-
-		if(do_opts & NBDC_DO_LIST) {
-			ask_list(sock);
-			exit(EXIT_SUCCESS);
-		}
-
-		/* Write the export name that we're after */
-		magic = htonll(opts_magic);
-		if (write(sock, &magic, sizeof(magic)) < 0)
-			err("Failed/2.2: %m");
-
-		opt = ntohl(NBD_OPT_EXPORT_NAME);
-		if (write(sock, &opt, sizeof(opt)) < 0)
-			err("Failed/2.3: %m");
-		namesize = (u32)strlen(name);
-		namesize = ntohl(namesize);
-		if (write(sock, &namesize, sizeof(namesize)) < 0)
-			err("Failed/2.4: %m");
-		if (write(sock, name, strlen(name)) < 0)
-			err("Failed/2.4: %m");
-	} else {
-		if (magic != cliserv_magic) {
-			if(magic != opts_magic)
-				err("Not enough cliserv_magic");
-			else
-				err("It looks like you're trying to connect to a newstyle server with the oldstyle protocol. Try the -N option.");
-		}
-		printf(".");
 	}
+	printf(".");
+	if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
+		err("Failed reading flags: %m");
+	}
+	global_flags = ntohs(tmp);
+	if((needed_flags & *flags) != needed_flags) {
+		/* There's currently really only one reason why this
+		 * check could possibly fail, but we may need to change
+		 * this error message in the future... */
+		fprintf(stderr, "\nE: Server does not support listing exports\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (global_flags & NBD_FLAG_NO_ZEROES) {
+		client_flags |= NBD_FLAG_C_NO_ZEROES;
+	}
+	client_flags = htonl(client_flags);
+	if (write(sock, &client_flags, sizeof(client_flags)) < 0)
+		err("Failed/2.1: %m");
+
+	if(do_opts & NBDC_DO_LIST) {
+		ask_list(sock);
+		exit(EXIT_SUCCESS);
+	}
+
+	/* Write the export name that we're after */
+	magic = htonll(opts_magic);
+	if (write(sock, &magic, sizeof(magic)) < 0)
+		err("Failed/2.2: %m");
+
+	opt = ntohl(NBD_OPT_EXPORT_NAME);
+	if (write(sock, &opt, sizeof(opt)) < 0)
+		err("Failed/2.3: %m");
+	namesize = (u32)strlen(name);
+	namesize = ntohl(namesize);
+	if (write(sock, &namesize, sizeof(namesize)) < 0)
+		err("Failed/2.4: %m");
+	if (write(sock, name, strlen(name)) < 0)
+		err("Failed/2.4: %m");
 
 	if (read(sock, &size64, sizeof(size64)) <= 0) {
 		if (!errno)
@@ -347,15 +337,9 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 	} else
 		printf("size = %luMB", (unsigned long)(size64>>20));
 
-	if(!name) {
-		if (read(sock, flags, sizeof(*flags)) < 0)
-			err("Failed/4: %m\n");
-		*flags = ntohl(*flags);
-	} else {
-		if(read(sock, &tmp, sizeof(tmp)) < 0)
-			err("Failed/4: %m\n");
-		*flags |= (uint32_t)ntohs(tmp);
-	}
+	if(read(sock, &tmp, sizeof(tmp)) < 0)
+		err("Failed/4: %m\n");
+	*flags = (uint32_t)ntohs(tmp);
 
 	if (!(*flags & NBD_FLAG_NO_ZEROES)) {
 		if (read(sock, &buf, 124) < 0)
@@ -436,8 +420,7 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 	}
-	fprintf(stderr, "Usage: nbd-client host port nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
-	fprintf(stderr, "Or   : nbd-client -name|-N name host [port] nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
@@ -475,12 +458,12 @@ int main(int argc, char *argv[]) {
 	int sdp=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	u64 size64;
-	u32 flags;
+	uint16_t flags;
 	int c;
 	int nonspecial=0;
 	int b_unix=0;
 	char* name=NULL;
-	uint32_t needed_flags=0;
+	uint16_t needed_flags=0;
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
 	sigset_t block, old;
@@ -531,7 +514,7 @@ int main(int argc, char *argv[]) {
 				case 1:
 					// port
 					if(!strtol(optarg, NULL, 0)) {
-						// not parseable as a number, assume it's the device and we have a name
+						// not parseable as a number, assume it's the device
 						nbddev = optarg;
 						nonspecial++;
 					} else {
@@ -605,7 +588,7 @@ int main(int argc, char *argv[]) {
     err("swap option unsupported on Android because mlockall is unsupported.");
 #endif
 
-	if((!port && !name) || !hostname || !nbddev) {
+	if(!name || !hostname || !nbddev || !(opts & NBDC_DO_LIST)) {
 		usage("not enough information specified");
 		exit(EXIT_FAILURE);
 	}
@@ -685,7 +668,7 @@ int main(int argc, char *argv[]) {
 			} else {
 				if(cont) {
 					u64 new_size;
-					u32 new_flags;
+					uint16_t new_flags;
 
 					close(sock); close(nbd);
 					for (;;) {
