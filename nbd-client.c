@@ -289,7 +289,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 		err("Failed reading flags: %m");
 	}
 	global_flags = ntohs(tmp);
-	if((needed_flags & *flags) != needed_flags) {
+	if((needed_flags & global_flags) != needed_flags) {
 		/* There's currently really only one reason why this
 		 * check could possibly fail, but we may need to change
 		 * this error message in the future... */
