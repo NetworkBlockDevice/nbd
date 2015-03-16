@@ -1528,9 +1528,9 @@ CLIENT* negotiate(int net, GArray* servers) {
 }
 
 void send_export_info(CLIENT* client) {
-	uint64_t size_host;
-	uint16_t flags;
-	size_host = htonll((u64)(client->exportsize));
+	uint64_t size_host = htonll((u64)(client->exportsize));
+	uint16_t flags = 0;
+
 	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed/9: %m");
 	if (client->server->flags & F_READONLY)
