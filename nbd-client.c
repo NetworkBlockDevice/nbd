@@ -458,7 +458,7 @@ int main(int argc, char *argv[]) {
 	int sdp=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	u64 size64;
-	uint16_t flags;
+	uint16_t flags = 0;
 	int c;
 	int nonspecial=0;
 	int b_unix=0;
