@@ -588,7 +588,7 @@ int main(int argc, char *argv[]) {
     err("swap option unsupported on Android because mlockall is unsupported.");
 #endif
 
-	if(!name || !hostname || !nbddev || !(opts & NBDC_DO_LIST)) {
+	if(!hostname || ((!name || !nbddev) && !(opts & NBDC_DO_LIST))) {
 		usage("not enough information specified");
 		exit(EXIT_FAILURE);
 	}
