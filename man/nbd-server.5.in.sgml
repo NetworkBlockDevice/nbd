@@ -186,34 +186,16 @@ manpage.1: manpage.sgml
 	    Optional; boolean
 	  </para>
 	  <para>
-	    If this option is set to true, nbd-server will export all
-	    exports on a separate port with the old (pre-2.9.17)
-	    handshake protocol. In that case, the 'port' option for
-	    individual exports is mandatory.
+	    In versions of nbd-server between 2.9.17 and 3.9.1, when this
+	    option was set to true, nbd-server would export all exports
+	    on a separate port with the old (pre-2.9.17) handshake
+	    protocol. In that case, the 'port' option for individual
+	    exports was mandatory.
 	  </para>
 	  <para>
-	    If the option is set to false, the 'port' option for
-	    individual exports is optional (and will be ignored if
-	    specified). The server will only export devices on the
-	    standard port.
-	  </para>
-	  <para>
-	    For upgrades from pre-2.9.17 versions of nbd, it may be
-	    appropriate to enable the oldstyle parameter until all
-	    clients have been converted to using name-based exports.
-	  </para>
-	  <para>
-	    Note that exports specified on the command line will
-	    always use the old handshake protocol and will not allow
-	    name-based exports.
-	  </para>
-	  <para>
-	    Also note that even if this parameter is set to true, all
-	    exports will also be made available using the new handshake
-	    protocol; it is not possible to switch that off. The reason
-	    for this is that the old style protocol will eventually be
-	    deprecated, and this option is only available to allow for
-	    smooth upgrades.
+	    Since version 3.10 of nbd-server, however, this option is no
+	    longer supported, and any attempt to use it will result in
+	    nbd-server exiting with an appropriate error message.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -502,32 +484,6 @@ manpage.1: manpage.sgml
             There is no corresponding command line option, since command line control is considered
             deprecated. You can however specify a custom config file with the <option>-C</option> option.
 	    The <option>filesize</option> option <emphasis>must</emphasis> be specified when using this feature!
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>port</option></term>
-	<listitem>
-	  <para>Required if 'oldstyle' global parameter is set; integer.</para>
-	  <para>
-	    The port on which this export is to be served using the
-	    old-style handshake protocol.
-	  </para>
-	  <para>
-	    This parameter only makes sense when the 'oldstyle'
-	    parameter is set to true in the 'generic' section. If that
-	    parameter is not set, but this parameter is found in an
-	    export section, then nbd-server will issue a warning upon
-	    startup but should otherwise continue to function correctly.
-	  </para>
-	  <para>
-	    It is not possible to combine multiple exports on the same
-	    port using the old style handshake. Please use the new style
-	    handshake for that purpose.
-	  </para>
-	  <para>
-	    When specified on the command line, this should be the
-	    first argument.
 	  </para>
 	</listitem>
       </varlistentry>
