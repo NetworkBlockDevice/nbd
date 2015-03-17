@@ -341,7 +341,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 		err("Failed/4: %m\n");
 	*flags = (uint32_t)ntohs(tmp);
 
-	if (!(*flags & NBD_FLAG_NO_ZEROES)) {
+	if (!(global_flags & NBD_FLAG_NO_ZEROES)) {
 		if (read(sock, &buf, 124) < 0)
 			err("Failed/5: %m\n");
 	}
