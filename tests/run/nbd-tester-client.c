@@ -27,6 +27,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -42,7 +43,7 @@
 #include "cliserv.h"
 
 static gchar errstr[1024];
-const static int errstr_len=1024;
+const static int errstr_len=1023;
 
 static uint64_t size;
 
@@ -266,6 +267,7 @@ int writebuffer(int fd, struct chunklist * l) {
 
 #define TEST_WRITE (1<<0)
 #define TEST_FLUSH (1<<1)
+#define TEST_EXPECT_ERROR (1<<2)
 
 int timeval_subtract (struct timeval *result, struct timeval *x,
 		      struct timeval *y) {
@@ -335,14 +337,102 @@ static inline int write_all(int f, void *buf, size_t len) {
 #define WRITE_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
 #define WRITE_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
-int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
+int setup_connection_common(int sock, char* name, CONNECTION_TYPE ctype, int* serverflags) {
+	char buf[256];
+	u64 tmp64;
+	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
+	uint32_t tmp32 = 0;
+
+	if(ctype<CONNECTION_TYPE_INIT_PASSWD)
+		goto end;
+	READ_ALL_ERRCHK(sock, buf, strlen(INIT_PASSWD), err, "Could not read INIT_PASSWD: %s", strerror(errno));
+	if(strlen(buf)==0) {
+		snprintf(errstr, errstr_len, "Server closed connection");
+		goto err;
+	}
+	if(strncmp(buf, INIT_PASSWD, strlen(INIT_PASSWD))) {
+		snprintf(errstr, errstr_len, "INIT_PASSWD does not match");
+		goto err;
+	}
+	if(ctype<CONNECTION_TYPE_CLISERV)
+		goto end;
+	READ_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err, "Could not read cliserv_magic: %s", strerror(errno));
+	tmp64=ntohll(tmp64);
+	if(tmp64 != mymagic) {
+		strncpy(errstr, "mymagic does not match", errstr_len);
+		goto err;
+	}
+	if(ctype<CONNECTION_TYPE_FULL)
+		goto end;
+	if(!name) {
+		READ_ALL_ERRCHK(sock, &size, sizeof(size), err, "Could not read size: %s", strerror(errno));
+		size=ntohll(size);
+		READ_ALL_ERRCHK(sock, buf, 128, err, "Could not read data: %s", strerror(errno));
+		goto end;
+	}
+	/* flags */
+	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err, "Could not read reserved field: %s", strerror(errno));
+	/* reserved field */
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err, "Could not write reserved field: %s", strerror(errno));
+	/* magic */
+	tmp64 = htonll(opts_magic);
+	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err, "Could not write magic: %s", strerror(errno));
+	/* name */
+	tmp32 = htonl(NBD_OPT_EXPORT_NAME);
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err, "Could not write option: %s", strerror(errno));
+	tmp32 = htonl((uint32_t)strlen(name));
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err, "Could not write name length: %s", strerror(errno));
+	WRITE_ALL_ERRCHK(sock, name, strlen(name), err, "Could not write name:: %s", strerror(errno));
+	READ_ALL_ERRCHK(sock, &size, sizeof(size), err, "Could not read size: %s", strerror(errno));
+	size = ntohll(size);
+	uint16_t flags;
+	READ_ALL_ERRCHK(sock, &flags, sizeof(uint16_t), err, "Could not read flags: %s", strerror(errno));
+	flags = ntohs(flags);
+	*serverflags = flags;
+	READ_ALL_ERRCHK(sock, buf, 124, err, "Could not read reserved zeroes: %s", strerror(errno));
+	goto end;
+err:
+	close(sock);
+	sock=-1;
+end:
+	return sock;
+}
+
+int setup_unix_connection(gchar* unixsock, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
+	struct sockaddr_un addr;
+	int sock;
+
+	sock = 0;
+	if(ctype<CONNECTION_TYPE_CONNECT) {
+		goto end;
+	}
+	if((sock=socket(AF_UNIX, SOCK_STREAM, 0))<0) {
+		strncpy(errstr, strerror(errno), errstr_len);
+		goto err;
+	}
+
+	setmysockopt(sock);
+	memset(&addr, 0, sizeof(struct sockaddr_un));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, unixsock, 107);
+	if(connect(sock, (struct sockaddr*)&addr, sizeof(addr))<0) {
+		strncpy(errstr, strerror(errno), errstr_len);
+		goto err_open;
+	}
+	sock = setup_connection_common(sock, name, ctype, serverflags);
+	goto end;
+err_open:
+	close(sock);
+err:
+	sock=-1;
+end:
+	return sock;
+}
+
+int setup_inet_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
 	int sock;
 	struct hostent *host;
 	struct sockaddr_in addr;
-	char buf[256];
-	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
-	u64 tmp64;
-	uint32_t tmp32 = 0;
 
 	sock=0;
 	if(ctype<CONNECTION_TYPE_CONNECT)
@@ -363,53 +453,7 @@ int setup_connection(gchar *hostname, int port, gchar* name, CONNECTION_TYPE cty
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
 	}
-	if(ctype<CONNECTION_TYPE_INIT_PASSWD)
-		goto end;
-	READ_ALL_ERRCHK(sock, buf, strlen(INIT_PASSWD), err_open, "Could not read INIT_PASSWD: %s", strerror(errno));
-	if(strlen(buf)==0) {
-		snprintf(errstr, errstr_len, "Server closed connection");
-		goto err_open;
-	}
-	if(strncmp(buf, INIT_PASSWD, strlen(INIT_PASSWD))) {
-		snprintf(errstr, errstr_len, "INIT_PASSWD does not match");
-		goto err_open;
-	}
-	if(ctype<CONNECTION_TYPE_CLISERV)
-		goto end;
-	READ_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err_open, "Could not read cliserv_magic: %s", strerror(errno));
-	tmp64=ntohll(tmp64);
-	if(tmp64 != mymagic) {
-		strncpy(errstr, "mymagic does not match", errstr_len);
-		goto err_open;
-	}
-	if(ctype<CONNECTION_TYPE_FULL)
-		goto end;
-	if(!name) {
-		READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
-		size=ntohll(size);
-		READ_ALL_ERRCHK(sock, buf, 128, err_open, "Could not read data: %s", strerror(errno));
-		goto end;
-	}
-	/* flags */
-	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err_open, "Could not read reserved field: %s", strerror(errno));
-	/* reserved field */
-	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err_open, "Could not write reserved field: %s", strerror(errno));
-	/* magic */
-	tmp64 = htonll(opts_magic);
-	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err_open, "Could not write magic: %s", strerror(errno));
-	/* name */
-	tmp32 = htonl(NBD_OPT_EXPORT_NAME);
-	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err_open, "Could not write option: %s", strerror(errno));
-	tmp32 = htonl((uint32_t)strlen(name));
-	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err_open, "Could not write name length: %s", strerror(errno));
-	WRITE_ALL_ERRCHK(sock, name, strlen(name), err_open, "Could not write name:: %s", strerror(errno));
-	READ_ALL_ERRCHK(sock, &size, sizeof(size), err_open, "Could not read size: %s", strerror(errno));
-	size = ntohll(size);
-	uint16_t flags;
-	READ_ALL_ERRCHK(sock, &flags, sizeof(uint16_t), err_open, "Could not read flags: %s", strerror(errno));
-	flags = ntohs(flags);
-	*serverflags = flags;
-	READ_ALL_ERRCHK(sock, buf, 124, err_open, "Could not read reserved zeroes: %s", strerror(errno));
+	sock=setup_connection_common(sock, name, ctype, serverflags);
 	goto end;
 err_open:
 	close(sock);
@@ -417,6 +461,18 @@ err:
 	sock=-1;
 end:
 	return sock;
+}
+
+int setup_connection(gchar* hostname, gchar* unixsock, int port, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
+	int retval = 0;
+	if(hostname != NULL) {
+		return setup_inet_connection(hostname, port, name, ctype, serverflags);
+	} else if(unixsock != NULL) {
+		return setup_unix_connection(unixsock, name, ctype, serverflags);
+	} else {
+		g_error("need a hostname or a unix domain socket!");
+		return -1;
+	}
 }
 
 int close_connection(int sock, CLOSE_TYPE type) {
@@ -463,7 +519,7 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	}
 	if(rep.error) {
 		snprintf(errstr, errstr_len, "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).", (long int)rep.error, (long unsigned int)rep.error, (long long int)(*((u64*)rep.handle)), (long long unsigned int)*((u64*)rep.handle));
-		retval=-1;
+		retval=-2;
 		goto end;
 	}
 	if (datasize)
@@ -473,7 +529,7 @@ end:
 	return retval;
 }
 
-int oversize_test(gchar* hostname, int port, char* name, int sock,
+int oversize_test(gchar* hostname, gchar* unixsock, int port, char* name, int sock,
 		  char sock_is_open, char close_sock, int testflags) {
 	int retval=0;
 	struct nbd_request req;
@@ -486,7 +542,7 @@ int oversize_test(gchar* hostname, int port, char* name, int sock,
 
 	/* This should work */
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
+		if((sock=setup_connection(hostname, unixsock, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
@@ -542,7 +598,7 @@ int oversize_test(gchar* hostname, int port, char* name, int sock,
 	return retval;
 }
 
-int throughput_test(gchar* hostname, int port, char* name, int sock,
+int throughput_test(gchar* hostname, gchar* unixsock, int port, char* name, int sock,
 		    char sock_is_open, char close_sock, int testflags) {
 	long long int i;
 	char writebuf[1024];
@@ -567,7 +623,7 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 	memset (writebuf, 'X', 1024);
 	size=0;
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
+		if((sock=setup_connection(hostname, unixsock, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
@@ -628,9 +684,19 @@ int throughput_test(gchar* hostname, int port, char* name, int sock,
 			if(FD_ISSET(sock, &set)) {
 				/* Okay, there's something ready for
 				 * reading here */
-				if(read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i)<0) {
-					retval=-1;
+				int rv;
+				if((rv=read_packet_check_header(sock, (testflags & TEST_WRITE)?0:1024, i))<0) {
+					if(!(testflags & TEST_EXPECT_ERROR) || rv != -2) {
+						retval=-1;
+					} else {
+						printf("\n");
+					}
 					goto err_open;
+				} else {
+					if(testflags & TEST_EXPECT_ERROR) {
+						retval=-1;
+						goto err_open;
+					}
 				}
 				--requests;
 			}
@@ -769,7 +835,7 @@ uint64_t getrandomhandle(GHashTable *phash) {
 	return handle;
 }
 
-int integrity_test(gchar* hostname, int port, char* name, int sock,
+int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int sock,
 		   char sock_is_open, char close_sock, int testflags) {
 	struct nbd_reply rep;
 	fd_set rset;
@@ -801,7 +867,7 @@ int integrity_test(gchar* hostname, int port, char* name, int sock,
 
 	size=0;
 	if(!sock_is_open) {
-		if((sock=setup_connection(hostname, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
+		if((sock=setup_connection(hostname, unixsock, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval=-1;
 			goto err;
@@ -1270,10 +1336,10 @@ void handle_nonopt(char* opt, gchar** hostname, long int* p) {
 	}
 }
 
-typedef int (*testfunc)(gchar*, int, char*, int, char, char, int);
+typedef int (*testfunc)(gchar*, gchar*, int, char*, int, char, char, int);
 
 int main(int argc, char**argv) {
-	gchar *hostname;
+	gchar *hostname=NULL, *unixsock=NULL;
 	long int p = 0;
 	char* name = NULL;
 	int sock=0;
@@ -1285,14 +1351,17 @@ int main(int argc, char**argv) {
 	/* Ignore SIGPIPE as we want to pick up the error from write() */
 	signal (SIGPIPE, SIG_IGN);
 
+	errstr[errstr_len]='\0';
+
 	if(argc<3) {
 		g_message("%d: Not enough arguments", (int)getpid());
 		g_message("%d: Usage: %s <hostname> <port>", (int)getpid(), argv[0]);
 		g_message("%d: Or: %s <hostname> -N <exportname> [<port>]", (int)getpid(), argv[0]);
+		g_message("%d: Or: %s -u <unix socket> -N <exportname>", (int)getpid(), argv[0]);
 		exit(EXIT_FAILURE);
 	}
-	logging();
-	while((c=getopt(argc, argv, "-N:t:owfil"))>=0) {
+	logging(MY_NAME);
+	while((c=getopt(argc, argv, "-FN:t:owfilu:"))>=0) {
 		switch(c) {
 			case 1:
 				handle_nonopt(optarg, &hostname, &p);
@@ -1302,6 +1371,9 @@ int main(int argc, char**argv) {
 				if(!p) {
 					p = 10809;
 				}
+				break;
+			case 'F':
+				testflags|=TEST_EXPECT_ERROR;
 				break;
 			case 't':
 				transactionlog=g_strdup(optarg);
@@ -1321,6 +1393,9 @@ int main(int argc, char**argv) {
 			case 'i':
 				test=integrity_test;
 				break;
+			case 'u':
+				unixsock=g_strdup(optarg);
+				break;
 		}
 	}
 
@@ -1328,7 +1403,7 @@ int main(int argc, char**argv) {
 		handle_nonopt(argv[optind++], &hostname, &p);
 	}
 
-	if(test(hostname, (int)p, name, sock, FALSE, TRUE, testflags)<0) {
+	if(test(hostname, unixsock, (int)p, name, sock, FALSE, TRUE, testflags)<0) {
 		g_warning("Could not run test: %s", errstr);
 		exit(EXIT_FAILURE);
 	}

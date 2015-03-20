@@ -54,31 +54,6 @@ typedef unsigned long long u64;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-static u64 cliserv_magic = 0x00420281861253LL;
-static u64 opts_magic = 0x49484156454F5054LL;
-static u64 rep_magic = 0x3e889045565a9LL;
-#define INIT_PASSWD "NBDMAGIC"
-
-#define INFO(a) do { } while(0)
-
-inline void setmysockopt(int sock) {
-	int size = 1;
-#if 0
-	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(int)) < 0)
-		 INFO("(no sockopt/1: %m)");
-#endif
-#ifdef	IPPROTO_TCP
-	size = 1;
-	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &size, sizeof(int)) < 0)
-		 INFO("(no sockopt/2: %m)");
-#endif
-#if 0
-	size = 1024;
-	if (setsockopt(sock, IPPROTO_TCP, TCP_MAXSEG, &size, sizeof(int)) < 0)
-		 INFO("(no sockopt/3: %m)");
-#endif
-}
-
 #ifndef G_GNUC_NORETURN
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
 #define G_GNUC_NORETURN __attribute__((__noreturn__))
@@ -89,60 +64,22 @@ inline void setmysockopt(int sock) {
 #endif
 #endif
 
-inline void err_nonfatal(const char *s) {
-	char s1[150], *s2;
+extern const u64 cliserv_magic;
+extern const u64 opts_magic;
+extern const u64 rep_magic;
 
-	strncpy(s1, s, sizeof(s1));
-	if ((s2 = strstr(s, "%m"))) {
-		strcpy(s1 + (s2 - s), strerror(errno));
-		s2 += 2;
-		strcpy(s1 + strlen(s1), s2);
-	}
-#ifndef	sun
-	/* Solaris doesn't have %h in syslog */
-	else if ((s2 = strstr(s, "%h"))) {
-		strcpy(s1 + (s2 - s), hstrerror(h_errno));
-		s2 += 2;
-		strcpy(s1 + strlen(s1), s2);
-	}
-#endif
+#define INIT_PASSWD "NBDMAGIC"
 
-	s1[sizeof(s1)-1] = '\0';
-#ifdef ISSERVER
-	syslog(LOG_ERR, "%s", s1);
-	syslog(LOG_ERR, "Exiting.");
-#endif
-	fprintf(stderr, "Error: %s\nExiting.\n", s1);
-}
+#define INFO(a) do { } while(0)
 
-inline void err(const char *s) G_GNUC_NORETURN;
+void setmysockopt(int sock);
+void err_nonfatal(const char *s);
 
-inline void err(const char *s) {
-	err_nonfatal(s);
-	exit(EXIT_FAILURE);
-}
+void err(const char *s) G_GNUC_NORETURN;
 
-inline void logging(void) {
-#ifdef ISSERVER
-	openlog(MY_NAME, LOG_PID, LOG_DAEMON);
-#endif
-	setvbuf(stdout, NULL, _IONBF, 0);
-	setvbuf(stderr, NULL, _IONBF, 0);
-}
+void logging(const char* name);
 
-#ifdef WORDS_BIGENDIAN
-inline u64 ntohll(u64 a) {
-	return a;
-}
-#else
-inline u64 ntohll(u64 a) {
-	u32 lo = a & 0xffffffff;
-	u32 hi = a >> 32U;
-	lo = ntohl(lo);
-	hi = ntohl(hi);
-	return ((u64) lo) << 32U | hi;
-}
-#endif
+uint64_t ntohll(uint64_t a);
 #define htonll ntohll
 
 #define NBD_DEFAULT_PORT	"10809"	/* Port on which named exports are
@@ -164,5 +101,7 @@ inline u64 ntohll(u64 a) {
 
 /* Global flags */
 #define NBD_FLAG_FIXED_NEWSTYLE (1 << 0)	/* new-style export that actually supports extending */
+#define NBD_FLAG_NO_ZEROES	(1 << 1)	/* we won't send the 128 bits of zeroes if the client sends NBD_FLAG_C_NO_ZEROES */
 /* Flags from client to server. Only one such option currently. */
 #define NBD_FLAG_C_FIXED_NEWSTYLE NBD_FLAG_FIXED_NEWSTYLE
+#define NBD_FLAG_C_NO_ZEROES	NBD_FLAG_NO_ZEROES
