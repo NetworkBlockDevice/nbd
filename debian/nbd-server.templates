@@ -52,20 +52,3 @@ _Description: AUTO_GEN is set to "n" in /etc/nbd-server
  /etc/nbd-server/config in the new format may be generated based on the
  current configuration. Until then, the nbd-server installation will be
  broken.
-
-Template: nbd-server/convert
-Type: boolean
-Default: true
-_Description: Convert old-style nbd-server configuration file?
- A pre-2.9 nbd-server configuration file has been found on this system.
- The current nbd-server package no longer supports this file and will
- not work if it is kept as is.
- .
- If you choose this option, the system will generate a new style
- configuration file based upon the old-style configuration file, which
- will be removed. Otherwise, configuration questions will be asked and
- the system will generate a new configuration file.
- .
- If a new-style configuration file already exists and you choose this
- option, you will shortly see a "modified configuration file" prompt, as
- usual.
