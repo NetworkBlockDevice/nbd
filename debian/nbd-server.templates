@@ -18,12 +18,6 @@ _Description: Number of nbd-server instances to run:
  Note that you can always add extra servers by adding them to
  /etc/nbd-server/config, or by running "dpkg-reconfigure nbd-server".
 
-Template: nbd-server/port
-Type: string
-_Description: TCP Port for server number ${number}:
- Please specify the TCP port this instance of nbd server will use for
- backwards compatibility with older clients.
-
 Template: nbd-server/name
 Type: string
 _Description: Name of export ${number}:
@@ -75,17 +69,3 @@ _Description: Convert old-style nbd-server configuration file?
  If a new-style configuration file already exists and you choose this
  option, you will shortly see a "modified configuration file" prompt, as
  usual.
-
-Template: nbd-server/useports
-Type: boolean
-Default: false
-_Description: Support port-based exports?
- Since version 2.9.18, nbd-server supports name-based exports, rather
- than port-based ones. While this is generally preferable, you may have
- to support systems running an older version of nbd-client, or might
- need to go through a lot of trouble to update your older configurations
- in order to migrate to name-based exports. In either of those cases,
- you should accept this option.
- .
- Everyone else should leave the option at the default setting, which
- will cause nbd-server to only support name-based exports.
