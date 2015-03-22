@@ -1,6 +1,8 @@
 nbd (1:3.10-1~1) experimental; urgency=medium
 
-  * New upstream release
+  * New upstream release.
+    - Drops support for oldstyle (port-based) exports; only name-based
+      exports are supported anymore.
 
  -- Wouter Verhelst <wouter@debian.org>  Fri, 20 Mar 2015 10:13:17 +0100
 
