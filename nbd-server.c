@@ -2154,6 +2154,158 @@ void destroy_pid_t(gpointer data) {
 	g_free(data);
 }
 
+static pid_t
+spawn_child()
+{
+        pid_t pid;
+        sigset_t newset;
+        sigset_t oldset;
+
+        sigemptyset(&newset);
+        sigaddset(&newset, SIGCHLD);
+        sigaddset(&newset, SIGTERM);
+        sigprocmask(SIG_BLOCK, &newset, &oldset);
+        pid = fork();
+        if (pid < 0) {
+                msg3(LOG_ERR, "Could not fork (%s)", strerror(errno));
+                goto out;
+        }
+        if (pid > 0) { /* Parent */
+                pid_t *pidp;
+
+                pidp = g_malloc(sizeof(pid_t));
+                *pidp = pid;
+                g_hash_table_insert(children, pidp, pidp);
+                goto out;
+        }
+        /* Child */
+        signal(SIGCHLD, SIG_DFL);
+        signal(SIGTERM, SIG_DFL);
+        signal(SIGHUP, SIG_DFL);
+out:
+        sigprocmask(SIG_SETMASK, &oldset, NULL);
+        return pid;
+}
+
+static int
+socket_accept(const int sock)
+{
+        struct sockaddr_storage addrin;
+        socklen_t addrinlen = sizeof(addrin);
+        int net;
+
+        net = accept(sock, (struct sockaddr *) &addrin, &addrinlen);
+        if (net < 0) {
+                err_nonfatal("Failed to accept socket connection: %m");
+        }
+
+        return net;
+}
+
+static void
+handle_modern_connection(GArray *const servers, const int sock)
+{
+        int net;
+        pid_t pid;
+        CLIENT *client = NULL;
+        int sock_flags_old;
+        int sock_flags_new;
+
+        net = socket_accept(sock);
+        if (net < 0)
+                return;
+
+        if (!dontfork) {
+                pid = spawn_child();
+                if (pid) {
+                        if (pid > 0)
+                                msg2(LOG_INFO, "Spawned a child process");
+                        if (pid < 0)
+                                msg2(LOG_ERR, "Failed to spawn a child process");
+                        close(net);
+                        return;
+                }
+                /* Child just continues. */
+        }
+
+        client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
+        if (!client) {
+                msg2(LOG_ERR, "Modern initial negotiation failed");
+                goto handler_err;
+        }
+
+        if (client->server->max_connections > 0 &&
+           g_hash_table_size(children) >= client->server->max_connections) {
+                msg3(LOG_ERR, "Max connections (%d) reached",
+                     client->server->max_connections);
+                goto handler_err;
+        }
+
+        sock_flags_old = fcntl(net, F_GETFL, 0);
+        if (sock_flags_old == -1) {
+                msg2(LOG_ERR, "Failed to get socket flags");
+                goto handler_err;
+        }
+
+        sock_flags_new = sock_flags_old & ~O_NONBLOCK;
+        if (sock_flags_new != sock_flags_old &&
+            fcntl(net, F_SETFL, sock_flags_new) == -1) {
+                msg2(LOG_ERR, "Failed to set socket to blocking mode");
+                goto handler_err;
+        }
+
+        if (set_peername(net, client)) {
+                msg2(LOG_ERR, "Failed to set peername");
+                goto handler_err;
+        }
+
+        if (!authorized_client(client)) {
+                msg3(LOG_INFO, "Client '%s' is not authorized to access",
+                     client->clientname);
+                goto handler_err;
+        }
+
+        if (!dontfork) {
+                int i;
+
+                /* Free all root server resources here, because we are
+                 * currently in the child process serving one specific
+                 * connection. These are not simply needed anymore. */
+                g_hash_table_destroy(children);
+                children = NULL;
+                close(modernsock);
+
+                /* Now that we are in the child process after a
+                 * succesful negotiation, we do not need the list of
+                 * servers anymore, get rid of it.*/
+
+                for (i = 0; i < servers->len; i++) {
+                        const SERVER *const server = &g_array_index(servers, SERVER, i);
+                        close(server->socket);
+                }
+
+                /* FALSE does not free the
+                   actual data. This is required,
+                   because the client has a
+                   direct reference into that
+                   data, and otherwise we get a
+                   segfault... */
+                g_array_free(servers, FALSE);
+        }
+
+        msg2(LOG_INFO, "Starting to serve");
+        serveconnection(client);
+        exit(EXIT_SUCCESS);
+
+handler_err:
+        g_free(client);
+        close(net);
+
+        if (!dontfork) {
+                exit(EXIT_FAILURE);
+        }
+}
+
 static void
 handle_connection(GArray *servers, int net, SERVER *serve, CLIENT *client)
 {
@@ -2329,24 +2481,13 @@ int serveloop(GArray* servers) {
 
 		memcpy(&rset, &mset, sizeof(fd_set));
 		if(pselect(max+1, &rset, NULL, NULL, NULL, &original_mask)>0) {
-			int net;
 
 			DEBUG("accept, ");
 			if(modernsock >= 0 && FD_ISSET(modernsock, &rset)) {
-				CLIENT *client;
-
-				if((net=accept(modernsock, (struct sockaddr *) &addrin, &addrinlen)) < 0) {
-					err_nonfatal("accept: %m");
-					continue;
-				}
-				client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
-				if(!client) {
-					close(net);
-					continue;
-				}
-				handle_connection(servers, net, client->server, client);
+				handle_modern_connection(servers, modernsock);
 			}
 			for(i=0; i < servers->len; i++) {
+				int net;
 				SERVER *serve;
 
 				serve=&(g_array_index(servers, SERVER, i));
