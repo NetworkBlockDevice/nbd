@@ -13,13 +13,18 @@ nbdkit - A toolkit for creating NBD servers
 
 =head1 DESCRIPTION
 
-C<nbdkit> is both a toolkit for creating Network Block Device (NBD)
-servers from "unconventional" sources and the name of an NBD server.
+Network Block Device (NBD) is a network protocol for accessing block
+devices over the network.  Block devices are hard disks and things
+that behave like hard disks such as disk images and virtual machines.
 
-To create a new block device source, all you have to do is write a few
-glue functions.  The liberal licensing of nbdkit is meant to allow you
-to link nbdkit with proprietary libraries or include nbdkit in
-proprietary code.
+C<nbdkit> is both a toolkit for creating NBD servers from
+"unconventional" sources and the name of an NBD server.
+
+To create a new Network Block Device source, all you need to do is
+write a few glue functions, possibly in C, or perhaps in a high level
+language like Perl or Python.  The liberal licensing of nbdkit is
+meant to allow you to link nbdkit with proprietary libraries or to
+include nbdkit in proprietary code.
 
 If you want to write an nbdkit plugin, you should read
 L<nbdkit-plugin(3)>.
