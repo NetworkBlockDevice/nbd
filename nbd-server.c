@@ -1554,12 +1554,33 @@ void send_export_info(CLIENT* client) {
 	}
 }
 
+static int nbd_errno(int errcode) {
+	switch (errcode) {
+	case EPERM:
+		return htonl(1);
+	case EIO:
+		return htonl(5);
+	case ENOMEM:
+		return htonl(12);
+	case EINVAL:
+		return htonl(22);
+	case EFBIG:
+	case ENOSPC:
+#ifdef EDQUOT
+	case EDQUOT:
+#endif
+		return htonl(28); // ENOSPC
+	default:
+		return htonl(22); // EINVAL
+	}
+}
+
 /** sending macro. */
 #define SEND(net,reply) { writeit( net, &reply, sizeof( reply )); \
 	if (client->transactionlogfd != -1) \
 		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
 /** error macro. */
-#define ERROR(client,reply,errcode) { reply.error = htonl(errcode); SEND(client->net,reply); reply.error = 0; }
+#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client->net,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -1609,7 +1630,8 @@ int mainloop(CLIENT *client) {
 
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
-		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
+		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ) ||
+		    (command==NBD_CMD_TRIM)) {
 			if (request.from + len < request.from) { // 64 bit overflow!!
 				DEBUG("[Number too large!]");
 				ERROR(client, reply, EINVAL);
@@ -1618,7 +1640,7 @@ int mainloop(CLIENT *client) {
 
 			if (((off_t)request.from + len) > client->exportsize) {
 				DEBUG("[RANGE!]");
-				ERROR(client, reply, EINVAL);
+				ERROR(client, reply, (command==NBD_CMD_WRITE) ? ENOSPC : EINVAL);
 				continue;
 			}
 
@@ -1711,6 +1733,12 @@ int mainloop(CLIENT *client) {
 		case NBD_CMD_TRIM:
 			/* The kernel module sets discard_zeroes_data == 0,
 			 * so it is okay to do nothing.  */
+			if ((client->server->flags & F_READONLY) ||
+			    (client->server->flags & F_AUTOREADONLY)) {
+				DEBUG("[TRIM to READONLY!]");
+				ERROR(client, reply, EPERM);
+				continue;
+			}
 			if (exptrim(&request, client)) {
 				DEBUG("Trim failed: %m");
 				ERROR(client, reply, errno);

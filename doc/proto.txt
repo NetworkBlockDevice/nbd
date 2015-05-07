@@ -43,7 +43,7 @@ now, the only flag is NBD_CMD_FLAG_FUA (bit 16), "Force unit access".
 
 The reply contains three fields: a 32 bit magic number ('magic'), a 32
 bit error code ('error'; 0, unless an error occurred in which case it is
-the errno of the error on the server side), and the same 64 bit handle
+one of the error values documented below), and the same 64 bit handle
 that the corresponding request had in its 'handle' field. In case the
 reply is sent in response to a read request and the error field is 0
 (zero), the reply header is immediately followed by request.len bytes of
@@ -64,6 +64,30 @@ with NBD_CMD_WRITE. This is implemented using sync_file_range
 if present, else by fdatasync() of that file (note not all files
 in a multifile environment). NBD_CMD_FLAG_FUA will not be set
 unless NBD_FLAG_SEND_FUA is set.
+
+Error values
+------------
+
+The following error values are defined:
+
+      Integer value    Short name     Description
+      -------------------------------------------------------------
+         1             EPERM          Operation not permitted
+         5             EIO            Input/output error
+        12             ENOMEM         Cannot allocate memory
+        22             EINVAL         Invalid argument
+        28             ENOSPC         No space left on device
+
+The server should return ENOSPC if it receives a write request including
+one or more sectors beyond the size of the device.  It should return
+EINVAL if it receives a read or trim request including one or more
+sectors beyond the size of the device.  It also should map the EDQUOT
+and EFBIG errors to ENOSPC.  Finally, it should return EPERM if it
+receives a write or trim request on a read-only export.  Which error to
+return in any other case is not specified by the NBD protocol.
+
+Negotiation
+===========
 
 There are two versions of the negotiation: the 'old' style (nbd <=
 2.9.16) and the 'new' style (nbd >= 2.9.17, though due to a bug it does
