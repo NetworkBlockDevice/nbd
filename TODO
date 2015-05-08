@@ -1,3 +1,7 @@
+* There is a proposal to narrow the range of possible errnos that the
+  server can return, and also to encode them in an OS-independent way.
+  See: http://article.gmane.org/gmane.linux.drivers.nbd.general/3154
+
 * Can we do language bindings using #!'s?
   You would enter:
     nbdkit foo [args]
