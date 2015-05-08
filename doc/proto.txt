@@ -358,9 +358,9 @@ The following request types exist:
   NBD_CMD_DISC command.
 
 * NBD_CMD_FLUSH (3)
-  A flush request; a write barrier. The server MUST NOT send the reply
-  header to this request before all outstanding write requests that were
-  sent before this command have hit the disk (using fsync() or similar).
+  A flush request; a write barrier. The server MUST NOT send a successful
+  reply header for this request before all write requests that were
+  completed before this command have hit the disk (using fsync() or similar).
   In this command, "len" and "offset" are reserved, and should be set to
   all-zero.
 
