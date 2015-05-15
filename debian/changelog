@@ -1,3 +1,9 @@
+nbd (1:2.9.16-8+squeeze2) squeeze-lts; urgency=medium
+
+  * Backport (relevant parts of) fix for CVE-2015-0847.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 15 May 2015 18:52:57 +0200
+
 nbd (1:2.9.16-8+squeeze1) oldstable-security; urgency=low
 
   * Cherry-pick df890c99337a255979e608d71f42401c0cddd5e0 from git HEAD
