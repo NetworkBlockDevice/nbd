@@ -159,6 +159,9 @@ char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
+static volatile sig_atomic_t is_sigchld_caught;
+static volatile sig_atomic_t is_sigterm_caught;
+
 /**
  * Types of virtuatlization
  **/
@@ -843,22 +846,7 @@ GArray* parse_cfile(gchar* f, GError** e) {
  * is severely wrong)
  **/
 void sigchld_handler(int s) {
-        int status;
-	int* i;
-	pid_t pid;
-
-	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
-		if(WIFEXITED(status)) {
-			msg3(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
-		}
-		i=g_hash_table_lookup(children, &pid);
-		if(!i) {
-			msg3(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
-		} else {
-			DEBUG2("Removing %d from the list of children", pid);
-			g_hash_table_remove(children, &pid);
-		}
-	}
+	is_sigchld_caught = 1;
 }
 
 /**
@@ -883,15 +871,7 @@ void killchild(gpointer key, gpointer value, gpointer user_data) {
  * is severely wrong).
  **/
 void sigterm_handler(int s) {
-	int parent=0;
-
-	g_hash_table_foreach(children, killchild, &parent);
-
-	if(parent) {
-		unlink(pidfname);
-	}
-
-	exit(EXIT_SUCCESS);
+	is_sigterm_caught = 1;
 }
 
 /**
@@ -1575,6 +1555,8 @@ int serveloop(GArray* servers) {
 	int sock;
 	fd_set mset;
 	fd_set rset;
+	sigset_t blocking_mask;
+	sigset_t original_mask;
 
 	/* 
 	 * Set up the master fd_set. The set of descriptors we need
@@ -1590,13 +1572,62 @@ int serveloop(GArray* servers) {
 		FD_SET(sock, &mset);
 		max=sock>max?sock:max;
 	}
+
+	/* Construct a signal mask which is used to make signal testing and
+	 * receiving an atomic operation to ensure no signal is received between
+	 * tests and blocking pselect(). */
+	if (sigemptyset(&blocking_mask) == -1)
+		err("failed to initialize blocking_mask: %m");
+	
+	if (sigaddset(&blocking_mask, SIGCHLD) == -1)
+		err("failed to add SIGCHLD to blocking_mask: %m");
+	
+	if (sigaddset(&blocking_mask, SIGHUP) == -1)
+		err("failed to add SIGHUP to blocking_mask: %m");
+	
+	if (sigaddset(&blocking_mask, SIGTERM) == -1)
+		err("failed to add SIGTERM to blocking_mask: %m");
+	
+	if (sigprocmask(SIG_BLOCK, &blocking_mask, &original_mask) == -1)
+		err("failed to block signals: %m");
+
 	for(;;) {
 		CLIENT *client;
 		int net;
 		pid_t *pid;
 
+                if (is_sigterm_caught) {
+                        is_sigterm_caught = 0;
+ 
+                        g_hash_table_foreach(children, killchild, NULL);
+                        unlink(pidfname);
+ 
+                        exit(EXIT_SUCCESS);
+                }
+ 
+                if (is_sigchld_caught) {
+                        int status;
+                        int* i;
+                        pid_t pid;
+ 
+                        is_sigchld_caught = 0;
+ 
+                        while ((pid=waitpid(-1, &status, WNOHANG)) > 0) {
+                                if (WIFEXITED(status)) {
+                                        msg(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+                                }
+                                i = g_hash_table_lookup(children, &pid);
+                                if (!i) {
+                                        msg(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
+                                } else {
+                                        DEBUG("Removing %d from the list of children", pid);
+                                        g_hash_table_remove(children, &pid);
+                                }
+                        }
+                }
+ 
 		memcpy(&rset, &mset, sizeof(fd_set));
-		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
+		if(pselect(max+1, &rset, NULL, NULL, NULL, &original_mask)>0) {
 			DEBUG("accept, ");
 			for(i=0;i<servers->len;i++) {
 				serve=&(g_array_index(servers, SERVER, i));
