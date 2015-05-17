@@ -17,53 +17,21 @@ This package contains nbd-server and nbd-client.
 To install the package, do the normal `configure`/`make`/`make install`
 dance. You'll need to install it on both the client and the server.
 
-Using NBD is quite easy. First, on the client, you need to create the
-device nodes:
+Note that released nbd tarballs are found on
+[sourceforge](http://sourceforge.net/projects/nbd/files/nbd/).
 
+Using NBD is quite easy. First, on the client, you need to load the
+module and, if you're not using udev, to create the device nodes:
+
+    # modprobe nbd
     # cd /dev
     # ./MAKEDEV nbd0
 
 (if you need more than one NBD device, repeat the above command for nbd1,
 nbd2, ...)
 
-Since there's a problem with nbd and the (default) cfq I/O scheduler,
-you may want to set it to deadline:
-
-    echo 'deadline' > /sys/block/nbd0/queue/scheduler
-
-Note that this is done by default on recent kernels.
-
-(again, repeat the above for nbd1, nbd2, etc, if you need more than one
-device)
-
-Next, start the server. You can use a file or a block device for that:
-
-    nbd-server <port> <filename>
-
-e.g.,
-
-    nbd-server 1234 /home/wouter/nbd-export
-
-Note that the filename must be an absolute path; i.e., something like
-`/path/to/file`, not `../file`. See the nbd-server manpage for details
-on any available options.
-
-Finally, you'll be able to start the client:
-
-    nbd-client <hostname> <port> <nbd device>
-
-e.g.,
-
-    nbd-client 10.0.0.1 1234 /dev/nbd0
-
-`nbd-client` must be ran as root; the same is not true for nbd-server
-(but do make sure that /var/run is writeable by the server that
-`nbd-server` runs as; otherwise, you won't get a PID file, though the
-server will keep running).
-
-Starting with NBD 2.9, there is also support for a configuration file.
-This configuration file is expected to be found at
-`<sysconfdir>/nbd-server/config`, and should look something like this:
+Next, write a configuration file for the server. An example looks like
+this:
 
     # This is a comment
     [generic]
@@ -107,7 +75,32 @@ Specification, as can be found at
 was not intended to be used for configuration files, the glib API is
 flexible enough for it to be used as such.
 
-The old command-line syntax is still supported, however.
+Now start the server:
+
+    nbd-server -C /path/to/configfile
+
+Note that the filename must be an absolute path; i.e., something like
+`/path/to/file`, not `../file`. See the nbd-server manpage for details
+on any available options.
+
+Finally, you'll be able to start the client:
+
+    nbd-client <hostname> -N <export name> <nbd device>
+
+e.g.,
+
+    nbd-client 10.0.0.1 -N otherexport /dev/nbd0
+
+will use the second export in the above example (the one that exports
+`/export/nbd/experiment`)
+
+`nbd-client` must be ran as root; the same is not true for nbd-server
+(but do make sure that /var/run is writeable by the server that
+`nbd-server` runs as; otherwise, you won't get a PID file, though the
+server will keep running).
+
+The old command-line port-only way of exporting something is still
+supported, but it is deprecated.
 
 There are packages (or similar) available for the following operating
 systems:
@@ -125,3 +118,5 @@ systems:
 
 If you're packaging NBD for a different operating system that isn't in
 the above list, I'd like to know about it.
+
+For questions, please use the `nbd-general@lists.sourceforge.net` mailinglist.

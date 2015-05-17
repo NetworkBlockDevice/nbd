@@ -30,6 +30,8 @@ cleanup() {
 	if [ -z "$cleanup" ]
 	then
 		rm -rf $tmpdir
+	else
+		echo "Setup in $tmpdir"
 	fi
 }
 
@@ -39,39 +41,32 @@ dd if=/dev/zero of=$tmpnam bs=1024 count=4096 >/dev/null 2>&1
 echo $1
 
 case $1 in
-	*/cmd)
-		# Test with export specified on command line
-		../../nbd-server -C /dev/null -p ${pidfile} 11111 $tmpnam &
-		# -p only works if nbd-server wasn't compiled with -DNOFORK or
-		# -DNODAEMON, which I sometimes do for testing and debugging.
-		PID=$!
-		sleep 1
-		./nbd-tester-client 127.0.0.1 11111
-		retval=$?
-	;;
 	*/cfgsize)
 		# Test oversized requests
-		../../nbd-server -C /dev/null -p ${pidfile} 11112 $tmpnam &
+		cat > ${conffile} <<EOF
+[generic]
+[export]
+	exportname = $tmpnam
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 11112 -o
+		./nbd-tester-client -o 127.0.0.1 -N export
 		retval=$?
 	;;
 	*/cfg1)
 		# Test with export specified in config file
 		cat > ${conffile} <<EOF
 [generic]
-	oldstyle = true
 [export]
 	exportname = $tmpnam
-	port = 11113
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 11113
+		./nbd-tester-client 127.0.0.1 -N export
 		retval=$?
 	;;
 	*/cfgmulti)
@@ -79,22 +74,19 @@ EOF
 		# testing more options too
 		cat >${conffile} <<EOF
 [generic]
-	oldstyle = true
 [export1]
 	exportname = $tmpnam
-	port = 11114
 	copyonwrite = true
 	listenaddr = 127.0.0.1
 [export2]
 	exportname = $tmpnam
-	port = 11115
 	readonly = true
 	listenaddr = 127.0.0.1
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost 11114
+		./nbd-tester-client localhost -N export1
 		retval=$?
 		if [ $retval -ne 0 ]
 		then
@@ -110,7 +102,7 @@ EOF
 			fi
 			exit $retval
 		fi
-		./nbd-tester-client localhost 11115
+		./nbd-tester-client localhost -N export2
 		retval=$?
 	;;
 	*/cfgnew)
@@ -137,6 +129,37 @@ EOF
 		PID=$!
 		sleep 1
 		./nbd-tester-client -N export1 -w localhost
+		retval=$?
+	;;
+	*/tree)
+		# Test treefile mode
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = ${tmpdir}/nbd.tree
+	treefiles = true
+	filesize = 4194304
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -w localhost
+		retval=$?
+	;;
+	*/rotree)
+		# Test treefile mode readonly
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = ${tmpdir}/nbd.tree
+	treefiles = true
+	filesize = 4194304
+	readonly = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -w -F localhost
 		retval=$?
 	;;
 	*/flush)
@@ -232,6 +255,34 @@ EOF
 			./nbd-tester-client -N export1 localhost
 			retval=$?
 		fi
+		;;
+	*/rowrite)
+		cat >${conffile} <<EOF
+[generic]
+	listenaddr = 127.0.0.1
+[export1]
+	exportname = $tmpnam
+	readonly = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -w -F localhost
+		retval=$?
+		;;
+	*/unix)
+		cat >${conffile} <<EOF
+[generic]
+	unixsock = ${tmpdir}/unix.sock
+	listenaddr = 127.0.0.1
+[export1]
+	exportname = ${tmpnam}
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -u ${tmpdir}/unix.sock
+		retval=$?
 		;;
 	*)
 		echo "E: unknown test $1"

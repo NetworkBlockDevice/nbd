@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -x
+
+echo 'deb http://us.archive.ubuntu.com/ubuntu trusty main' > /etc/apt/sources.list.d/automake.list
+cat /etc/apt/sources.list.d/automake.list
+(
+  echo 'Package: *'
+  echo 'Pin: release a=trusty'
+  echo 'Pin-Priority: 200'
+) > /etc/apt/preferences.d/automake.pref
+cat /etc/apt/preferences.d/automake.pref

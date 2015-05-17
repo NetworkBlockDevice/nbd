@@ -1,7 +1,7 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[3.8],[wouter@debian.org])
+AC_INIT([nbd],[3.10],[wouter@debian.org])
 AM_INIT_AUTOMAKE(foreign dist-xz serial-tests)
 AM_MAINTAINER_MODE([enable])
 LT_INIT
@@ -83,6 +83,19 @@ AC_ARG_ENABLE(
   ]
 )
 
+AC_ARG_ENABLE(
+  [gznbd],
+  [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images. NOTE: no support for newstyle protocol.)])],
+  [
+    AS_IF(
+      [test "x$enableval" = "xyes"],
+      [ENABLE_GZNBD=yes],
+      [ENABLE_GZNBD=no]
+    )
+  ],
+  [ENABLE_GZNBD=no]
+)
+
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -94,6 +107,7 @@ AC_CHECK_SIZEOF(unsigned short int)
 AC_CHECK_SIZEOF(unsigned int)
 AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
+AC_STRUCT_DIRENT_D_TYPE
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
 AC_CHECK_HEADERS([linux/falloc.h])
 HAVE_FL_PH=no
@@ -140,11 +154,13 @@ AC_TYPE_OFF_T
 AC_TYPE_PID_T
 nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(nbd_server_CPPFLAGS)
+AM_CONDITIONAL(GZNBD, [test "x$ENABLE_GZNBD" = "xyes"])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
 		 doc/Doxyfile
 		 doc/Makefile
 		 man/Makefile
+		 gznbd/Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile

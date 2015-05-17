@@ -65,6 +65,7 @@
 #include <sys/stat.h>
 #include <sys/select.h>
 #include <sys/wait.h>
+#include <sys/un.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -74,6 +75,7 @@
 #endif
 #include <signal.h>
 #include <errno.h>
+#include <libgen.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -131,6 +133,8 @@ int dontfork = 0;
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
+#define TREEPAGESIZE 4096 /**< tree (block) files uses those chunks */
+#define TREEDIRSIZE  1024 /**< number of files per subdirectory (or subdirs per subdirectory) */
 
 /** Per-export flags: */
 #define F_READONLY 1      /**< flag to tell us a file is readonly */
@@ -147,10 +151,12 @@ int dontfork = 0;
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
+#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
 #define F_LIST 2	  /**< Allow clients to list the exports on a server */
+#define F_NO_ZEROES 4	  /**< Do not send zeros to client */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char pidftemplate[256]; /**< template to be used for the filename of the PID file */
@@ -161,6 +167,16 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_MODERN	(1 << 2)
 
 #include <nbdsrv.h>
+
+static volatile sig_atomic_t is_sigchld_caught; /**< Flag set by
+						     SIGCHLD handler
+						     to mark a child
+						     exit */
+
+static volatile sig_atomic_t is_sigterm_caught; /**< Flag set by
+						     SIGTERM handler
+						     to mark a exit
+						     request */
 
 static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
                                                     handler to mark a
@@ -222,6 +238,7 @@ struct generic_conf {
         gchar *group;           /**< group we run running as      */
         gchar *modernaddr;      /**< address of the modern socket */
         gchar *modernport;      /**< port of the modern socket    */
+        gchar *unixsock;	/**< file name of the unix domain socket */
         gint flags;             /**< global flags                 */
 };
 
@@ -305,13 +322,105 @@ static inline void writeit(int f, void *buf, size_t len) {
 	}
 }
 
+void myseek(int handle,off_t a);
+
+/**
+ * Tree structure helper functions
+ */
+
+static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
+	if (lenmax<10)
+		err("Char buffer overflow. This is likely a bug.");
+
+	if (size<TREEDIRSIZE*TREEPAGESIZE) {
+		// we are done, add filename
+		snprintf(name,lenmax,"/FILE%04X",(pos/TREEPAGESIZE) % TREEDIRSIZE);
+		*ppos = pos / (TREEPAGESIZE*TREEDIRSIZE);
+	} else {
+		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
+		char buffer[10];
+		snprintf(buffer,sizeof(buffer),"/TREE%04X",*ppos % TREEDIRSIZE);
+		memcpy(name,buffer,9); // copy into string without trailing zero
+		*ppos/=TREEDIRSIZE;
+	}
+}
+
+static void mkdir_path(char * path) {
+	char *subpath=path+1;
+	while (subpath=strchr(subpath,'/')) {
+		*subpath='\0'; // path is modified in place with terminating null char instead of slash
+		if (mkdir(path,0700)==-1) {
+			if (errno!=EEXIST)
+				err("Path access error! %m");
+		}
+		*subpath='/';
+		subpath++;
+	}
+}
+
+static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
+	char filename[256+strlen(name)];
+	strcpy(filename,name);
+	off_t ppos;
+	construct_path(filename+strlen(name),256,size,pos,&ppos);
+
+	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
+
+	int handle=open(filename, mode, 0600);
+	if (handle<0 && errno==ENOENT) {
+		if (mode & O_RDWR) {
+
+			DEBUG("Creating new treepath");
+
+			mkdir_path(filename);
+			handle=open(filename, O_RDWR|O_CREAT, 0600);
+			if (handle<0) {
+				err("Error opening tree block file %m");
+			}
+		} else {
+
+			DEBUG("Creating a dummy tempfile for reading");
+			gchar * tmpname;
+			tmpname = g_strdup_printf("dummy-XXXXXX");
+			handle = mkstemp(tmpname);
+			if (handle>0) {
+				unlink(tmpname); /* File will stick around whilst FD open */
+			} else {
+				err("Error opening tree block file %m");
+			}
+			g_free(tmpname);
+		}
+		char *n = "\0";
+		myseek(handle,TREEPAGESIZE-1);
+		ssize_t c = write(handle,n,1);
+		if (c<1) {
+			err("Error setting tree block file size %m");
+		}
+	}
+	return handle;
+}
+
+static void delete_treefile(char* name,off_t size,off_t pos) {
+	char filename[256+strlen(name)];
+	strcpy(filename,name);
+	size_t psize=size;
+	off_t ppos;
+	construct_path(filename+strlen(name),256,size,pos,&ppos);
+
+	DEBUG("Deleting treefile: %s",filename);
+
+	if (unlink(filename)==-1)
+		DEBUG("Deleting failed : %s",strerror(errno));
+}
+
+
 /**
  * Print out a message about how to use nbd-server. Split out to a separate
  * function so that we can call it from multiple places
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections] [-V]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -319,7 +428,8 @@ void usage() {
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
-	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n\n"
+	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n"
+	       "\t-V|--version\toutput the version and exit\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -338,6 +448,9 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	}
 	if(serve->flags & F_MULTIFILE) {
 		printf("\tmultifile = true\n");
+	}
+	if(serve->flags & F_TREEFILES) {
+		printf("\ttreefiles = true\n");
 	}
 	if(serve->flags & F_COPYONWRITE) {
 		printf("\tcopyonwrite = true\n");
@@ -371,6 +484,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
 		{"max-connection", required_argument, NULL, 'M'},
+		{"version", no_argument, NULL, 'V'},
 		{0,0,0,0}
 	};
 	SERVER *serve;
@@ -387,7 +501,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -452,6 +566,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'p':
 			strncpy(pidftemplate, optarg, 256);
+			pidftemplate[255]='\0';
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
@@ -469,6 +584,10 @@ SERVER* cmdline(int argc, char *argv[]) {
 			break;
 		case 'M':
 			serve->max_connections = strtol(optarg, NULL, 0);
+			break;
+		case 'V':
+			printf("This is nbd-server version " VERSION "\n");
+			exit(EXIT_SUCCESS);
 			break;
 		default:
 			usage();
@@ -495,14 +614,22 @@ SERVER* cmdline(int argc, char *argv[]) {
 }
 
 /* forward definition of parse_cfile */
-GArray* parse_cfile(gchar* f, struct generic_conf *genconf, GError** e);
+GArray* parse_cfile(gchar* f, struct generic_conf *genconf, bool expect_generic, GError** e);
+
+#ifdef HAVE_STRUCT_DIRENT_D_TYPE
+#define NBD_D_TYPE de->d_type
+#else
+#define NBD_D_TYPE 0
+#define DT_UNKNOWN 0
+#define DT_REG 1
+#endif
 
 /**
  * Parse config file snippets in a directory. Uses readdir() and friends
  * to find files and open them, then passes them on to parse_cfile
  * with have_global set false
  **/
-GArray* do_cfile_dir(gchar* dir, GError** e) {
+GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e) {
 	DIR* dirh = opendir(dir);
 	struct dirent* de;
 	gchar* fname;
@@ -518,7 +645,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	while((de = readdir(dirh))) {
 		int saved_errno=errno;
 		fname = g_build_filename(dir, de->d_name, NULL);
-		switch(de->d_type) {
+		switch(NBD_D_TYPE) {
 			case DT_UNKNOWN:
 				/* Filesystem doesn't return type of
 				 * file through readdir. Run stat() on
@@ -535,7 +662,7 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 				if(strcmp((de->d_name + strlen(de->d_name) - 5), ".conf")) {
 					goto next;
 				}
-				tmp = parse_cfile(fname, NULL, e);
+				tmp = parse_cfile(fname, genconf, false, e);
 				errno=saved_errno;
 				if(*e) {
 					goto err_out;
@@ -555,10 +682,10 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
 	err_out:
 		if(retval)
 			g_array_free(retval, TRUE);
-		if(dirh)
-			closedir(dirh);
-		return NULL;
+		retval = NULL;
 	}
+	if(dirh)
+		closedir(dirh);
 	return retval;
 }
 
@@ -576,11 +703,14 @@ GArray* do_cfile_dir(gchar* dir, GError** e) {
  *        NBDS_ERR_CFILE_VALUE_INVALID, NBDS_ERR_CFILE_VALUE_UNSUPPORTED
  *        or NBDS_ERR_CFILE_NO_EXPORTS. @see NBDS_ERRS.
  *
- * @return a Array of SERVER* pointers, If the config file is empty or does not
- *	exist, returns an empty GHashTable; if the config file contains an
+ * @param expect_generic if true, we expect a configuration file that
+ * 	  contains a [generic] section. If false, we don't.
+ *
+ * @return a GArray of SERVER* pointers. If the config file is empty or does not
+ *	exist, returns an empty GArray; if the config file contains an
  *	error, returns NULL, and e is set appropriately
  **/
-GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
+GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_generic, GError** e) {
 	const char* DEFAULT_ERROR = "Could not parse %s in group %s: %s";
 	const char* MISSING_REQUIRED_ERROR = "Could not find required value %s in group %s: %s";
 	gchar* cfdir = NULL;
@@ -588,15 +718,16 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	gchar *virtstyle=NULL;
 	PARAM lp[] = {
 		{ "exportname", TRUE,	PARAM_STRING, 	&(s.exportname),	0 },
-		{ "port", 	TRUE,	PARAM_INT, 	&(s.port),		0 },
 		{ "authfile",	FALSE,	PARAM_STRING,	&(s.authname),		0 },
 		{ "filesize",	FALSE,	PARAM_OFFT,	&(s.expected_size),	0 },
 		{ "virtstyle",	FALSE,	PARAM_STRING,	&(virtstyle),		0 },
 		{ "prerun",	FALSE,	PARAM_STRING,	&(s.prerun),		0 },
 		{ "postrun",	FALSE,	PARAM_STRING,	&(s.postrun),		0 },
 		{ "transactionlog", FALSE, PARAM_STRING, &(s.transactionlog),	0 },
+		{ "cowdir",	FALSE,	PARAM_STRING,	&(s.cowdir),		0 },
 		{ "readonly",	FALSE,	PARAM_BOOL,	&(s.flags),		F_READONLY },
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
+		{ "treefiles",	FALSE,	PARAM_BOOL,	&(s.flags),		F_TREEFILES },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
@@ -614,11 +745,12 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	PARAM gp[] = {
 		{ "user",	FALSE, PARAM_STRING,	&(genconftmp.user),       0 },
 		{ "group",	FALSE, PARAM_STRING,	&(genconftmp.group),      0 },
-		{ "oldstyle",	FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_OLDSTYLE },
+		{ "oldstyle",	FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_OLDSTYLE }, // only left here so we can issue an appropriate error message when the option is used
 		{ "listenaddr", FALSE, PARAM_STRING,	&(genconftmp.modernaddr), 0 },
 		{ "port", 	FALSE, PARAM_STRING,	&(genconftmp.modernport), 0 },
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
+		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -654,7 +786,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
-	if((!startgroup || strcmp(startgroup, "generic")) && genconf) {
+	if((!startgroup || strcmp(startgroup, "generic")) && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
 		g_key_file_free(cfile);
 		return NULL;
@@ -665,12 +797,9 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
-		if(i==1 || !genconf) {
+		if(i==1 || !expect_generic) {
 			p=lp;
 			p_size=lp_size;
-			if(!(glob_flags & F_OLDSTYLE)) {
-				lp[1].required = FALSE;
-			}
 		} 
 		for(j=0;j<p_size;j++) {
 			assert(p[j].target != NULL);
@@ -760,14 +889,15 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 		} else {
 			s.virtstyle=VIRT_IPLIT;
 		}
-		if(s.port && !(glob_flags & F_OLDSTYLE)) {
-			g_warning("A port was specified, but oldstyle exports were not requested. This may not do what you expect.");
-			g_warning("Please read 'man 5 nbd-server' and search for oldstyle for more info");
+		if(genconftmp.flags & F_OLDSTYLE) {
+			g_message("Since 3.10, the oldstyle protocol is no longer supported. Please migrate to the newstyle protocol.");
+			g_message("Exiting.");
+			return NULL;
 		}
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
-		if(i>0 || !genconf) {
+		if(i>0 || !expect_generic) {
 			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
@@ -784,7 +914,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 	}
 	g_key_file_free(cfile);
 	if(cfdir) {
-		GArray* extra = do_cfile_dir(cfdir, e);
+		GArray* extra = do_cfile_dir(cfdir, &genconftmp, e);
 		if(extra) {
 			retval = g_array_append_vals(retval, extra->data, extra->len);
 			i+=extra->len;
@@ -796,7 +926,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 			}
 		}
 	}
-	if(i==1 && genconf) {
+	if(i==1 && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NO_EXPORTS, "The config file does not specify any exports");
 	}
 
@@ -810,27 +940,16 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, GError** e) {
 }
 
 /**
- * Signal handler for SIGCHLD
+ * Handle SIGCHLD by setting atomically a flag which will be evaluated in the
+ * main loop of the root server process. This allows us to separate the signal
+ * catching from th actual task triggered by SIGCHLD and hence processing in the
+ * interrupt context is kept as minimial as possible.
+ *
  * @param s the signal we're handling (must be SIGCHLD, or something
  * is severely wrong)
  **/
-void sigchld_handler(int s) {
-        int status;
-	int* i;
-	pid_t pid;
-
-	while((pid=waitpid(-1, &status, WNOHANG)) > 0) {
-		if(WIFEXITED(status)) {
-			msg(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
-		}
-		i=g_hash_table_lookup(children, &pid);
-		if(!i) {
-			msg(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
-		} else {
-			DEBUG("Removing %d from the list of children", pid);
-			g_hash_table_remove(children, &pid);
-		}
-	}
+static void sigchld_handler(const int s G_GNUC_UNUSED) {
+        is_sigchld_caught = 1;
 }
 
 /**
@@ -848,15 +967,16 @@ void killchild(gpointer key, gpointer value, gpointer user_data) {
 }
 
 /**
- * Handle SIGTERM and dispatch it to our children
+ * Handle SIGTERM by setting atomically a flag which will be evaluated in the
+ * main loop of the root server process. This allows us to separate the signal
+ * catching from th actual task triggered by SIGTERM and hence processing in the
+ * interrupt context is kept as minimial as possible.
+ *
  * @param s the signal we're handling (must be SIGTERM, or something
  * is severely wrong).
  **/
-void sigterm_handler(int s) {
-	g_hash_table_foreach(children, killchild, NULL);
-	unlink(pidfname);
-
-	exit(EXIT_SUCCESS);
+static void sigterm_handler(const int s G_GNUC_UNUSED) {
+	is_sigterm_caught = 1;
 }
 
 /**
@@ -875,7 +995,7 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
 /**
  * Get the file handle and offset, given an export offset.
  *
- * @param export An array of export files
+ * @param client The client we're serving for
  * @param a The offset to get corresponding file/offset for
  * @param fhandle [out] File descriptor
  * @param foffset [out] Offset into fhandle
@@ -883,10 +1003,21 @@ static void sighup_handler(const int s G_GNUC_UNUSED) {
  * from fhandle starting at foffset (0 if there is no limit)
  * @return 0 on success, -1 on failure
  **/
-int get_filepos(GArray* export, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
+
+	GArray * const export = client->export;
+
 	/* Negative offset not allowed */
 	if(a < 0)
 		return -1;
+
+	/* Open separate file for treefiles */
+        if (client->server->flags & F_TREEFILES) {
+		*foffset = a % TREEPAGESIZE;
+		*maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
+		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a);
+		return 0;
+	}
 
 	/* Binary search for last file with starting offset <= a */
 	FILE_INFO fi;
@@ -949,7 +1080,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	size_t maxbytes;
 	ssize_t retval;
 
-	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+	if(get_filepos(client, a, &fhandle, &foffset, &maxbytes))
 		return -1;
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
@@ -1000,6 +1131,10 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		fdatasync(fhandle);
 #endif
 	}
+	/* close file pointer in case of treefiles */
+        if (client->server->flags & F_TREEFILES) {
+		close(fhandle);
+	}
 	return retval;
 }
 
@@ -1039,8 +1174,9 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
+	ssize_t retval;
 
-	if(get_filepos(client->export, a, &fhandle, &foffset, &maxbytes))
+	if(get_filepos(client, a, &fhandle, &foffset, &maxbytes))
 		return -1;
 	if(maxbytes && len > maxbytes)
 		len = maxbytes;
@@ -1048,7 +1184,11 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
 	myseek(fhandle, foffset);
-	return read(fhandle, buf, len);
+	retval = read(fhandle, buf, len);
+        if (client->server->flags & F_TREEFILES) {
+		close(fhandle);
+	}
+	return retval;
 }
 
 /**
@@ -1182,6 +1322,14 @@ int expflush(CLIENT *client) {
         if (client->server->flags & F_COPYONWRITE) {
 		return fsync(client->difffile);
 	}
+
+        if (client->server->flags & F_TREEFILES ) {
+		// all we can do is force sync the entire filesystem containing the tree
+		if (client->server->flags & F_READONLY)
+			return 0;
+		sync();
+		return 0;
+	}
 	
 	for (i = 0; i < client->export->len; i++) {
 		FILE_INFO fi = g_array_index(client->export, FILE_INFO, i);
@@ -1197,6 +1345,19 @@ int expflush(CLIENT *client) {
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
+        if (client->server->flags & F_TREEFILES) {
+		if (client->server->flags & F_READONLY)
+			return 0;
+
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first to be trimmed block
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
+		while (min<max) {
+			delete_treefile(client->exportname,client->exportsize,min);
+			min+=TREEPAGESIZE;
+		}
+		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+		return 0;
+	}
 #if HAVE_FALLOC_PH
 	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
 	FILE_INFO cur = prev;
@@ -1308,88 +1469,69 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
  *
  * @param client The client we're negotiating with.
  **/
-CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
-	char zeros[128];
-	uint64_t size_host;
+CLIENT* negotiate(int net, GArray* servers) {
 	uint32_t flags = NBD_FLAG_HAS_FLAGS;
-	uint16_t smallflags = 0;
+	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
+	uint32_t cflags = 0;
+	uint32_t opt;
 
-	memset(zeros, '\0', sizeof(zeros));
-	assert(((phase & NEG_INIT) && (phase & NEG_MODERN)) || client);
-	if(phase & NEG_MODERN) {
-		smallflags |= NBD_FLAG_FIXED_NEWSTYLE;
-	}
-	if(phase & NEG_INIT) {
-		/* common */
-		if (write(net, INIT_PASSWD, 8) < 0) {
-			err_nonfatal("Negotiation failed/1: %m");
-			if(client)
-				exit(EXIT_FAILURE);
-		}
-		if(phase & NEG_MODERN) {
-			/* modern */
-			magic = htonll(opts_magic);
-		} else {
-			/* oldstyle */
-			magic = htonll(cliserv_magic);
-		}
-		if (write(net, &magic, sizeof(magic)) < 0) {
-			err_nonfatal("Negotiation failed/2: %m");
-			if(phase & NEG_OLD)
-				exit(EXIT_FAILURE);
-		}
-	}
-	if ((phase & NEG_MODERN) && (phase & NEG_INIT)) {
-		/* modern */
-		uint32_t cflags;
-		uint32_t opt;
+	assert(servers != NULL);
+	if (write(net, INIT_PASSWD, 8) < 0)
+		err_nonfatal("Negotiation failed/1: %m");
+	magic = htonll(opts_magic);
+	if (write(net, &magic, sizeof(magic)) < 0)
+		err_nonfatal("Negotiation failed/2: %m");
 
-		if(!servers)
-			err("programmer error");
-		smallflags = htons(smallflags);
-		if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-			err_nonfatal("Negotiation failed/3: %m");
-		if (read(net, &cflags, sizeof(cflags)) < 0)
-			err_nonfatal("Negotiation failed/4: %m");
-		cflags = htonl(cflags);
-		do {
-			if (read(net, &magic, sizeof(magic)) < 0)
-				err_nonfatal("Negotiation failed/5: %m");
-			magic = ntohll(magic);
-			if(magic != opts_magic) {
-				err_nonfatal("Negotiation failed/5a: magic mismatch");
-				return NULL;
-			}
-			if (read(net, &opt, sizeof(opt)) < 0)
-				err_nonfatal("Negotiation failed/6: %m");
-			opt = ntohl(opt);
-			switch(opt) {
-			case NBD_OPT_EXPORT_NAME:
-				// NBD_OPT_EXPORT_NAME must be the last
-				// selected option, so return from here
-				// if that is chosen.
-				return handle_export_name(opt, net, servers, cflags);
-				break;
-			case NBD_OPT_LIST:
-				handle_list(opt, net, servers, cflags);
-				break;
-			case NBD_OPT_ABORT:
-				// handled below
-				break;
-			default:
-				send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
-				break;
-			}
-		} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
-		if(opt == NBD_OPT_ABORT) {
-			err_nonfatal("Session terminated by client");
+	smallflags = htons(smallflags);
+	if (write(net, &smallflags, sizeof(uint16_t)) < 0)
+		err_nonfatal("Negotiation failed/3: %m");
+	if (read(net, &cflags, sizeof(cflags)) < 0)
+		err_nonfatal("Negotiation failed/4: %m");
+	cflags = htonl(cflags);
+	if (cflags & NBD_FLAG_C_NO_ZEROES) {
+		glob_flags |= F_NO_ZEROES;
+	}
+	do {
+		if (read(net, &magic, sizeof(magic)) < 0)
+			err_nonfatal("Negotiation failed/5: %m");
+		magic = ntohll(magic);
+		if(magic != opts_magic) {
+			err_nonfatal("Negotiation failed/5a: magic mismatch");
 			return NULL;
 		}
+		if (read(net, &opt, sizeof(opt)) < 0)
+			err_nonfatal("Negotiation failed/6: %m");
+		opt = ntohl(opt);
+		switch(opt) {
+		case NBD_OPT_EXPORT_NAME:
+			// NBD_OPT_EXPORT_NAME must be the last
+			// selected option, so return from here
+			// if that is chosen.
+			return handle_export_name(opt, net, servers, cflags);
+			break;
+		case NBD_OPT_LIST:
+			handle_list(opt, net, servers, cflags);
+			break;
+		case NBD_OPT_ABORT:
+			// handled below
+			break;
+		default:
+			send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
+			break;
+		}
+	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
+	if(opt == NBD_OPT_ABORT) {
+		err_nonfatal("Session terminated by client");
+		return NULL;
 	}
-	/* common */
-	size_host = htonll((u64)(client->exportsize));
-	if (write(net, &size_host, 8) < 0)
+}
+
+void send_export_info(CLIENT* client) {
+	uint64_t size_host = htonll((u64)(client->exportsize));
+	uint16_t flags = 0;
+
+	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed/9: %m");
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
@@ -1401,23 +1543,36 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 		flags |= NBD_FLAG_ROTATIONAL;
 	if (client->server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
-	if (phase & NEG_OLD) {
-		/* oldstyle */
-		flags = htonl(flags);
-		if (write(client->net, &flags, 4) < 0)
-			err("Negotiation failed/10: %m");
-	} else {
-		/* modern */
-		smallflags = (uint16_t)(flags & ~((uint16_t)0));
-		smallflags = htons(smallflags);
-		if (write(client->net, &smallflags, sizeof(smallflags)) < 0) {
-			err("Negotiation failed/11: %m");
-		}
+	flags = htons(flags);
+	if (write(client->net, &flags, sizeof(flags)) < 0)
+		err("Negotiation failed/11: %m");
+	if (!(glob_flags & F_NO_ZEROES)) {
+		char zeros[128];
+		memset(zeros, '\0', sizeof(zeros));
+		if (write(client->net, zeros, 124) < 0)
+			err("Negotiation failed/12: %m");
 	}
-	/* common */
-	if (write(client->net, zeros, 124) < 0)
-		err("Negotiation failed/12: %m");
-	return NULL;
+}
+
+static int nbd_errno(int errcode) {
+	switch (errcode) {
+	case EPERM:
+		return htonl(1);
+	case EIO:
+		return htonl(5);
+	case ENOMEM:
+		return htonl(12);
+	case EINVAL:
+		return htonl(22);
+	case EFBIG:
+	case ENOSPC:
+#ifdef EDQUOT
+	case EDQUOT:
+#endif
+		return htonl(28); // ENOSPC
+	default:
+		return htonl(22); // EINVAL
+	}
 }
 
 /** sending macro. */
@@ -1425,7 +1580,7 @@ CLIENT* negotiate(int net, CLIENT *client, GArray* servers, int phase) {
 	if (client->transactionlogfd != -1) \
 		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
 /** error macro. */
-#define ERROR(client,reply,errcode) { reply.error = htonl(errcode); SEND(client->net,reply); reply.error = 0; }
+#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client->net,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -1442,7 +1597,7 @@ int mainloop(CLIENT *client) {
 #ifdef DODBG
 	int i = 0;
 #endif
-	negotiate(client->net, client, NULL, client->modern ? NEG_MODERN : (NEG_OLD | NEG_INIT));
+	send_export_info(client);
 	DEBUG("Entering request loop!\n");
 	reply.magic = htonl(NBD_REPLY_MAGIC);
 	reply.error = 0;
@@ -1475,7 +1630,8 @@ int mainloop(CLIENT *client) {
 
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
-		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ)) {
+		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ) ||
+		    (command==NBD_CMD_TRIM)) {
 			if (request.from + len < request.from) { // 64 bit overflow!!
 				DEBUG("[Number too large!]");
 				ERROR(client, reply, EINVAL);
@@ -1484,7 +1640,7 @@ int mainloop(CLIENT *client) {
 
 			if (((off_t)request.from + len) > client->exportsize) {
 				DEBUG("[RANGE!]");
-				ERROR(client, reply, EINVAL);
+				ERROR(client, reply, (command==NBD_CMD_WRITE) ? ENOSPC : EINVAL);
 				continue;
 			}
 
@@ -1577,6 +1733,12 @@ int mainloop(CLIENT *client) {
 		case NBD_CMD_TRIM:
 			/* The kernel module sets discard_zeroes_data == 0,
 			 * so it is okay to do nothing.  */
+			if ((client->server->flags & F_READONLY) ||
+			    (client->server->flags & F_AUTOREADONLY)) {
+				DEBUG("[TRIM to READONLY!]");
+				ERROR(client, reply, EPERM);
+				continue;
+			}
 			if (exptrim(&request, client)) {
 				DEBUG("Trim failed: %m");
 				ERROR(client, reply, errno);
@@ -1602,111 +1764,128 @@ void setupexport(CLIENT* client) {
 	int i;
 	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
+	int treefile = (client->server->flags & F_TREEFILES);
 	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
 	int cancreate = (client->server->expected_size) && !multifile;
 
-	client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
+	if (treefile) {
+		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
+		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
+	} else {
 
-	/* If multi-file, open as many files as we can.
-	 * If not, open exactly one file.
-	 * Calculate file sizes as we go to get total size. */
-	for(i=0; ; i++) {
-		FILE_INFO fi;
-		gchar *tmpname;
-		gchar* error_string;
+		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
-		if (i)
-		  cancreate = 0;
-		/* if expected_size is specified, and this is the first file, we can create the file */
-		mode_t mode = (client->server->flags & F_READONLY) ?
-		  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+		/* If multi-file, open as many files as we can.
+		 * If not, open exactly one file.
+		 * Calculate file sizes as we go to get total size. */
+		for(i=0; ; i++) {
+			FILE_INFO fi;
+			gchar *tmpname;
+			gchar* error_string;
 
-		if (temporary) {
-			tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
-			DEBUG( "Opening %s\n", tmpname );
-			fi.fhandle = mkstemp(tmpname);
-		} else {
-			if(multifile) {
-				tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+			if (i)
+			  cancreate = 0;
+			/* if expected_size is specified, and this is the first file, we can create the file */
+			mode_t mode = (client->server->flags & F_READONLY) ?
+			  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+
+			if (temporary) {
+				tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
+				DEBUG( "Opening %s\n", tmpname );
+				fi.fhandle = mkstemp(tmpname);
 			} else {
-				tmpname=g_strdup(client->exportname);
-			}
-			DEBUG( "Opening %s\n", tmpname );
-			fi.fhandle = open(tmpname, mode, 0x600);
-			if(fi.fhandle == -1 && mode == O_RDWR) {
-				/* Try again because maybe media was read-only */
-				fi.fhandle = open(tmpname, O_RDONLY);
-				if(fi.fhandle != -1) {
-					/* Opening the base file in copyonwrite mode is
-					 * okay */
-					if(!(client->server->flags & F_COPYONWRITE)) {
-						client->server->flags |= F_AUTOREADONLY;
-						client->server->flags |= F_READONLY;
+				if(multifile) {
+					tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+				} else {
+					tmpname=g_strdup(client->exportname);
+				}
+				DEBUG( "Opening %s\n", tmpname );
+				fi.fhandle = open(tmpname, mode, 0600);
+				if(fi.fhandle == -1 && mode == O_RDWR) {
+					/* Try again because maybe media was read-only */
+					fi.fhandle = open(tmpname, O_RDONLY);
+					if(fi.fhandle != -1) {
+						/* Opening the base file in copyonwrite mode is
+						 * okay */
+						if(!(client->server->flags & F_COPYONWRITE)) {
+							client->server->flags |= F_AUTOREADONLY;
+							client->server->flags |= F_READONLY;
+						}
 					}
 				}
 			}
-		}
-		if(fi.fhandle == -1) {
-			if(multifile && i>0)
-				break;
-			error_string=g_strdup_printf(
-				"Could not open exported file %s: %%m",
-				tmpname);
-			err(error_string);
-		}
-
-		if (temporary)
-			unlink(tmpname); /* File will stick around whilst FD open */
-
-		fi.startoff = laststartoff + lastsize;
-		g_array_append_val(client->export, fi);
-		g_free(tmpname);
-
-		/* Starting offset and size of this file will be used to
-		 * calculate starting offset of next file */
-		laststartoff = fi.startoff;
-		lastsize = size_autodetect(fi.fhandle);
-
-		/* If we created the file, it will be length zero */
-		if (!lastsize && cancreate) {
-			assert(!multifile);
-			if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
-				err("Could not expand file: %m");
+			if(fi.fhandle == -1) {
+				if(multifile && i>0)
+					break;
+				error_string=g_strdup_printf(
+					"Could not open exported file %s: %%m",
+					tmpname);
+				err(error_string);
 			}
-			lastsize = client->server->expected_size;
-			break; /* don't look for any more files */
+
+			if (temporary)
+				unlink(tmpname); /* File will stick around whilst FD open */
+
+			fi.startoff = laststartoff + lastsize;
+			g_array_append_val(client->export, fi);
+			g_free(tmpname);
+
+			/* Starting offset and size of this file will be used to
+			 * calculate starting offset of next file */
+			laststartoff = fi.startoff;
+			lastsize = size_autodetect(fi.fhandle);
+
+			/* If we created the file, it will be length zero */
+			if (!lastsize && cancreate) {
+				assert(!multifile);
+				if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
+					err("Could not expand file: %m");
+				}
+				lastsize = client->server->expected_size;
+				break; /* don't look for any more files */
+			}
+
+			if(!multifile || temporary)
+				break;
 		}
 
-		if(!multifile || temporary)
-			break;
-	}
+		/* Set export size to total calculated size */
+		client->exportsize = laststartoff + lastsize;
 
-	/* Set export size to total calculated size */
-	client->exportsize = laststartoff + lastsize;
+		/* Export size may be overridden */
+		if(client->server->expected_size) {
+			/* desired size must be <= total calculated size */
+			if(client->server->expected_size > client->exportsize) {
+				err("Size of exported file is too big\n");
+			}
 
-	/* Export size may be overridden */
-	if(client->server->expected_size) {
-		/* desired size must be <= total calculated size */
-		if(client->server->expected_size > client->exportsize) {
-			err("Size of exported file is too big\n");
+			client->exportsize = client->server->expected_size;
 		}
-
-		client->exportsize = client->server->expected_size;
 	}
 
 	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
 	if(multifile) {
 		msg(LOG_INFO, "Total number of files: %d", i);
 	}
+	if(treefile) {
+		msg(LOG_INFO, "Total number of (potential) files: %d", (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
+	}
 }
 
 int copyonwrite_prepare(CLIENT* client) {
 	off_t i;
-	if ((client->difffilename = malloc(1024))==NULL)
-		err("Failed to allocate string for diff file name");
-	snprintf(client->difffilename, 1024, "%s-%s-%d.diff",client->exportname,client->clientname,
-		(int)getpid()) ;
-	client->difffilename[1023]='\0';
+	gchar* dir;
+	gchar* export_base;
+	if (client->server->cowdir != NULL) {
+		dir = g_strdup(client->server->cowdir);
+	} else {
+		dir = g_strdup(dirname(client->exportname));
+	}
+	export_base = g_strdup(basename(client->exportname));
+	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
+		(int)getpid());
+	g_free(dir);
+	g_free(export_base);
 	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 	if (client->difffile<0) err("Could not create diff file (%m)") ;
@@ -1789,8 +1968,7 @@ void serveconnection(CLIENT *client) {
  **/
 int set_peername(int net, CLIENT *client) {
 	struct sockaddr_storage netaddr;
-	struct sockaddr_in  *netaddr4 = NULL;
-	struct sockaddr_in6 *netaddr6 = NULL;
+	struct sockaddr* addr = (struct sockaddr*)&netaddr;
 	socklen_t addrinlen = sizeof( struct sockaddr_storage );
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -1799,27 +1977,30 @@ int set_peername(int net, CLIENT *client) {
 	char *tmp = NULL;
 	int i;
 	int e;
-	int shift;
 
 	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
 		msg(LOG_INFO, "getpeername failed: %m");
 		return -1;
 	}
 
-	if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
-			peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-		msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
-		return -1;
-	}
+	if(addr->sa_family == AF_UNIX) {
+		strcpy(peername, "unix");
+	} else {
+		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
+				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
+			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+			return -1;
+		}
 
-	memset(&hints, '\0', sizeof (hints));
-	hints.ai_flags = AI_ADDRCONFIG;
-	e = getaddrinfo(peername, NULL, &hints, &ai);
+		memset(&hints, '\0', sizeof (hints));
+		hints.ai_flags = AI_ADDRCONFIG;
+		e = getaddrinfo(peername, NULL, &hints, &ai);
 
-	if(e != 0) {
-		msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
-		freeaddrinfo(ai);
-		return -1;
+		if(e != 0) {
+			msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+			freeaddrinfo(ai);
+			return -1;
+		}
 	}
 
 	switch(client->server->virtstyle) {
@@ -1835,33 +2016,39 @@ int set_peername(int net, CLIENT *client) {
 				}
 			}
 		case VIRT_IPLIT:
-			msg(LOG_DEBUG, "virststyle ipliteral");
+			msg(LOG_DEBUG, "virtstyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
 			break;
 		case VIRT_CIDR:
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &(client->clientaddr), addrinlen);
 			int addrbits;
-			assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
-			if(ai->ai_family == AF_INET) {
-				addrbits = 32;
-			} else if(ai->ai_family == AF_INET6) {
-				addrbits = 128;
+			if(addr->sa_family == AF_UNIX) {
+				tmp = g_strdup(peername);
+			} else {
+				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
+				if(ai->ai_family == AF_INET) {
+					addrbits = 32;
+				} else if(ai->ai_family == AF_INET6) {
+					addrbits = 128;
+				}
+				uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
+				for(int i = 0; i < addrbits; i+=8) {
+					int masklen = client->server->cidrlen - i;
+					masklen = masklen > 0 ? masklen : 0;
+					uint8_t mask = getmaskbyte(masklen);
+					*addrptr &= mask;
+					addrptr++;
+				}
+				getnameinfo((struct sockaddr *) &netaddr, addrinlen,
+								netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
+				tmp=g_strdup_printf("%s/%s", netname, peername);
 			}
-			uint8_t* addrptr = ((struct sockaddr*)&netaddr)->sa_data;
-			for(int i = 0; i < addrbits; i+=8) {
-				int masklen = client->server->cidrlen - i;
-				masklen = masklen > 0 ? masklen : 0;
-				uint8_t mask = getmaskbyte(masklen);
-				*addrptr &= mask;
-				addrptr++;
-			}
-			getnameinfo((struct sockaddr *) &netaddr, addrinlen,
-							netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
-			tmp=g_strdup_printf("%s/%s", netname, peername);
 
-			if(tmp != NULL)
-			  client->exportname=g_strdup_printf(client->server->exportname, tmp);
+			if(tmp != NULL) {
+				client->exportname=g_strdup_printf(client->server->exportname, tmp);
+				g_free(tmp);
+			}
 
 			break;
 	}
@@ -1906,9 +2093,12 @@ spawn_child()
                 goto out;
         }
         /* Child */
+
+        /* Child's signal disposition is reset to default. */
         signal(SIGCHLD, SIG_DFL);
         signal(SIGTERM, SIG_DFL);
         signal(SIGHUP, SIG_DFL);
+        sigemptyset(&oldset);
 out:
         sigprocmask(SIG_SETMASK, &oldset, NULL);
         return pid;
@@ -1955,7 +2145,7 @@ handle_modern_connection(GArray *const servers, const int sock)
                 /* Child just continues. */
         }
 
-        client = negotiate(net, NULL, servers, NEG_INIT | NEG_MODERN);
+        client = negotiate(net, servers);
         if (!client) {
                 msg(LOG_ERR, "Modern initial negotiation failed");
                 goto handler_err;
@@ -2102,9 +2292,12 @@ handle_oldstyle_connection(GArray *const servers, SERVER *const serve)
 			goto handle_connection_out;
 		}
 		/* child */
+
+		/* Child's signal disposition is reset to default. */
 		signal(SIGCHLD, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
 		signal(SIGHUP, SIG_DFL);
+		sigemptyset(&oldset);
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 
 		g_hash_table_destroy(children);
@@ -2176,7 +2369,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
         int retval = -1;
         struct generic_conf genconf;
 
-        new_servers = parse_cfile(config_file_pos, &genconf, gerror);
+        new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
         if (!new_servers)
                 goto out;
 
@@ -2208,6 +2401,8 @@ void serveloop(GArray* servers) {
 	int max;
 	fd_set mset;
 	fd_set rset;
+	sigset_t blocking_mask;
+	sigset_t original_mask;
 
 	/* 
 	 * Set up the master fd_set. The set of descriptors we need
@@ -2230,7 +2425,56 @@ void serveloop(GArray* servers) {
 		FD_SET(sock, &mset);
 		max=sock>max?sock:max;
 	}
+
+	/* Construct a signal mask which is used to make signal testing and
+	 * receiving an atomic operation to ensure no signal is received between
+	 * tests and blocking pselect(). */
+	if (sigemptyset(&blocking_mask) == -1)
+		err("failed to initialize blocking_mask: %m");
+
+	if (sigaddset(&blocking_mask, SIGCHLD) == -1)
+		err("failed to add SIGCHLD to blocking_mask: %m");
+
+	if (sigaddset(&blocking_mask, SIGHUP) == -1)
+		err("failed to add SIGHUP to blocking_mask: %m");
+
+	if (sigaddset(&blocking_mask, SIGTERM) == -1)
+		err("failed to add SIGTERM to blocking_mask: %m");
+
+	if (sigprocmask(SIG_BLOCK, &blocking_mask, &original_mask) == -1)
+	    err("failed to block signals: %m");
+
 	for(;;) {
+		if (is_sigterm_caught) {
+			is_sigterm_caught = 0;
+
+			g_hash_table_foreach(children, killchild, NULL);
+			unlink(pidfname);
+
+			exit(EXIT_SUCCESS);
+		}
+
+		if (is_sigchld_caught) {
+			int status;
+			int* i;
+			pid_t pid;
+
+			is_sigchld_caught = 0;
+
+			while ((pid=waitpid(-1, &status, WNOHANG)) > 0) {
+				if (WIFEXITED(status)) {
+					msg(LOG_INFO, "Child exited with %d", WEXITSTATUS(status));
+				}
+				i = g_hash_table_lookup(children, &pid);
+				if (!i) {
+					msg(LOG_INFO, "SIGCHLD received for an unknown child with PID %ld", (long)pid);
+				} else {
+					DEBUG("Removing %d from the list of children", pid);
+					g_hash_table_remove(children, &pid);
+				}
+			}
+		}
+
                 /* SIGHUP causes the root server process to reconfigure
                  * itself and add new export servers for each newly
                  * found export configuration group, i.e. spawn new
@@ -2265,8 +2509,7 @@ void serveloop(GArray* servers) {
                 }
 
 		memcpy(&rset, &mset, sizeof(fd_set));
-		if(select(max+1, &rset, NULL, NULL, NULL)>0) {
-
+		if (pselect(max + 1, &rset, NULL, NULL, NULL, &original_mask) > 0) {
 			DEBUG("accept, ");
 			for(i=0; i < modernsocks->len; i++) {
 				int sock = g_array_index(modernsocks, int, i);
@@ -2447,6 +2690,46 @@ out:
         return retval;
 }
 
+int open_unix(const gchar *const sockname, GError **const gerror) {
+	struct sockaddr_un sa;
+	int sock=-1;
+	int retval=-1;
+
+	memset(&sa, 0, sizeof(struct sockaddr_un));
+	sa.sun_family = AF_UNIX;
+	strncpy(sa.sun_path, sockname, 107);
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(sock < 0) {
+		g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+				"failed to open a unix socket: "
+				"failed to create socket: %s",
+				strerror(errno));
+		goto out;
+	}
+	if(bind(sock, (struct sockaddr*)&sa, sizeof(struct sockaddr_un))<0) {
+		g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				"failed to open a unix socket: "
+				"failed to bind to address %s: %s",
+				sockname, strerror(errno));
+		goto out;
+	}
+	if(listen(sock, 10)<0) {
+		g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+				"failed to open a unix socket: "
+				"failed to start listening: %s",
+				strerror(errno));
+		goto out;
+	}
+	retval=0;
+	g_array_append_val(modernsocks, sock);
+out:
+	if(retval<0 && sock >= 0) {
+		close(sock);
+	}
+
+	return retval;
+}
+
 int open_modern(const gchar *const addr, const gchar *const port,
                 GError **const gerror) {
 	struct addrinfo hints;
@@ -2455,7 +2738,6 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	struct sock_flags;
 	int e;
         int retval = -1;
-	int i=0;
 	int sock = -1;
 
 	memset(&hints, '\0', sizeof(hints));
@@ -2540,7 +2822,7 @@ out:
  * Connect our servers.
  **/
 void setup_servers(GArray *const servers, const gchar *const modernaddr,
-                   const gchar *const modernport) {
+                   const gchar *const modernport, const gchar* unixsock) {
 	int i;
 	struct sigaction sa;
 	int want_modern=0;
@@ -2567,6 +2849,15 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
                         g_clear_error(&gerror);
                         exit(EXIT_FAILURE);
                 }
+	}
+	if(unixsock != NULL) {
+		GError* gerror = NULL;
+		if(open_unix(unixsock, &gerror) == -1) {
+			msg(LOG_ERR, "failed to setup servers: %s",
+					gerror->message);
+			g_clear_error(&gerror);
+			exit(EXIT_FAILURE);
+		}
 	}
 	children=g_hash_table_new_full(g_int_hash, g_int_equal, NULL, destroy_pid_t);
 
@@ -2715,11 +3006,11 @@ int main(int argc, char *argv[]) {
 
 	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
-	logging();
+	logging(MY_NAME);
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv);
 
-        servers = parse_cfile(config_file_pos, &genconf, &err);
+        servers = parse_cfile(config_file_pos, &genconf, true, &err);
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
@@ -2773,7 +3064,8 @@ int main(int argc, char *argv[]) {
 	}
 	if (!dontfork)
 		daemonize(serve);
-	setup_servers(servers, genconf.modernaddr, genconf.modernport);
+	setup_servers(servers, genconf.modernaddr, genconf.modernport,
+			genconf.unixsock);
 	dousers(genconf.user, genconf.group);
 
 	serveloop(servers);
