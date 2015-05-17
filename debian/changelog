@@ -1,6 +1,6 @@
 nbd (1:2.9.16-8+squeeze2) squeeze-lts; urgency=medium
 
-  * Backport (relevant parts of) fix for CVE-2015-0847.
+  * Backport (relevant parts of) fix for CVE-2015-0847. Closes: #784657.
 
  -- Wouter Verhelst <wouter@debian.org>  Fri, 15 May 2015 18:52:57 +0200
 
