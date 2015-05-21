@@ -363,7 +363,7 @@ open_plugin_so (const char *name)
     free_filename = 1;
   }
 
-  dl = dlopen (filename, RTLD_NOW|RTLD_LOCAL);
+  dl = dlopen (filename, RTLD_NOW|RTLD_GLOBAL);
   if (dl == NULL) {
     fprintf (stderr, "%s: %s: %s\n", program_name, filename, dlerror ());
     exit (EXIT_FAILURE);
