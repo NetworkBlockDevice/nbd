@@ -1,7 +1,10 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[3.11],[wouter@debian.org])
+AC_INIT([nbd],
+  m4_esyscmd_s(git describe --dirty|sed -e 's/nbd-//'),
+  [wouter@debian.org],,
+  [http://nbd.sourceforge.net/])
 AM_INIT_AUTOMAKE(foreign dist-xz serial-tests)
 AM_MAINTAINER_MODE([enable])
 LT_INIT
