@@ -296,12 +296,7 @@ Option types
   finish with an NBD_REP_ACK packet.
 
 * NBD_OPT_STARTTLS (5)
-  The client wishes to initiate TLS. XXX Data. If the server replies
-  with NBD_REP_STARTTLS, then the client should immediately initiate a
-  TLS handshake and continue the negotiation in the encrypted channel.
-  If the server is unwilling to perform TLS, it should reply with
-  NBD_REP_ERR_POLICY. For backwards compatibility, a client should also
-  be prepared to handle NBD_REP_ERR_UNSUP.
+  defined by the experimental STARTTLS extension; see below.
 
 Reply types
 - - - - - -
@@ -341,8 +336,7 @@ Reply types
     the "length of name" field be equal to "length of reply - 8".
 
 * NBD_REP_STARTTLS (3)
-  An affirmative reply to NBD_OPT_STARTTLS. The very next byte read from
-  the client should be assumed to be the first byte in a TLS handshake.
+  defined by the experimental STARTTLS extension; see below.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies may have some data set, in which
@@ -369,13 +363,7 @@ case that data is an error message suitable for display to the user.
   which the server is running. Not currently used.
 
 * NBD_REP_ERR_TLS_REQD (2^31 + 5)
-  The server is unwilling to continue negotiation unless TLS is
-  negotiated first. A server MUST NOT send this error if it has one or
-  more exports that do not require TLS; not even if the client indicated
-  interest (by way of NBD_OPT_PEEK_EXPORT) in an export which requires
-  TLS.
-  If this reply is used, servers SHOULD send it in reply to each and every
-  unencrypted NBD_OPT_* message (apart from NBD_OPT_STARTTLS).
+  defined by the experimental STARTTLS extension; see below.
 
 Request types
 - - - - - - -
@@ -418,6 +406,47 @@ The following request types exist:
 
 * NBD_CMD_CACHE (5)
   This command is defined by xnbd.
+
+Experimental extensions
+-----------------------
+
+The specifications in this section are non-normative and experimental.
+They are not currently implemented by any known version of the nbd
+protocol; a first implementation may require changes to the
+specifications in this section.
+
+Therefore, implementors are strongly suggested to contact the
+mailinglist in order to help fine-tune the specifications in this
+section before committing to a particular implementation.
+
+STARTTLS extension
+- - - - - - - - - -
+
+To implement secure NBD connections, a STARTTLS extension is envisioned.
+This extension adds one option request, one option reply, and one error
+type.
+
+* NBD_OPT_STARTTLS (5)
+  The client wishes to initiate TLS. If the server replies
+  with NBD_REP_STARTTLS, then the client should immediately initiate a
+  TLS handshake and continue the negotiation in the encrypted channel.
+  If the server is unwilling to perform TLS, it should reply with
+  NBD_REP_ERR_POLICY. For backwards compatibility, a client should also
+  be prepared to handle NBD_REP_ERR_UNSUP. If the client sent along any
+  data with the request, the server should send back
+  NBD_REP_ERR_INVALID.
+* NBD_REP_STARTTLS (3)
+  An affirmative reply to NBD_OPT_STARTTLS. Length should be zero. The
+  very next byte read from the client should be assumed to be the first
+  byte in a TLS handshake.
+* NBD_REP_ERR_TLS_REQD
+  The server is unwilling to continue negotiation unless TLS is
+  negotiated first. A server MUST NOT send this error if it has one or
+  more exports that do not require TLS; not even if the client indicated
+  interest (by way of NBD_OPT_PEEK_EXPORT) in an export which requires
+  TLS.
+  If this reply is used, servers SHOULD send it in reply to each and every
+  unencrypted NBD_OPT_* message (apart from NBD_OPT_STARTTLS).
 
 About this file
 ---------------
