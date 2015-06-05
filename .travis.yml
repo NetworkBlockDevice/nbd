@@ -8,4 +8,4 @@ install:
   - sudo apt-get -t trusty install automake
   - sudo apt-get install docbook-utils
   - automake --version
-script: ./autogen.sh && ./configure && make && make check
+script: ./autogen.sh && dpkg-buildpackage -rfakeroot -uc -us -i -I.git
