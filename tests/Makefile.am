@@ -34,7 +34,6 @@ CLEANFILES = *~ *.cmi *.cmx *.cmxa *.so
 MAINTAINERCLEANFILES =
 
 EXTRA_DIST = \
-	ocamltest.ml \
 	test-captive.sh \
 	test-dump-config.sh \
 	test-foreground.sh \
@@ -42,6 +41,8 @@ EXTRA_DIST = \
 	test-help-plugin.sh \
 	test.pl \
 	test.py \
+	test_ocaml_plugin.ml \
+	test-ocaml.c \
 	test-single.sh \
 	test-start.sh \
 	test-random-sock.sh
@@ -68,7 +69,8 @@ if HAVE_LIBGUESTFS
 TESTS_ENVIRONMENT = \
 	LIBGUESTFS_ATTACH_METHOD=appliance \
 	LIBGUESTFS_DEBUG=1 \
-	LIBGUESTFS_TRACE=1
+	LIBGUESTFS_TRACE=1 \
+	LD_LIBRARY_PATH=../plugins/ocaml/.libs
 
 # Common test library.
 check_LTLIBRARIES = libtest.la
@@ -187,10 +189,11 @@ test_ocaml_CFLAGS = \
 test_ocaml_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
 check_SCRIPTS += test-ocaml-plugin.so
-test-ocaml-plugin.so: test_ocaml_plugin.ml ../plugins/ocaml/.libs/nbdkit-ocaml-plugin.a ../plugins/ocaml/NBDKit.cmi ../plugins/ocaml/NBDKit.cmx
+test-ocaml-plugin.so: test_ocaml_plugin.ml ../plugins/ocaml/libnbdkitocaml.la ../plugins/ocaml/NBDKit.cmi ../plugins/ocaml/NBDKit.cmx
 	$(OCAMLOPT) $(OCAMLOPTFLAGS) -I ../plugins/ocaml \
-	  -output-obj -o $@ \
-	  NBDKit.cmx $< ../plugins/ocaml/.libs/nbdkit-ocaml-plugin.a
+	  -output-obj -runtime-variant _pic -o $@ \
+	  NBDKit.cmx $< \
+	  -cclib -L../plugins/ocaml/.libs -cclib -lnbdkitocaml
 
 endif
 

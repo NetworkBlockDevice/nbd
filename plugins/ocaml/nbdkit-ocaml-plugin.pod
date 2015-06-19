@@ -15,25 +15,22 @@ nbdkit-ocaml-plugin - nbdkit OCaml plugin
 C<nbdkit-ocaml-plugin> allows you to write nbdkit plugins in natively
 compiled OCaml code.
 
-=head1 IMPORTANT NOTE
-
-Currently this requires a specially compiled version of OCaml, and so
-it won't work with the OCaml compiler provided by most Linux distros.
-
-We hope to have this problem resolved in a future version of OCaml.
-You can track progress in this upstream bug:
-L<http://caml.inria.fr/mantis/view.php?id=6693>
+Note this requires OCaml E<ge> 4.02.2, which has support for shared
+libraries.  See L<http://caml.inria.fr/mantis/view.php?id=6693>
 
 =head1 COMPILING AN OCAML NBDKIT PLUGIN
 
 After writing your OCaml plugin (C<myplugin.ml>), link it using this
 command:
 
- ocamlopt.opt -output-obj -o nbdkit-myplugin-plugin.so \
-   NBDKit.cmx myplugin.ml $plugindir/nbdkit-plugin-ocaml.a
+ ocamlopt.opt \
+   -output-obj -runtime-variant _pic \
+   -o nbdkit-myplugin-plugin.so \
+   NBDKit.cmx myplugin.ml \
+   -cclib -lnbdkitocaml
 
-You can use it as if it were a regular nbdkit plugin (see
-L<nbdkit(1)>, L<nbdkit-plugin(3)>).
+You can then use C<nbdkit-myplugin-plugin.so> as if it were a regular
+nbdkit plugin (see L<nbdkit(1)>, L<nbdkit-plugin(3)>).
 
 =head1 WRITING AN OCAML NBDKIT PLUGIN
 

@@ -211,7 +211,7 @@ AS_IF([test "x$OCAMLOPT" != "xno" && test "x$enable_ocaml" != "xno"],[
     dnl Check OCaml can create a shared library (see README for details).
     AC_MSG_CHECKING([if $OCAMLOPT can create a shared library])
     echo 'print_endline "test"' > conftest.ml
-    AS_IF([$OCAMLOPT $OCAMLOPTFLAGS -output-obj -o conftest.so conftest.ml >&AS_MESSAGE_LOG_FD 2>&1],[
+    AS_IF([$OCAMLOPT $OCAMLOPTFLAGS -output-obj -runtime-variant _pic -o conftest.so conftest.ml >&AS_MESSAGE_LOG_FD 2>&1],[
         AC_MSG_RESULT([yes])
         ocaml_link_shared=yes
     ],[

@@ -35,8 +35,6 @@ EXTRA_DIST = \
 	NBDKit.ml \
 	nbdkit-ocaml-plugin.pod
 
-plugindir = $(libdir)/nbdkit/plugins
-
 if HAVE_OCAML
 
 ocamllibdir = $(OCAMLLIB)
@@ -45,28 +43,27 @@ ocamllib_DATA = NBDKit.mli NBDKit.cmi NBDKit.cmx NBDKit.o
 NBDKit.cmi: NBDKit.mli
 	$(OCAMLC) -c $<
 
-NBDKit.cmx NBDKit.o: NBDKit.ml
+NBDKit.cmx: NBDKit.ml
 	$(OCAMLOPT) $(OCAMLOPTFLAGS) -c $<
+NBDKit.o: NBDKit.cmx
 
-# NB: nbdkit-ocaml-plugin is not a self-contained plugin.  It's a
-# static library that you have to link in to the OCaml plugins that
-# you write.  Hence this builds 'nbdkit-ocaml-plugin.a'.  See
-# nbdkit-ocaml-plugin(3) for more details.
+# NB: libnbdkitocaml is not plugin.  It's a library that you have to
+# link in to the OCaml plugins that you write.  nbdkit-ocaml-plugin(3)
+# for more details.
 
-plugin_LTLIBRARIES = nbdkit-ocaml-plugin.la
+lib_LTLIBRARIES = libnbdkitocaml.la
 
-nbdkit_ocaml_plugin_la_SOURCES = \
+libnbdkitocaml_la_SOURCES = \
 	ocaml.c \
 	$(top_srcdir)/include/nbdkit-plugin.h
 
-nbdkit_ocaml_plugin_la_CPPFLAGS = \
+libnbdkitocaml_la_CPPFLAGS = \
 	-I$(OCAMLLIB) \
 	-I$(top_srcdir)/include
-nbdkit_ocaml_plugin_la_CFLAGS = \
+
+libnbdkitocaml_la_CFLAGS = \
 	$(WARNINGS_CFLAGS) \
 	-fPIC
-nbdkit_ocaml_plugin_la_LDFLAGS = \
-	-module -avoid-version -static
 
 if HAVE_POD2MAN
 
