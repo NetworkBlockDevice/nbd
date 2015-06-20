@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-nbdkit-ocaml-plugin - nbdkit OCaml plugin
+nbdkit-ocaml-plugin - writing nbdkit plugins in OCaml
 
 =head1 SYNOPSIS
 
@@ -12,7 +12,7 @@ nbdkit-ocaml-plugin - nbdkit OCaml plugin
 
 =head1 DESCRIPTION
 
-C<nbdkit-ocaml-plugin> allows you to write nbdkit plugins in natively
+This manual page describes how to write nbdkit plugins in natively
 compiled OCaml code.
 
 Note this requires OCaml E<ge> 4.02.2, which has support for shared
@@ -30,7 +30,13 @@ command:
    -cclib -lnbdkitocaml
 
 You can then use C<nbdkit-myplugin-plugin.so> as if it were a regular
-nbdkit plugin (see L<nbdkit(1)>, L<nbdkit-plugin(3)>).
+nbdkit plugin (see L<nbdkit(1)>, L<nbdkit-plugin(3)>):
+
+ nbdkit ./nbdkit-myplugin-plugin.so [args ...]
+
+or if the C<.so> file is installed in the C<$plugindir> directory:
+
+ nbdkit myplugin [args ...]
 
 =head1 WRITING AN OCAML NBDKIT PLUGIN
 
@@ -55,6 +61,33 @@ Your OCaml code should call C<NBDKit.register_plugin> like this:
  let thread_model = NBDKit.THREAD_MODEL_SERIALIZE_CONNECTIONS
  
  let () = NBDKit.register_plugin thread_model plugin
+
+Your plugin can only call C<register_plugin> once.
+
+=head2 HANDLE
+
+Your C<open_connection> callback can return an OCaml value of any
+type.  The same value is passed back to the per-connection callbacks
+like C<get_size> and C<pread>.
+
+Typically (although this is not a requirement) you define your own
+handle struct in your plugin:
+
+ type handle = {
+   (* any per-connection data you want to store goes here *)
+   h_id : int; (* this is just an example field *)
+   h_readonly : bool;
+ }
+ 
+ let id = ref 0
+ let myplugin_open readonly =
+   (* return a newly allocated handle *)
+   incr id;
+   { h_id = !id; h_readonly = readonly }
+ 
+ let myplugin_get_size handle =
+   printf "handle ID = %d\n" handle.h_id;
+   (* ... *)
 
 =head2 THREADS
 
