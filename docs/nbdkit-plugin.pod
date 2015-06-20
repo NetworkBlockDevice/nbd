@@ -528,7 +528,7 @@ compiled and can be found by doing:
 
 =head1 WRITING PLUGINS IN OTHER PROGRAMMING LANGUAGES
 
-You can also write nbdkit plugins in Perl or Python.  Other
+You can also write nbdkit plugins in OCaml, Perl or Python.  Other
 programming languages may be offered in future.
 
 For more information see:
