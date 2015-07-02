@@ -336,14 +336,14 @@ case that data is an error message suitable for display to the user.
 
     The option sent by the client is known by this server and
     syntactically valid, but server-side policy forbids the server to
-    allow the option (e.g., the client sent NBD_OPT_LIST but server
+    allow the option (e.g., the client sent `NBD_OPT_LIST` but server
     configuration has that disabled)
 
 * `NBD_REP_ERR_INVALID` (2^31 + 3)
 
     The option sent by the client is know by this server, but was
     determined by the server to be syntactically invalid. For instance,
-    the client sent an NBD_OPT_LIST with nonzero data length.
+    the client sent an `NBD_OPT_LIST` with nonzero data length.
 
 * `NBD_REP_ERR_PLATFORM` (2^31 + 4)
 
@@ -425,7 +425,7 @@ The following request types exist:
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
-    overwriting it again with NBD_CMD_WRITE.
+    overwriting it again with `NBD_CMD_WRITE`.
 
 * Other requests
 
