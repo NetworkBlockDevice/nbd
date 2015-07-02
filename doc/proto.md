@@ -196,25 +196,27 @@ the response.
 There are five request types in the data pushing phase: `NBD_CMD_READ`,
 `NBD_CMD_WRITE`, `NBD_CMD_DISC` (disconnect), `NBD_CMD_FLUSH`, `NBD_CMD_TRIM`.
 
-The request is sent by the client; the response by the server. A request
-header consists a 32 bit magic number (magic), a 32 bit field denoting
-the request type (see below; 'type'), a 64 bit handle ('handle'), a 64
-bit data offset ('from'), and a 32 bit length ('len'). In case of a
-write request, the header is immediately followed by 'len' bytes of
-data. In the case of `NBD_CMD_FLUSH`, the offset and length should
-be zero (meaning "flush entire device"); other values are reserved
-for future use (e.g. for flushing specific areas without a write).
+The request is sent by the client; the response by the server.
+
+The request message looks as follows:
+
+C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)  
+C: 16 bits, command flags  
+C: 16 bits, type  
+C: 64 bits, handle  
+C: 32 bits, offset (unsigned)  
+C: 32 bits, length (unsigned)  
+C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)
+
+The reply looks as follows:
+
+S: 32 bits, 0x67446698, magic (`NBD_REPLY_MAGIC`)  
+S: 32 bits, error  
+S: 64 bits, handle  
+S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 
 Bits 16 and above of the commands are reserved for flags.  Right
 now, the only flag is `NBD_CMD_FLAG_FUA` (bit 16), "Force unit access".
-
-The reply contains three fields: a 32 bit magic number ('magic'), a 32
-bit error code ('error'; 0, unless an error occurred in which case it is
-one of the error values documented below), and the same 64 bit handle
-that the corresponding request had in its 'handle' field. In case the
-reply is sent in response to a read request and the error field is 0
-(zero), the reply header is immediately followed by request.len bytes of
-data.
 
 In case of a disconnect request, the server will immediately close the
 connection. Requests are currently handled synchronously; when (not if)
