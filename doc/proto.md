@@ -16,6 +16,15 @@ need not be an actual block device; it may be a block device, a regular
 file, or a more complex configuration involving several files. That is
 an implementational detail of the server.
 
+## Conventions
+
+In the below protocol descriptions, the label 'C:' is used for messages
+sent by the client, whereas 'S:' is used for messages sent by the
+server).  `monotype text` is for literal character data or (when used in
+comments) constant names, `0xdeadbeaf` is used for literal hex numbers
+(which are always sent in network byte order), and (brackets) are used
+for comments. Anything else is a description of the data that is sent.
+
 ## Protocol phases
 
 The protocol has two phases: the handshake (in which the connection is
