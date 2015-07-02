@@ -440,6 +440,17 @@ The following request types exist:
 
 #### Error values
 
+The error values are used for the error field in the reply message.
+Originally, error messages were defined as the value of `errno` on the
+system running the server; however, although they happen to have similar
+values on most systems, these values are in fact not well-defined, and
+therefore not entirely portable.
+
+Therefore, the allowed values for the error field have been restricted
+to set of possibilities. To remain intelligible with older clients, the
+most common values of `errno` for that particular error has been chosen
+as the value for an error.
+
 The following error values are defined:
 
     Integer value    Short name     Description
