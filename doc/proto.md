@@ -115,11 +115,6 @@ The presence of the option length in every option allows the server
 to skip any options presented by the client that it does not
 understand.
 
-The data needed for the `NBD_OPT_EXPORT_NAME` option is:
-
-C: name of the export (character string of length as specified,
-   not terminated by any NUL bytes or similar)
-
 If the value of the option field is `NBD_OPT_EXPORT_NAME` and the server
 is willing to allow the export, the server replies with information
 about the used export:
@@ -182,9 +177,6 @@ required to.
 There are two message types in the data pushing phase: the request, and
 the response.
 
-There are five request types in the data pushing phase: `NBD_CMD_READ`,
-`NBD_CMD_WRITE`, `NBD_CMD_DISC` (disconnect), `NBD_CMD_FLUSH`, `NBD_CMD_TRIM`.
-
 The request message, sent by the client, looks as follows:
 
 C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)  
@@ -202,24 +194,8 @@ S: 32 bits, error
 S: 64 bits, handle  
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 
-Bits 16 and above of the commands are reserved for flags.  Right
-now, the only flag is `NBD_CMD_FLAG_FUA` (bit 16), "Force unit access".
-
-In case of a disconnect request, the server will immediately close the
-connection. Requests are currently handled synchronously; when (not if)
-we change that to asynchronous handling, handling the disconnect request
-will probably be postponed until there are no other outstanding
-requests.
-
-A flush request will not be sent unless `NBD_FLAG_SEND_FLUSH` is set,
-and indicates the backing file should be fdatasync()'d to disk.
-
-The top 16 bits of the request are flags. `NBD_CMD_FLAG_FUA` implies
-a force unit access, and can currently only be usefully combined
-with `NBD_CMD_WRITE`. This is implemented using sync_file_range
-if present, else by fdatasync() of that file (note not all files
-in a multifile environment). `NBD_CMD_FLAG_FUA` will not be set
-unless `NBD_FLAG_SEND_FUA` is set.
+Replies need not be sent in the same order as requests (i.e., requests
+may be handled by the server asynchronously).
 
 ## Values
 
@@ -391,28 +367,55 @@ The following request types exist:
     bytes of data, read offset bytes into the file, unless an error
     condition has occurred.
 
+    If an error occurs, the server SHOULD set the appropriate error code
+    in the error field. The server MUST then either close the
+    connection, or send *length* bytes of data (which MAY be invalid).
+
+    If an error occurs while reading after the server has already sent
+    out the reply header with an error field set to zero (i.e.,
+    signalling no error), the server MUST immediately close the
+    connection; it MUST NOT send any further data to the client.
+
 * `NBD_CMD_WRITE` (1)
 
     A write request. Length and offset define the location and amount of
-    data to be written. The server should write the data to disk, and then
-    send the reply header. However, the server does not need to ensure
-    that all data has hit the disk, unless the `NBD_CMD_FLAG_FUA` flag is
-    set (bit 16).
+    data to be written. The client MUST follow the request header with
+    *length* number of bytes to be written to the device.
+  
+    The server MUST write the data to disk, and then send the reply
+    message. The server MAY send the reply message before the data has
+    reached permanent storage.
+
+    If the `NBD_FLAG_SEND_FUA` flag ("Force Unit Access") was set in the
+    export flags field, the client MAY set the flag `NBD_CMD_FLAG_FUA` in
+    the command flags field. If this flag was set, the server MUST NOT send
+    the reply until it has ensured that the newly-written data has reached
+    permanent storage.
+
+    If an error occurs, the server SHOULD set the appropriate error code
+    in the error field. The server MAY then close the connection.
 
 * `NBD_CMD_DISC` (2)
 
     A disconnect request. The server MUST handle all outstanding
-    requests, and then close the connection.
-    A client MUST NOT send anything to the server after sending an
-    `NBD_CMD_DISC` command.
+    requests, and then close the connection.  A client MUST NOT send
+    anything to the server after sending an `NBD_CMD_DISC` command.
+
+    The values of the length and offset fields in a disconnect request
+    are not defined.
 
 * `NBD_CMD_FLUSH` (3)
 
-    A flush request; a write barrier. The server MUST NOT send a successful
-    reply header for this request before all write requests that were
-    completed before this command have hit the disk (using fsync() or similar).
-    In this command, "len" and "offset" are reserved, and should be set to
-    all-zero.
+    A flush request; a write barrier. The server MUST NOT send a
+    successful reply header for this request before all write requests
+    for which a reply has already been sent to the client have reached
+    permanent storage (using fsync() or similar).
+
+    A client MUST NOT send a flush request unless `NBD_FLAG_SEND_FLUSH`
+    was set in the export flags field.
+    
+    For a flush request, *length* and *offset* are reserved, and MUST be
+    set to all-zero.
 
 * `NBD_CMD_TRIM` (4)
 
@@ -422,11 +425,18 @@ The following request types exist:
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
-    overwriting it again with `NBD_CMD_WRITE`.
+    overwriting it again with NBD_CMD_WRITE.
 
-* `NBD_CMD_CACHE` (5)
+* Other requests
 
-    This command is defined by xnbd.
+    Some third-party implementations may require additional protocol
+    messages which are not described in this document. In the interest of
+    interoperability, authors of such implementations SHOULD contact the
+    maintainer of this document, so that these messages can be listed here
+    to avoid conflicting implementations.
+
+    Currently one such message is known: `NBD_CMD_CACHE`, with type set to
+    5, implemented by xnbd.
 
 #### Error values
 
