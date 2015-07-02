@@ -103,17 +103,17 @@ return in any other case is not specified by the NBD protocol.
 
 ## Negotiation
 
-There are two versions of the negotiation: the 'old' style (nbd <=
-2.9.16) and the 'new' style (nbd >= 2.9.17, though due to a bug it does
-not work with anything below 2.9.18). What follows is a description of
-both cases (in the below description, the label 'C:' is used for
-messages sent by the client, whereas 'S:' is used for messages sent by
-the server). "quoted text" is for literal character data, '0xdeadbeaf'
-is used for literal hex numbers (which are always sent in network byte
-order), and (brackets) are used for comments. Anything else is a
-description of the data that is sent.
+There are three versions of the negotiation. They are referred to as
+"oldstyle", "newstyle", and "fixed newstyle" negotiation. Oldstyle was
+the only version of the negotiation until nbd 2.9.16; newstyle was
+introduced for nbd 2.9.17. A short while later, it was discovered that
+newstyle was insufficiently structured to allow protocol options to be
+added while retaining backwards compatibility. The minor changes
+introduced to fix this problem are, where necessary, referred to as
+"fixed newstyle" to differentiate from the original version of the
+newstyle negotiation.
 
-### 'old' style handshake
+### Oldstyle negotiation
 
 S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)  
 S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
@@ -121,25 +121,28 @@ S: 64 bits, size of the export in bytes (unsigned)
 S: 32 bits, flags  
 S: 124 bytes, zeroes (reserved).
 
-As can be seen, this isn't exactly a negotiation; it's just the server
-sending a bunch of data to the client. If the client is unhappy with
-what he receives, he's supposed to disconnect and not look back.
+As can be seen, this isn't exactly a negotiation; it's just a matter of
+the server sending a bunch of data to the client. If the client is
+unhappy with what he receives, he should disconnect and not look back.
 
 The fact that the size of the export was specified before the flags were
 sent, made it impossible for the protocol to be changed in a
 backwards-compatible manner to allow for named exports without ugliness.
-As a result, the old style negotiation is now no longer developed, and
-only still supported for backwards compatibility.
+As a result, the old style negotiation is now no longer developed;
+starting with version 3.10 of the reference implementation, it is also
+no longer supported.
 
-### 'new' style handshake
+### Newstyle negotiation
 
-A client who wants to use the new style negotiation should connect on
-the IANA-reserved port for NBD, 10809. The server may listen on other
-ports as well, but it will use the old style handshake on those. The
-server will refuse to allow old-style negotiations on the new-style
-port. For debugging purposes, the server may change the port on which to
-listen for new-style negotiation, but this should not happen for
+A client who wants to use the new style negotiation SHOULD connect on
+the IANA-reserved port for NBD, 10809. The server MAY listen on other
+ports as well, but it SHOULD use the old style handshake on those. The
+server SHOULD refuse to allow oldstyle negotiations on the newstyle
+port. For debugging purposes, the server MAY change the port on which to
+listen for newstyle negotiation, but this should not happen for
 production purposes.
+
+The initial few exchanges in newstyle negotiation look as follows:
 
 S: 64 bits, `NBDMAGIC` (as in the old style handshake)  
 S: 64 bits, `0x49484156454F5054` (note different magic number)  
@@ -147,14 +150,13 @@ S: 16 bits, global flags
 C: 32 bits, flags  
 
 This completes the initial phase of negotiation; the client and server
-now both know they understand the first version of the new-style
+now both know they understand the first version of the newstyle
 handshake, with no options. What follows is a repeating group of
-options. Currently only one option can be set (the name of the export to
-be used), and it is not optional; but future protocol extensions may add
-other options that may or may not be optional. Once extra protocol
-options have been added, the order in which these options are set will
-not be significant.
+options. In non-fixed newstyle only one option can be set
+(`NBD_OPT_EXPORT_NAME`), and it is not optional.
 
+At this point, we move on to option haggling, during which point the
+client can send one or (in fixed newstyle) more options to the server.
 The generic format of setting an option is as follows:
 
 C: 64 bits, `0x49484156454F5054` (note same newstyle handshake's magic number)  
@@ -171,38 +173,40 @@ The data needed for the `NBD_OPT_EXPORT_NAME` option is:
 C: name of the export (character string of length as specified,
    not terminated by any NUL bytes or similar)
 
-Once all options are set, the server replies with information about the
-used export:
+If the value of the option field is `NBD_OPT_EXPORT_NAME` and the server
+is willing to allow the export, the server replies with information
+about the used export:
 
 S: 64 bits, size of the export in bytes (unsigned)  
 S: 16 bits, export flags  
 S: 124 bytes, zeroes (reserved)
 
+If the server is unwilling to allow the export, it should close the
+connection.
+
 The reason that the flags field is 16 bits large and not 32 as in the
-old style of the protocol is that there are now 16 bits of per-export
-flags, and 16 bits of per-server flags. Concatenated together, this
-results in 32 bits, which allows for using a common set of macros for
-both; indeed, the code masks away the upper or lower bits of a 32 bit
-"flags" field when performing the new-style handshake. If we ever run
-out of flags, the server will set the most significant flag bit,
-signalling that an extra flag field will follow, to which the client
-will have to reply with a flag field of its own before the extra flags
-are sent. This is not yet implemented.
+oldstyle negotiation is that there are now 16 bits of per-export flags,
+and 16 bits of per-server flags. Concatenated together, this results in
+32 bits, which allows for using a common set of macros for both. If we
+ever run out of flags, the server will set the most significant flag
+bit, signalling that an extra flag field will follow, to which the
+client will have to reply with a flag field of its own before the extra
+flags are sent. This is not yet implemented.
 
-### Fixed 'new' style handshake
+### Fixed newstyle negotiation
 
-Unfortunately, due to a mistake on my end, the server would immediately
-close the connection when it saw an option it did not understand, rather
-than signalling this fact to the client, which would've allowed it to
-retry; and replies from the server were not structured either, which
-meant that if the server were to send something the client did not
-understand, it would have to abort negotiation as well.
+Unfortunately, due to a mistake, the server would immediately close the
+connection when it saw an option it did not understand, rather than
+signalling this fact to the client, which would've allowed it to retry;
+and replies from the server were not structured either, which meant that
+if the server were to send something the client did not understand, it
+would have to abort negotiation as well.
 
-To fix these two issues, the handshake has been extended once more:
+To fix these two issues, the following changes were implemented:
 
-- The server will set bit 0 of its first set of reserved flags, to
-  signal that it supports this version of the protocol.
-- The client should reply with bit 0 set in its reserved field too,
+- The server will set bit 0 of its global flags field, to
+  signal that it supports fixed newstyle negotiation
+- The client should reply with bit 0 set in its flags field too,
   though its side of the protocol does not change incompatibly.
 - The client may now send other options to the server as appropriate, in
   the generic format for sending an option as described above.
@@ -222,7 +226,9 @@ S: any data as required by the reply (e.g., an export name in the case
 As there is no unique number for client requests, clients who want to
 differentiate between answers to two instances of the same option during
 any negotiation must make sure they've seen the answer to an outstanding
-request before sending the next one of the same type.
+request before sending the next one of the same type. The server MAY
+send replies in the order that the requests were received, but is not
+required to.
 
 ## Values
 
