@@ -115,12 +115,11 @@ description of the data that is sent.
 
 ### 'old' style handshake
 
-S: "NBDMAGIC" (the `INIT_PASSWD` in the code)  
-S: 0x00420281861253 (`cliserv_magic`, a magic number)  
-S: size of the export in bytes, 64 bit unsigned int  
-S: flags, 4 bytes  
-S: 124 bytes of zeroes (registered for future use, yes this is
-   excessive).
+S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)  
+S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
+S: 64 bits, size of the export in bytes (unsigned)
+S: 32 bits, flags  
+S: 124 bytes, zeroes (reserved).
 
 As can be seen, this isn't exactly a negotiation; it's just the server
 sending a bunch of data to the client. If the client is unhappy with
@@ -142,11 +141,10 @@ port. For debugging purposes, the server may change the port on which to
 listen for new-style negotiation, but this should not happen for
 production purposes.
 
-S: "NBDMAGIC" (as in the old style handshake)
-S: 0x49484156454F5054 (note different magic number)
-S: 16 bits of zero (bits 1-15 reserved for future use; bit 0 in use to
-   signal fixed newstyle (see below))
-C: 32 bits of zero (reserved for future use)
+S: 64 bits, `NBDMAGIC` (as in the old style handshake)  
+S: 64 bits, `0x49484156454F5054` (note different magic number)  
+S: 16 bits, global flags  
+C: 32 bits, flags  
 
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the new-style
@@ -159,11 +157,10 @@ not be significant.
 
 The generic format of setting an option is as follows:
 
-C: 0x49484156454F5054 (note same new-style handshake's magic number)  
-C: 32 bits denoting the chosen option (`NBD_OPT_EXPORT_NAME` is the only
-   possible value in this version of the protocol)  
-C: unsigned 32 bit length of option data  
-C: (any data needed for the chosen option)  
+C: 64 bits, `0x49484156454F5054` (note same newstyle handshake's magic number)  
+C: 32 bits, option  
+C: 32 bits, length of option data (unsigned)  
+C: any data needed for the chosen option, of length as specified above.
 
 The presence of the option length in every option allows the server
 to skip any options presented by the client that it does not
@@ -177,9 +174,9 @@ C: name of the export (character string of length as specified,
 Once all options are set, the server replies with information about the
 used export:
 
-S: size of the export in bytes, 64 bit unsigned int  
-S: flags (16 bits unsigned int)  
-S: 124 bytes of zeroes (forgot to remove that, oops)  
+S: 64 bits, size of the export in bytes (unsigned)  
+S: 16 bits, export flags  
+S: 124 bytes, zeroes (reserved)
 
 The reason that the flags field is 16 bits large and not 32 as in the
 old style of the protocol is that there are now 16 bits of per-export
@@ -213,11 +210,10 @@ To fix these two issues, the handshake has been extended once more:
   with reply packets in the following format:
 
 S: 64 bits, `0x3e889045565a9` (magic number for replies)  
-S: 32 bits, the option as sent by the client to which this is a reply
-   packet.  
-S: 32 bits, denoting reply type (e.g., `NBD_REP_ACK` to denote successful
-   completion, or `NBD_REP_ERR_UNSUP` to denote use of an option not known
-   by this server  
+S: 32 bits, the option as sent by the client to which this is a reply  
+S: 32 bits, reply type (e.g., `NBD_REP_ACK` for successful completion,
+   or `NBD_REP_ERR_UNSUP` to mark use of an option not known by this
+   server  
 S: 32 bits, length of the reply. This may be zero for some replies, in
    which case the next field is not sent  
 S: any data as required by the reply (e.g., an export name in the case
