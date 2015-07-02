@@ -48,26 +48,6 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
-## Error values
-
-The following error values are defined:
-
-    Integer value    Short name     Description
-    -------------------------------------------------------------
-       1             EPERM          Operation not permitted
-       5             EIO            Input/output error
-      12             ENOMEM         Cannot allocate memory
-      22             EINVAL         Invalid argument
-      28             ENOSPC         No space left on device
-
-The server should return `ENOSPC` if it receives a write request including
-one or more sectors beyond the size of the device.  It should return
-`EINVAL` if it receives a read or trim request including one or more
-sectors beyond the size of the device.  It also should map the `EDQUOT`
-and `EFBIG` errors to `ENOSPC`.  Finally, it should return `EPERM` if it
-receives a write or trim request on a read-only export.  Which error to
-return in any other case is not specified by the NBD protocol.
-
 ## Negotiation
 
 There are three versions of the negotiation. They are referred to as
@@ -440,6 +420,26 @@ The following request types exist:
 * `NBD_CMD_CACHE` (5)
 
     This command is defined by xnbd.
+
+## Error values
+
+The following error values are defined:
+
+    Integer value    Short name     Description
+    -------------------------------------------------------------
+       1             EPERM          Operation not permitted
+       5             EIO            Input/output error
+      12             ENOMEM         Cannot allocate memory
+      22             EINVAL         Invalid argument
+      28             ENOSPC         No space left on device
+
+The server should return `ENOSPC` if it receives a write request including
+one or more sectors beyond the size of the device.  It should return
+`EINVAL` if it receives a read or trim request including one or more
+sectors beyond the size of the device.  It also should map the `EDQUOT`
+and `EFBIG` errors to `ENOSPC`.  Finally, it should return `EPERM` if it
+receives a write or trim request on a read-only export.  Which error to
+return in any other case is not specified by the NBD protocol.
 
 ## Experimental extensions
 
