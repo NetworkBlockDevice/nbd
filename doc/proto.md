@@ -1,10 +1,27 @@
 # The NBD protocol
 
-The NBD protocol has two phases: the handshake (in which the connection
-is established, an exported NBD device is negotiated between the client
-and the server, and protocol options are negotiated), and the data
-pushing phase (in which the client and server are communicating between
-eachother).
+## Introduction
+
+The Network Block Device is a Linux-originated lightweight block access
+protocol that allows one to export a block device to a client. While the
+name of the protocol specifically references the concept of block
+devices, there is nothing inherent in the *protocol* which requires that
+exports are, in fact, block devices; the protocol only concerns itself
+with a range of bytes, and several operations of particular lengths at
+particular offsets within that range of bytes.
+
+For matters of clarity, in this document we will refer to an export from
+a server as a block device, even though the actual backing on the server
+need not be an actual block device; it may be a block device, a regular
+file, or a more complex configuration involving several files. That is
+an implementational detail of the server.
+
+## Protocol phases
+
+The protocol has two phases: the handshake (in which the connection is
+established, an exported NBD device is negotiated between the client and
+the server, and protocol options are negotiated), and the data pushing
+phase (in which the export is read from and written to).
 
 On the client side under Linux, the handshake is implemented in
 userspace, while the data pushing phase is implemented in kernel space.
@@ -13,14 +30,14 @@ To get from the handshake to the data pushing phase, the client performs
     ioctl(nbd, NBD_SET_SOCK, sock)
     ioctl(nbd, NBD_DO_IT)
 
-with `nbd` in the above ioctl being a file descriptor for an open
-`/dev/nbdX` device node, and `sock` being the socket to the server. The
-second of the two above ioctls does not return until the client
-disconnects.
+with `nbd` in the above being a file descriptor for an open `/dev/nbdX`
+device node, and `sock` being the socket to the server. The second of
+the above two calls does not return until the client disconnects.
 
-Note that there are other `ioctl`s available, that are used by the client
-to communicate the options to the kernel which were negotiated with the
-server during the handshake.
+Note that there are other `ioctl` calls available, that are used by the
+client to communicate the options to the kernel which were negotiated
+with the server during the handshake. This document does not describe
+those.
 
 There are two message types in the data pushing phase: the request, and
 the response.
