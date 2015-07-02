@@ -271,7 +271,7 @@ receiving the global flags from the server.
   set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
   bytes of zeroes at the end of the negotiation.
 
-### Option types
+#### Option types
 
 - `NBD_OPT_EXPORT_NAME` (1)
 
@@ -303,7 +303,7 @@ receiving the global flags from the server.
 
     defined by the experimental STARTTLS extension; see below.
 
-### Reply types
+#### Reply types
 
 - `NBD_REP_ACK` (1)
 
@@ -363,7 +363,10 @@ case that data is an error message suitable for display to the user.
 
     defined by the experimental `STARTTLS` extension; see below.
 
-### Request types
+
+### Data pushing phase
+
+#### Request types
 
 The following request types exist:
 
@@ -411,7 +414,7 @@ The following request types exist:
 
     This command is defined by xnbd.
 
-## Error values
+#### Error values
 
 The following error values are defined:
 
