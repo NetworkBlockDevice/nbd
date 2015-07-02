@@ -223,8 +223,11 @@ unless `NBD_FLAG_SEND_FUA` is set.
 
 ## Values
 
-This section describes the meaning of constants (other than magic
-numbers) in the protocol handshake.
+This section describes the value and meaning of constants (other than
+magic numbers) in the protocol.
+
+When flags fields are specified, they are numbered in network byte
+order.
 
 ### Negotiation phase
 
@@ -273,58 +276,70 @@ receiving the global flags from the server.
 
 #### Option types
 
+These values are used in the "option" field during the option haggling
+of the newstyle negotiation.
+
 - `NBD_OPT_EXPORT_NAME` (1)
 
-    Choose the export which the client would like to use, and end option
-    haggling. Data: name of the export, free-form UTF8 text (subject to
-    limitations by server implementation). If the chosen export does not
-    exist or requirements for the chosen export are not met (e.g., the
-    client did not negotiate TLS for an export where the server requires
-    it), the server should close the connection.
+    Choose the export which the client would like to use, end option
+    haggling, and proceed to the data pushing phase. Data: name of the
+    export, free-form UTF8 text (subject to limitations by server
+    implementation). If the chosen export does not exist or requirements
+    for the chosen export are not met (e.g., the client did not
+    negotiate TLS for an export where the server requires it), the
+    server should close the connection.
 
     A special, "empty", name (i.e., the length field is zero and no name
     is specified), is reserved for a "default" export, to be used in cases
     where explicitly specifying an export name makes no sense.
 
+    This is the only valid option in nonfixed newstyle negotiation. A
+    server which wishes to use any other option MUST support fixed
+    newstyle.
+
 - `NBD_OPT_ABORT` (2)
 
-    Abort negotiation and close the connection. Optional.
+    The client desires to abort the negotiation and close the
+    connection.
 
 - `NBD_OPT_LIST` (3)
 
-    Returns a number of `NBD_REP_SERVER` replies, one for each export,
-    followed by an `NBD_REP_ACK`. No flags should be sent.
+    Return a number of `NBD_REP_SERVER` replies, one for each export,
+    followed by `NBD_REP_ACK`.
 
 - `NBD_OPT_PEEK_EXPORT` (4)
 
-    defined by the experimental `PEEK_EXPORT` extension; see below.
+    Defined by the experimental `PEEK_EXPORT` extension; see below.
 
 - `NBD_OPT_STARTTLS` (5)
 
-    defined by the experimental STARTTLS extension; see below.
+    Defined by the experimental `STARTTLS` extension; see below.
 
-#### Reply types
+#### Option reply types
+
+These values are used in the "reply type" field, sent by the server
+during option haggling in the fixed newstyle negotiation.
 
 - `NBD_REP_ACK` (1)
 
-    Will be sent by the server when it accepts the option, or when sending
-    data related to the option (in the case of `NBD_OPT_LIST`) has finished.
-    No data.
+    Will be sent by the server when it accepts the option and no further
+    information is available, or when sending data related to the option
+    (in the case of `NBD_OPT_LIST`) has finished. No data.
 
 * `NBD_REP_SERVER` (2)
 
     A description of an export. Data:
 
-    - 32 bits, length of name
+    - 32 bits, length of name (unsigned)
     - Name of the export, as expected by `NBD_OPT_EXPORT_NAME`
     - If length of name < (length of reply as sent in the reply packet
       header - 4), then the rest of the data contains some undefined
       implementation-specific details about the export. This is not
       currently implemented, but future versions of nbd-server may send
       along some details about the export. If the client did not
-      explicitly request otherwise, these details are defined to be UTF-8
-      encoded data suitable for direct display to a human being.
-    - The experimental `PEEK_EXPORT` extension (see below) will add extra
+      explicitly request otherwise, these details are defined to be
+      UTF-8 encoded data suitable for direct display to a human being.
+    - The experimental `PEEK_EXPORT` extension (see below) adds extra
       data to the end of this request.
 
 * `NBD_REP_STARTTLS` (3)
@@ -332,7 +347,7 @@ receiving the global flags from the server.
     defined by the experimental STARTTLS extension; see below.
 
 There are a number of error reply types, all of which are denoted by
-having bit 31 set. All error replies may have some data set, in which
+having bit 31 set. All error replies MAY have some data set, in which
 case that data is an error message suitable for display to the user.
 
 * `NBD_REP_ERR_UNSUP` (2^31 + 1)
@@ -345,14 +360,14 @@ case that data is an error message suitable for display to the user.
 
     The option sent by the client is known by this server and
     syntactically valid, but server-side policy forbids the server to
-    allow the option (e.g., the client sent `NBD_OPT_LIST` but server
+    allow the option (e.g., the client sent NBD_OPT_LIST but server
     configuration has that disabled)
 
 * `NBD_REP_ERR_INVALID` (2^31 + 3)
 
     The option sent by the client is know by this server, but was
     determined by the server to be syntactically invalid. For instance,
-    the client sent an `NBD_OPT_LIST` with nonzero data length.
+    the client sent an NBD_OPT_LIST with nonzero data length.
 
 * `NBD_REP_ERR_PLATFORM` (2^31 + 4)
 
@@ -361,8 +376,7 @@ case that data is an error message suitable for display to the user.
 
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
-    defined by the experimental `STARTTLS` extension; see below.
-
+    defined by the experimental STARTTLS extension; see below.
 
 ### Data pushing phase
 
