@@ -205,9 +205,7 @@ the response.
 There are five request types in the data pushing phase: `NBD_CMD_READ`,
 `NBD_CMD_WRITE`, `NBD_CMD_DISC` (disconnect), `NBD_CMD_FLUSH`, `NBD_CMD_TRIM`.
 
-The request is sent by the client; the response by the server.
-
-The request message looks as follows:
+The request message, sent by the client, looks as follows:
 
 C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)  
 C: 16 bits, command flags  
@@ -217,7 +215,7 @@ C: 32 bits, offset (unsigned)
 C: 32 bits, length (unsigned)  
 C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)
 
-The reply looks as follows:
+The server replies with:
 
 S: 32 bits, 0x67446698, magic (`NBD_REPLY_MAGIC`)  
 S: 32 bits, error  
