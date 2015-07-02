@@ -519,25 +519,18 @@ This extension adds one option request, and extends one option reply
 ### `STARTTLS` extension
 
 To implement secure NBD connections, a STARTTLS extension is envisioned.
-This extension adds one option request, one option reply, and one error
-type.
+This extension adds one option request and one error type.
 
 * `NBD_OPT_STARTTLS` (5)
 
-    The client wishes to initiate TLS. If the server replies
-    with `NBD_REP_STARTTLS`, then the client should immediately initiate a
-    TLS handshake and continue the negotiation in the encrypted channel.
-    If the server is unwilling to perform TLS, it should reply with
-    `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should also
-    be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent along any
-    data with the request, the server should send back
+    The client wishes to initiate TLS. If the server replies with
+    `NBD_REP_ACK`, then the client should immediately initiate a TLS
+    handshake and continue the negotiation in the encrypted channel. If
+    the server is unwilling to perform TLS, it should reply with
+    `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should
+    also be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent
+    along any data with the request, the server should send back
     `NBD_REP_ERR_INVALID`.
-
-* `NBD_REP_STARTTLS` (3)
-
-    An affirmative reply to `NBD_OPT_STARTTLS`. Length should be zero. The
-    very next byte read from the client should be assumed to be the first
-    byte in a TLS handshake.
 
 * `NBD_REP_ERR_TLS_REQD`
 
