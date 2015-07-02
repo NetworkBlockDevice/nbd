@@ -468,6 +468,8 @@ more sectors beyond the size of the device.  It also SHOULD map the
 Which error to return in any other case is not specified by the NBD
 protocol.
 
+The server SHOULD AVOID returning ENOMEM if at all possible.
+
 ## Experimental extensions
 
 The specifications in this section are non-normative and experimental.
