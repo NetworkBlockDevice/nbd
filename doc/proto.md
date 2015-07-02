@@ -39,48 +39,6 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
-There are two message types in the data pushing phase: the request, and
-the response.
-
-There are five request types in the data pushing phase: `NBD_CMD_READ`,
-`NBD_CMD_WRITE`, `NBD_CMD_DISC` (disconnect), `NBD_CMD_FLUSH`, `NBD_CMD_TRIM`.
-
-The request is sent by the client; the response by the server. A request
-header consists a 32 bit magic number (magic), a 32 bit field denoting
-the request type (see below; 'type'), a 64 bit handle ('handle'), a 64
-bit data offset ('from'), and a 32 bit length ('len'). In case of a
-write request, the header is immediately followed by 'len' bytes of
-data. In the case of `NBD_CMD_FLUSH`, the offset and length should
-be zero (meaning "flush entire device"); other values are reserved
-for future use (e.g. for flushing specific areas without a write).
-
-Bits 16 and above of the commands are reserved for flags.  Right
-now, the only flag is `NBD_CMD_FLAG_FUA` (bit 16), "Force unit access".
-
-The reply contains three fields: a 32 bit magic number ('magic'), a 32
-bit error code ('error'; 0, unless an error occurred in which case it is
-one of the error values documented below), and the same 64 bit handle
-that the corresponding request had in its 'handle' field. In case the
-reply is sent in response to a read request and the error field is 0
-(zero), the reply header is immediately followed by request.len bytes of
-data.
-
-In case of a disconnect request, the server will immediately close the
-connection. Requests are currently handled synchronously; when (not if)
-we change that to asynchronous handling, handling the disconnect request
-will probably be postponed until there are no other outstanding
-requests.
-
-A flush request will not be sent unless `NBD_FLAG_SEND_FLUSH` is set,
-and indicates the backing file should be fdatasync()'d to disk.
-
-The top 16 bits of the request are flags. `NBD_CMD_FLAG_FUA` implies
-a force unit access, and can currently only be usefully combined
-with `NBD_CMD_WRITE`. This is implemented using sync_file_range
-if present, else by fdatasync() of that file (note not all files
-in a multifile environment). `NBD_CMD_FLAG_FUA` will not be set
-unless `NBD_FLAG_SEND_FUA` is set.
-
 ## Error values
 
 The following error values are defined:
@@ -229,6 +187,50 @@ any negotiation must make sure they've seen the answer to an outstanding
 request before sending the next one of the same type. The server MAY
 send replies in the order that the requests were received, but is not
 required to.
+
+## Data pushing
+
+There are two message types in the data pushing phase: the request, and
+the response.
+
+There are five request types in the data pushing phase: `NBD_CMD_READ`,
+`NBD_CMD_WRITE`, `NBD_CMD_DISC` (disconnect), `NBD_CMD_FLUSH`, `NBD_CMD_TRIM`.
+
+The request is sent by the client; the response by the server. A request
+header consists a 32 bit magic number (magic), a 32 bit field denoting
+the request type (see below; 'type'), a 64 bit handle ('handle'), a 64
+bit data offset ('from'), and a 32 bit length ('len'). In case of a
+write request, the header is immediately followed by 'len' bytes of
+data. In the case of `NBD_CMD_FLUSH`, the offset and length should
+be zero (meaning "flush entire device"); other values are reserved
+for future use (e.g. for flushing specific areas without a write).
+
+Bits 16 and above of the commands are reserved for flags.  Right
+now, the only flag is `NBD_CMD_FLAG_FUA` (bit 16), "Force unit access".
+
+The reply contains three fields: a 32 bit magic number ('magic'), a 32
+bit error code ('error'; 0, unless an error occurred in which case it is
+one of the error values documented below), and the same 64 bit handle
+that the corresponding request had in its 'handle' field. In case the
+reply is sent in response to a read request and the error field is 0
+(zero), the reply header is immediately followed by request.len bytes of
+data.
+
+In case of a disconnect request, the server will immediately close the
+connection. Requests are currently handled synchronously; when (not if)
+we change that to asynchronous handling, handling the disconnect request
+will probably be postponed until there are no other outstanding
+requests.
+
+A flush request will not be sent unless `NBD_FLAG_SEND_FLUSH` is set,
+and indicates the backing file should be fdatasync()'d to disk.
+
+The top 16 bits of the request are flags. `NBD_CMD_FLAG_FUA` implies
+a force unit access, and can currently only be usefully combined
+with `NBD_CMD_WRITE`. This is implemented using sync_file_range
+if present, else by fdatasync() of that file (note not all files
+in a multifile environment). `NBD_CMD_FLAG_FUA` will not be set
+unless `NBD_FLAG_SEND_FUA` is set.
 
 ## Values
 
