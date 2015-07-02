@@ -230,6 +230,17 @@ numbers) in the protocol handshake.
 
 #### Flag fields
 
+##### Global flags
+
+This field of 16 bits is sent by the server after the `INIT_PASSWD` and
+the first magic number.
+
+- bit 0, `NBD_FLAG_FIXED_NEWSTYLE`; should be set by servers that
+  support the fixed newstyle protocol
+- bit 1, `NBD_FLAG_NO_ZEROES`; if set, and if the client replies with
+  `NBD_FLAG_C_NO_ZEROES` in the client flags field, the server MUST NOT
+  send the 124 bytes of zero at the end of the negotiation.
+
 ##### Export flags
 
 This field of 16 bits is sent by the server after option haggling, or
@@ -246,17 +257,6 @@ immediately after the global flags field in oldstyle negotiation:
   schedule I/O accesses as for a rotational medium
 - bit 5, `NBD_FLAG_SEND_TRIM`; should be set to 1 if the server supports
   `NBD_CMD_TRIM` commands
-
-##### Global flags
-
-This field of 16 bits is sent by the server after the `INIT_PASSWD` and
-the first magic number.
-
-- bit 0, `NBD_FLAG_FIXED_NEWSTYLE`; should be set by servers that
-  support the fixed newstyle protocol
-- bit 1, `NBD_FLAG_NO_ZEROES`; if set, and if the client replies with
-  `NBD_FLAG_C_NO_ZEROES` in the client flags field, the server MUST NOT
-  send the 124 bytes of zero at the end of the negotiation.
 
 ##### Client flags
 
