@@ -226,60 +226,50 @@ unless `NBD_FLAG_SEND_FUA` is set.
 This section describes the meaning of constants (other than magic
 numbers) in the protocol handshake.
 
-### Flag bits
+### Negotiation phase
 
-* Per-export (16 bits, sent after option haggling, or immediately after
-  the global flag field in oldstyle negotiation):
+#### Flag fields
 
-    bit 0 - `NBD_FLAG_HAS_FLAGS`
+##### Export flags
 
-    should always be 1
+This field of 16 bits is sent by the server after option haggling, or
+immediately after the global flags field in oldstyle negotiation:
 
-    bit 1 - `NBD_FLAG_READ_ONLY`
+- bit 0, `NBD_FLAG_HAS_FLAGS`; should always be 1
+- bit 1, `NBD_FLAG_READ_ONLY`; should be set to 1 if the export is
+  read-only
+- bit 2, `NBD_FLAG_SEND_FLUSH`; should be set to 1 if the server
+  supports `NBD_CMD_FLUSH` commands
+- bit 3, `NBD_FLAG_SEND_FUA`; should be set to 1 if the server supports
+  the `NBD_CMD_FLAG_FUA` flag
+- bit 4, `NBD_FLAG_ROTATIONAL`; should be set to 1 to let the client
+  schedule I/O accesses as for a rotational medium
+- bit 5, `NBD_FLAG_SEND_TRIM`; should be set to 1 if the server supports
+  `NBD_CMD_TRIM` commands
 
-    should be set to 1 if the export is read-only
+##### Global flags
 
-    bit 2 - `NBD_FLAG_SEND_FLUSH`
+This field of 16 bits is sent by the server after the `INIT_PASSWD` and
+the first magic number.
 
-    should be set to 1 if the server supports `NBD_CMD_FLUSH` commands
+- bit 0, `NBD_FLAG_FIXED_NEWSTYLE`; should be set by servers that
+  support the fixed newstyle protocol
+- bit 1, `NBD_FLAG_NO_ZEROES`; if set, and if the client replies with
+  `NBD_FLAG_C_NO_ZEROES` in the client flags field, the server MUST NOT
+  send the 124 bytes of zero at the end of the negotiation.
 
-    bit 3 - `NBD_FLAG_SEND_FUA`
+##### Client flags
 
-    should be set to 1 if the server supports the `NBD_CMD_FLAG_FUA` flag
+This field of 32 bits is sent bafter initial connection and after
+receiving the global flags from the server.
 
-    bit 4 - `NBD_FLAG_ROTATIONAL`
-
-    should be set to 1 to let the client schedule I/O accesses as for a
-    rotational medium
-
-    bit 5 - `NBD_FLAG_SEND_TRIM`
-
-    should be set to 1 if the server supports `NBD_CMD_TRIM` commands
-
-* Global flag bits (16 bits, after initial connection):
-
-    bit 0 - `NBD_FLAG_FIXED_NEWSTYLE`
-
-    should be set by servers that support the fixed newstyle protocol
-
-    bit 1 - `NBD_FLAG_NO_ZEROES`
-
-    If set, and if the client sets `NBD_FLAG_C_NO_ZEROES`, then the 124
-    bytes of zero at the end of the negotiation will not be sent by the
-    server.
-
-* Client (after initial connection and after receiving flags from
-  server):
-
-    bit 0 - `NBD_FLAG_C_FIXED_NEWSTYLE`
-    Should be set by clients that support the fixed newstyle protocol.
-    Servers may choose to honour fixed newstyle from clients that didn't
-    set this bit, but relying on this isn't recommended.
-
-    bit 1 - `NBD_FLAG_C_NO_ZEROES`
-    MUST only be set if the server also sets `NBD_FLAG_NO_ZEROES`. If set,
-    the server MUST NOT send the 124 bytes of zeroes at the end of the
-    negotiation.
+- bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
+  support the fixed newstyle protocol. Servers MAY choose to honour
+  fixed newstyle from clients that didn't set this bit, but relying on
+  this isn't recommended.
+- bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
+  set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
+  bytes of zeroes at the end of the negotiation.
 
 ### Option types
 
