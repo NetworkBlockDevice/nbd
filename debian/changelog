@@ -1,3 +1,10 @@
+nbd (1:3.8-4+deb8u2) jessie; urgency=low
+
+  * Cherry-pick two commits from 3.10 to fix authfile parsing.
+    Closes: #785727.
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 17 Jul 2015 21:52:40 +0200
+
 nbd (1:3.8-4+deb8u1) jessie-security; urgency=medium
 
   * Add fix for CVE-2015-0847. Closes: #784657.
