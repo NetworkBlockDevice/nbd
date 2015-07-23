@@ -40,15 +40,44 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include <nbdkit-plugin.h>
 
 static char *filename = NULL;
+static int rdelayms = 0;        /* read delay (milliseconds) */
+static int wdelayms = 0;        /* write delay (milliseconds) */
 
 static void
 file_unload (void)
 {
   free (filename);
+}
+
+static int
+parse_delay (const char *value)
+{
+  size_t len = strlen (value);
+  int r;
+
+  if (len > 2 && strcmp (&value[len-2], "ms") == 0) {
+    if (sscanf (value, "%d", &r) == 1)
+      return r;
+    else {
+      nbdkit_error ("cannot parse rdelay/wdelay milliseconds parameter: %s",
+                    value);
+      return -1;
+    }
+  }
+  else {
+    if (sscanf (value, "%d", &r) == 1)
+      return r * 1000;
+    else {
+      nbdkit_error ("cannot parse rdelay/wdelay seconds parameter: %s",
+                    value);
+      return -1;
+    }
+  }
 }
 
 /* Called for each key=value passed on the command line.  This plugin
@@ -61,6 +90,16 @@ file_config (const char *key, const char *value)
     /* See FILENAMES AND PATHS in nbdkit-plugin(3). */
     filename = nbdkit_absolute_path (value);
     if (!filename)
+      return -1;
+  }
+  else if (strcmp (key, "rdelay") == 0) {
+    rdelayms = parse_delay (value);
+    if (rdelayms == -1)
+      return -1;
+  }
+  else if (strcmp (key, "wdelay") == 0) {
+    wdelayms = parse_delay (value);
+    if (wdelayms == -1)
       return -1;
   }
   else {
@@ -84,7 +123,9 @@ file_config_complete (void)
 }
 
 #define file_config_help \
-  "file=<FILENAME>     (required) The filename to serve."
+  "file=<FILENAME>     (required) The filename to serve.\n" \
+  "rdelay=<NN>[ms]                Read delay in seconds/milliseconds.\n" \
+  "wdelay=<NN>[ms]                Write delay in seconds/milliseconds." \
 
 /* The per-connection handle. */
 struct handle {
@@ -153,6 +194,14 @@ file_pread (void *handle, void *buf, uint32_t count, uint64_t offset)
 {
   struct handle *h = handle;
 
+  if (rdelayms > 0) {
+    const struct timespec ts = {
+      .tv_sec = rdelayms / 1000,
+      .tv_nsec = (rdelayms * 1000000) % 1000000000
+    };
+    nanosleep (&ts, NULL);
+  }
+
   while (count > 0) {
     ssize_t r = pread (h->fd, buf, count, offset);
     if (r == -1) {
@@ -176,6 +225,14 @@ static int
 file_pwrite (void *handle, const void *buf, uint32_t count, uint64_t offset)
 {
   struct handle *h = handle;
+
+  if (wdelayms > 0) {
+    const struct timespec ts = {
+      .tv_sec = wdelayms / 1000,
+      .tv_nsec = (wdelayms * 1000000) % 1000000000
+    };
+    nanosleep (&ts, NULL);
+  }
 
   while (count > 0) {
     ssize_t r = pwrite (h->fd, buf, count, offset);

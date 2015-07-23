@@ -25,6 +25,26 @@ used here.
 
 This parameter is required.
 
+=item B<rdelay=SECS>
+
+=item B<rdelay=E<lt>NNE<gt>ms>
+
+Delay reads for C<SECS> seconds or C<NN> milliseconds.
+This is used to simulate a slow or remote server, or to
+test certain kinds of race conditions in Linux.
+
+The default is no delay.
+
+=item B<wdelay=SECS>
+
+=item B<wdelay=E<lt>NNE<gt>ms>
+
+Delay writes for C<SECS> seconds or C<NN> milliseconds.
+This is used to simulate a slow or remote server, or to
+test certain kinds of race conditions in Linux.
+
+The default is no delay.
+
 =back
 
 =head1 SEE ALSO
