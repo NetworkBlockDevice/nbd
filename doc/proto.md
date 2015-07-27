@@ -64,7 +64,7 @@ newstyle negotiation.
 
 S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)  
 S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
-S: 64 bits, size of the export in bytes (unsigned)
+S: 64 bits, size of the export in bytes (unsigned)  
 S: 32 bits, flags  
 S: 124 bytes, zeroes (reserved).
 
