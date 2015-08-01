@@ -48,7 +48,7 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
-## Negotiation
+### Negotiation
 
 There are three versions of the negotiation. They are referred to as
 "oldstyle", "newstyle", and "fixed newstyle" negotiation. Oldstyle was
@@ -60,7 +60,7 @@ introduced to fix this problem are, where necessary, referred to as
 "fixed newstyle" to differentiate from the original version of the
 newstyle negotiation.
 
-### Oldstyle negotiation
+#### Oldstyle negotiation
 
 S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)  
 S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
@@ -79,7 +79,7 @@ As a result, the old style negotiation is now no longer developed;
 starting with version 3.10 of the reference implementation, it is also
 no longer supported.
 
-### Newstyle negotiation
+#### Newstyle negotiation
 
 A client who wants to use the new style negotiation SHOULD connect on
 the IANA-reserved port for NBD, 10809. The server MAY listen on other
@@ -135,7 +135,7 @@ bit, signalling that an extra flag field will follow, to which the
 client will have to reply with a flag field of its own before the extra
 flags are sent. This is not yet implemented.
 
-### Fixed newstyle negotiation
+#### Fixed newstyle negotiation
 
 Unfortunately, due to a mistake, the server would immediately close the
 connection when it saw an option it did not understand, rather than
@@ -172,7 +172,7 @@ request before sending the next one of the same type. The server MAY
 send replies in the order that the requests were received, but is not
 required to.
 
-## Data pushing
+### Data pushing
 
 There are two message types in the data pushing phase: the request, and
 the response.
