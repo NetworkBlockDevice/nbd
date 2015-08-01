@@ -27,15 +27,15 @@ for comments. Anything else is a description of the data that is sent.
 
 ## Protocol phases
 
-The NBD protocol has two phases: the handshake and the data pushing
-phase. During the handshake, a connection is established and an exported NBD
-device along other protocol parameters are negotiated between the client and the
-server. After a successful handshake, the client and the server proceed to data
-pushing phase in which the export is read from and written to.
+The NBD protocol has two phases: the handshake and the transmission. During the
+handshake, a connection is established and an exported NBD device along other
+protocol parameters are negotiated between the client and the server. After a
+successful handshake, the client and the server proceed to the transmission
+phase in which the export is read from and written to.
 
 On the client side under Linux, the handshake is implemented in
-userspace, while the data pushing phase is implemented in kernel space.
-To get from the handshake to the data pushing phase, the client performs
+userspace, while the transmission phase is implemented in kernel space.
+To get from the handshake to the transmission phase, the client performs
 
     ioctl(nbd, NBD_SET_SOCK, sock)
     ioctl(nbd, NBD_DO_IT)
@@ -177,9 +177,9 @@ request before sending the next one of the same type. The server MAY
 send replies in the order that the requests were received, but is not
 required to.
 
-### Data pushing
+### Transmission
 
-There are two message types in the data pushing phase: the request, and
+There are two message types in the transmission phase: the request, and
 the response.
 
 The request message, sent by the client, looks as follows:
@@ -263,7 +263,7 @@ of the newstyle negotiation.
 - `NBD_OPT_EXPORT_NAME` (1)
 
     Choose the export which the client would like to use, end option
-    haggling, and proceed to the data pushing phase. Data: name of the
+    haggling, and proceed to the transmission phase. Data: name of the
     export, free-form UTF8 text (subject to limitations by server
     implementation). If the chosen export does not exist or requirements
     for the chosen export are not met (e.g., the client did not
@@ -359,7 +359,7 @@ case that data is an error message suitable for display to the user.
 
     defined by the experimental STARTTLS extension; see below.
 
-### Data pushing phase
+### Transmission phase
 
 #### Request types
 
