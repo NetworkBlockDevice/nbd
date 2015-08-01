@@ -168,7 +168,7 @@ S: 32 bits, reply type (e.g., `NBD_REP_ACK` for successful completion,
 S: 32 bits, length of the reply. This may be zero for some replies, in
    which case the next field is not sent  
 S: any data as required by the reply (e.g., an export name in the case
-   of `NBD_REP_SERVER`
+   of `NBD_REP_SERVER`)
 
 As there is no unique number for client requests, clients who want to
 differentiate between answers to two instances of the same option during
