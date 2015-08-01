@@ -48,7 +48,11 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
-### Negotiation
+### Handshake
+
+The handshake is the first phase of the protocol. It's main purpose is to
+provide means for both the client and the server to negotiate which export they
+are going to use and how.
 
 There are three versions of the negotiation. They are referred to as
 "oldstyle", "newstyle", and "fixed newstyle" negotiation. Oldstyle was
@@ -205,7 +209,7 @@ magic numbers) in the protocol.
 When flags fields are specified, they are numbered in network byte
 order.
 
-### Negotiation phase
+### Handshake phase
 
 #### Flag fields
 
