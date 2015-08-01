@@ -27,10 +27,11 @@ for comments. Anything else is a description of the data that is sent.
 
 ## Protocol phases
 
-The protocol has two phases: the handshake (in which the connection is
-established, an exported NBD device is negotiated between the client and
-the server, and protocol options are negotiated), and the data pushing
-phase (in which the export is read from and written to).
+The NBD protocol has two phases: the handshake and the data pushing
+phase. During the handshake, a connection is established and an exported NBD
+device along other protocol parameters are negotiated between the client and the
+server. After a successful handshake, the client and the server proceed to data
+pushing phase in which the export is read from and written to.
 
 On the client side under Linux, the handshake is implemented in
 userspace, while the data pushing phase is implemented in kernel space.
