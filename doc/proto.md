@@ -27,14 +27,15 @@ for comments. Anything else is a description of the data that is sent.
 
 ## Protocol phases
 
-The protocol has two phases: the handshake (in which the connection is
-established, an exported NBD device is negotiated between the client and
-the server, and protocol options are negotiated), and the data pushing
-phase (in which the export is read from and written to).
+The NBD protocol has two phases: the handshake and the transmission. During the
+handshake, a connection is established and an exported NBD device along other
+protocol parameters are negotiated between the client and the server. After a
+successful handshake, the client and the server proceed to the transmission
+phase in which the export is read from and written to.
 
 On the client side under Linux, the handshake is implemented in
-userspace, while the data pushing phase is implemented in kernel space.
-To get from the handshake to the data pushing phase, the client performs
+userspace, while the transmission phase is implemented in kernel space.
+To get from the handshake to the transmission phase, the client performs
 
     ioctl(nbd, NBD_SET_SOCK, sock)
     ioctl(nbd, NBD_DO_IT)
@@ -48,7 +49,11 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
-## Negotiation
+### Handshake
+
+The handshake is the first phase of the protocol. It's main purpose is to
+provide means for both the client and the server to negotiate which export they
+are going to use and how.
 
 There are three versions of the negotiation. They are referred to as
 "oldstyle", "newstyle", and "fixed newstyle" negotiation. Oldstyle was
@@ -60,7 +65,7 @@ introduced to fix this problem are, where necessary, referred to as
 "fixed newstyle" to differentiate from the original version of the
 newstyle negotiation.
 
-### Oldstyle negotiation
+#### Oldstyle negotiation
 
 S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)  
 S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
@@ -79,7 +84,7 @@ As a result, the old style negotiation is now no longer developed;
 starting with version 3.10 of the reference implementation, it is also
 no longer supported.
 
-### Newstyle negotiation
+#### Newstyle negotiation
 
 A client who wants to use the new style negotiation SHOULD connect on
 the IANA-reserved port for NBD, 10809. The server MAY listen on other
@@ -135,7 +140,7 @@ bit, signalling that an extra flag field will follow, to which the
 client will have to reply with a flag field of its own before the extra
 flags are sent. This is not yet implemented.
 
-### Fixed newstyle negotiation
+#### Fixed newstyle negotiation
 
 Unfortunately, due to a mistake, the server would immediately close the
 connection when it saw an option it did not understand, rather than
@@ -163,7 +168,7 @@ S: 32 bits, reply type (e.g., `NBD_REP_ACK` for successful completion,
 S: 32 bits, length of the reply. This may be zero for some replies, in
    which case the next field is not sent  
 S: any data as required by the reply (e.g., an export name in the case
-   of `NBD_REP_SERVER`
+   of `NBD_REP_SERVER`)
 
 As there is no unique number for client requests, clients who want to
 differentiate between answers to two instances of the same option during
@@ -172,9 +177,9 @@ request before sending the next one of the same type. The server MAY
 send replies in the order that the requests were received, but is not
 required to.
 
-## Data pushing
+### Transmission
 
-There are two message types in the data pushing phase: the request, and
+There are two message types in the transmission phase: the request, and
 the response.
 
 The request message, sent by the client, looks as follows:
@@ -205,7 +210,7 @@ magic numbers) in the protocol.
 When flags fields are specified, they are numbered in network byte
 order.
 
-### Negotiation phase
+### Handshake phase
 
 #### Flag fields
 
@@ -239,7 +244,7 @@ immediately after the global flags field in oldstyle negotiation:
 
 ##### Client flags
 
-This field of 32 bits is sent bafter initial connection and after
+This field of 32 bits is sent after initial connection and after
 receiving the global flags from the server.
 
 - bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
@@ -258,7 +263,7 @@ of the newstyle negotiation.
 - `NBD_OPT_EXPORT_NAME` (1)
 
     Choose the export which the client would like to use, end option
-    haggling, and proceed to the data pushing phase. Data: name of the
+    haggling, and proceed to the transmission phase. Data: name of the
     export, free-form UTF8 text (subject to limitations by server
     implementation). If the chosen export does not exist or requirements
     for the chosen export are not met (e.g., the client did not
@@ -354,7 +359,7 @@ case that data is an error message suitable for display to the user.
 
     defined by the experimental STARTTLS extension; see below.
 
-### Data pushing phase
+### Transmission phase
 
 #### Request types
 
