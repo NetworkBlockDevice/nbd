@@ -244,7 +244,7 @@ immediately after the global flags field in oldstyle negotiation:
 
 ##### Client flags
 
-This field of 32 bits is sent bafter initial connection and after
+This field of 32 bits is sent after initial connection and after
 receiving the global flags from the server.
 
 - bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
