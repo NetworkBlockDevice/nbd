@@ -1087,8 +1087,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 	DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
 
-	myseek(fhandle, foffset);
-	retval = write(fhandle, buf, len);
+	retval = pwrite(fhandle, buf, len, foffset);
 	if(client->server->flags & F_SYNC) {
 		fsync(fhandle);
 	} else if (fua) {
@@ -1183,8 +1182,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 
 	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
-	myseek(fhandle, foffset);
-	retval = read(fhandle, buf, len);
+	retval = pread(fhandle, buf, len, foffset);
         if (client->server->flags & F_TREEFILES) {
 		close(fhandle);
 	}
