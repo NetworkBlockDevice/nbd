@@ -168,6 +168,16 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 
 #include <nbdsrv.h>
 
+/* Our thread pool */
+GThreadPool *tpool;
+
+/* A work package for the thread pool functions */
+struct work_package {
+	CLIENT* client;
+	struct nbd_request* req;
+	void* data; /**< for read requests */
+};
+
 static volatile sig_atomic_t is_sigchld_caught; /**< Flag set by
 						     SIGCHLD handler
 						     to mark a child
@@ -240,6 +250,7 @@ struct generic_conf {
         gchar *modernport;      /**< port of the modern socket    */
         gchar *unixsock;	/**< file name of the unix domain socket */
         gint flags;             /**< global flags                 */
+	gint threads;		/**< maximum number of parallel threads we want to run */
 };
 
 /**
@@ -751,6 +762,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
+		{ "max_threads", FALSE, PARAM_INT,	&(genconftmp.threads),	  0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -775,6 +787,9 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
                  * found from configuration files. */
                 memcpy(&genconftmp, genconf, sizeof(struct generic_conf));
         }
+	if(genconftmp.threads == 0) {
+		genconftmp.threads = 4;
+	}
 
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
@@ -1426,6 +1441,7 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 			client->modern = TRUE;
 			client->transactionlogfd = -1;
 			client->clientfeats = cflags;
+			pthread_mutex_init(&(client->lock), NULL);
 			free(name);
 			return client;
 		}
@@ -1570,6 +1586,126 @@ static int nbd_errno(int errcode) {
 		return htonl(28); // ENOSPC
 	default:
 		return htonl(22); // EINVAL
+	}
+}
+
+static void package_dispose(struct work_package* package) {
+	g_free(package->data);
+	g_free(package->req);
+	g_free(package);
+}
+
+struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
+	struct work_package* rv = calloc(sizeof (struct work_package), 1);
+
+	rv->req = req;
+	rv->client = client;
+
+	if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE)
+		rv->data = malloc(req->len);
+
+	return rv;
+}
+
+static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
+	rep->magic = htonl(NBD_REPLY_MAGIC);
+	rep->error = 0;
+	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
+}
+
+static void handle_read(CLIENT* client, struct nbd_request* req) {
+	struct nbd_reply rep;
+	void* buf = malloc(req->len);
+	if(!buf) {
+		err("Could not allocate memory for request");
+	}
+	DEBUG("handling read request\n");
+	setup_reply(&rep, req);
+	if(expread(req->from, buf, req->len, client)) {
+		DEBUG("Read failed: %m");
+		rep.error = errno;
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	writeit(client->net, buf, req->len);
+	pthread_mutex_unlock(&(client->lock));
+}
+
+static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
+	err("not yet implemented");
+}
+
+static void handle_flush(CLIENT* client, struct nbd_request* req) {
+	err("not yet implemented");
+}
+
+static void handle_trim(CLIENT* client, struct nbd_request* req) {
+	err("not yet implemented");
+}
+
+static void handle_disconnect(CLIENT* client, struct nbd_request* req) {
+	err("not yet implemented");
+}
+
+static void send_error(CLIENT* client, struct nbd_request* req, int error_number) {
+	err("not yet implemented");
+}
+
+static void handle_request(gpointer data, gpointer user_data) {
+	struct work_package* package = (struct work_package*) data;
+
+	switch(package->req->type) {
+		case NBD_CMD_READ:
+			handle_read(package->client, package->req);
+			break;
+		case NBD_CMD_WRITE:
+			handle_write(package->client, package->req, package->data);
+			break;
+		case NBD_CMD_FLUSH:
+			handle_flush(package->client, package->req);
+			break;
+		case NBD_CMD_TRIM:
+			handle_trim(package->client, package->req);
+			break;
+		case NBD_CMD_DISC:
+			handle_disconnect(package->client, package->req);
+			break;
+		default:
+			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
+			send_error(package->client, package->req, EINVAL);
+			break;
+	}
+
+	package_dispose(package);
+}
+
+static int mainloop_threaded(CLIENT* client) {
+	struct nbd_request* req;
+	struct work_package* pkg;
+
+	send_export_info(client);
+	DEBUG("Entering request loop\n");
+	while(1) {
+		req = calloc(sizeof (struct nbd_request), 1);
+
+		readit(client->net, req, sizeof(struct nbd_request));
+		if(client->transactionlogfd != -1) {
+			writeit(client->transactionlogfd, req, sizeof(struct nbd_request));
+		}
+
+		req->from = ntohll(req->from);
+		req->type = ntohll(req->type);
+		req->len = ntohl(req->len);
+
+		if(req->magic != htonl(NBD_REQUEST_MAGIC))
+			err("Protocol error: not enough magic.");
+
+		pkg = package_create(client, req);
+		
+		if(req->type & NBD_CMD_MASK_COMMAND == NBD_CMD_WRITE) {
+			readit(client->net, pkg->data, req->len);
+		}
+		g_thread_pool_push(tpool, pkg, NULL);
 	}
 }
 
@@ -1942,7 +2078,7 @@ void serveconnection(CLIENT *client) {
 
 	setmysockopt(client->net);
 
-	mainloop(client);
+	mainloop_threaded(client);
 	do_run(client->server->postrun, client->exportname);
 
 	if (-1 != client->transactionlogfd)
@@ -2368,6 +2504,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
         struct generic_conf genconf;
 
         new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
+	g_thread_pool_set_max_threads(tpool, genconf.threads, NULL);
         if (!new_servers)
                 goto out;
 
@@ -3062,6 +3199,9 @@ int main(int argc, char *argv[]) {
 	}
 	if (!dontfork)
 		daemonize(serve);
+
+	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
+
 	setup_servers(servers, genconf.modernaddr, genconf.modernport,
 			genconf.unixsock);
 	dousers(genconf.user, genconf.group);

@@ -180,6 +180,27 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>max_threads</option></term>
+	<listitem>
+	  <para>
+	    Optional; integer; default 4
+	  </para>
+	  <para>
+	    Since NBD 3.12, nbd-server will read requests in a main
+	    thread, but do the handling of these requests, and the
+	    sending of the reply, in a number of separate worker
+	    threads, which are shared among all exports. With this
+	    parameter, you can configure the number of these worker
+	    threads.
+	  </para>
+	  <para>
+	    The default should be reasonable for a dual-core single-disk
+	    server. You might want to increase it if you have a powerful
+	    server that does little else than serving NBD.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>oldstyle</option></term>
 	<listitem>
 	  <para>

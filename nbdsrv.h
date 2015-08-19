@@ -71,6 +71,7 @@ typedef struct {
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 	int transactionlogfd;/**< fd for transaction log */
 	int clientfeats;     /**< Features supported by this client */
+	pthread_mutex_t lock;
 } CLIENT;
 
 /* Constants and macros */
