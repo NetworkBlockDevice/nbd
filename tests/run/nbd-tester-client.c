@@ -846,7 +846,7 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 	double timespan;
 	double speed;
 	char speedchar[2] = { '\0', '\0' };
-	int retval=0;
+	int retval=-1;
 	int serverflags = 0;
 	pid_t G_GNUC_UNUSED mypid = getpid();
 	int blkhashfd = -1;
@@ -869,7 +869,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 	if(!sock_is_open) {
 		if((sock=setup_connection(hostname, unixsock, port, name, CONNECTION_TYPE_FULL, &serverflags))<0) {
 			g_warning("Could not open socket: %s", errstr);
-			retval=-1;
 			goto err;
 		}
 	}
@@ -882,7 +881,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 	blkhashname=strdup("/tmp/blkarray-XXXXXX");
 	if (!blkhashname || (-1 == (blkhashfd = mkstemp(blkhashname)))) {
 		g_warning("Could not open temp file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 #else
@@ -891,26 +889,22 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 				    O_CREAT | O_RDWR,
 				    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH))) {
 		g_warning("Could not open temp file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 #endif
 	/* Ensure space freed if we die */
 	if (-1 == unlink(blkhashname)) {
 		g_warning("Could not unlink temp file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 
 	if (-1 == lseek(blkhashfd, (off_t)((size>>9)*sizeof(struct blkitem)), SEEK_SET)) {
 		g_warning("Could not llseek temp file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 
 	if (-1 == write(blkhashfd, "\0", 1)) {
 		g_warning("Could not write temp file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 
@@ -921,19 +915,16 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 				    blkhashfd,
 				    0))) {
 		g_warning("Could not mmap temp file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 
 	if (-1 == (logfd = open(transactionlog, O_RDONLY)))
 	{
 		g_warning("Could open log file: %s", strerror(errno));
-		retval=-1;
 		goto err;
 	}
 		
 	if(gettimeofday(&start, NULL)<0) {
-		retval=-1;
 		snprintf(errstr, errstr_len, "Could not measure start time: %s", strerror(errno));
 		goto err_open;
 	}
@@ -961,12 +952,10 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 		tv.tv_usec=0;
 		ret = select(1+((sock>logfd)?sock:logfd), &rset, &wset, NULL, &tv);
 		if (ret == 0) {
-			retval=-1;
 			snprintf(errstr, errstr_len, "Timeout reading from socket");
 			goto err_open;
 		} else if (ret<0) {
 			g_warning("Could not mmap temp file: %s", errstr);
-			retval=-1;
 			goto err;
 		}
 		/* We know we've got at least one thing to do here then */
@@ -985,7 +974,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 			switch (magic) {
 			case NBD_REQUEST_MAGIC:
 				if (NULL == (prc = calloc(1, sizeof(struct reqcontext)))) {
-					retval=-1;
 					snprintf(errstr, errstr_len, "Could not allocate request");
 					goto err_open;
 				}
@@ -1019,7 +1007,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 						strerror(errno));
 
 				if (rep.error) {
-					retval=-1;
 					snprintf(errstr, errstr_len, "Transaction log file contained errored transaction");
 					goto err_open;
 				}
@@ -1028,7 +1015,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 				 * none in the log */
 				break;
 			default:
-				retval=-1;
 				snprintf(errstr, errstr_len, "Could not measure start time: %08x", magic);
 				goto err_open;
 			}
@@ -1044,7 +1030,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 			if (!blocked && !(txbuf.head) && (NULL != (prc = txqueue.head)))
 			{
 				if (ntohl(prc->req.magic) != NBD_REQUEST_MAGIC) {
-					retval=-1;
 					g_warning("Asked to write a request without a magic number");
 					goto err_open;
 				}
@@ -1131,7 +1116,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 				case NBD_CMD_FLUSH:
 					break;
 				default:
-					retval=-1;
 					snprintf(errstr, errstr_len, "Incomprehensible command: %08x", command);
 					goto err_open;
 					break;
@@ -1143,7 +1127,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 
 			/* there should be some now */
 			if (writebuffer(sock, &txbuf)<0) {
-				retval=-1;
 				snprintf(errstr, errstr_len, "Failed to write to socket buffer: %s", strerror(errno));
 				goto err_open;
 			}
@@ -1154,7 +1137,7 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 		if(FD_ISSET(sock, &rset)) {
 			/* Okay, there's something ready for
 			 * reading here */
-			
+
 			READ_ALL_ERRCHK(sock,
 					&rep,
 					sizeof(struct nbd_reply),
@@ -1163,13 +1146,11 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 					strerror(errno));
 			
 			if (rep.magic != htonl(NBD_REPLY_MAGIC)) {
-				retval=-1;
 				snprintf(errstr, errstr_len, "Bad magic from server");
 				goto err_open;
 			}
 			
 			if (rep.error) {
-				retval=-1;
 				snprintf(errstr, errstr_len, "Server errored a transaction");
 				goto err_open;
 			}
@@ -1178,18 +1159,15 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 			memcpy(&handle,rep.handle,8);
 			prc = g_hash_table_lookup(handlehash, &handle);
 			if (!prc) {
-				retval=-1;
 				snprintf(errstr, errstr_len, "Unrecognised handle in reply: 0x%llX", *(long long unsigned int*)(rep.handle));
 				goto err_open;
 			}
 			if (!g_hash_table_remove(handlehash, &handle)) {
-				retval=-1;
 				snprintf(errstr, errstr_len, "Could not remove handle from hash: 0x%llX", *(long long unsigned int*)(rep.handle));
 				goto err_open;
 			}
 
 			if (prc->req.magic != htonl(NBD_REQUEST_MAGIC)) {
-				retval=-1;
 				snprintf(errstr, errstr_len, "Bad magic in inflight data: %08x", prc->req.magic);
 				goto err_open;
 			}
@@ -1222,7 +1200,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 					}
 					/* work out what we was written */
 					if (checkbuf(dbuf, blkhash[blknum].seq, blknum)) {
-						retval=-1;
 						snprintf(errstr, errstr_len, "Bad reply data: I wanted blk %08x, seq %08x but I got (at a guess) blk %08x, seq %08x",
 							 (unsigned int) blknum,
 							 blkhash[blknum].seq,
@@ -1273,7 +1250,6 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 	printf("\n");
 
 	if (gettimeofday(&stop, NULL)<0) {
-		retval=-1;
 		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
 		goto err_open;
 	}
@@ -1292,6 +1268,8 @@ int integrity_test(gchar* hostname, gchar* unixsock, int port, char* name, int s
 		speedchar[0]='G';
 	}
 	g_message("%d: Integrity %s test complete. Took %.3f seconds to complete, %.3f%sib/s", (int)getpid(), (testflags & TEST_WRITE)?"write":"read", timespan, speed, speedchar);
+
+	retval = 0;
 
 err_open:
 	if(close_sock) {
