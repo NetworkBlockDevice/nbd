@@ -715,7 +715,7 @@ int throughput_test(gchar* hostname, gchar* unixsock, int port, char* name, int 
 			goto err_open;
 		}
 		if(!(printer++ % 10)) {
-			printf("%d: Requests: %d\r", (int)mypid, requests);
+			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	}
 	/* Now empty the read buffer */
@@ -732,10 +732,10 @@ int throughput_test(gchar* hostname, gchar* unixsock, int port, char* name, int 
 			--requests;
 		}
 		if(!(printer++ % 10)) {
-			printf("%d: Requests: %d\r", (int)mypid, requests);
+			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	} while (requests);
-	printf("%d: Requests: %d\n", (int)mypid, requests);
+	printf("%d: Requests: %d  \n", (int)mypid, requests);
 	if(gettimeofday(&stop, NULL)<0) {
 		retval=-1;
 		snprintf(errstr, errstr_len, "Could not measure end time: %s", strerror(errno));
