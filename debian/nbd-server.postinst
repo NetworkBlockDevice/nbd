@@ -40,12 +40,6 @@ case "$1" in
 	then
 	    TMPFILE=`mktemp /tmp/nbd-server.XXXXXX`
 	    cat /usr/share/nbd-server/nbd-server.conf.tmpl > $TMPFILE
-	    db_get nbd-server/useports
-	    DOPORTS="$RET"
-	    if [ "$DOPORTS" ]
-	    then
-	      echo "	oldstyle = true" >> $TMPFILE
-	    fi
 	    for i in $(seq 0 $(( $NUMBER - 1 )) )
 	    do
 	      # stay downward compatible
@@ -53,8 +47,6 @@ case "$1" in
 	      then
 	          unset i
 	      fi
-	      db_get nbd-server/port$i
-	      PORT=$RET
 	      db_get nbd-server/name$i
 	      NAME=$RET
 	      db_get nbd-server/filename$i
@@ -62,10 +54,6 @@ case "$1" in
 	      (   echo "[$NAME]"
 		  echo "	exportname = $FN"
 	      ) >> $TMPFILE
-	      if [ $DOPORTS ]
-	      then
-		  echo "	port = $PORT" >> $TMPFILE
-	      fi
 	    done
 	    ucf --debconf-ok $TMPFILE /etc/nbd-server/config
 	else

@@ -85,7 +85,7 @@ case "$1" in
                     sed -i -e 's:\(^NBD_DEVICE\['$i'\]\=\).*:\1"'$device'":g' -e \
                         's/\(^NBD_TYPE\['$i'\]=\).*/\1"'$type_'"/g' -e \
                         's/\(^NBD_HOST\['$i'\]=\).*/\1"'$host'"/g'  -e \
-                        's/\(^NBD_PORT\['$i'\]=\).*/\1"'$port'"/g' -e \
+                        's/\(^NBD_PORT\['$i'\]=\).*/#\1"'$port'"/g' -e \
 			's/\(^NBD_NAME\['$i'\]=\).*/\1"'$name'"/g' -e \
 			's/\(^NBD_EXTRA\['$i'\]=\).*/\1"'$extra'"/g' \
                          $TMPFILE
