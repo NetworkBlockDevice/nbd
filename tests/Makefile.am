@@ -34,6 +34,7 @@ CLEANFILES = *~ *.cmi *.cmx *.cmxa *.so
 MAINTAINERCLEANFILES =
 
 EXTRA_DIST = \
+	README.tests \
 	test-captive.sh \
 	test-dump-config.sh \
 	test-foreground.sh \
