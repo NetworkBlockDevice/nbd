@@ -73,7 +73,7 @@ main (int argc, char *argv[])
   if (guestfs_launch (g) == -1)
     exit (EXIT_FAILURE);
 
-  /* Check the data in the file is \x01-\0x08 repeated 512 times. */
+  /* Check the data in the file is \x01-\x08 repeated 512 times. */
   data = guestfs_pread_device (g, "/dev/sda", 8 * 512, 0, &size);
   if (!data)
     exit (EXIT_FAILURE);

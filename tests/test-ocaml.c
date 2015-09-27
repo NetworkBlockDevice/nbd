@@ -73,7 +73,7 @@ main (int argc, char *argv[])
   if (guestfs_launch (g) == -1)
     exit (EXIT_FAILURE);
 
-  /* Check the inital data read from the plugin is \x01-\0x08,
+  /* Check the inital data read from the plugin is \x01-\x08,
    * repeated 512 times.
    */
   data = guestfs_pread_device (g, "/dev/sda", 8 * 512, 0, &size);
