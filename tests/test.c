@@ -45,7 +45,9 @@
 
 #include "test.h"
 
-/* test_start_nbdkit below makes assumptions about the format of these strings */
+/* 'test_start_nbdkit' below makes assumptions about the format of
+ * these strings.
+ */
 static char tmpdir[] =            "/tmp/nbdkitXXXXXX";
 static char sockpath[] =          "/tmp/nbdkitXXXXXX/sock";
 static char unixsockpath[] = "unix:/tmp/nbdkitXXXXXX/sock";
