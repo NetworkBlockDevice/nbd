@@ -1,0 +1,31 @@
+The real tests use libguestfs as a convenient way to control the qemu
+NBD client.
+
+To test a plugin using libguestfs:
+
+  - #include <test.h>
+
+  - Call:
+
+    test_start_nbdkit (NBDKIT_PLUGIN ("name"), <plugin args ...>, NULL)
+
+    at the beginning.  This starts the nbdkit server.
+
+  - Open a libguestfs handle, and configure the NBD client using:
+
+    guestfs_add_drive_opts (g, "",
+                            GUESTFS_ADD_DRIVE_OPTS_FORMAT, "raw",
+                            GUESTFS_ADD_DRIVE_OPTS_PROTOCOL, "nbd",
+                            GUESTFS_ADD_DRIVE_OPTS_SERVER, server,
+                            -1);
+
+    'server' is a global that is initialized by 'test_start_nbdkit' and
+    points to the nbdkit server socket.
+
+  - Perform tests via libguestfs using the libguestfs device "/dev/sda",
+    which corresponds to the NBD drive exposed by the plugin.
+
+  - Close the handle and exit.  An 'atexit' handler installed by
+    'test_start_nbdkit' cleans up the server automatically.
+
+For an example, see 'test-file.c'.
