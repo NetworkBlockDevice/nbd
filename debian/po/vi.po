@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.16-3\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2011-01-05 18:59+0100\n"
+"POT-Creation-Date: 2015-09-26 13:20+0200\n"
 "PO-Revision-Date: 2010-09-30 16:13+0930\n"
 "Last-Translator: Clytie Siddall <clytie@riverland.net.au>\n"
 "Language-Team: Vietnamese <vi-VN@googlegroups.com>\n"
@@ -44,15 +44,40 @@ msgstr ""
 "Nếu trường hợp này không đúng, bạn hãy gỡ bỏ dòng này và sau đó chạy lệnh "
 "cấu hình lại « dpkg-reconfigure nbd-client »."
 
-#. Type: string
+#. Type: error
 #. Description
 #: ../nbd-client.templates:3001
+#, fuzzy
+#| msgid "Hostname of the server (number: ${number})?"
+msgid "A port has been selected for export ${number}"
+msgstr "Tên máy của máy phục vụ (số : ${number}):"
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:3001
+msgid ""
+"The file /etc/nbd-client configures an NBD export by way of a port number. "
+"This method of connecting to an NBD export is no longer supported as of NBD "
+"3.10."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../nbd-client.templates:3001
+msgid ""
+"Please migrate the configuration so it uses name-based exports, rather than "
+"port-based ones."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:4001
 msgid "Number of nbd-client connections to use:"
 msgstr "Số các kết nối ndb-client cần dùng:"
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:3001
+#: ../nbd-client.templates:4001
 msgid ""
 "nbd-client can handle multiple concurrent connections. Please specify the "
 "number of connections you'd like this configuration script to set up."
@@ -62,7 +87,7 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:3001
+#: ../nbd-client.templates:4001
 msgid ""
 "Note that if something has already been specified in /etc/nbd-client, the "
 "current configuration will be used as defaults in these dialogs."
@@ -72,19 +97,19 @@ msgstr ""
 
 #. Type: select
 #. Choices
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:5001
 msgid "swap, filesystem, raw"
 msgstr "trao đổi, hệ thống tập tin, thô"
 
 #. Type: select
 #. Description
-#: ../nbd-client.templates:4002
+#: ../nbd-client.templates:5002
 msgid "Intended use of the network block device number ${number}:"
 msgstr "Sử dụng dự định của thiết bị khối mạng số ${number}:"
 
 #. Type: select
 #. Description
-#: ../nbd-client.templates:4002
+#: ../nbd-client.templates:5002
 msgid ""
 "The network block device can serve multiple purposes. One of the most "
 "interesting is to provide swap space over the network for diskless clients, "
@@ -99,7 +124,7 @@ msgstr ""
 
 #. Type: select
 #. Description
-#: ../nbd-client.templates:4002
+#: ../nbd-client.templates:5002
 msgid ""
 "If you intend to use the network block device as a swap device, choose \"swap"
 "\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
@@ -120,13 +145,13 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:5001
+#: ../nbd-client.templates:6001
 msgid "Hostname of the server (number: ${number})?"
 msgstr "Tên máy của máy phục vụ (số : ${number}):"
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:5001
+#: ../nbd-client.templates:6001
 msgid ""
 "Please enter the network name or IP address of the machine on which the nbd-"
 "server process is running."
@@ -136,51 +161,37 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:6001
+#: ../nbd-client.templates:7001
 #, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
-msgid "Port or name for nbd export (number: ${number})?"
+msgid "Name for NBD export (numer: ${number})?"
 msgstr "Tên máy của máy phục vụ (số : ${number}):"
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:6001
-#, fuzzy
-#| msgid "Please enter the TCP port number to access nbd-server."
+#: ../nbd-client.templates:7001
 msgid ""
-"Please enter the TCP port number or NBD export name needed to access nbd-"
-"server."
-msgstr "Hãy gõ số thứ tự cổng TCP để truy cập đến nbd-server."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"Versions of nbd-server of 2.9.16 or lower did not support specifying a name "
-"for the NBD export. If your NBD server is of an older version, you should "
-"enter the TCP port number here, and should make sure not to enter any non-"
-"numeric characters in the field."
-msgstr ""
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"More recent versions of nbd-server support providing a name for an export. "
-"If the data entered in this field contains any non-numeric characters, then "
-"this configuration system will accept that as a name and provide it to nbd-"
-"client as a name-based export rather than a port-based one."
+"Please enter the NBD export name needed to access nbd-server. The name "
+"entered here should match an existing export on the server."
 msgstr ""
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
+msgid ""
+"Note that as of NBD 3.10, connecting to an NBD export using the older port-"
+"based negotiation protocol is no longer supported."
+msgstr ""
+
+#. Type: string
+#. Description
+#: ../nbd-client.templates:8001
 msgid "/dev entry for this nbd-client (number: ${number})?"
 msgstr "Mục nhập « /dev » cho nbd-client này (số : ${number}):"
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:7001
+#: ../nbd-client.templates:8001
 msgid ""
 "Every nbd-client process needs to be associated with a /dev entry with major "
 "number 43. Please enter the name of the /dev entry you want to use for this "
@@ -194,7 +205,7 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:7001
+#: ../nbd-client.templates:8001
 msgid ""
 "If the /dev entry specified does not exist, it will be created with minor "
 "number ${number}."
@@ -204,13 +215,13 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../nbd-client.templates:8001
+#: ../nbd-client.templates:9001
 msgid "Disconnect all NBD devices on \"stop\"?"
 msgstr "Ngắt kết nối mọi thiết bị NBD khi « dừng » ?"
 
 #. Type: boolean
 #. Description
-#: ../nbd-client.templates:8001
+#: ../nbd-client.templates:9001
 msgid ""
 "When the nbd-client init script is called to stop the nbd-client service, "
 "there are two things that can be done: either it can disconnect all nbd-"
@@ -224,7 +235,7 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../nbd-client.templates:8001
+#: ../nbd-client.templates:9001
 msgid ""
 "The default (and the traditional behavior) is to disconnect all nbd-client "
 "devices. If the root device or other critical file systems are on NBD this "
@@ -236,13 +247,13 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:9001
+#: ../nbd-client.templates:10001
 msgid "Extra parameters (number: ${number})"
 msgstr "Các tham số bổ sung (số : ${number})"
 
 #. Type: string
 #. Description
-#: ../nbd-client.templates:9001
+#: ../nbd-client.templates:10001
 msgid ""
 "If you wish to add any extra parameters to nbd-client, then please enter "
 "them here."
@@ -280,28 +291,6 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
-msgid "TCP Port for server number ${number}:"
-msgstr "Cổng TCP cho trình phục vụ số ${number}:"
-
-#. Type: string
-#. Description
-#: ../nbd-server.templates:3001
-#, fuzzy
-#| msgid ""
-#| "Please specify the TCP port this instance of nbd server will use for "
-#| "listening. As NBD is likely to use more than one port, no dedicated port "
-#| "has been assigned in IANA lists."
-msgid ""
-"Please specify the TCP port this instance of nbd server will use for "
-"backwards compatibility with older clients."
-msgstr ""
-"Hãy ghi rõ số thứ tự cổng TCP mà thể hiện nbd-server sẽ sử dụng để lắng "
-"nghe. Vì NBD rất có thể sử dụng nhiều cổng, không có cổng dành riêng được "
-"gán trong danh sách IANA."
-
-#. Type: string
-#. Description
-#: ../nbd-server.templates:4001
 #, fuzzy
 #| msgid "File to export (server number ${number}):"
 msgid "Name of export ${number}:"
@@ -309,19 +298,19 @@ msgstr "Tập tin cần xuất (trình phục vụ số ${number}):"
 
 #. Type: string
 #. Description
-#: ../nbd-server.templates:4001
+#: ../nbd-server.templates:3001
 msgid "Please specify a name for this export."
 msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:4001
 msgid "File to export (server number ${number}):"
 msgstr "Tập tin cần xuất (trình phục vụ số ${number}):"
 
 #. Type: string
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:4001
 #, no-c-format
 msgid ""
 "Please specify a file name or block device that should be exported over the "
@@ -339,7 +328,7 @@ msgstr ""
 
 #. Type: string
 #. Description
-#: ../nbd-server.templates:5001
+#: ../nbd-server.templates:4001
 msgid ""
 "Note that it is possible to tune the way in which the IP address will be "
 "substituted in the file name. See \"man 5 nbd-server\" for details."
@@ -349,13 +338,13 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:5001
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
 msgstr "« AUTO_GEN » được đặt thành « n » trong « /etc/nbd-server »"
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:5001
 msgid ""
 "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
 "\"n\". The file will therefore not be regenerated automatically."
@@ -366,7 +355,7 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:5001
 msgid ""
 "Note that the current version of the nbd-server package no longer uses /etc/"
 "nbd-server. Instead it uses a new configuration file, read by nbd-server "
@@ -380,7 +369,7 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../nbd-server.templates:6001
+#: ../nbd-server.templates:5001
 msgid ""
 "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
 "config in the new format may be generated based on the current "
@@ -390,72 +379,59 @@ msgstr ""
 "server/config » theo định dạng mới có thể được tạo ra dựa vào cấu hình hiện "
 "thời. Đến lúc đó, bản cài đặt trình phục vụ nbd-server bị hỏng."
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:7001
-msgid "Convert old-style nbd-server configuration file?"
-msgstr "Chuyển đổi tập tin cấu hình nbd-server kiểu cũ ?"
+#, fuzzy
+#~| msgid "Please enter the TCP port number to access nbd-server."
+#~ msgid ""
+#~ "Please enter the TCP port number or NBD export name needed to access nbd-"
+#~ "server."
+#~ msgstr "Hãy gõ số thứ tự cổng TCP để truy cập đến nbd-server."
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:7001
-msgid ""
-"A pre-2.9 nbd-server configuration file has been found on this system. The "
-"current nbd-server package no longer supports this file and will not work if "
-"it is kept as is."
-msgstr ""
-"Một tập tin cấu hình trình phục vụ nbd-server cũ hơn phiên bản 2.9 đã được "
-"tìm trên hệ thống này. Gói nbd-server hiện thời không còn hỗ trợ lại tập tin "
-"này thì sẽ không hoạt động được nếu trường hợp này không thay đổi."
+#~ msgid "TCP Port for server number ${number}:"
+#~ msgstr "Cổng TCP cho trình phục vụ số ${number}:"
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:7001
-msgid ""
-"If you choose this option, the system will generate a new style "
-"configuration file based upon the old-style configuration file, which will "
-"be removed. Otherwise, configuration questions will be asked and the system "
-"will generate a new configuration file."
-msgstr ""
-"Bật tùy chọn này thì hệ thống tạo một tập tin cấu hình kiểu mới dựa vào tập "
-"tin cấu hình cũ (mà bị gỡ bỏ). Không thì chương trình hỏi một số câu về cấu "
-"hình, sau đó hệ thống tạo một tập tin cấu hình mới."
+#, fuzzy
+#~| msgid ""
+#~| "Please specify the TCP port this instance of nbd server will use for "
+#~| "listening. As NBD is likely to use more than one port, no dedicated port "
+#~| "has been assigned in IANA lists."
+#~ msgid ""
+#~ "Please specify the TCP port this instance of nbd server will use for "
+#~ "backwards compatibility with older clients."
+#~ msgstr ""
+#~ "Hãy ghi rõ số thứ tự cổng TCP mà thể hiện nbd-server sẽ sử dụng để lắng "
+#~ "nghe. Vì NBD rất có thể sử dụng nhiều cổng, không có cổng dành riêng được "
+#~ "gán trong danh sách IANA."
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:7001
-msgid ""
-"If a new-style configuration file already exists and you choose this option, "
-"you will shortly see a \"modified configuration file\" prompt, as usual."
-msgstr ""
-"Nếu một tập tin cấu hình kiểu mới đã tồn tại, và bạn bật tuỳ chọn này, "
-"chương trình sẽ hiển thị một dấu nhắc « tập tin cấu hình đã sửa đổi » như "
-"bình thường."
+#~ msgid "Convert old-style nbd-server configuration file?"
+#~ msgstr "Chuyển đổi tập tin cấu hình nbd-server kiểu cũ ?"
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:8001
-msgid "Support port-based exports?"
-msgstr ""
+#~ msgid ""
+#~ "A pre-2.9 nbd-server configuration file has been found on this system. "
+#~ "The current nbd-server package no longer supports this file and will not "
+#~ "work if it is kept as is."
+#~ msgstr ""
+#~ "Một tập tin cấu hình trình phục vụ nbd-server cũ hơn phiên bản 2.9 đã "
+#~ "được tìm trên hệ thống này. Gói nbd-server hiện thời không còn hỗ trợ lại "
+#~ "tập tin này thì sẽ không hoạt động được nếu trường hợp này không thay đổi."
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:8001
-msgid ""
-"Since version 2.9.18, nbd-server supports name-based exports, rather than "
-"port-based ones. While this is generally preferable, you may have to support "
-"systems running an older version of nbd-client, or might need to go through "
-"a lot of trouble to update your older configurations in order to migrate to "
-"name-based exports. In either of those cases, you should accept this option."
-msgstr ""
+#~ msgid ""
+#~ "If you choose this option, the system will generate a new style "
+#~ "configuration file based upon the old-style configuration file, which "
+#~ "will be removed. Otherwise, configuration questions will be asked and the "
+#~ "system will generate a new configuration file."
+#~ msgstr ""
+#~ "Bật tùy chọn này thì hệ thống tạo một tập tin cấu hình kiểu mới dựa vào "
+#~ "tập tin cấu hình cũ (mà bị gỡ bỏ). Không thì chương trình hỏi một số câu "
+#~ "về cấu hình, sau đó hệ thống tạo một tập tin cấu hình mới."
 
-#. Type: boolean
-#. Description
-#: ../nbd-server.templates:8001
-msgid ""
-"Everyone else should leave the option at the default setting, which will "
-"cause nbd-server to only support name-based exports."
-msgstr ""
+#~ msgid ""
+#~ "If a new-style configuration file already exists and you choose this "
+#~ "option, you will shortly see a \"modified configuration file\" prompt, as "
+#~ "usual."
+#~ msgstr ""
+#~ "Nếu một tập tin cấu hình kiểu mới đã tồn tại, và bạn bật tuỳ chọn này, "
+#~ "chương trình sẽ hiển thị một dấu nhắc « tập tin cấu hình đã sửa đổi » như "
+#~ "bình thường."
 
 #~ msgid "Port on which the nbd-server is running (number: ${number})?"
 #~ msgstr "Cổng trên đó chạy trình phục vụ nbd-server (số : ${number}):"

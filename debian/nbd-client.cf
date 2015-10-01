@@ -18,10 +18,6 @@ NBD_TYPE[0]=
 # The host on which the nbd-server process is running
 NBD_HOST[0]=
 #
-# The port on which this client needs to connect. Optional for
-# new-style exports (which use a single port, and export names).
-NBD_PORT[0]=
-#
 # The name of the export. Required for new-style exports.
 NBD_NAME[0]=
 #

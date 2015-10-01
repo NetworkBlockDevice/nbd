@@ -16,6 +16,16 @@ _Description: AUTO_GEN is set to "n" in /etc/nbd-client
  If that's wrong, remove the line and call "dpkg-reconfigure nbd-client"
  afterwards.
 
+Template: nbd-client/port-used
+Type: error
+_Description: A port has been selected for export ${number}
+ The file /etc/nbd-client configures an NBD export by way of a port
+ number. This method of connecting to an NBD export is no longer
+ supported as of NBD 3.10.
+ .
+ Please migrate the configuration so it uses name-based exports, rather
+ than port-based ones.
+
 Template: nbd-client/number
 Type: string
 Default: 0
@@ -48,6 +58,15 @@ Type: string
 _Description: Hostname of the server (number: ${number})?
  Please enter the network name or IP address of the machine on which
  the nbd-server process is running.
+
+Template: nbd-client/port
+Type: string
+_Description: Name for NBD export (numer: ${number})?
+ Please enter the NBD export name needed to access nbd-server. The name
+ entered here should match an existing export on the server.
+ .
+ Note that as of NBD 3.10, connecting to an NBD export using the older
+ port-based negotiation protocol is no longer supported.
 
 Template: nbd-client/device
 Type: string
