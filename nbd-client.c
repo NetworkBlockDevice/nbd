@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <time.h>
 
 #include <linux/ioctl.h>
@@ -351,6 +352,96 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	*rsize64 = size64;
 }
 
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix) {
+	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
+	if(fd < 0) {
+		fprintf(stderr, "while opening %s: ", SYSCONFDIR "/nbdtab");
+		perror("could not open config file");
+		return false;
+	}
+	off_t size = lseek(fd, 0, SEEK_END);
+	lseek(fd, 0, SEEK_SET);
+	void *data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
+	char *fsep = "\n\t# ";
+	char *lsep = "\n#";
+
+	char *loc = strstr((const char*)data, cfgname);
+	if(!loc) {
+		return false;
+	}
+	size_t l = strlen(cfgname) + 6;
+	*dev_ptr = malloc(l);
+	snprintf(*dev_ptr, l, "/dev/%s", cfgname);
+
+	size_t line_len, field_len, ws_len;
+#define CHECK_LEN field_len = strcspn(loc, fsep); ws_len = strspn(loc+field_len, fsep); if(field_len > line_len || line_len <= 0) { return false; }
+#define MOVE_NEXT line_len -= field_len + ws_len; loc += field_len + ws_len
+	// find length of line
+	line_len = strcspn(loc, lsep);
+	// first field is the device node name, which we already know, so skip it
+	CHECK_LEN;
+	MOVE_NEXT;
+	// next field is the hostname
+	CHECK_LEN;
+	*hostn_ptr = strndup(loc, field_len);
+	MOVE_NEXT;
+	// third field is the export name
+	CHECK_LEN;
+	*name_ptr = strndup(loc, field_len);
+	if(ws_len + field_len > line_len) {
+		// optional last field is not there, so return success
+		return true;
+	}
+	MOVE_NEXT;
+	CHECK_LEN;
+#undef CHECK_LEN
+#undef MOVE_NEXT
+	// fourth field is the options field, a comma-separated field of options
+	size_t cflen = 0;
+	do {
+		if(!strncmp(loc, "bs=", 3)) {
+			*bs = (int)strtol(loc+3, &loc, 0);
+			goto next;
+		}
+		if(!strncmp(loc, "timeout=", 8)) {
+			*timeout = (int)strtol(loc+8, &loc, 0);
+			goto next;
+		}
+		if(!strncmp(loc, "persist", 7)) {
+			loc += 7;
+			*persist = 1;
+			goto next;
+		}
+		if(!strncmp(loc, "swap", 4)) {
+			*swap = 1;
+			loc += 4;
+			goto next;
+		}
+		if(!strncmp(loc, "sdp", 3)) {
+			*sdp = 1;
+			loc += 3;
+			goto next;
+		}
+		if(!strncmp(loc, "unix", 4)) {
+			*b_unix = 1;
+			loc += 4;
+			goto next;
+		}
+		// skip unknown options, with a warning unless they start with a '_'
+		l = strcspn(loc, ",");
+		if(*loc != '_') {
+			char* s = strndup(loc, l);
+			fprintf(stderr, "Warning: unknown option '%s' found in nbdtab file", s);
+			free(s);
+		}
+		loc += l;
+next:
+		if(*loc == ',') {
+			loc++;
+		}
+	} while(strcspn(loc, lsep) > 0);
+}
+
 void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	unsigned long size;
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
@@ -423,6 +514,7 @@ void usage(char* errmsg, ...) {
 	}
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
+	fprintf(stderr, "Or   : nbd-client nbdX\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
@@ -585,9 +677,20 @@ int main(int argc, char *argv[]) {
   if (swap)
     err("swap option unsupported on Android because mlockall is unsupported.");
 #endif
-
-	if(!hostname || ((!name || !nbddev) && !(opts & NBDC_DO_LIST))) {
-		usage("not enough information specified");
+	if(hostname) {
+		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
+			if(!strncmp(hostname, "nbd", 3)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix)) {
+					usage("no valid configuration for specified device found", hostname);
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				usage("not enough information specified, and argument didn't look like an nbd device");
+				exit(EXIT_FAILURE);
+			}
+		}
+	} else {
+		usage("no information specified");
 		exit(EXIT_FAILURE);
 	}
 

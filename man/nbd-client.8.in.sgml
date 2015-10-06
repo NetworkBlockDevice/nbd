@@ -82,6 +82,10 @@ manpage.1: manpage.sgml
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
+      <arg choice=plain><replaceable>short-device</replaceable></arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
       <arg choice=plain><option>-d <replaceable>nbd-device</replaceable></option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
@@ -149,21 +153,29 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The TCP port on which <command>nbd-server</command> is
 	    running at the server.</para>
-	  <para>For the deprecated oldstyle protocol, passing a port
-	    number is required. In the oldstyle protocol, exports are
-	    defined by the port on which they are running.</para>
-	  <para>For the newstyle protocol, the port number defaults to
-	    10809, the IANA-assigned port number for the NBD protocol.
-	    The newstyle protocol is selected automatically by
-	    nbd-client when one of the -list or -name options are
-	    used.</para>
+          <para>The port number defaults to 10809, the IANA-assigned
+            port number for the NBD protocol.</para>
+          <para>Previous versions of the nbd tools supported an older
+            version of the negotiation protocol known as "oldstyle".
+            This protocol version is no longer supported as of version
+            3.11 of the nbd spport tools.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>nbd-device</option></term>
 	<listitem>
-	  <para>The block special file this nbd-client should connect
-	    to.</para>
+	  <para>The block special file (<file>/dev</file> entry) which this
+	  nbd-client should connect to, specified as a full path.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>short-device</option></term>
+	<listitem>
+	  <para>The name of the block special file which this nbd-client should
+	  connect to, but without the leading <file>/dev</file> part.</para>
+	  <para>When this mode is used, &dhpackage; will look up the
+	  necessary configuration in the <file>nbdtab</file> file. For
+	  more information, see nbdtab(5).
 	</listitem>
       </varlistentry>
       <varlistentry>
