@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include <linux/ioctl.h>
 #define MY_NAME "nbd_client"
@@ -646,8 +647,12 @@ int main(int argc, char *argv[]) {
 			 * does not return until the NBD device has
 			 * disconnected.
 			 */
+			struct timespec req = {
+				.tv_sec = 0,
+				.tv_nsec = 100000000,
+			};
 			while(check_conn(nbddev, 0)) {
-				sleep(1);
+				nanosleep(&req, NULL);
 			}
 			open(nbddev, O_RDONLY);
 			exit(0);
