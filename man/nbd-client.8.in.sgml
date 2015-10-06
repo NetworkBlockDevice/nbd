@@ -69,6 +69,19 @@ manpage.1: manpage.sgml
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
+      <arg choice=plain><option>-unix <replaceable>path</replaceable></option></arg>
+      <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-sdp</arg>
+      <arg>-swap</arg>
+      <arg>-persist</arg>
+      <arg>-nofork</arg>
+      <arg>-systemd-mark</arg>
+      <arg>-block-size <replaceable>block size</replaceable></arg>
+      <arg>-timeout <replaceable>seconds</replaceable></arg>
+      <arg>-name <replaceable>name</replaceable></arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
       <arg choice=plain><option>-d <replaceable>nbd-device</replaceable></option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
@@ -267,6 +280,18 @@ manpage.1: manpage.sgml
 	    used for new configurations.
 	  </para>
 	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-unix</option></term>
+        <term><option>-u</option></term>
+        <listitem>
+          <para>
+            Connect to the server over a unix domain socket at
+            <replaceable>path</replaceable>, rather than to a server
+            over a TCP socket. The server must be listening on the given
+            socket.
+          </para>
+        </listitem>
       </varlistentry>
     </variablelist>
   </refsect1>
