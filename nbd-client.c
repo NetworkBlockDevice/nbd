@@ -429,7 +429,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
 	fprintf(stderr, "blocksizes other than 1024 without patches\n");
-	fprintf(stderr, "Default value for port with -N is 10809. Note that port must always be numeric\n");
+	fprintf(stderr, "Default value for port is 10809. Note that port must always be numeric\n");
 }
 
 void disconnect(char* device) {
@@ -447,7 +447,7 @@ void disconnect(char* device) {
 }
 
 int main(int argc, char *argv[]) {
-	char* port=NULL;
+	char* port=NBD_DEFAULT_PORT;
 	int sock, nbd;
 	int blocksize=1024;
 	char *hostname=NULL;
@@ -547,7 +547,6 @@ int main(int argc, char *argv[]) {
 			opts |= NBDC_DO_LIST;
 			name="";
 			nbddev="";
-			port = NBD_DEFAULT_PORT;
 			break;
 		case 'm':
 			argv[0][0] = '@';
@@ -557,9 +556,6 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'N':
 			name=optarg;
-			if(!port) {
-				port = NBD_DEFAULT_PORT;
-			}
 			break;
 		case 'p':
 			cont=1;
