@@ -164,7 +164,7 @@ manpage.1: manpage.sgml
       <varlistentry>
 	<term><option>nbd-device</option></term>
 	<listitem>
-	  <para>The block special file (<file>/dev</file> entry) which this
+	  <para>The block special file (<filename>/dev</filename> entry) which this
 	  nbd-client should connect to, specified as a full path.</para>
 	</listitem>
       </varlistentry>
@@ -172,9 +172,9 @@ manpage.1: manpage.sgml
         <term><option>short-device</option></term>
 	<listitem>
 	  <para>The name of the block special file which this nbd-client should
-	  connect to, but without the leading <file>/dev</file> part.</para>
+	  connect to, but without the leading <filename>/dev</filename> part.</para>
 	  <para>When this mode is used, &dhpackage; will look up the
-	  necessary configuration in the <file>nbdtab</file> file. For
+	  necessary configuration in the <filename>nbdtab</filename> file. For
 	  more information, see nbdtab(5).
 	</listitem>
       </varlistentry>
@@ -212,7 +212,7 @@ manpage.1: manpage.sgml
 	    server is exporting over IPv6 as well as over IPv4, this
 	    will list all exports twice; otherwise, it should list them
 	    all only once.</para>
-	  <para>Note that this option <emph>only</emph> works
+	  <para>Note that this option <emphasis>only</emphasis> works
 	    with nbd-server processes running version 3.1 or above, and
 	    must be enabled in server configuration (with the
 	    "allowlist" option) before it can be used.
