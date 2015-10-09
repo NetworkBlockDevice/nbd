@@ -1701,8 +1701,8 @@ static int mainloop_threaded(CLIENT* client) {
 			err("Protocol error: not enough magic.");
 
 		pkg = package_create(client, req);
-		
-		if(req->type & NBD_CMD_MASK_COMMAND == NBD_CMD_WRITE) {
+
+		if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
 			readit(client->net, pkg->data, req->len);
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
