@@ -1645,11 +1645,29 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 }
 
 static void handle_flush(CLIENT* client, struct nbd_request* req) {
-	err("not yet implemented");
+	struct nbd_reply rep;
+	DEBUG("handling flush request\n");
+	setup_reply(&rep, req);
+	if(expflush(client)) {
+		DEBUG("Flush failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
 }
 
 static void handle_trim(CLIENT* client, struct nbd_request* req) {
-	err("not yet implemented");
+	struct nbd_reply rep;
+	DEBUG("handling trim request\n");
+	setup_reply(&rep, req);
+	if(exptrim(req, client)) {
+		DEBUG("Trim failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
 }
 
 
