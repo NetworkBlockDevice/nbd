@@ -1632,7 +1632,16 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 }
 
 static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
-	err("not yet implemented");
+	struct nbd_reply rep;
+	DEBUG("handling write request\n");
+	setup_reply(&rep, req);
+	if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
+		DEBUG("Write failed: %m");
+		rep.error = errno;
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
 }
 
 static void handle_flush(CLIENT* client, struct nbd_request* req) {
