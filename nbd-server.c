@@ -1670,11 +1670,6 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 	pthread_mutex_unlock(&(client->lock));
 }
 
-
-static void send_error(CLIENT* client, struct nbd_request* req, int error_number) {
-	err("not yet implemented");
-}
-
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
 
@@ -1693,7 +1688,12 @@ static void handle_request(gpointer data, gpointer user_data) {
 			break;
 		default:
 			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
-			send_error(package->client, package->req, EINVAL);
+			struct nbd_reply rep;
+			setup_reply(&rep, package->req);
+			rep.error = nbd_errno(EINVAL);
+			pthread_mutex_lock(&(package->client->lock));
+			writeit(package->client->net, &rep, sizeof rep);
+			pthread_mutex_unlock(&(package->client->lock));
 			break;
 	}
 
