@@ -3,9 +3,9 @@ compiler:
   - clang
   - gcc
 install: 
-  - sudo sh .travis/add-trusty
+  - sudo sh .travis/add-wily
   - sudo apt-get update
-  - sudo apt-get -t trusty install automake
+  - sudo apt-get -t wily install automake
   - sudo apt-get install docbook-utils
   - automake --version
 script: ./autogen.sh && ./configure && make && make check
