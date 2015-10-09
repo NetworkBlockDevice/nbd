@@ -1673,7 +1673,7 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
 
-	switch(package->req->type) {
+	switch(package->req->type & NBD_CMD_MASK_COMMAND) {
 		case NBD_CMD_READ:
 			handle_read(package->client, package->req);
 			break;
