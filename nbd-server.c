@@ -1623,7 +1623,7 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 	setup_reply(&rep, req);
 	if(expread(req->from, buf, req->len, client)) {
 		DEBUG("Read failed: %m");
-		rep.error = errno;
+		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
 	writeit(client->net, &rep, sizeof rep);
@@ -1637,7 +1637,7 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 	setup_reply(&rep, req);
 	if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
 		DEBUG("Write failed: %m");
-		rep.error = errno;
+		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
 	writeit(client->net, &rep, sizeof rep);
