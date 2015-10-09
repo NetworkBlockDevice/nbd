@@ -1635,9 +1635,16 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 	struct nbd_reply rep;
 	DEBUG("handling write request\n");
 	setup_reply(&rep, req);
-	if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
-		DEBUG("Write failed: %m");
-		rep.error = nbd_errno(errno);
+
+	if ((client->server->flags & F_READONLY) ||
+	    (client->server->flags & F_AUTOREADONLY)) {
+		DEBUG("[WRITE to READONLY!]");
+		rep.error = nbd_errno(EPERM);
+	} else {
+		if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
+			DEBUG("Write failed: %m");
+			rep.error = nbd_errno(errno);
+		}
 	}
 	pthread_mutex_lock(&(client->lock));
 	writeit(client->net, &rep, sizeof rep);
