@@ -35,38 +35,32 @@ this:
 
     # This is a comment
     [generic]
- 	   # The [generic] section is required, even if nothing is specified
-    	# there.
-    	# When either of these options are specified, nbd-server drops
-    	# privileges to the given user and group after opening ports, but
-    	# _before_ opening files.
-    	user = nbd
-    	group = nbd
-    	# Since version 2.9.17, nbd-server will do exports on a name
-    	# basis (the used name is the name of the section in which the
-    	# export is specified). This however required an incompatible
-    	# protocol change. To enable backwards-compatible port-based
-    	# exports, uncomment the following line:
-    	# oldstyle = true
+        # The [generic] section is required, even if nothing is specified
+        # there.
+        # When either of these options are specified, nbd-server drops
+        # privileges to the given user and group after opening ports, but
+        # _before_ opening files.
+        user = nbd
+        group = nbd
     [export1]
-    	exportname = /export/nbd/export1-file
-    	# The following line will be ignored unless the 
-    	# "oldstyle = true" line in the generic section above is
-    	# enabled.
-    	port = 12345
-    	authfile = /export/nbd/export1-authfile
-    	timeout = 30
-    	filesize = 10000000
-    	readonly = false
-    	multifile = false
-    	copyonwrite = false
-    	prerun = dd if=/dev/zero of=%s bs=1k count=500
-    	postrun = rm -f %s
+        exportname = /export/nbd/export1-file
+        # The following line will be ignored unless the 
+        # "oldstyle = true" line in the generic section above is
+        # enabled.
+        port = 12345
+        authfile = /export/nbd/export1-authfile
+        timeout = 30
+        filesize = 10000000
+        readonly = false
+        multifile = false
+        copyonwrite = false
+        prerun = dd if=/dev/zero of=%s bs=1k count=500
+        postrun = rm -f %s
     [otherexport]
-    	exportname = /export/nbd/experiment
-    	# The other options are all optional, except this one in case
-    	# the oldstyle option is used in [generic]:
-    	# port = 12346
+        exportname = /export/nbd/experiment
+        # The other options are all optional, except this one in case
+        # the oldstyle option is used in [generic]:
+        # port = 12346
 
 The configuration file is parsed with GLib's GKeyFile, which parses key
 files as they are specified in the Freedesktop.org Desktop Entry
