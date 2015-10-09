@@ -1,0 +1,216 @@
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+
+<!-- Process this file with docbook-to-man to generate an nroff manual
+     page: `docbook-to-man manpage.sgml > manpage.1'.  You may view
+     the manual page with: `docbook-to-man manpage.sgml | nroff -man |
+     less'.  A typical entry in a Makefile or Makefile.am is:
+
+manpage.1: manpage.sgml
+	docbook-to-man $< > $@
+  -->
+
+  <!-- Fill in your name for FIRSTNAME and SURNAME. -->
+  <!ENTITY dhfirstname "<firstname>Wouter</firstname>">
+  <!ENTITY dhsurname   "<surname>Verhelst</surname>">
+  <!-- Please adjust the date whenever revising the manpage. -->
+  <!ENTITY dhdate      "<date>$Date: 2006-10-18 15:01:57 +0200 (wo, 18 okt 2006) $</date>">
+  <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
+       allowed: see man(7), man(1). -->
+  <!ENTITY dhsection   "<manvolnum>5</manvolnum>">
+  <!ENTITY dhemail     "<email>wouter@debian.org</email>">
+  <!ENTITY dhusername  "Wouter Verhelst">
+  <!ENTITY dhucpackage "<refentrytitle>NBDTAB</refentrytitle>">
+  <!ENTITY dhpackage   "$sysconfdir/nbdtab">
+
+  <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
+  <!ENTITY gnu         "<acronym>GNU</acronym>">
+]>
+
+<refentry>
+  <refentryinfo>
+    <address>
+      &dhemail;
+    </address>
+    <author>
+      &dhfirstname;
+      &dhsurname;
+    </author>
+    <copyright>
+      <year>2015</year>
+      <holder>&dhusername;</holder>
+    </copyright>
+    &dhdate;
+  </refentryinfo>
+  <refmeta>
+    &dhucpackage;
+
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>&dhpackage;</refname>
+
+    <refpurpose>configuration file for nbd-client</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&dhpackage; </command>
+
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para>This file allows to configure predefined connections for
+      nbd-client. It may contain multiple definitions, one per line,
+      each of which contains four space-separated fields.</para>
+
+    <para>To connect a device specified in the nbdtab file,
+      run <command>nbd-client</command>(8) with the short name of that
+      device as the sole argument. It will then look up the required
+      information in <filename>nbdtab</filename>, and make the
+      connection.</para>
+
+    <para>Fields are separated from one another by any number of space
+      or tab characters; records are separated from one another by
+      newline characters. The file may also contain any number of
+      comments, which start with a '#' character and continue until the
+      end of the line or the end of the file, whichever is first.</para>
+    <refsect2>
+      <title>Fields</title>
+      <para>The file contains the following fields:</para>
+      <orderedlist>
+	<listitem>
+	  <para>The short name of the device file. That is, it should
+	  contain the name of the device without the leading
+	  <filename>/dev/</filename> part; e.g., it could say
+	  <filename>nbd0</filename>.</para>
+	</listitem>
+	<listitem>
+	  <para>The hostname (in case of a TCP socket) or filename (in
+	  case of a unix domain socket) on which the server is
+	  listening.</para>
+	</listitem>
+	<listitem>
+	  <para>The name of the export as exported by
+	  <command>nbd-server</command>.</para>
+	</listitem>
+	<listitem>
+	  <para>Any extra options. This field is optional (no pun
+	  intended), and need not appear in a file if no options are
+	  necessary. The options recognized by
+	  <command>nbd-client</command>(8) are specified below, in the
+	  section "Options". Any unknown options in
+	  this field will produce a warning by
+	  <command>nbd-client</command>, unless they are prepended by
+	  an underscore ('_') character; the underscore is
+	  specifically reserved for local use, or for distribution
+	  customization.</para>
+	</listitem>
+      </orderedlist>
+    </refsect2>
+    <refsect2>
+      <title>Options</title>
+      <para>Every command-line <command>nbd-client</command> option
+        has a corresponding option in the <filename>nbdtab</filename> file,
+        and vice versa; where this isn't the case, that is a
+        bug.</para>
+      <para>Individual options in this field should be separated from
+        one another by the comma character.</para>
+      <variablelist>
+	<varlistentry>
+	  <term><option>bs=<replaceable>block size</replaceable></option></term>
+	  <listitem>
+	    <para>The block size for this export. If this option is
+	    not used, the kernel's default will be used
+	    instead.</para>
+	    <para>Corresponds to the <option>-b</option> option on the
+	    command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>port=<replaceable>port number</replaceable></option></term>
+	  <listitem>
+	    <para>The port on which to communicate with the
+	    <command>nbd-server</command>. Defaults to the
+	    IANA-assigned port for NBD, 10809.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>timeout=<replaceable>timeout</replaceable></option></term>
+	  <listitem>
+	    <para>The timeout. If this option is not specified, no
+	    timeout is configured.</para>
+	    <para>Corresponds to the <option>-t</option> option on the
+	    command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>persist</option></term>
+	  <listitem>
+	    <para>Persist the connection, using the semantics of the
+	    <option>-p</option> command-line option.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>swap</option></term>
+	  <listitem>
+	    <para>Optimize for swap; <option>-s</option>.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>sdp</option></term>
+	  <listitem>
+	    <para>Use the Socket Direct protocol; <option>-S</option>.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>unix</option></term>
+	  <listitem>
+	    <para>Use a Unix Domain socket to connect to the server;
+	    <option>-u</option>.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </refsect2>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para>nbd-server (1), nbd-client (8), nbd-trdump (8)</para>
+      
+
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>The NBD kernel module and the NBD tools were originally
+      written by Pavel Machek (pavel@ucw.cz)</para>
+
+    <para>The Linux kernel module is now maintained by Paul Clements
+      (Paul.Clements@steeleye.com), while the userland tools are
+      maintained by &dhusername; (&dhemail;)</para>
+
+    <para>On The Hurd there is a regular translator available to perform the
+      client side of the protocol, and the use of
+      <command>nbd-client</command> is not required. Please see the
+      relevant documentation for more information.</para>
+
+    <para>This manual page was written by &dhusername; (&dhemail;).
+      Permission is granted to copy, distribute and/or modify this
+      document under the terms of the <acronym>GNU</acronym> General
+      Public License, version 2, as published by the Free Software
+      Foundation.</para>
+
+  </refsect1>
+  <refsect1>
+    <title>EXAMPLES</title>
+    <para>A simple <filename>nbdtab</filename> file could look like
+    this:</para>
+    <programlisting>
+# swap space, called "swapexport" on the server
+# optimize for swap, and try to reconnect upon disconnect.
+nbd0 nbdserver.example.com swapexport swap,persist
+# other export, called "data" on the server. No options for this one.
+nbd1 nbdserver.example.com data
+</programlisting>
+  </refsect1>
+</refentry>

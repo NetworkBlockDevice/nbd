@@ -170,6 +170,7 @@ AC_CONFIG_FILES([Makefile
 		 man/nbd-client.8.sh
 		 man/nbd-server.5.sh
 		 man/nbd-server.1.sh
-		 man/nbd-trdump.1.sh])
+		 man/nbd-trdump.1.sh
+		 man/nbdtab.5.sh])
 AC_OUTPUT
 
