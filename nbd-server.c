@@ -1652,9 +1652,6 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 	err("not yet implemented");
 }
 
-static void handle_disconnect(CLIENT* client, struct nbd_request* req) {
-	err("not yet implemented");
-}
 
 static void send_error(CLIENT* client, struct nbd_request* req, int error_number) {
 	err("not yet implemented");
@@ -1675,9 +1672,6 @@ static void handle_request(gpointer data, gpointer user_data) {
 			break;
 		case NBD_CMD_TRIM:
 			handle_trim(package->client, package->req);
-			break;
-		case NBD_CMD_DISC:
-			handle_disconnect(package->client, package->req);
 			break;
 		default:
 			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
@@ -1713,6 +1707,10 @@ static int mainloop_threaded(CLIENT* client) {
 
 		if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
 			readit(client->net, pkg->data, req->len);
+		}
+		if(req->type == NBD_CMD_DISC) {
+			g_thread_pool_free(tpool, FALSE, TRUE);
+			return 0;
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
 	}
