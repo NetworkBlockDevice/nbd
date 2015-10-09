@@ -1694,7 +1694,7 @@ static int mainloop_threaded(CLIENT* client) {
 		}
 
 		req->from = ntohll(req->from);
-		req->type = ntohll(req->type);
+		req->type = ntohl(req->type);
 		req->len = ntohl(req->len);
 
 		if(req->magic != htonl(NBD_REQUEST_MAGIC))
