@@ -7,6 +7,7 @@ AC_INIT([nbd],
   [http://nbd.sourceforge.net/])
 AM_INIT_AUTOMAKE(foreign dist-xz serial-tests)
 AM_MAINTAINER_MODE([enable])
+AC_CONFIG_MACRO_DIR([support])
 LT_INIT
 
 AC_ARG_ENABLE(
