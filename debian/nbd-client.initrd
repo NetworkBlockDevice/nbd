@@ -48,8 +48,8 @@ nbdbasedev="${nbddev#/dev/}"
 case "$nbdroot" in
 	*,*,*)
 		nbdsrv="${nbdroot%%,*}"
-		nbdport="${nbdroot%,*}"
-		nbdport="${nbdport##*,}"
+		nbdpath="${nbdroot%,*}"
+		nbdpath="${nbdpath##*,}"
 		# root= parameter overrides three-option nbdroot= parameter
 		if [ -z "$nbdrootdev" ]
 		then
@@ -80,14 +80,6 @@ case "$nbdroot" in
 		;;
 esac
 
-case "$nbdport" in
-	*[^0-9]*)
-		# non-numeric characters, assume a name rather than a port
-		nbdpath="$nbdport"
-		unset nbdport
-		;;
-esac
-
 nbdrootdev=${nbdrootdev%p*}
 nbdbasedev=${nbdbasedev%p*}
 # If host is omitted, use ROOTSERVER from DHCP.
@@ -97,7 +89,7 @@ case "$nbdsrv" in
 		;;
 esac
 
-if [ -z "$nbdsrv" ] || [ -z "$nbdrootdev" ] || ( [ -z "$nbdpath" ] && [ -z "$nbdport" ] )
+if [ -z "$nbdsrv" ] || [ -z "$nbdrootdev" ] || [ -z "$nbdpath" ]
 then
 	log_failure_msg "Insufficient information to set up nbd, quitting (nbdroot=$nbdroot, host=$nbdsrv, name=$nbdpath, port=$nbdport, nbd-device=$nbdrootdev)"
 	exit 0
@@ -105,7 +97,7 @@ fi
 
 # Support defining an alternate launch script with env variable NBDCLIENT.
 NBDCLIENT=${NBDCLIENT:-/sbin/nbd-client}
-$NBDCLIENT $nbdsrv ${nbdpath:+-N} $nbdpath $nbdport $nbdrootdev -swap -persist -systemd-mark
+$NBDCLIENT $nbdsrv -N $nbdpath $nbdport $nbdrootdev -swap -persist -systemd-mark
 
 # This should be removed once the cfq scheduler no longer deadlocks nbd
 # devices

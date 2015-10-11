@@ -103,11 +103,11 @@ case "$1" in
 	  then
 	  	echo "${NBD_DEVICE[$i]} already connected, skipping..."
 	  else
-		if [ -z "${NBD_NAME[$i]}" -a -z "${NBD_PORT[$i]}" ]
+		if [ -z "${NBD_NAME[$i]}" ]
 		then
-			echo "Either NBD_NAME or NBD_PORT must be specified for ${NBD_DEVICE[$i]}"
+			echo "NBD_NAME must be specified for ${NBD_DEVICE[$i]}"
 		else
-			if $DAEMON "${NBD_HOST[$i]}" ${NBD_NAME[$i]:+-N "${NBD_NAME[$i]}"} ${NBD_PORT[$i]:+"${NBD_PORT[$i]}"} "${NBD_DEVICE[$i]}" ${NBD_EXTRA[$i]}
+			if $DAEMON "${NBD_HOST[$i]}" -N "${NBD_NAME[$i]}" "${NBD_DEVICE[$i]}" ${NBD_EXTRA[$i]}
 			then
 				echo "connected ${NBD_DEVICE[$i]}"
 			else
