@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: nbd 1:2.9.25-2\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2015-09-26 13:20+0200\n"
-"PO-Revision-Date: 2012-03-12 09:42+0100\n"
-"Last-Translator: Jeroen Schot <schot@a-eskwadraat.nl>\n"
+"PO-Revision-Date: 2015-10-15 13:21+0200\n"
+"Last-Translator: Wouter Verhelst <wouter@debian.org>\n"
 "Language-Team: Debian l10n Dutch <debian-l10n-dutch@lists.debian.org>\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -46,10 +46,8 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr "Poort of naam van de nbd-export (nummer: ${number})?"
+msgstr "Een poort is geselecteerd voor export ${number}"
 
 #. Type: error
 #. Description
@@ -59,6 +57,9 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"Het bestand /etc/nbd-client configureert een NBD-export via een poortnummer. "
+"Deze methode van verbinden met een NBD-export wordt niet langer ondersteund "
+"sinds NBD 3.10."
 
 #. Type: error
 #. Description
@@ -67,6 +68,8 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"Gelieve de configuratie te migreren naar naam-gebaseerde in plaats van poort-"
+"gebaseerde exports."
 
 #. Type: string
 #. Description
@@ -161,10 +164,8 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (numer: ${number})?"
-msgstr "Poort of naam van de nbd-export (nummer: ${number})?"
+msgstr "Naam van de nbd-export (nummer: ${number})?"
 
 #. Type: string
 #. Description
@@ -173,6 +174,9 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"Gelieve de NBD exportnaam in te geven die nodig is om verbinding te maken "
+"met nbd-server. De naam die hier ingegeven wordt, moet overeenkomen met een "
+"bestaande export op de server."
 
 #. Type: string
 #. Description
@@ -181,6 +185,8 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"Merk op dat sinds NBD 3.10 het maken van een verbinding met een NBD-export "
+"via het oudere poort-gebaseerde protocol niet langer ondersteund wordt."
 
 #. Type: string
 #. Description
