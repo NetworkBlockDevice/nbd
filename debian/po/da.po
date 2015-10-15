@@ -1,14 +1,14 @@
 # Danish translation nbd.
-# Copyright (C) 2012 nbd & nedenstående oversættere.
+# Copyright (C) 2015 nbd & nedenstående oversættere.
 # This file is distributed under the same license as the nbd package.
-# Joe Hansen <joedalton2@yahoo.dk>, 2012.
+# Joe Hansen <joedalton2@yahoo.dk>, 2012, 2015.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2015-09-26 13:20+0200\n"
-"PO-Revision-Date: 2012-05-01 19:21+0100\n"
+"PO-Revision-Date: 2015-10-15 19:21+0100\n"
 "Last-Translator: Joe Hansen <joedalton2@yahoo.dk>\n"
 "Language-Team: Danish <debian-l10n-danish@lists.debian.org>\n"
 "Language: da\n"
@@ -45,10 +45,8 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr "Port eller navn for nbd-eksport (nummer: ${number})?"
+msgstr "En port er blevet valg for eksport ${number}"
 
 #. Type: error
 #. Description
@@ -58,6 +56,9 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"Filen /etc/nbd-client konfigurerer en NBD-eksport via et portnummer. "
+"Denne metode for forbindelse til en NBD-eksport er ikke understøttet fra "
+"og med NBD 3.10."
 
 #. Type: error
 #. Description
@@ -66,6 +67,8 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"Migrer venligst konfigurationen så den bruger navnebaseret eksport, frem for "
+"portbaserede."
 
 #. Type: string
 #. Description
@@ -156,10 +159,8 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (numer: ${number})?"
-msgstr "Port eller navn for nbd-eksport (nummer: ${number})?"
+msgstr "Navn for NBD-eksport (nummer: ${number})?"
 
 #. Type: string
 #. Description
@@ -168,6 +169,8 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"Indtast venligst NBD-eksportnavnet krævet for at tilgå nbd-server. "
+"Navnet indtastet her skal matche en eksisterende eksport på serveren."
 
 #. Type: string
 #. Description
@@ -176,6 +179,8 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"Bemærk at fra NBD 3.10, er forbindelse til en NBD-eksport via den ældre "
+"port-baserede forhandlingsprotokol ikke længere understøttet."
 
 #. Type: string
 #. Description
@@ -372,100 +377,3 @@ msgstr ""
 "server/config oprettes i det nye format baseret på den aktuelle "
 "konfiguration. Indtil da vil nbd-server-installationen være ødelagt."
 
-#~ msgid ""
-#~ "Please enter the TCP port number or NBD export name needed to access nbd-"
-#~ "server."
-#~ msgstr ""
-#~ "Indtast venligst TCP-portnummere eller NBD-eksportnavnet krævet for "
-#~ "adgang til nbd-server."
-
-#~ msgid ""
-#~ "Versions of nbd-server of 2.9.16 or lower did not support specifying a "
-#~ "name for the NBD export. If your NBD server is of an older version, you "
-#~ "should enter the TCP port number here, and should make sure not to enter "
-#~ "any non-numeric characters in the field."
-#~ msgstr ""
-#~ "Versioner af nbd-server fra 2.9.16 og nedefter understøttede ikke "
-#~ "angivelse af et navn for NBD-eksporten. Hvis din NBD-server er en ældre "
-#~ "version, så skal du indtaste TCP-portnummeret her og husk at sikre dig, "
-#~ "at du ikke har indtastet ikkenumeriske tegn i feltet."
-
-#~ msgid ""
-#~ "More recent versions of nbd-server support providing a name for an "
-#~ "export. If the data entered in this field contains any non-numeric "
-#~ "characters, then this configuration system will accept that as a name and "
-#~ "provide it to nbd-client as a name-based export rather than a port-based "
-#~ "one."
-#~ msgstr ""
-#~ "Nyere versioner af nbd-server understøtter angivelse af et navn for en "
-#~ "eksport. Hvis dataene indtastet i feltet indeholder eventuelle "
-#~ "ikkenumeriske tegn, så vil dette konfigurationssystem acceptere dette som "
-#~ "et navn og tilbyde det til nbd-client som en navnebaseret eksport fremfor "
-#~ "en portbaseret eksport."
-
-#~ msgid "TCP Port for server number ${number}:"
-#~ msgstr "TCP-port for servernummer ${number}:"
-
-#~ msgid ""
-#~ "Please specify the TCP port this instance of nbd server will use for "
-#~ "backwards compatibility with older clients."
-#~ msgstr ""
-#~ "Angiv venligst TCP-porten som denne instans af nbd-server vil bruge for "
-#~ "baglæns kompatibilitet med ældre klienter."
-
-#~ msgid "Convert old-style nbd-server configuration file?"
-#~ msgstr "Konverter nbd-server-konfigurationsfiler med gammel stil?"
-
-#~ msgid ""
-#~ "A pre-2.9 nbd-server configuration file has been found on this system. "
-#~ "The current nbd-server package no longer supports this file and will not "
-#~ "work if it is kept as is."
-#~ msgstr ""
-#~ "En præ-2.9 konfigurationsfil for nbd-server er blevet fundet på dit "
-#~ "system. Den aktuelle pakke for nbd-server understøtter ikke længere denne "
-#~ "fil og vil ikke fungere, hvis den bevares uændret."
-
-#~ msgid ""
-#~ "If you choose this option, the system will generate a new style "
-#~ "configuration file based upon the old-style configuration file, which "
-#~ "will be removed. Otherwise, configuration questions will be asked and the "
-#~ "system will generate a new configuration file."
-#~ msgstr ""
-#~ "Hvis du vælger denne indstilling, så vil systemet oprette en ny "
-#~ "konfigurationsfil baseret på den gamle konfigurationsfil, som vil blive "
-#~ "fjernet. Ellers vil du blive spurgt om konfigurationen og systemet vil så "
-#~ "oprette en ny konfigurationsfil."
-
-#~ msgid ""
-#~ "If a new-style configuration file already exists and you choose this "
-#~ "option, you will shortly see a \"modified configuration file\" prompt, as "
-#~ "usual."
-#~ msgstr ""
-#~ "Hvis en konfigurationsfil i den nye stil allerede findes og du vælger "
-#~ "denne indstilling, så vil du et kort øjeblik se en »modified "
-#~ "configuration file«-prompt - som sædvanlig."
-
-#~ msgid "Support port-based exports?"
-#~ msgstr "Understøt portbaseret eksport?"
-
-#~ msgid ""
-#~ "Since version 2.9.18, nbd-server supports name-based exports, rather than "
-#~ "port-based ones. While this is generally preferable, you may have to "
-#~ "support systems running an older version of nbd-client, or might need to "
-#~ "go through a lot of trouble to update your older configurations in order "
-#~ "to migrate to name-based exports. In either of those cases, you should "
-#~ "accept this option."
-#~ msgstr ""
-#~ "Siden version 2.9.18 understøtter nbd-server navnebaseret eksport, "
-#~ "fremfor portbaseret eksport. Selv om dette ofte foretrækkes, så skal du "
-#~ "måske understøtte systemer der køre en ældre version af nbd-client, eller "
-#~ "måske gennemgå en masse besvær for at opdatere dine gamle konfigurationer "
-#~ "for at migrere til navnebaseret eksport. I begge disse tilfælde skal du "
-#~ "acceptere denne indstilling."
-
-#~ msgid ""
-#~ "Everyone else should leave the option at the default setting, which will "
-#~ "cause nbd-server to only support name-based exports."
-#~ msgstr ""
-#~ "Alle andre skal bevare standardindstillingen, som vil medføre at nbd-"
-#~ "server kun understøtter navnebaseret eksport."

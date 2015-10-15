@@ -2,20 +2,20 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the nbd package.
 #
-# Yuri Kozlov <yuray@komyakino.ru>, 2009, 2010, 2011.
+# Yuri Kozlov <yuray@komyakino.ru>, 2009, 2010, 2011, 2015.
 msgid ""
 msgstr ""
-"Project-Id-Version: nbd 1:2.9.20-1~1\n"
+"Project-Id-Version: nbd 1:3.11-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2015-09-26 13:20+0200\n"
-"PO-Revision-Date: 2011-02-04 13:11+0300\n"
+"PO-Revision-Date: 2015-10-15 19:19+0300\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Lokalize 1.0\n"
+"X-Generator: Lokalize 1.5\n"
 "Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
@@ -23,7 +23,7 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:2001
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-client"
-msgstr "Значение переменной AUTO_GEN равно \"n\" в /etc/nbd-client"
+msgstr "Значение переменной AUTO_GEN равно «n» в /etc/nbd-client"
 
 #. Type: error
 #. Description
@@ -33,7 +33,7 @@ msgid ""
 "\"n\". The file will therefore not be regenerated automatically."
 msgstr ""
 "Файл /etc/nbd-client содержит строку, которая устанавливает переменную "
-"AUTO_GEN в значение \"n\". Из-за этого регенерация файла не будет выполнена "
+"AUTO_GEN в значение «n». Из-за этого регенерация файла не будет выполнена "
 "автоматически."
 
 #. Type: error
@@ -43,16 +43,15 @@ msgid ""
 "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
 "afterwards."
 msgstr ""
-"Если это неправильно, удалите строку и запустите \"dpkg-reconfigure nbd-"
-"client\"."
+"Если это неправильно, удалите строку и запустите «dpkg-reconfigure nbd-"
+"client»."
 
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr "Порт или имя для экспорта nbd (номер: ${number})?"
+msgstr "Для экспорта используется порт (${number})"
 
 #. Type: error
 #. Description
@@ -62,6 +61,9 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"В файле /etc/nbd-client настраивается экспорт NBD номером порта. "
+"Такой метод подключения к экспорту NBD не поддерживается, начиная с "
+"NBD 3.10."
 
 #. Type: error
 #. Description
@@ -70,12 +72,14 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"Исправьте настройку так, чтобы в ней упоминался экспорт по имени, а не по "
+"порту."
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:4001
 msgid "Number of nbd-client connections to use:"
-msgstr "Число соединений, используемых nbd-client:"
+msgstr "Количество соединений, используемых nbd-client:"
 
 #. Type: string
 #. Description
@@ -138,11 +142,11 @@ msgid ""
 "client process; you will have to set it up manually."
 msgstr ""
 "Если вы хотите использовать сетевое блочное устройство в качестве устройства "
-"для пространства подкачки, выберите \"пространство подкачки\". Если вы "
+"для пространства подкачки, выберите «пространство подкачки». Если вы "
 "хотите использовать на нём файловую систему, добавьте в строку /etc/fstab "
-"параметр \"_netdev\" (иначе init попытается смонтировать его до того как это "
-"станет возможным), и выберите \"файловая система\". Для всех других целей, "
-"выберите \"неразмеченное устройство\". В этом случае сценарий загрузки nbd-"
+"параметр «_netdev» (иначе init попытается смонтировать его до того как это "
+"станет возможным), и выберите «файловая система». Для всех других целей, "
+"выберите «неразмеченное устройство». В этом случае сценарий загрузки nbd-"
 "client только запустит процесс nbd-client; всё остальное вам нужно настроить "
 "вручную."
 
@@ -165,10 +169,9 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (numer: ${number})?"
-msgstr "Порт или имя для экспорта nbd (номер: ${number})?"
+msgstr "Имя для экспорта NBD (номер: ${number})?"
 
 #. Type: string
 #. Description
@@ -177,6 +180,8 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"Укажите имя экспорта NBD, необходимое для доступа к nbd-server. Указываемое "
+"имя должно совпадать с существующим экспортом на сервере."
 
 #. Type: string
 #. Description
@@ -185,6 +190,8 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"Заметим, что начиная с NBD 3.10, подключение к экспорту NBD через устаревший "
+"формат протокола на основе порта больше не поддерживается."
 
 #. Type: string
 #. Description
@@ -220,7 +227,7 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:9001
 msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "Отсоединять все устройства NBD по команде \"stop\"?"
+msgstr "Отсоединять все устройства NBD по команде «stop»?"
 
 #. Type: boolean
 #. Description
@@ -290,8 +297,8 @@ msgid ""
 "Note that you can always add extra servers by adding them to /etc/nbd-server/"
 "config, or by running \"dpkg-reconfigure nbd-server\"."
 msgstr ""
-"Заметим, что вы всегда можете добавить дополнительные серверы, указав их в /"
-"etc/nbd-server/config или запустив \"dpkg-reconfigure nbd-server\"."
+"Заметим, что вы всегда можете добавить дополнительные серверы, указав их в "
+"/etc/nbd-server/config или запустив «dpkg-reconfigure nbd-server»."
 
 #. Type: string
 #. Description
@@ -324,11 +331,11 @@ msgid ""
 "export/swaps/swp%s\"."
 msgstr ""
 "Укажите имя файла или блочного устройства, которое должно быть доступно по "
-"сети. Вы можете экспортировать реальное блочное устройство (например, \"/dev/"
-"hda1\"); обычный файл (например, \"/export/nbd/bl1\"); или несколько файлов "
-"сразу. В третьем варианте, вы можете использовать в имени файла \"%s\", "
-"которое будет преобразовано в IP-адрес подключающегося клиента. Пример: \"/"
-"export/swaps/swp%s\"."
+"сети. Вы можете экспортировать реальное блочное устройство (например, «/dev/"
+"hda1»), обычный файл (например, «/export/nbd/bl1») или несколько файлов "
+"сразу. В третьем варианте, вы можете использовать в имени файла «%s», "
+"которое будет преобразовано в IP-адрес подключающегося клиента. Пример: "
+"«/export/swaps/swp%s»."
 
 #. Type: string
 #. Description
@@ -338,13 +345,13 @@ msgid ""
 "substituted in the file name. See \"man 5 nbd-server\" for details."
 msgstr ""
 "Заметим, что возможно подстроить каким образом IP-адрес будет подменяться "
-"именем файла. См. \"man 5 nbd-server\"."
+"именем файла. См. «man 5 nbd-server»."
 
 #. Type: error
 #. Description
 #: ../nbd-server.templates:5001
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "Значение переменной AUTO_GEN равно \"n\" в /etc/nbd-server"
+msgstr "Значение переменной AUTO_GEN равно «n» в /etc/nbd-server"
 
 #. Type: error
 #. Description
@@ -354,7 +361,7 @@ msgid ""
 "\"n\". The file will therefore not be regenerated automatically."
 msgstr ""
 "Файл /etc/nbd-server содержит строку, которая устанавливает переменную "
-"AUTO_GEN в значение \"n\". Из-за этого регенерация файла не будет выполнена "
+"AUTO_GEN в значение «n». Из-за этого регенерация файла не будет выполнена "
 "автоматически."
 
 #. Type: error
@@ -369,7 +376,7 @@ msgstr ""
 "Заметим, что в текущей версии пакета nbd-server больше не используется /etc/"
 "nbd-server. Вместо него используется новый файл настройки, который читается "
 "самим сервером nbd-server (а не сценарием начального запуска) и используется "
-"больше параметров. См. \"man 5 nbd-server\"."
+"больше параметров. См. «man 5 nbd-server»."
 
 #. Type: error
 #. Description
