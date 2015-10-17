@@ -1,21 +1,21 @@
-# translation of nbd debconf to Portuguese
+# translation of nbd's debconf messages to European Portuguese
 # Copyright (C) 2007 the nbd's copyright holder
 # This file is distributed under the same license as the nbd package.
 #
-# Américo Monteiro <a_monteiro@netcabo.pt>, 2007, 2009, 2010, 2011.
+# Américo Monteiro <a_monteiro@gmx.com>, 2007, 2009, 2010, 2011, 2015.
 msgid ""
 msgstr ""
-"Project-Id-Version: nbd 1:2.9.20-1~1\n"
+"Project-Id-Version: nbd 1:3.11-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2015-09-26 13:20+0200\n"
-"PO-Revision-Date: 2011-02-01 19:07+0000\n"
-"Last-Translator: Américo Monteiro <a_monteiro@netcabo.pt>\n"
+"PO-Revision-Date: 2015-10-16 00:43+0100\n"
+"Last-Translator: Américo Monteiro <a_monteiro@gmx.com>\n"
 "Language-Team: Portuguese <traduz@debianpt.org>\n"
 "Language: Pt\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Lokalize 1.0\n"
+"X-Generator: Lokalize 1.4\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. Type: error
@@ -47,10 +47,9 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr "Porto ou nome para exportação do nbd (número: ${number})?"
+msgstr "Um porto foi seleccionado para exportar ${number}"
 
 #. Type: error
 #. Description
@@ -60,6 +59,9 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"O ficheiro /etc/nbd-client configura uma exportação NBD pelo método de um "
+"número de porto. Este método de ligação a uma exportação NBD não é mais "
+"suportado a partir do NBD 3.10."
 
 #. Type: error
 #. Description
@@ -68,6 +70,8 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"Por favor migre a configuração para que passe a usar exportações baseadas "
+"em nomes, em vez de baseadas em portos."
 
 #. Type: string
 #. Description
@@ -160,10 +164,9 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (numer: ${number})?"
-msgstr "Porto ou nome para exportação do nbd (número: ${number})?"
+msgstr "Nome para exportação NBD (número: ${number})?"
 
 #. Type: string
 #. Description
@@ -172,6 +175,9 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"Por favor indique o nome de exportação NBD necessário para aceder ao "
+"nbd-server. O nome indicado deve coincidir a uma exportação existente no "
+"servidor."
 
 #. Type: string
 #. Description
@@ -180,6 +186,8 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"Note que a partir do NBD 3.10, já não é suportada a ligação a uma "
+"exportação NBD usando o antigo protocolo baseado em porto."
 
 #. Type: string
 #. Description
