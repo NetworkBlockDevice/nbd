@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:3.11-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"POT-Creation-Date: 2015-10-17 09:40+0200\n"
 "PO-Revision-Date: 2015-10-15 19:19+0300\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
@@ -49,7 +49,6 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
 msgstr "Для экспорта используется порт (${number})"
 
@@ -61,9 +60,8 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
-"В файле /etc/nbd-client настраивается экспорт NBD номером порта. "
-"Такой метод подключения к экспорту NBD не поддерживается, начиная с "
-"NBD 3.10."
+"В файле /etc/nbd-client настраивается экспорт NBD номером порта. Такой метод "
+"подключения к экспорту NBD не поддерживается, начиная с NBD 3.10."
 
 #. Type: error
 #. Description
@@ -142,12 +140,12 @@ msgid ""
 "client process; you will have to set it up manually."
 msgstr ""
 "Если вы хотите использовать сетевое блочное устройство в качестве устройства "
-"для пространства подкачки, выберите «пространство подкачки». Если вы "
-"хотите использовать на нём файловую систему, добавьте в строку /etc/fstab "
-"параметр «_netdev» (иначе init попытается смонтировать его до того как это "
-"станет возможным), и выберите «файловая система». Для всех других целей, "
-"выберите «неразмеченное устройство». В этом случае сценарий загрузки nbd-"
-"client только запустит процесс nbd-client; всё остальное вам нужно настроить "
+"для пространства подкачки, выберите «пространство подкачки». Если вы хотите "
+"использовать на нём файловую систему, добавьте в строку /etc/fstab параметр "
+"«_netdev» (иначе init попытается смонтировать его до того как это станет "
+"возможным), и выберите «файловая система». Для всех других целей, выберите "
+"«неразмеченное устройство». В этом случае сценарий загрузки nbd-client "
+"только запустит процесс nbd-client; всё остальное вам нужно настроить "
 "вручную."
 
 #. Type: string
@@ -169,8 +167,7 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#| msgid "Port or name for nbd export (number: ${number})?"
-msgid "Name for NBD export (numer: ${number})?"
+msgid "Name for NBD export (number: ${number})?"
 msgstr "Имя для экспорта NBD (номер: ${number})?"
 
 #. Type: string
@@ -297,8 +294,8 @@ msgid ""
 "Note that you can always add extra servers by adding them to /etc/nbd-server/"
 "config, or by running \"dpkg-reconfigure nbd-server\"."
 msgstr ""
-"Заметим, что вы всегда можете добавить дополнительные серверы, указав их в "
-"/etc/nbd-server/config или запустив «dpkg-reconfigure nbd-server»."
+"Заметим, что вы всегда можете добавить дополнительные серверы, указав их в /"
+"etc/nbd-server/config или запустив «dpkg-reconfigure nbd-server»."
 
 #. Type: string
 #. Description
@@ -334,8 +331,8 @@ msgstr ""
 "сети. Вы можете экспортировать реальное блочное устройство (например, «/dev/"
 "hda1»), обычный файл (например, «/export/nbd/bl1») или несколько файлов "
 "сразу. В третьем варианте, вы можете использовать в имени файла «%s», "
-"которое будет преобразовано в IP-адрес подключающегося клиента. Пример: "
-"«/export/swaps/swp%s»."
+"которое будет преобразовано в IP-адрес подключающегося клиента. Пример: «/"
+"export/swaps/swp%s»."
 
 #. Type: string
 #. Description

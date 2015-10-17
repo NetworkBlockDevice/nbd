@@ -61,7 +61,7 @@ _Description: Hostname of the server (number: ${number})?
 
 Template: nbd-client/port
 Type: string
-_Description: Name for NBD export (numer: ${number})?
+_Description: Name for NBD export (number: ${number})?
  Please enter the NBD export name needed to access nbd-server. The name
  entered here should match an existing export on the server.
  .

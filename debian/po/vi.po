@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.16-3\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"POT-Creation-Date: 2015-10-17 09:40+0200\n"
 "PO-Revision-Date: 2010-09-30 16:13+0930\n"
 "Last-Translator: Clytie Siddall <clytie@riverland.net.au>\n"
 "Language-Team: Vietnamese <vi-VN@googlegroups.com>\n"
@@ -164,7 +164,7 @@ msgstr ""
 #: ../nbd-client.templates:7001
 #, fuzzy
 #| msgid "Hostname of the server (number: ${number})?"
-msgid "Name for NBD export (numer: ${number})?"
+msgid "Name for NBD export (number: ${number})?"
 msgstr "Tên máy của máy phục vụ (số : ${number}):"
 
 #. Type: string

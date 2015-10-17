@@ -31,7 +31,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.20-1~1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"POT-Creation-Date: 2015-10-17 09:40+0200\n"
 "PO-Revision-Date: 2011-02-05 22:41+0100\n"
 "Last-Translator: Camaleón <noelamac@gmail.com>\n"
 "Language-Team: Debian Spanish <debian-l10n-spanish@lists.debian.org>\n"
@@ -187,7 +187,7 @@ msgstr ""
 #: ../nbd-client.templates:7001
 #, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
-msgid "Name for NBD export (numer: ${number})?"
+msgid "Name for NBD export (number: ${number})?"
 msgstr ""
 "¿Cuál es el puerto o el nombre para la exportación nbd (número: ${number})?"
 

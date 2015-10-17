@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.25-2\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"POT-Creation-Date: 2015-10-17 09:40+0200\n"
 "PO-Revision-Date: 2015-10-15 13:21+0200\n"
 "Last-Translator: Wouter Verhelst <wouter@debian.org>\n"
 "Language-Team: Debian l10n Dutch <debian-l10n-dutch@lists.debian.org>\n"
@@ -164,7 +164,7 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-msgid "Name for NBD export (numer: ${number})?"
+msgid "Name for NBD export (number: ${number})?"
 msgstr "Naam van de nbd-export (nummer: ${number})?"
 
 #. Type: string
