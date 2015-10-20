@@ -129,7 +129,28 @@ else
 	AC_DEFINE(HAVE_FALLOC_PH, 0, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([no])
 fi
-AC_COMPILE_IFELSE
+
+AC_CHECK_HEADERS([winioctl.h], [], [],
+[#include <io.h>
+#include <windef.h>
+#include <winbase.h>
+])
+HAVE_FSCTL_SET_ZERO_DATA=no
+if test "x$ac_cv_header_winioctl_h" = "xyes"
+then
+        AC_CHECK_DECL(FSCTL_SET_ZERO_DATA, [HAVE_FSCTL_SET_ZERO_DATA=yes], [HAVE_FSCTL_SET_ZERO_DATA=no],
+        [#include <windef.h>
+        #include <winbase.h>
+        #include <winioctl.h>
+        ])
+fi
+if test "x$HAVE_FSCTL_SET_ZERO_DATA" = "xyes"
+then
+        AC_DEFINE(HAVE_FSCTL_SET_ZERO_DATA, 1, [Define to 1 if you have FSCTL_SET_ZERO_DATA])
+else
+        AC_DEFINE(HAVE_FSCTL_SET_ZERO_DATA, 0, [Define to 1 if you have FSCTL_SET_ZERO_DATA])
+fi
+
 AC_CHECK_FUNC([sync_file_range],
 	[AC_DEFINE([HAVE_SYNC_FILE_RANGE], [sync_file_range(2) is not supported], [sync_file_range(2) is supported])],
         [])

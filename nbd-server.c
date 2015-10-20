@@ -111,6 +111,15 @@
 #include <sdp_inet.h>
 #endif
 
+#if HAVE_FSCTL_SET_ZERO_DATA
+#include <io.h>
+/* don't include <windows.h> to avoid redefining eg the ERROR macro */
+#define NOMINMAX 1
+#include <windef.h>
+#include <winbase.h>
+#include <winioctl.h>
+#endif
+
 /** Default position of the config file */
 #ifndef SYSCONFDIR
 #define SYSCONFDIR "/etc"
@@ -1353,6 +1362,22 @@ int expflush(CLIENT *client) {
 	return 0;
 }
 
+static void punch_hole(int fd, off_t off, off_t len) {
+	DEBUG("punching hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
+#if HAVE_FALLOC_PH
+	fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len);
+#elif HAVE_FSCTL_SET_ZERO_DATA
+	FILE_ZERO_DATA_INFORMATION zerodata;
+	zerodata.FileOffset.QuadPart = off;
+	zerodata.BeyondFinalZero.QuadPart = off + len;
+	HANDLE w32handle = (HANDLE)_get_osfhandle(fd);
+	DWORD bytesret;
+	DeviceIoControl(w32handle, FSCTL_SET_ZERO_DATA, &zerodata, sizeof(zerodata), NULL, 0, &bytesret, NULL);
+#else
+	DEBUG("punching holes not supported on this platform\n");
+#endif
+}
+
 /*
  * If the current system supports it, call fallocate() on the backend
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
@@ -1371,12 +1396,9 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
 		return 0;
 	}
-#if HAVE_FALLOC_PH
 	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
 	FILE_INFO cur = prev;
 	int i = 1;
-	/* We're running on a system that supports the
-	 * FALLOC_FL_PUNCH_HOLE option to re-sparsify a file */
 	do {
 		if(i<client->export->len) {
 			cur = g_array_index(client->export, FILE_INFO, i);
@@ -1384,14 +1406,11 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		if(prev.startoff <= req->from) {
 			off_t curoff = req->from - prev.startoff;
 			off_t curlen = cur.startoff - prev.startoff - curoff;
-			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, curoff, curlen);
+			punch_hole(prev.fhandle, curoff, curlen);
 		}
 		prev = cur;
 	} while(i < client->export->len && cur.startoff < (req->from + req->len));
 	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
-#else
-	DEBUG("Ignoring TRIM request (not supported on current platform");
-#endif
 	return 0;
 }
 
