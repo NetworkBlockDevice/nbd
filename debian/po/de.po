@@ -1,17 +1,17 @@
 # German translation of nbd templates
 # Helge Kreutzmann <debian@helgefjell.de>, 2006, 2007, 2008
-# and Chris Leick <c.leick@vollbio.de>, 2009 - 2011.
+# and Chris Leick <c.leick@vollbio.de>, 2009 - 2015.
 # This file is distributed under the same license as the nbd package.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: nbd 1:2.9.20-1~1\n"
+"Project-Id-Version: nbd 1:3.11-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-10-17 09:40+0200\n"
-"PO-Revision-Date: 2011-02-12 00:35+0100\n"
+"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"PO-Revision-Date: 2015-10-15 22:10+0100\n"
 "Last-Translator: Chris Leick <c.leick@vollbio.de>\n"
 "Language-Team: de <debian-l10n-german@lists.debian.org>\n"
-"Language: \n"
+"Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -51,10 +51,8 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr "Port oder Name für NBD-Export (Nummer: ${number})?"
+msgstr "Für Export ${number} wurde ein Port ausgewählt"
 
 #. Type: error
 #. Description
@@ -64,6 +62,9 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"Die Datei /etc/nbd-client konfiguriert einen NBD-Export über eine Portnummer. "
+"Diese Methode zum Verbinden mit einem NBD-Export wird nicht länger von NBD "
+"unterstützt."
 
 #. Type: error
 #. Description
@@ -72,6 +73,8 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"Bitte migrieren Sie die Konfiguration so, dass sie namensbasierte Exporte "
+"anstelle von portbasierten verwendet."
 
 #. Type: string
 #. Description
@@ -174,10 +177,8 @@ msgstr ""
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (number: ${number})?"
-msgstr "Port oder Name für NBD-Export (Nummer: ${number})?"
+msgstr "Name für NBD-Export (Nummer: ${number})?"
 
 #. Type: string
 #. Description
@@ -186,6 +187,9 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"Bitte geben Sie den für den Zugriff auf den NBD-Server nötigen "
+"NBD-Exportnamen ein. Der hier eingegebene Name sollte einem existierenden "
+"Export auf dem Server entsprechen."
 
 #. Type: string
 #. Description
@@ -194,6 +198,8 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"Beachten Sie, dass seit NBD 3.10 das Verbinden mit einem NBD-Export mittels "
+"altem portbasierten Übertragungsprotokoll nicht länger unterstützt wird."
 
 #  Template: nbd-client/device
 #  ddtp-prioritize: 42
@@ -410,106 +416,3 @@ msgstr ""
 "eine Datei /etc/nbd-server/config im neuen Format, basierend auf Ihrer "
 "aktuellen Konfiguration, erstellt werden. Bis dahin wird Ihre NBD-Server-"
 "Installation defekt sein."
-
-#~ msgid ""
-#~ "Please enter the TCP port number or NBD export name needed to access nbd-"
-#~ "server."
-#~ msgstr ""
-#~ "Bitte geben Sie die TCP-Portnummer oder den NBD-Exportnamen an, um auf "
-#~ "NBD-Server zuzugreifen."
-
-#~ msgid ""
-#~ "Versions of nbd-server of 2.9.16 or lower did not support specifying a "
-#~ "name for the NBD export. If your NBD server is of an older version, you "
-#~ "should enter the TCP port number here, and should make sure not to enter "
-#~ "any non-numeric characters in the field."
-#~ msgstr ""
-#~ "Versionen von NBD-Server bis einschließlich 2.9.16 unterstützten nicht "
-#~ "die Angabe eines Namens für den NDB-Export. Falls Ihr NBD-Server eine "
-#~ "ältere Version hat, sollten Sie hier den TCP-Port eingeben und "
-#~ "sicherstellen, dass keine Zeichen in das Feld eingegeben werden, die "
-#~ "nicht numerisch sind."
-
-#~ msgid ""
-#~ "More recent versions of nbd-server support providing a name for an "
-#~ "export. If the data entered in this field contains any non-numeric "
-#~ "characters, then this configuration system will accept that as a name and "
-#~ "provide it to nbd-client as a name-based export rather than a port-based "
-#~ "one."
-#~ msgstr ""
-#~ "Aktuellere Versionen von NBD-Server unterstützen die Angabe eines Namens "
-#~ "für einen Export. Falls die eingegebenen Daten in diesem Feld "
-#~ "irgendwelche nicht numerischen Zeichen enthalten. wird dieses "
-#~ "Konfigurationssystem dies als Name akzeptieren und es dem NBD-Client als "
-#~ "namens- anstatt als portpasierten Export bereitstellen."
-
-#  Template: nbd-client/host
-#  ddtp-prioritize: 42
-#
-#~ msgid "TCP Port for server number ${number}:"
-#~ msgstr "TCP-Port für Server Nummer ${number}:"
-
-#~ msgid ""
-#~ "Please specify the TCP port this instance of nbd server will use for "
-#~ "backwards compatibility with older clients."
-#~ msgstr ""
-#~ "Bitte geben Sie den TCP-Port an, den diese Instanz des NBD-Servers für "
-#~ "Rückwärtskompatibilität mit älteren Clients benutzen wird."
-
-#~ msgid "Convert old-style nbd-server configuration file?"
-#~ msgstr "Im alten Format vorliegende NBD-Server-Konfiguration konvertieren?"
-
-#~ msgid ""
-#~ "A pre-2.9 nbd-server configuration file has been found on this system. "
-#~ "The current nbd-server package no longer supports this file and will not "
-#~ "work if it is kept as is."
-#~ msgstr ""
-#~ "Eine NBD-Server-Konfigurationsdatei vor 2.9 wurde auf diesem System "
-#~ "gefunden. Das aktuelle NBD-Server-Paket unterstützt diese Datei nicht "
-#~ "länger und wird nicht funktionieren, falls sie so beibehalten wird, wie "
-#~ "sie ist."
-
-#~ msgid ""
-#~ "If you choose this option, the system will generate a new style "
-#~ "configuration file based upon the old-style configuration file, which "
-#~ "will be removed. Otherwise, configuration questions will be asked and the "
-#~ "system will generate a new configuration file."
-#~ msgstr ""
-#~ "Falls Sie diese Option wählen, wird das System eine Konfiguration im "
-#~ "neuen Format erzeugen, die auf der Konfigurationsdatei im alten Format "
-#~ "basiert, welche entfernt wird. Andernfalls werden Konfigurationsfragen "
-#~ "gestellt und das System erzeugt eine neue Konfigurationsdatei."
-
-#~ msgid ""
-#~ "If a new-style configuration file already exists and you choose this "
-#~ "option, you will shortly see a \"modified configuration file\" prompt, as "
-#~ "usual."
-#~ msgstr ""
-#~ "Falls bereits eine Konfigurationsdatei im neuen Format existiert und Sie "
-#~ "diese Option wählen, wird in Kürze wie gewohnt die Abfrage »modified "
-#~ "configuration file« erfolgen."
-
-#~ msgid "Support port-based exports?"
-#~ msgstr "portbasierte Exporte unterstützen?"
-
-#~ msgid ""
-#~ "Since version 2.9.18, nbd-server supports name-based exports, rather than "
-#~ "port-based ones. While this is generally preferable, you may have to "
-#~ "support systems running an older version of nbd-client, or might need to "
-#~ "go through a lot of trouble to update your older configurations in order "
-#~ "to migrate to name-based exports. In either of those cases, you should "
-#~ "accept this option."
-#~ msgstr ""
-#~ "Seit Version 2.9.18 unterstützt NBD-Server namens- anstatt portbasierte "
-#~ "Exporte. Obwohl dies allgemein wünschenswert ist, müssen Sie "
-#~ "möglicherweise ein System unterstützen, auf dem eine ältere Version von "
-#~ "NBD-Client ausgeführt wird oder Sie könnten sich eine Menge Ärger "
-#~ "einhandeln, um Ihre alten Konfigurationen auf namensbasierte Exporte zu "
-#~ "migrieren. In diesen beiden Fällen sollten Sie diese Option akzeptieren."
-
-#~ msgid ""
-#~ "Everyone else should leave the option at the default setting, which will "
-#~ "cause nbd-server to only support name-based exports."
-#~ msgstr ""
-#~ "Alle anderen sollten diese Option auf der Standardeinstellung belassen, "
-#~ "die NBD-Server veranlasst, nur namensbasierte Exporte zu unterstützen."
