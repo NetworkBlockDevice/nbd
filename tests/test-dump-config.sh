@@ -34,7 +34,7 @@
 set -e
 
 output="$(../src/nbdkit --dump-config)"
-if [[ ! ( "$output" =~ ^libdir= ) ]]; then
+if [[ ! ( "$output" =~ ^bindir= ) ]]; then
     echo "$0: unexpected output from nbdkit --dump-config"
     echo "$output"
     exit 1
