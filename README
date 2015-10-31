@@ -7,11 +7,13 @@ The key features are:
 
 * Multithreaded NBD server written in C with good performance.
 
+* Liberal license (BSD) allows nbdkit to be linked to proprietary
+  libraries or included in proprietary code.
+
 * Well-documented, simple plugin API with a stable ABI guarantee.
   Let's you export "unconventional" block devices easily.
 
-* Liberal license (BSD) allows nbdkit to be linked to proprietary
-  libraries or included in proprietary code.
+* You can write plugins in C, Perl, Python or OCaml.
 
 For documentation, see the docs/ directory.
 
