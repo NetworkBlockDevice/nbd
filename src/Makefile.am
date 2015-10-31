@@ -48,8 +48,11 @@ nbdkit_SOURCES = \
 	$(top_srcdir)/include/nbdkit-plugin.h
 
 nbdkit_CPPFLAGS = \
+	-Dbindir=\"$(bindir)\" \
 	-Dlibdir=\"$(libdir)\" \
 	-Dplugindir=\"$(plugindir)\" \
+	-Dsbindir=\"$(sbindir)\" \
+	-Dsysconfdir=\"$(sysconfdir)\" \
 	-I$(top_srcdir)/include
 nbdkit_CFLAGS = \
 	-pthread \

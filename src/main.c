@@ -127,8 +127,13 @@ display_version (void)
 static void
 dump_config (void)
 {
+  printf ("%s=%s\n", "bindir", bindir);
   printf ("%s=%s\n", "libdir", libdir);
+  printf ("%s=%s\n", "name", PACKAGE_NAME);
   printf ("%s=%s\n", "plugindir", plugindir);
+  printf ("%s=%s\n", "sbindir", sbindir);
+  printf ("%s=%s\n", "sysconfdir", sysconfdir);
+  printf ("%s=%s\n", "version", PACKAGE_VERSION);
 }
 
 int
