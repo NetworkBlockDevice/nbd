@@ -50,6 +50,7 @@ nbdkit_SOURCES = \
 nbdkit_CPPFLAGS = \
 	-Dbindir=\"$(bindir)\" \
 	-Dlibdir=\"$(libdir)\" \
+	-Dmandir=\"$(mandir)\" \
 	-Dplugindir=\"$(plugindir)\" \
 	-Dsbindir=\"$(sbindir)\" \
 	-Dsysconfdir=\"$(sysconfdir)\" \
