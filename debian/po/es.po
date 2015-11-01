@@ -4,7 +4,7 @@
 #
 # Changes:
 # - Initial translation
-# Camaleón <noelamac@gmail.com>, 2010
+# Camaleón <noelamac@gmail.com>, 2010, 2015.
 #
 # - Updates
 #
@@ -29,16 +29,18 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: nbd 1:2.9.20-1~1\n"
+"Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-10-17 09:40+0200\n"
-"PO-Revision-Date: 2011-02-05 22:41+0100\n"
+"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"PO-Revision-Date: 2015-10-15 19:33+0200\n"
 "Last-Translator: Camaleón <noelamac@gmail.com>\n"
 "Language-Team: Debian Spanish <debian-l10n-spanish@lists.debian.org>\n"
-"Language: \n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Virtaal 0.7.1\n"
 "X-Poedit-Language: Spanish\n"
 
 #. Type: error
@@ -70,11 +72,9 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr ""
-"¿Cuál es el puerto o el nombre para la exportación nbd (número: ${number})?"
+msgstr "Ha seleccionado un puerto para el recurso de exportación ${number}"
 
 #. Type: error
 #. Description
@@ -84,6 +84,9 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"El archivo «/etc/nbd-client» tiene una configuración para un recurso de "
+"exportación NBD que utiliza un número de puerto. Desde la versión 3.10 ya no "
+"se admite este sistema para conectarse a un recurso de exportación NBD."
 
 #. Type: error
 #. Description
@@ -92,6 +95,8 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"Tiene que migrar la configuración para utilizar recursos de exportaciones "
+"basados en nombres en lugar de puertos."
 
 #. Type: string
 #. Description
@@ -106,9 +111,8 @@ msgid ""
 "nbd-client can handle multiple concurrent connections. Please specify the "
 "number of connections you'd like this configuration script to set up."
 msgstr ""
-"nbd-client puede gestionar varias conexiones concurrentes. Por favor, "
-"especifique el número de conexiones que le gustaría configurar mediante este "
-"script."
+"nbd-client puede gestionar varias conexiones concurrentes. Indique el número "
+"de conexiones que le gustaría configurar mediante este script."
 
 #. Type: string
 #. Description
@@ -170,7 +174,7 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:6001
 msgid "Hostname of the server (number: ${number})?"
-msgstr "¿Cuál es el nombre del servidor (número: ${number})?"
+msgstr "¿Cuál es el nombre de equipo del servidor (número: ${number})?"
 
 #. Type: string
 #. Description
@@ -179,17 +183,15 @@ msgid ""
 "Please enter the network name or IP address of the machine on which the nbd-"
 "server process is running."
 msgstr ""
-"Por favor, introduzca el nombre de la red o la dirección IP del equipo donde "
-"se está ejecutando el proceso nbd-server."
+"Introduzca el nombre de la red o la dirección IP del equipo donde se está "
+"ejecutando el proceso nbd-server."
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
 #| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (number: ${number})?"
-msgstr ""
-"¿Cuál es el puerto o el nombre para la exportación nbd (número: ${number})?"
+msgstr "¿Cuál es el nombre del recurso de exportación NBD (número: ${number})?"
 
 #. Type: string
 #. Description
@@ -198,6 +200,9 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"Introduzca el nombre del recurso de exportación NBD que se necesita para "
+"acceder a nbd-server. Este nombre debe coincidir con un recurso de "
+"exportación existente en el servidor."
 
 #. Type: string
 #. Description
@@ -206,13 +211,15 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"Tenga en cuenta que a partir de NBD 3.10 ya no se admiten conexiones a un "
+"recurso de exportación NBD que utilicen el protocolo de negociación anterior "
+"basado en puertos."
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:8001
 msgid "/dev entry for this nbd-client (number: ${number})?"
-msgstr ""
-"¿Cuál es la entrada en «/dev» para este nbd-client (número: ${number})?"
+msgstr "¿Cuál es la entrada en «/dev» para este nbd-client (número: ${number})?"
 
 #. Type: string
 #. Description
@@ -224,9 +231,9 @@ msgid ""
 "the last part."
 msgstr ""
 "Cada proceso nbd-client necesita asociarse con una entrada en «/dev» que "
-"tenga un número principal de 43. Por favor, introduzca el nombre de la "
-"entrada en «/dev» que desea utilizar con este nbd-client. Tenga en cuenta "
-"que necesita especificar la ruta completa, no sólo la última parte."
+"tenga un número principal de 43. Introduzca el nombre de la entrada en "
+"«/dev» que desea utilizar con este nbd-client. Tenga en cuenta que necesita "
+"especificar la ruta completa, no sólo la última parte."
 
 #. Type: string
 #. Description
@@ -269,7 +276,7 @@ msgstr ""
 "La opción predeterminada (y el comportamiento tradicional) es desconectar "
 "todos los dispositivos nbd-client. Si el dispositivo raíz o cualquier otro "
 "sistema de archivos crítico se encuentran en NBD esto causará una pérdida de "
-"datos, lo cual no debería ser aceptable."
+"datos, por lo que debería rechazar esta opción."
 
 #. Type: string
 #. Description
@@ -302,8 +309,8 @@ msgid ""
 "generate."
 msgstr ""
 "Se pueden ejecutar varios procesos nbd-server para exportar múltiples "
-"archivos o dispositivos de bloques. Por favor, especifique cuántas "
-"configuraciones desea generar para esos servidores."
+"archivos o dispositivos de bloques. Indique cuántas configuraciones desea "
+"generar para esos servidores."
 
 #. Type: string
 #. Description
@@ -320,13 +327,13 @@ msgstr ""
 #. Description
 #: ../nbd-server.templates:3001
 msgid "Name of export ${number}:"
-msgstr "Nombre de la exportación ${number}:"
+msgstr "Nombre del recurso de exportación ${number}:"
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:3001
 msgid "Please specify a name for this export."
-msgstr "Por favor, especifique un nombre para esta exportación."
+msgstr "Indique un nombre para este recurso de exportación."
 
 #. Type: string
 #. Description
@@ -346,12 +353,12 @@ msgid ""
 "expanded to the IP-address of the connecting client. An example would be \"/"
 "export/swaps/swp%s\"."
 msgstr ""
-"Por favor, especifique un nombre de archivo o un dispositivo de bloques para "
-"exportar a través de la red. Puede exportar un dispositivo de bloques real "
-"(por ejemplo «/dev/hda1»), un archivo común (como «/export/nbd/bl1»), o un "
-"conjunto de archivos al mismo tiempo. Para la tercera opción, puede utilizar "
-"«%s» en el nombre del archivo, que se sustituirá con la dirección IP del "
-"cliente que se conecta. Un ejemplo sería «/export/swaps/swp%s»."
+"Indique un nombre de archivo o un dispositivo de bloques para exportar a "
+"través de la red. Puede exportar un dispositivo de bloques real (por ejemplo "
+"«/dev/hda1»), un archivo común (como «/export/nbd/bl1»), o un conjunto de "
+"archivos al mismo tiempo. Para la tercera opción, puede utilizar «%s» en el "
+"nombre del archivo, que se sustituirá con la dirección IP del cliente que se "
+"conecta. Un ejemplo sería «/export/swaps/swp%s»."
 
 #. Type: string
 #. Description
@@ -389,8 +396,8 @@ msgid ""
 "itself (rather than the init script), which supports more options. See \"man "
 "5 nbd-server\" for details."
 msgstr ""
-"Tenga en cuenta que la versión actual del paquete nbd-server ya no utiliza «/"
-"etc/nbd-server». En su lugar utiliza un nuevo archivo de configuración que "
+"Tenga en cuenta que la versión actual del paquete nbd-server ya no utiliza "
+"«/etc/nbd-server». En su lugar utiliza un nuevo archivo de configuración que "
 "lee el propio nbd-server (en lugar del script de inicio) y que admite más "
 "opciones. Consulte «man 5 nbd-server» para obtener más información."
 

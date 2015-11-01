@@ -10,6 +10,8 @@ nbd (1:3.11-1) unstable; urgency=medium
     - Russian, by Yuri Kuzlov; Closes: #801883
     - Danish, by Joe Dalton.
     - German, by Chris Leick; Closes: #802201
+    - Czech, by Miroslav Kure; Closes: #803224
+    - Spanish, by Camaleón; Closes: #803308
 
  -- Wouter Verhelst <wouter@debian.org>  Sun, 20 Sep 2015 22:59:56 +0200
 
