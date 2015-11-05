@@ -32,6 +32,7 @@ int main(void) {
 		.servename = "test",
 		.max_connections = 0,
 		.transactionlog = "/etc/foo",
+		.cowdir = "/tmp",
 	};
 
 	srvd = dup_serve(&srvs);
@@ -49,4 +50,5 @@ int main(void) {
 	count_assert(stringcmp(srvs.servename, srvd->servename) == 0);
 	count_assert(srvs.max_connections == srvd->max_connections);
 	count_assert(stringcmp(srvs.transactionlog, srvd->transactionlog) == 0);
+	count_assert(stringcmp(srvs.cowdir, srvd->cowdir) == 0);
 }

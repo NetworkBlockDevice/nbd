@@ -179,6 +179,9 @@ SERVER* dup_serve(const SERVER *const s) {
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
 
+	if(s->cowdir)
+		serve->cowdir = g_strdup(s->cowdir);
+
 	serve->max_connections = s->max_connections;
 
 	return serve;
