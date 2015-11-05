@@ -98,6 +98,7 @@
 #include <grp.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include <glib.h>
 
@@ -353,12 +354,12 @@ static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * 
 
 	if (size<TREEDIRSIZE*TREEPAGESIZE) {
 		// we are done, add filename
-		snprintf(name,lenmax,"/FILE%04X",(pos/TREEPAGESIZE) % TREEDIRSIZE);
+		snprintf(name,lenmax,"/FILE%04" PRIX64,(pos/TREEPAGESIZE) % TREEDIRSIZE);
 		*ppos = pos / (TREEPAGESIZE*TREEDIRSIZE);
 	} else {
 		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
 		char buffer[10];
-		snprintf(buffer,sizeof(buffer),"/TREE%04X",*ppos % TREEDIRSIZE);
+		snprintf(buffer,sizeof(buffer),"/TREE%04lX",*ppos % TREEDIRSIZE);
 		memcpy(name,buffer,9); // copy into string without trailing zero
 		*ppos/=TREEDIRSIZE;
 	}
@@ -2051,7 +2052,7 @@ void setupexport(CLIENT* client) {
 		msg(LOG_INFO, "Total number of files: %d", i);
 	}
 	if(treefile) {
-		msg(LOG_INFO, "Total number of (potential) files: %d", (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
+		msg(LOG_INFO, "Total number of (potential) files: %" PRId64, (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
 	}
 }
 
