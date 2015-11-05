@@ -160,14 +160,10 @@ SERVER* dup_serve(const SERVER *const s) {
 	if(s->listenaddr)
 		serve->listenaddr = g_strdup(s->listenaddr);
 
-	serve->port = s->port;
-
 	if(s->authname)
-		serve->authname = strdup(s->authname);
+		serve->authname = g_strdup(s->authname);
 
 	serve->flags = s->flags;
-	serve->socket = s->socket;
-	serve->socket_family = s->socket_family;
 	serve->virtstyle = s->virtstyle;
 	serve->cidrlen = s->cidrlen;
 
@@ -186,66 +182,6 @@ SERVER* dup_serve(const SERVER *const s) {
 	serve->max_connections = s->max_connections;
 
 	return serve;
-}
-
-int append_serve(const SERVER *const s, GArray *const a) {
-	SERVER *ns = NULL;
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	struct addrinfo *rp = NULL;
-	char   host[NI_MAXHOST];
-	gchar  *port = NULL;
-	int e;
-	int ret;
-
-	assert(s != NULL);
-	if(a == NULL) {
-		return -1;
-	}
-
-	port = g_strdup_printf("%d", s->port);
-
-	memset(&hints,'\0',sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
-	hints.ai_protocol = IPPROTO_TCP;
-
-	e = getaddrinfo(s->listenaddr, port, &hints, &ai);
-
-	if (port)
-		g_free(port);
-
-	if(e == 0) {
-		for (rp = ai; rp != NULL; rp = rp->ai_next) {
-			e = getnameinfo(rp->ai_addr, rp->ai_addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
-
-			if (e != 0) { // error
-				fprintf(stderr, "getnameinfo: %s\n", gai_strerror(e));
-				continue;
-			}
-
-			// duplicate server and set listenaddr to resolved IP address
-			ns = dup_serve (s);
-			if (ns) {
-				ns->listenaddr = g_strdup(host);
-				ns->socket_family = rp->ai_family;
-				g_array_append_val(a, *ns);
-				free(ns);
-				ns = NULL;
-			}
-		}
-
-		ret = 0;
-	} else {
-		fprintf(stderr, "getaddrinfo failed on listen host/address: %s (%s)\n", s->listenaddr ? s->listenaddr : "any", gai_strerror(e));
-		ret = -1;
-	}
-
-	if (ai)
-		freeaddrinfo(ai);
-
-	return ret;
 }
 
 uint64_t size_autodetect(int fhandle) {

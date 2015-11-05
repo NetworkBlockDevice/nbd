@@ -31,11 +31,8 @@ typedef struct {
 	uint64_t expected_size; /**< size of the exported file as it was told to
 			       us through configuration */
 	gchar* listenaddr;   /**< The IP address we're listening on */
-	unsigned int port;   /**< port we're exporting this file at */
 	char* authname;      /**< filename of the authorization file */
 	int flags;           /**< flags associated with this exported file */
-	int socket;	     /**< The socket of this server. */
-	int socket_family;   /**< family of the socket */
 	VIRT_STYLE virtstyle;/**< The style of virtualization, if any */
 	uint8_t cidrlen;     /**< The length of the mask when we use
 				  CIDR-style virtualization */
@@ -158,14 +155,6 @@ int authorized_client(CLIENT *opts);
  * @return new duplicated server
  **/
 SERVER* dup_serve(const SERVER *const s);
-
-/**
- * append new server to array
- * @param s server
- * @param a server array
- * @return 0 success, -1 error
- */
-int append_serve(const SERVER *const s, GArray *const a);
 
 /**
  * Detect the size of a file.

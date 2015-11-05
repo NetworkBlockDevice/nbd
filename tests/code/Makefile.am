@@ -1,5 +1,5 @@
-TESTS = clientacl dup append mask size
-check_PROGRAMS = clientacl dup append mask size
+TESTS = clientacl dup mask size
+check_PROGRAMS = clientacl dup mask size
 EXTRA_DIST = macro.h
 
 AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@

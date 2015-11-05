@@ -168,7 +168,6 @@ int dontfork = 0;
 #define F_NO_ZEROES 4	  /**< Do not send zeros to client */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
-char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
 #define NEG_INIT	(1 << 0)
@@ -462,7 +461,6 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	printf("[%s]\n", section_header);
 	printf("\texportname = %s\n", serve->exportname);
 	printf("\tlistenaddr = %s\n", serve->listenaddr);
-	printf("\tport = %d\n", serve->port);
 	if(serve->flags & F_READONLY) {
 		printf("\treadonly = true\n");
 	}
@@ -490,7 +488,7 @@ void dump_section(SERVER* serve, gchar* section_header) {
  * @param argc the argc argument to main()
  * @param argv the argv argument to main()
  **/
-SERVER* cmdline(int argc, char *argv[]) {
+SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	int i=0;
 	int nonspecial=0;
 	int c;
@@ -541,11 +539,12 @@ SERVER* cmdline(int argc, char *argv[]) {
 				}
 
 				if(addr_port[1]) {
-					serve->port=strtol(addr_port[1], NULL, 0);
-					serve->listenaddr=g_strdup(addr_port[0]);
+					genconf->modernport=g_strdup(addr_port[1]);
+					genconf->modernaddr=g_strdup(addr_port[0]);
 				} else {
-					serve->listenaddr=NULL;
-					serve->port=strtol(addr_port[0], NULL, 0);
+					g_free(genconf->modernaddr);
+					genconf->modernaddr=NULL;
+					genconf->modernport=g_strdup(addr_port[0]);
 				}
 				g_strfreev(addr_port);
 				break;
@@ -585,8 +584,8 @@ SERVER* cmdline(int argc, char *argv[]) {
 			section_header = g_strdup(optarg);
 			break;
 		case 'p':
-			strncpy(pidftemplate, optarg, 256);
-			pidftemplate[255]='\0';
+			strncpy(pidfname, optarg, 256);
+			pidfname[255]='\0';
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
@@ -621,7 +620,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		g_free(serve);
 		serve=NULL;
 	} else {
-		glob_flags |= F_OLDSTYLE;
+		err("The oldstyle handshake protocol is no longer supported");
 	}
 	if(do_output) {
 		if(!serve) {
@@ -922,10 +921,9 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
 		if(i>0 || !expect_generic) {
-			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
-			append_serve(&s, retval);
+			g_array_append_val(retval, s);
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -2383,12 +2381,6 @@ handle_modern_connection(GArray *const servers, const int sock)
                 /* Now that we are in the child process after a
                  * succesful negotiation, we do not need the list of
                  * servers anymore, get rid of it.*/
-
-                for (i = 0; i < servers->len; i++) {
-                        const SERVER *const server = &g_array_index(servers, SERVER, i);
-                        close(server->socket);
-                }
-
                 /* FALSE does not free the
                    actual data. This is required,
                    because the client has a
@@ -2409,107 +2401,6 @@ handler_err:
         if (!dontfork) {
                 exit(EXIT_FAILURE);
         }
-}
-
-static void
-handle_oldstyle_connection(GArray *const servers, SERVER *const serve)
-{
-	int net;
-	CLIENT *client = NULL;
-	int sock_flags_old;
-	int sock_flags_new;
-
-	net = socket_accept(serve->socket);
-	if (net < 0)
-		return;
-
-	if(serve->max_connections > 0 &&
-	   g_hash_table_size(children) >= serve->max_connections) {
-		msg(LOG_INFO, "Max connections reached");
-		goto handle_connection_out;
-	}
-	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	sock_flags_new = sock_flags_old & ~O_NONBLOCK;
-	if (sock_flags_new != sock_flags_old &&
-	    fcntl(net, F_SETFL, sock_flags_new) == -1) {
-		err("fcntl F_SETFL ~O_NONBLOCK");
-	}
-
-	client = g_new0(CLIENT, 1);
-	client->server=serve;
-	client->exportsize=OFFT_MAX;
-	client->net=net;
-	client->transactionlogfd = -1;
-
-	if (set_peername(net, client)) {
-		goto handle_connection_out;
-	}
-	if (!authorized_client(client)) {
-		msg(LOG_INFO, "Unauthorized client");
-		goto handle_connection_out;
-	}
-	msg(LOG_INFO, "Authorized client");
-
-	if (!dontfork) {
-		pid_t pid;
-		int i;
-		sigset_t newset;
-		sigset_t oldset;
-
-		sigemptyset(&newset);
-		sigaddset(&newset, SIGCHLD);
-		sigaddset(&newset, SIGTERM);
-		sigprocmask(SIG_BLOCK, &newset, &oldset);
-		if ((pid = fork()) < 0) {
-			msg(LOG_INFO, "Could not fork (%s)", strerror(errno));
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			goto handle_connection_out;
-		}
-		if (pid > 0) { /* parent */
-			pid_t *pidp;
-
-			pidp = g_malloc(sizeof(pid_t));
-			*pidp = pid;
-			g_hash_table_insert(children, pidp, pidp);
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			goto handle_connection_out;
-		}
-		/* child */
-
-		/* Child's signal disposition is reset to default. */
-		signal(SIGCHLD, SIG_DFL);
-		signal(SIGTERM, SIG_DFL);
-		signal(SIGHUP, SIG_DFL);
-		sigemptyset(&oldset);
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
-
-		g_hash_table_destroy(children);
-		children = NULL;
-		for(i=0;i<servers->len;i++) {
-			close(g_array_index(servers, SERVER, i).socket);
-		}
-		/* FALSE does not free the
-		   actual data. This is required,
-		   because the client has a
-		   direct reference into that
-		   data, and otherwise we get a
-		   segfault... */
-		g_array_free(servers, FALSE);
-		for(i=0;i<modernsocks->len;i++) {
-			close(g_array_index(modernsocks, int, i));
-		}
-		g_array_free(modernsocks, TRUE);
-	}
-
-	msg(LOG_INFO, "Starting to serve");
-	serveconnection(client);
-	exit(EXIT_SUCCESS);
-
-handle_connection_out:
-	g_free(client);
-	close(net);
 }
 
 /**
@@ -2534,8 +2425,6 @@ static int get_index_by_servename(const gchar *const servename,
 
         return -1;
 }
-
-int setup_serve(SERVER *const serve, GError **const gerror);
 
 /**
  * Parse configuration files and add servers to the array if they don't
@@ -2565,10 +2454,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
                 if (new_server.servename
                     && -1 == get_index_by_servename(new_server.servename,
                                                     servers)) {
-                        if (setup_serve(&new_server, gerror) == -1)
-                                goto out;
-                        if (append_serve(&new_server, servers) == -1)
-                                goto out;
+			g_array_append_val(servers, new_server);
                 }
         }
 
@@ -2599,13 +2485,6 @@ void serveloop(GArray* servers) {
 	 */
 	max=0;
 	FD_ZERO(&mset);
-	for(i=0;i<servers->len;i++) {
-		int sock;
-		if((sock=(g_array_index(servers, SERVER, i)).socket) >= 0) {
-			FD_SET(sock, &mset);
-			max=sock>max?sock:max;
-		}
-	}
 	for(i=0;i<modernsocks->len;i++) {
 		int sock = g_array_index(modernsocks, int, i);
 		FD_SET(sock, &mset);
@@ -2684,11 +2563,6 @@ void serveloop(GArray* servers) {
                                 const SERVER server = g_array_index(servers,
                                                                     SERVER, i);
 
-                                if (server.socket >= 0) {
-                                        FD_SET(server.socket, &mset);
-                                        max = server.socket > max ? server.socket : max;
-                                }
-
                                 msg(LOG_INFO, "reconfigured new server: %s",
                                     server.servename);
                         }
@@ -2704,17 +2578,6 @@ void serveloop(GArray* servers) {
 				}
 
 				handle_modern_connection(servers, sock);
-			}
-			for(i=0; i < servers->len; i++) {
-				SERVER *serve;
-
-				serve=&(g_array_index(servers, SERVER, i));
-				if(serve->socket < 0) {
-					continue;
-				}
-				if(FD_ISSET(serve->socket, &rset)) {
-					handle_oldstyle_connection(servers, serve);
-				}
 			}
 		}
 	}
@@ -2763,117 +2626,6 @@ int dosockopts(const int socket, GError **const gerror) {
 	}
 
         return 0;
-}
-
-/**
- * Connect a server's socket.
- *
- * @param serve the server we want to connect.
- **/
-int setup_serve(SERVER *const serve, GError **const gerror) {
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	gchar *port = NULL;
-	int e;
-        int retval = -1;
-
-        /* Without this, it's possible that socket == 0, even if it's
-         * not initialized at all. And that would be wrong because 0 is
-         * totally legal value for properly initialized descriptor. This
-         * line is required to ensure that unused/uninitialized
-         * descriptors are marked as such (new style configuration
-         * case). Currently, servers are being initialized in multiple
-         * places, and some of the them do the socket initialization
-         * incorrectly. This is the only point common to all code paths,
-         * and therefore setting -1 is put here. However, the whole
-         * server initialization procedure should be extracted to its
-         * own function and all code paths wanting to mess with servers
-         * should initialize servers with that function.
-         * 
-         * TODO: fix server initialization */
-        serve->socket = -1;
-
-	if(!(glob_flags & F_OLDSTYLE)) {
-		return serve->servename ? 1 : 0;
-	}
-	memset(&hints,'\0',sizeof(hints));
-	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG | AI_NUMERICSERV;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = serve->socket_family;
-
-	port = g_strdup_printf("%d", serve->port);
-	if (!port) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SYS,
-                            "failed to open an export socket: "
-                            "failed to convert a port number to a string: %s",
-                            strerror(errno));
-                goto out;
-        }
-
-	e = getaddrinfo(serve->listenaddr,port,&hints,&ai);
-
-	g_free(port);
-
-	if(e != 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
-                            "failed to open an export socket: "
-                            "failed to get address info: %s",
-                            gai_strerror(e));
-                goto out;
-	}
-
-	if(serve->socket_family == AF_UNSPEC)
-		serve->socket_family = ai->ai_family;
-
-#ifdef WITH_SDP
-	if ((serve->flags) && F_SDP) {
-		if (ai->ai_family == AF_INET)
-			ai->ai_family = AF_INET_SDP;
-		else (ai->ai_family == AF_INET6)
-			ai->ai_family = AF_INET6_SDP;
-	}
-#endif
-	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
-                            "failed to open an export socket: "
-                            "failed to create a socket: %s",
-                            strerror(errno));
-                goto out;
-        }
-
-	if (dosockopts(serve->socket, gerror) == -1) {
-                g_prefix_error(gerror, "failed to open an export socket: ");
-                goto out;
-        }
-
-	DEBUG("Waiting for connections... bind, ");
-	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
-	if (e != 0 && errno != EADDRINUSE) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-                            "failed to open an export socket: "
-                            "failed to bind an address to a socket: %s",
-                            strerror(errno));
-                goto out;
-        }
-	DEBUG("listen, ");
-	if (listen(serve->socket, 1) < 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-                            "failed to open an export socket: "
-                            "failed to start listening on a socket: %s",
-                            strerror(errno));
-                goto out;
-        }
-
-        retval = serve->servename ? 1 : 0;
-out:
-
-        if (retval == -1 && serve->socket >= 0) {
-                close(serve->socket);
-                serve->socket = -1;
-        }
-	freeaddrinfo (ai);
-
-        return retval;
 }
 
 int open_unix(const gchar *const sockname, GError **const gerror) {
@@ -3011,30 +2763,13 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
                    const gchar *const modernport, const gchar* unixsock) {
 	int i;
 	struct sigaction sa;
-	int want_modern=0;
 
-	for(i=0;i<servers->len;i++) {
-                GError *gerror = NULL;
-                SERVER *server = &g_array_index(servers, SERVER, i);
-                int ret;
-
-		ret = setup_serve(server, &gerror);
-                if (ret == -1) {
-                        msg(LOG_ERR, "failed to setup servers: %s",
-                            gerror->message);
-                        g_clear_error(&gerror);
-                        exit(EXIT_FAILURE);
-                }
-                want_modern |= ret;
-	}
-	if(want_modern) {
-                GError *gerror = NULL;
-                if (open_modern(modernaddr, modernport, &gerror) == -1) {
-                        msg(LOG_ERR, "failed to setup servers: %s",
-                            gerror->message);
-                        g_clear_error(&gerror);
-                        exit(EXIT_FAILURE);
-                }
+        GError *gerror = NULL;
+        if (open_modern(modernaddr, modernport, &gerror) == -1) {
+                msg(LOG_ERR, "failed to setup servers: %s",
+                    gerror->message);
+                g_clear_error(&gerror);
+                exit(EXIT_FAILURE);
 	}
 	if(unixsock != NULL) {
 		GError* gerror = NULL;
@@ -3076,23 +2811,15 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
  * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
  **/
 #if !defined(NODAEMON)
-void daemonize(SERVER* serve) {
+void daemonize() {
 	FILE*pidf;
 
-	if(serve && !(serve->port)) {
-		return;
-	}
 	if(daemon(0,0)<0) {
 		err("daemon");
 	}
-	if(!*pidftemplate) {
-		if(serve) {
-			strncpy(pidftemplate, "/var/run/nbd-server.%d.pid", 255);
-		} else {
-			strncpy(pidftemplate, "/var/run/nbd-server.pid", 255);
-		}
+	if(!*pidfname) {
+		strncpy(pidfname, "/var/run/nbd-server.pid", 255);
 	}
-	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
 	pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
@@ -3188,13 +2915,11 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE) ;
 	}
 
-	memset(pidftemplate, '\0', 256);
-
 	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
 	logging(MY_NAME);
 	config_file_pos = g_strdup(CFILE);
-	serve=cmdline(argc, argv);
+	serve=cmdline(argc, argv, &genconf);
 
         servers = parse_cfile(config_file_pos, &genconf, true, &err);
 	
@@ -3203,32 +2928,9 @@ int main(int argc, char *argv[]) {
         glob_flags   |= genconf.flags;
 
 	if(serve) {
-		serve->socket_family = AF_UNSPEC;
-
-		append_serve(serve, servers);
+		g_array_append_val(servers, serve);
      
-		if (!(serve->port)) {
-			CLIENT *client;
-#ifndef ISSERVER
-			/* You really should define ISSERVER if you're going to use
-			 * inetd mode, but if you don't, closing stdout and stderr
-			 * (which inetd had connected to the client socket) will let it
-			 * work. */
-			close(1);
-			close(2);
-			open("/dev/null", O_WRONLY);
-			open("/dev/null", O_WRONLY);
-			g_log_set_default_handler( glib_message_syslog_redirect, NULL );
-#endif
-			client=g_malloc(sizeof(CLIENT));
-			client->server=serve;
-			client->net=-1;
-			client->exportsize=OFFT_MAX;
-			if (set_peername(0, client))
-				exit(EXIT_FAILURE);
-			serveconnection(client);
-			return 0;
-		}
+		/* TODO: reinstate inetd mode */
 	}
     
 	if(!servers || !servers->len) {
@@ -3249,7 +2951,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	if (!dontfork)
-		daemonize(serve);
+		daemonize();
 
 	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
 
