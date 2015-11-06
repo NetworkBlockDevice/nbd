@@ -2187,6 +2187,10 @@ int set_peername(int net, CLIENT *client) {
 		}
 	}
 
+	if(strncmp(peername, "::ffff:127.0.0.1", 7) == 0) {
+		memmove(peername, peername+7, strlen(peername));
+	}
+
 	switch(client->server->virtstyle) {
 		case VIRT_NONE:
 			msg(LOG_DEBUG, "virtualization is off");
