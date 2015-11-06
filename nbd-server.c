@@ -2167,7 +2167,7 @@ int set_peername(int net, CLIENT *client) {
 		return -1;
 	}
 
-	if(addr->sa_family == AF_UNIX) {
+	if(client->clientaddr.ss_family == AF_UNIX) {
 		strcpy(peername, "unix");
 	} else {
 		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
