@@ -359,7 +359,7 @@ static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * 
 	} else {
 		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
 		char buffer[10];
-		snprintf(buffer,sizeof(buffer),"/TREE%04lX",*ppos % TREEDIRSIZE);
+		snprintf(buffer,sizeof(buffer),"/TREE%04jX",(intmax_t)(*ppos % TREEDIRSIZE));
 		memcpy(name,buffer,9); // copy into string without trailing zero
 		*ppos/=TREEDIRSIZE;
 	}
