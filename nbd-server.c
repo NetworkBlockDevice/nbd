@@ -1381,12 +1381,27 @@ static void punch_hole(int fd, off_t off, off_t len) {
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
-        if (client->server->flags & F_TREEFILES) {
-		if (client->server->flags & F_READONLY)
-			return 0;
-
-		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first to be trimmed block
-		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
+	/* Don't trim when we're read only */
+	if(client->server->flags & F_READONLY) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* Don't trim beyond the size of the device, please */
+	if(req->from + req->len > client->exportsize) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* For copy-on-write, we should trim on the diff file. Not yet
+	 * implemented. */
+	if(client->server->flags & F_COPYONWRITE) {
+		DEBUG("TRIM not supported yet on copy-on-write exports");
+		return 0;
+	}
+	if (client->server->flags & F_TREEFILES) {
+		/* start address of first block to be trimmed */
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
+		/* start address of first block NOT to be trimmed */
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
 		while (min<max) {
 			delete_treefile(client->exportname,client->exportsize,min);
 			min+=TREEPAGESIZE;
@@ -1407,6 +1422,7 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 			punch_hole(prev.fhandle, curoff, curlen);
 		}
 		prev = cur;
+		i++;
 	} while(i < client->export->len && cur.startoff < (req->from + req->len));
 	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
 	return 0;
