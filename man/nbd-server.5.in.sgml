@@ -169,14 +169,13 @@ manpage.1: manpage.sgml
 	  <para>
 	    Optional; string
 	  </para>
-	  <para>If this option is set, it should contain the local IP
-	  address on which we should listen to
-	  <command>nbd-client</command>(8) connections. If it is not
-	    set, <command>nbd-server</command> will listen to all
-	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
-	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
-	  is not possible to specify more than one IP address
-	  here.</para>
+	  <para>If this option is set, it should contain a comma-separated lis
+	  of the local IP addresses on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not set,
+	  <command>nbd-server</command> will listen to "::, 0.0.0.0", which
+	  causes nbd-server to listen to all local IPv4 and IPv6 addresses. To
+	  limit to IPv6, specify the address as "::". To limit to IPv4, specify
+	  as "0.0.0.0".</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
