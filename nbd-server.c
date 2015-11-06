@@ -1956,7 +1956,6 @@ void setupexport(CLIENT* client) {
 		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
 		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
 	} else {
-
 		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
 		/* If multi-file, open as many files as we can.
@@ -1968,7 +1967,7 @@ void setupexport(CLIENT* client) {
 			gchar* error_string;
 
 			if (i)
-			  cancreate = 0;
+				cancreate = 0;
 			/* if expected_size is specified, and this is the first file, we can create the file */
 			mode_t mode = (client->server->flags & F_READONLY) ?
 			  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
@@ -2007,8 +2006,9 @@ void setupexport(CLIENT* client) {
 				err(error_string);
 			}
 
-			if (temporary)
+			if (temporary) {
 				unlink(tmpname); /* File will stick around whilst FD open */
+			}
 
 			fi.startoff = laststartoff + lastsize;
 			g_array_append_val(client->export, fi);
