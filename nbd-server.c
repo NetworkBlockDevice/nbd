@@ -1381,12 +1381,17 @@ static void punch_hole(int fd, off_t off, off_t len) {
  * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
  */
 int exptrim(struct nbd_request* req, CLIENT* client) {
-        if (client->server->flags & F_TREEFILES) {
-		if (client->server->flags & F_READONLY)
-			return 0;
+	/* don't trim when we're read only */
+	if (client->server->flags & F_READONLY) {
+		errno = EINVAL;
+		return -1;
+	}
 
-		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first to be trimmed block
-		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
+	if (client->server->flags & F_TREEFILES) {
+		/* start address of first block to be trimmed */
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
+		/* start address of first block NOT to be trimmed */
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
 		while (min<max) {
 			delete_treefile(client->exportname,client->exportsize,min);
 			min+=TREEPAGESIZE;
@@ -1394,21 +1399,25 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
 		return 0;
 	}
-	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
-	FILE_INFO cur = prev;
-	int i = 1;
-	do {
-		if(i<client->export->len) {
-			cur = g_array_index(client->export, FILE_INFO, i);
-		}
-		if(prev.startoff <= req->from) {
-			off_t curoff = req->from - prev.startoff;
-			off_t curlen = cur.startoff - prev.startoff - curoff;
-			punch_hole(prev.fhandle, curoff, curlen);
-		}
-		prev = cur;
-	} while(i < client->export->len && cur.startoff < (req->from + req->len));
-	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+	if (client->server->flags & F_COPYONWRITE) {
+		DEBUG("TRIM not supported yet on copy-on-write exports");
+		return 0;
+	}
+	if (client->server->flags & F_MULTIFILE) {
+		DEBUG("TRIM not supported yet on multifile exports");
+		return 0;
+	}
+	/* the easy case: single file, no trees, no CoW, just raw data */
+	/* just punch a hole in the file */
+	assert(client->export->len == 1);
+	FILE_INFO file = g_array_index(client->export, FILE_INFO, 0);
+	if (req->from + req->len > client->exportsize) {
+		/* trim request out of bounds */
+		errno = EINVAL;
+		return -1;
+	}
+	punch_hole(file.fhandle, (off_t)req->from, (off_t)req->len);
+	DEBUG("Performed TRIM request from %llu, length %llu\n", (unsigned long long) req->from, (unsigned long long) req->len);
 	return 0;
 }
 
