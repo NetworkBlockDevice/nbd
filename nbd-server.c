@@ -367,7 +367,7 @@ static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * 
 
 static void mkdir_path(char * path) {
 	char *subpath=path+1;
-	while (subpath=strchr(subpath,'/')) {
+	while ((subpath=strchr(subpath,'/'))) {
 		*subpath='\0'; // path is modified in place with terminating null char instead of slash
 		if (mkdir(path,0700)==-1) {
 			if (errno!=EEXIST)
@@ -423,7 +423,6 @@ static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 static void delete_treefile(char* name,off_t size,off_t pos) {
 	char filename[256+strlen(name)];
 	strcpy(filename,name);
-	size_t psize=size;
 	off_t ppos;
 	construct_path(filename+strlen(name),256,size,pos,&ppos);
 
@@ -1502,7 +1501,6 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
  * @param client The client we're negotiating with.
  **/
 CLIENT* negotiate(int net, GArray* servers) {
-	uint32_t flags = NBD_FLAG_HAS_FLAGS;
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
 	uint32_t cflags = 0;
@@ -1557,11 +1555,13 @@ CLIENT* negotiate(int net, GArray* servers) {
 		err_nonfatal("Session terminated by client");
 		return NULL;
 	}
+	err_nonfatal("Weird things happened: reached end of negotiation without success");
+	return NULL;
 }
 
 void send_export_info(CLIENT* client) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
-	uint16_t flags = 0;
+	uint16_t flags = NBD_FLAG_HAS_FLAGS;
 
 	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed/9: %m");
@@ -2762,7 +2762,6 @@ out:
  **/
 void setup_servers(GArray *const servers, const gchar *const modernaddr,
                    const gchar *const modernport, const gchar* unixsock) {
-	int i;
 	struct sigaction sa;
 
         GError *gerror = NULL;

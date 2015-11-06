@@ -464,7 +464,6 @@ end:
 }
 
 int setup_connection(gchar* hostname, gchar* unixsock, int port, gchar* name, CONNECTION_TYPE ctype, int* serverflags) {
-	int retval = 0;
 	if(hostname != NULL) {
 		return setup_inet_connection(hostname, port, name, ctype, serverflags);
 	} else if(unixsock != NULL) {
@@ -1322,7 +1321,6 @@ int main(int argc, char**argv) {
 	char* name = NULL;
 	int sock=0;
 	int c;
-	int nonopt=0;
 	int testflags=0;
 	testfunc test = throughput_test;
 

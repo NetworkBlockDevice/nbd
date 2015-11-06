@@ -221,7 +221,7 @@ void ask_list(int sock) {
 					break;
 			}
 			if(len > 0 && len < BUF_SIZE) {
-				if(len=read(sock, buf, len) < 0) {
+				if((len=read(sock, buf, len)) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
 				}
 				buf[len] = '\0';
@@ -397,7 +397,6 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 #undef CHECK_LEN
 #undef MOVE_NEXT
 	// fourth field is the options field, a comma-separated field of options
-	size_t cflen = 0;
 	do {
 		if(!strncmp(loc, "bs=", 3)) {
 			*bs = (int)strtol(loc+3, &loc, 0);
@@ -444,6 +443,7 @@ next:
 			loc++;
 		}
 	} while(strcspn(loc, lsep) > 0);
+	return true;
 }
 
 void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {

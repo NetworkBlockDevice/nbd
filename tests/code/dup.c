@@ -17,7 +17,6 @@ int stringcmp(const char* a, const char* b) {
 }
 
 int main(void) {
-	int count=0;
 	SERVER *srvd;
 	SERVER srvs = {
 		.exportname = "foo",
