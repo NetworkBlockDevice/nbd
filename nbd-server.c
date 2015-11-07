@@ -1409,19 +1409,23 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
 		return 0;
 	}
-	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
-	FILE_INFO cur = prev;
+	FILE_INFO cur = g_array_index(client->export, FILE_INFO, 0);
+	FILE_INFO next = prev;
 	int i = 1;
 	do {
-		if(i<client->export->len) {
-			cur = g_array_index(client->export, FILE_INFO, i);
+		if(i<=client->export->len) {
+			next = g_array_index(client->export, FILE_INFO, i);
+		} else {
+			next.fhandle = -1;
+			next.startoff = client->exportsize;
 		}
-		if(prev.startoff <= req->from) {
-			off_t curoff = req->from - prev.startoff;
-			off_t curlen = cur.startoff - prev.startoff - curoff;
-			punch_hole(prev.fhandle, curoff, curlen);
+		if(cur.startoff <= req->from && next.startoff - cur.startoff <= req->len) {
+			off_t reqoff = req->from - cur.startoff;
+			off_t curlen = next.startoff - curoff;
+			off_t reqlen = curlen - reqoff > req->len ? curlen - reqoff : req->len;
+			punch_hole(cur.fhandle, off, len);
 		}
-		prev = cur;
+		cur = next;
 		i++;
 	} while(i < client->export->len && cur.startoff < (req->from + req->len));
 	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
