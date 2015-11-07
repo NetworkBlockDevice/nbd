@@ -11,9 +11,6 @@ clientacl_LDADD = $(top_builddir)/libnbdsrv.la @GLIB_LIBS@
 dup_SOURCES = dup.c punchdummy.c
 dup_LDADD = $(top_builddir)/libnbdsrv.la @GLIB_LIBS@
 
-append_SOURCES = append.c punchdummy.c
-append_LDADD = $(top_builddir)/libnbdsrv.la @GLIB_LIBS@
-
 mask_SOURCES = mask.c punchdummy.c
 mask_LDADD = $(top_builddir)/libnbdsrv.la @GLIB_LIBS@
 
