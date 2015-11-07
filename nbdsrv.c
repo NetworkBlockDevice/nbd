@@ -15,6 +15,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <treefiles.h>
+#include "backend.h"
 
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			       authorization file (yuck) */
@@ -228,3 +230,60 @@ uint64_t size_autodetect(int fhandle) {
 	return UINT64_MAX;
 }
 
+int exptrim(struct nbd_request* req, CLIENT* client) {
+	/* Don't trim when we're read only */
+	if(client->server->flags & F_READONLY) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* Don't trim beyond the size of the device, please */
+	if(req->from + req->len > client->exportsize) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* For copy-on-write, we should trim on the diff file. Not yet
+	 * implemented. */
+	if(client->server->flags & F_COPYONWRITE) {
+		DEBUG("TRIM not supported yet on copy-on-write exports");
+		return 0;
+	}
+	if (client->server->flags & F_TREEFILES) {
+		/* start address of first block to be trimmed */
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
+		/* start address of first block NOT to be trimmed */
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
+		while (min<max) {
+			delete_treefile(client->exportname,client->exportsize,min);
+			min+=TREEPAGESIZE;
+		}
+		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+		return 0;
+	}
+	FILE_INFO cur = g_array_index(client->export, FILE_INFO, 0);
+	FILE_INFO next;
+	int i = 1;
+	do {
+		if(i<=client->export->len) {
+			next = g_array_index(client->export, FILE_INFO, i);
+		} else {
+			next.fhandle = -1;
+			next.startoff = client->exportsize;
+		}
+		if(cur.startoff <= req->from && next.startoff - cur.startoff <= req->len) {
+			off_t reqoff = req->from - cur.startoff;
+			off_t curlen = next.startoff - reqoff;
+			off_t reqlen = curlen - reqoff > req->len ? curlen - reqoff : req->len;
+			punch_hole(cur.fhandle, reqoff, reqlen);
+		}
+		cur = next;
+		i++;
+	} while(i < client->export->len && cur.startoff < (req->from + req->len));
+	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+	return 0;
+}
+
+void myseek(int handle,off_t a) {
+	if (lseek(handle, a, SEEK_SET) < 0) {
+		err("Can not seek locally!\n");
+	}
+}

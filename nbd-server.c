@@ -107,6 +107,8 @@
 #include "cliserv.h"
 #include "nbd-debug.h"
 #include "netdb-compat.h"
+#include "backend.h"
+#include "treefiles.h"
 
 #ifdef WITH_SDP
 #include <sdp_inet.h>
@@ -143,25 +145,6 @@ int dontfork = 0;
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
-#define TREEPAGESIZE 4096 /**< tree (block) files uses those chunks */
-#define TREEDIRSIZE  1024 /**< number of files per subdirectory (or subdirs per subdirectory) */
-
-/** Per-export flags: */
-#define F_READONLY 1      /**< flag to tell us a file is readonly */
-#define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
-#define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
-			    copyonwrite */
-#define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
-#define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
-#define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
-#define F_SYNC 64	  /**< Whether to fsync() after a write */
-#define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
-#define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
-#define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
-#define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
-#define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
-#define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
-#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
@@ -213,14 +196,6 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       e.g., FreeBSD) */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
-
-/**
- * Variables associated with an open file
- **/
-typedef struct {
-	int fhandle;      /**< file descriptor */
-	off_t startoff;   /**< starting offset of this file */
-} FILE_INFO;
 
 /**
  * Type of configuration file values
@@ -341,97 +316,6 @@ static inline void writeit(int f, void *buf, size_t len) {
 		buf += res;
 	}
 }
-
-void myseek(int handle,off_t a);
-
-/**
- * Tree structure helper functions
- */
-
-static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
-	if (lenmax<10)
-		err("Char buffer overflow. This is likely a bug.");
-
-	if (size<TREEDIRSIZE*TREEPAGESIZE) {
-		// we are done, add filename
-		snprintf(name,lenmax,"/FILE%04" PRIX64,(pos/TREEPAGESIZE) % TREEDIRSIZE);
-		*ppos = pos / (TREEPAGESIZE*TREEDIRSIZE);
-	} else {
-		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
-		char buffer[10];
-		snprintf(buffer,sizeof(buffer),"/TREE%04jX",(intmax_t)(*ppos % TREEDIRSIZE));
-		memcpy(name,buffer,9); // copy into string without trailing zero
-		*ppos/=TREEDIRSIZE;
-	}
-}
-
-static void mkdir_path(char * path) {
-	char *subpath=path+1;
-	while ((subpath=strchr(subpath,'/'))) {
-		*subpath='\0'; // path is modified in place with terminating null char instead of slash
-		if (mkdir(path,0700)==-1) {
-			if (errno!=EEXIST)
-				err("Path access error! %m");
-		}
-		*subpath='/';
-		subpath++;
-	}
-}
-
-static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
-	char filename[256+strlen(name)];
-	strcpy(filename,name);
-	off_t ppos;
-	construct_path(filename+strlen(name),256,size,pos,&ppos);
-
-	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
-
-	int handle=open(filename, mode, 0600);
-	if (handle<0 && errno==ENOENT) {
-		if (mode & O_RDWR) {
-
-			DEBUG("Creating new treepath");
-
-			mkdir_path(filename);
-			handle=open(filename, O_RDWR|O_CREAT, 0600);
-			if (handle<0) {
-				err("Error opening tree block file %m");
-			}
-		} else {
-
-			DEBUG("Creating a dummy tempfile for reading");
-			gchar * tmpname;
-			tmpname = g_strdup_printf("dummy-XXXXXX");
-			handle = mkstemp(tmpname);
-			if (handle>0) {
-				unlink(tmpname); /* File will stick around whilst FD open */
-			} else {
-				err("Error opening tree block file %m");
-			}
-			g_free(tmpname);
-		}
-		char *n = "\0";
-		myseek(handle,TREEPAGESIZE-1);
-		ssize_t c = write(handle,n,1);
-		if (c<1) {
-			err("Error setting tree block file size %m");
-		}
-	}
-	return handle;
-}
-
-static void delete_treefile(char* name,off_t size,off_t pos) {
-	char filename[256+strlen(name)];
-	strcpy(filename,name);
-	off_t ppos;
-	construct_path(filename+strlen(name),256,size,pos,&ppos);
-
-	DEBUG("Deleting treefile: %s",filename);
-
-	if (unlink(filename)==-1)
-		DEBUG("Deleting failed : %s",strerror(errno));
-}
-
 
 /**
  * Print out a message about how to use nbd-server. Split out to a separate
@@ -1074,18 +958,6 @@ int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* m
 }
 
 /**
- * seek to a position in a file, with error handling.
- * @param handle a filedescriptor
- * @param a position to seek to
- * @todo get rid of this.
- **/
-void myseek(int handle,off_t a) {
-	if (lseek(handle, a, SEEK_SET) < 0) {
-		err("Can not seek locally!\n");
-	}
-}
-
-/**
  * Write an amount of bytes at a given offset to the right file. This
  * abstracts the write-side of the multiple file option.
  *
@@ -1360,7 +1232,7 @@ int expflush(CLIENT *client) {
 	return 0;
 }
 
-static void punch_hole(int fd, off_t off, off_t len) {
+void punch_hole(int fd, off_t off, off_t len) {
 	DEBUG("punching hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
 #if HAVE_FALLOC_PH
 	fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len);
@@ -1374,62 +1246,6 @@ static void punch_hole(int fd, off_t off, off_t len) {
 #else
 	DEBUG("punching holes not supported on this platform\n");
 #endif
-}
-
-/*
- * If the current system supports it, call fallocate() on the backend
- * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
- */
-int exptrim(struct nbd_request* req, CLIENT* client) {
-	/* Don't trim when we're read only */
-	if(client->server->flags & F_READONLY) {
-		errno = EINVAL;
-		return -1;
-	}
-	/* Don't trim beyond the size of the device, please */
-	if(req->from + req->len > client->exportsize) {
-		errno = EINVAL;
-		return -1;
-	}
-	/* For copy-on-write, we should trim on the diff file. Not yet
-	 * implemented. */
-	if(client->server->flags & F_COPYONWRITE) {
-		DEBUG("TRIM not supported yet on copy-on-write exports");
-		return 0;
-	}
-	if (client->server->flags & F_TREEFILES) {
-		/* start address of first block to be trimmed */
-		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
-		/* start address of first block NOT to be trimmed */
-		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
-		while (min<max) {
-			delete_treefile(client->exportname,client->exportsize,min);
-			min+=TREEPAGESIZE;
-		}
-		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
-		return 0;
-	}
-	FILE_INFO cur = g_array_index(client->export, FILE_INFO, 0);
-	FILE_INFO next = prev;
-	int i = 1;
-	do {
-		if(i<=client->export->len) {
-			next = g_array_index(client->export, FILE_INFO, i);
-		} else {
-			next.fhandle = -1;
-			next.startoff = client->exportsize;
-		}
-		if(cur.startoff <= req->from && next.startoff - cur.startoff <= req->len) {
-			off_t reqoff = req->from - cur.startoff;
-			off_t curlen = next.startoff - curoff;
-			off_t reqlen = curlen - reqoff > req->len ? curlen - reqoff : req->len;
-			punch_hole(cur.fhandle, off, len);
-		}
-		cur = next;
-		i++;
-	} while(i < client->export->len && cur.startoff < (req->from + req->len));
-	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
-	return 0;
 }
 
 static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasize, void* data) {

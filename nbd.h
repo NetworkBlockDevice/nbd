@@ -63,11 +63,11 @@ enum {
  * server. All data are in network byte order.
  */
 struct nbd_request {
-	__be32 magic;
-	__be32 type;	/* == READ || == WRITE 	*/
+	uint32_t magic;
+	uint32_t type;	/* == READ || == WRITE 	*/
 	char handle[8];
-	__be64 from;
-	__be32 len;
+	uint64_t from;
+	uint32_t len;
 } __attribute__ ((packed));
 
 /*
@@ -75,8 +75,8 @@ struct nbd_request {
  * it has completed an I/O request (or an error occurs).
  */
 struct nbd_reply {
-	__be32 magic;
-	__be32 error;		/* 0 = ok, else error	*/
+	uint32_t magic;
+	uint32_t error;		/* 0 = ok, else error	*/
 	char handle[8];		/* handle you got from request	*/
 };
 #endif

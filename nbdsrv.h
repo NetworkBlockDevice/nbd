@@ -9,6 +9,7 @@
 
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "nbd.h"
 
 /* Structures */
 
@@ -71,6 +72,14 @@ typedef struct {
 	pthread_mutex_t lock;
 } CLIENT;
 
+/**
+ * Variables associated with an open file
+ **/
+typedef struct {
+	int fhandle;      /**< file descriptor */
+	off_t startoff;   /**< starting offset of this file */
+} FILE_INFO;
+
 /* Constants and macros */
 
 /**
@@ -115,6 +124,23 @@ typedef enum {
 #define msg(prio, ...) g_log(G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, __VA_ARGS__)
 #endif
 #define MY_NAME "nbd_server"
+
+/** Per-export flags: */
+#define F_READONLY 1      /**< flag to tell us a file is readonly */
+#define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
+#define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
+			    copyonwrite */
+#define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
+#define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
+#define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
+#define F_SYNC 64	  /**< Whether to fsync() after a write */
+#define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
+#define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
+#define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
+#define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
+#define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
+#define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
+#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
 
 /* Functions */
 
@@ -164,4 +190,20 @@ SERVER* dup_serve(const SERVER *const s);
  * impossible.
  **/
 uint64_t size_autodetect(int fhandle);
+
+/**
+ * Punch a hole in the backend file (if supported by the current system).
+ *
+ * @param req the request for which this is being processed
+ * @param client the client for which we're processing this request
+ **/
+int exptrim(struct nbd_request* req, CLIENT* client);
+
+/**
+ * seek to a position in a file, with error handling.
+ * @param handle a filedescriptor
+ * @param a position to seek to
+ * @todo get rid of this.
+ **/
+void myseek(int handle, off_t a);
 #endif //NBDSRV_H
