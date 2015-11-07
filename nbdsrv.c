@@ -269,10 +269,10 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 			next.fhandle = -1;
 			next.startoff = client->exportsize;
 		}
-		if(cur.startoff <= req->from && next.startoff - cur.startoff <= req->len) {
+		if(cur.startoff <= req->from && next.startoff - cur.startoff >= req->len) {
 			off_t reqoff = req->from - cur.startoff;
 			off_t curlen = next.startoff - reqoff;
-			off_t reqlen = curlen - reqoff > req->len ? curlen - reqoff : req->len;
+			off_t reqlen = curlen - reqoff > req->len ? req->len : curlen - reqoff;
 			punch_hole(cur.fhandle, reqoff, reqlen);
 		}
 		cur = next;
