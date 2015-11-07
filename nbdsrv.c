@@ -263,7 +263,7 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	FILE_INFO next;
 	int i = 1;
 	do {
-		if(i<=client->export->len) {
+		if(i<client->export->len) {
 			next = g_array_index(client->export, FILE_INFO, i);
 		} else {
 			next.fhandle = -1;
