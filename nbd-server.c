@@ -2740,7 +2740,7 @@ void glib_message_syslog_redirect(const gchar *log_domain,
 int main(int argc, char *argv[]) {
 	SERVER *serve;
 	GArray *servers;
-	GError *err=NULL;
+	GError *gerr=NULL;
 	struct generic_conf genconf;
 
 	memset(&genconf, 0, sizeof(struct generic_conf));
@@ -2757,7 +2757,7 @@ int main(int argc, char *argv[]) {
 	serve=cmdline(argc, argv, &genconf);
 
 	genconf.threads = 4;
-        servers = parse_cfile(config_file_pos, &genconf, true, &err);
+        servers = parse_cfile(config_file_pos, &genconf, true, &gerr);
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
@@ -2765,15 +2765,28 @@ int main(int argc, char *argv[]) {
 
 	if(serve) {
 		g_array_append_val(servers, *serve);
-     
-		/* TODO: reinstate inetd mode */
+
+		if(strcmp(genconf.modernport, "0")==0) {
+#ifndef ISSERVER
+			err("inetd mode requires syslog");
+#endif
+			CLIENT* client = g_malloc(sizeof(CLIENT));
+			client->server = serve;
+			client->net = -1;
+			client->modern = TRUE;
+			client->exportsize = OFFT_MAX;
+			if(set_peername(0, client))
+				exit(EXIT_FAILURE);
+			serveconnection(client);
+			return 0;
+		}
 	}
     
 	if(!servers || !servers->len) {
-                if(err && !(err->domain == NBDS_ERR
-                            && err->code == NBDS_ERR_CFILE_NOTFOUND)) {
+                if(gerr && !(gerr->domain == NBDS_ERR
+                            && gerr->code == NBDS_ERR_CFILE_NOTFOUND)) {
 			g_warning("Could not parse config file: %s", 
-					err ? err->message : "Unknown error");
+					gerr ? gerr->message : "Unknown error");
 		}
 	}
 	if(serve) {
@@ -2781,7 +2794,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if((!serve) && (!servers||!servers->len)) {
-		if(err)
+		if(gerr)
 			g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
