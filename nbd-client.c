@@ -271,15 +271,11 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	uint32_t namesize;
 
 	printf("Negotiation: ");
-	if (read(sock, buf, 8) < 0)
-		err("Failed/1: %m");
-	if (strlen(buf)==0)
-		err("Server closed connection");
+	readit(sock, buf, 8);
 	if (strcmp(buf, INIT_PASSWD))
 		err("INIT_PASSWD bad");
 	printf(".");
-	if (read(sock, &magic, sizeof(magic)) < 0)
-		err("Failed/2: %m");
+	readit(sock, &magic, sizeof(magic));
 	magic = ntohll(magic);
 	if (magic != opts_magic) {
 		if(magic == cliserv_magic) {
@@ -287,9 +283,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 		}
 	}
 	printf(".");
-	if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
-		err("Failed reading flags: %m");
-	}
+	read(sock, &tmp, sizeof(uint16_t));
 	global_flags = ntohs(tmp);
 	if((needed_flags & global_flags) != needed_flags) {
 		/* There's currently really only one reason why this
@@ -326,11 +320,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	if (write(sock, name, strlen(name)) < 0)
 		err("Failed/2.4: %m");
 
-	if (read(sock, &size64, sizeof(size64)) <= 0) {
-		if (!errno)
-			err("Server closed connection");
-		err("Failed/3: %m\n");
-	}
+	readit(sock, &size64, sizeof(size64));
 	size64 = ntohll(size64);
 
 	if ((size64>>12) > (uint64_t)~0UL) {
@@ -339,13 +329,11 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	} else
 		printf("size = %luMB", (unsigned long)(size64>>20));
 
-	if(read(sock, &tmp, sizeof(tmp)) < 0)
-		err("Failed/4: %m\n");
+	readit(sock, &tmp, sizeof(tmp));
 	*flags = (uint32_t)ntohs(tmp);
 
 	if (!(global_flags & NBD_FLAG_NO_ZEROES)) {
-		if (read(sock, &buf, 124) < 0)
-			err("Failed/5: %m\n");
+		readit(sock, &buf, 124);
 	}
 	printf("\n");
 

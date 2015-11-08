@@ -261,28 +261,6 @@ static inline const char * getcommandname(uint64_t command) {
 }
 
 /**
- * Read data from a file descriptor into a buffer
- *
- * @param f a file descriptor
- * @param buf a buffer
- * @param len the number of bytes to be read
- **/
-static inline void readit(int f, void *buf, size_t len) {
-	ssize_t res;
-	while (len > 0) {
-		DEBUG("*");
-		if ((res = read(f, buf, len)) <= 0) {
-			if(errno != EAGAIN) {
-				err("Read failed: %m");
-			}
-		} else {
-			len -= res;
-			buf += res;
-		}
-	}
-}
-
-/**
  * Consume data from an FD that we don't want
  *
  * @param f a file descriptor

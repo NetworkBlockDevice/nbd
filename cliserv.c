@@ -1,9 +1,12 @@
 #include <config.h>
-#include <cliserv.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#include <cliserv.h>
+#include <nbd-debug.h>
 
 const u64 cliserv_magic = 0x00420281861253LL;
 const u64 opts_magic = 0x49484156454F5054LL;
@@ -78,4 +81,27 @@ u64 ntohll(u64 a) {
 	hi = ntohl(hi);
 	return ((u64) lo) << 32U | hi;
 }
+
+/**
+ * Read data from a file descriptor into a buffer
+ *
+ * @param f a file descriptor
+ * @param buf a buffer
+ * @param len the number of bytes to be read
+ **/
+void readit(int f, void *buf, size_t len) {
+	ssize_t res;
+	while (len > 0) {
+		DEBUG("*");
+		if ((res = read(f, buf, len)) <= 0) {
+			if(errno != EAGAIN) {
+				err("Read failed: %m");
+			}
+		} else {
+			len -= res;
+			buf += res;
+		}
+	}
+}
+
 #endif
