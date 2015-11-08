@@ -2762,9 +2762,9 @@ int main(int argc, char *argv[]) {
 	SERVER *serve;
 	GArray *servers;
 	GError *err=NULL;
-        struct generic_conf genconf;
+	struct generic_conf genconf;
 
-        memset(&genconf, 0, sizeof(struct generic_conf));
+	memset(&genconf, 0, sizeof(struct generic_conf));
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
