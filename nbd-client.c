@@ -548,7 +548,7 @@ int main(int argc, char *argv[]) {
 	int c;
 	int nonspecial=0;
 	int b_unix=0;
-	char* name=NULL;
+	char* name="";
 	uint16_t needed_flags=0;
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
@@ -631,7 +631,6 @@ int main(int argc, char *argv[]) {
 		case 'l':
 			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
 			opts |= NBDC_DO_LIST;
-			name="";
 			nbddev="";
 			break;
 		case 'm':
@@ -684,6 +683,10 @@ int main(int argc, char *argv[]) {
 	} else {
 		usage("no information specified");
 		exit(EXIT_FAILURE);
+	}
+
+	if(strlen(name)==0) {
+		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
 	if (b_unix)

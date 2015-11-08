@@ -482,7 +482,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 		g_free(serve);
 		serve=NULL;
 	} else {
-		err("The oldstyle handshake protocol is no longer supported");
+		serve->servename = "";
 	}
 	if(do_output) {
 		if(!serve) {
@@ -657,9 +657,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
                  * found from configuration files. */
                 memcpy(&genconftmp, genconf, sizeof(struct generic_conf));
         }
-	if(genconftmp.threads == 0) {
-		genconftmp.threads = 4;
-	}
 
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
@@ -1255,12 +1252,16 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 		return NULL;
 	}
 	namelen = ntohl(namelen);
-	name = malloc(namelen+1);
-	name[namelen]=0;
-	if (read(net, name, namelen) < 0) {
-		err("Negotiation failed/8: %m");
-		free(name);
-		return NULL;
+	if(namelen > 0) {
+		name = malloc(namelen+1);
+		name[namelen]=0;
+		if (read(net, name, namelen) < 0) {
+			err("Negotiation failed/8: %m");
+			free(name);
+			return NULL;
+		}
+	} else {
+		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
@@ -2755,6 +2756,7 @@ int main(int argc, char *argv[]) {
 	config_file_pos = g_strdup(CFILE);
 	serve=cmdline(argc, argv, &genconf);
 
+	genconf.threads = 4;
         servers = parse_cfile(config_file_pos, &genconf, true, &err);
 	
         /* Update global variables with parsed values. This will be
@@ -2762,7 +2764,7 @@ int main(int argc, char *argv[]) {
         glob_flags   |= genconf.flags;
 
 	if(serve) {
-		g_array_append_val(servers, serve);
+		g_array_append_val(servers, *serve);
      
 		/* TODO: reinstate inetd mode */
 	}
@@ -2775,8 +2777,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	if(serve) {
-		g_warning("Specifying an export on the command line is deprecated.");
-		g_warning("Please use a configuration file instead.");
+		g_warning("Specifying an export on the command line no longer uses the oldstyle protocol.");
 	}
 
 	if((!serve) && (!servers||!servers->len)) {
