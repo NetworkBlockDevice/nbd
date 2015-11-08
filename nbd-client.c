@@ -283,7 +283,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 		}
 	}
 	printf(".");
-	read(sock, &tmp, sizeof(uint16_t));
+	readit(sock, &tmp, sizeof(uint16_t));
 	global_flags = ntohs(tmp);
 	if((needed_flags & global_flags) != needed_flags) {
 		/* There's currently really only one reason why this
