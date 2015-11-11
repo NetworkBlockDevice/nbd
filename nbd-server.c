@@ -2517,7 +2517,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
 		hints.ai_protocol = IPPROTO_TCP;
 		e = getaddrinfo(addrs[i], port ? port : NBD_DEFAULT_PORT, &hints, &ai);
 		ai_bak = ai;
-		if(e != 0) {
+		if(e != 0 && addrs[i+1] == NULL && modernsocks->len == 0) {
 			g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
 				    "failed to open a modern socket: "
 				    "failed to get address info: %s",
