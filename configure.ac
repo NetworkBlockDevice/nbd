@@ -1,9 +1,13 @@
 dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
-AC_INIT([nbd],[3.10],[wouter@debian.org])
+AC_INIT([nbd],
+  m4_esyscmd_s(support/genver.sh),
+  [wouter@debian.org],,
+  [http://nbd.sourceforge.net/])
 AM_INIT_AUTOMAKE(foreign dist-xz serial-tests)
 AM_MAINTAINER_MODE([enable])
+AC_CONFIG_MACRO_DIR([support])
 LT_INIT
 
 AC_ARG_ENABLE(
@@ -125,7 +129,28 @@ else
 	AC_DEFINE(HAVE_FALLOC_PH, 0, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([no])
 fi
-AC_COMPILE_IFELSE
+
+AC_CHECK_HEADERS([winioctl.h], [], [],
+[#include <io.h>
+#include <windef.h>
+#include <winbase.h>
+])
+HAVE_FSCTL_SET_ZERO_DATA=no
+if test "x$ac_cv_header_winioctl_h" = "xyes"
+then
+        AC_CHECK_DECL(FSCTL_SET_ZERO_DATA, [HAVE_FSCTL_SET_ZERO_DATA=yes], [HAVE_FSCTL_SET_ZERO_DATA=no],
+        [#include <windef.h>
+        #include <winbase.h>
+        #include <winioctl.h>
+        ])
+fi
+if test "x$HAVE_FSCTL_SET_ZERO_DATA" = "xyes"
+then
+        AC_DEFINE(HAVE_FSCTL_SET_ZERO_DATA, 1, [Define to 1 if you have FSCTL_SET_ZERO_DATA])
+else
+        AC_DEFINE(HAVE_FSCTL_SET_ZERO_DATA, 0, [Define to 1 if you have FSCTL_SET_ZERO_DATA])
+fi
+
 AC_CHECK_FUNC([sync_file_range],
 	[AC_DEFINE([HAVE_SYNC_FILE_RANGE], [sync_file_range(2) is not supported], [sync_file_range(2) is supported])],
         [])
@@ -152,8 +177,8 @@ AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
-nbd_server_CPPFLAGS=$nbd_server_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
-AC_SUBST(nbd_server_CPPFLAGS)
+AM_CPPFLAGS=$AM_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
+AC_SUBST(AM_CPPFLAGS)
 AM_CONDITIONAL(GZNBD, [test "x$ENABLE_GZNBD" = "xyes"])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
@@ -167,6 +192,7 @@ AC_CONFIG_FILES([Makefile
 		 man/nbd-client.8.sh
 		 man/nbd-server.5.sh
 		 man/nbd-server.1.sh
-		 man/nbd-trdump.1.sh])
+		 man/nbd-trdump.1.sh
+		 man/nbdtab.5.sh])
 AC_OUTPUT
 

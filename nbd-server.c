@@ -98,6 +98,7 @@
 #include <grp.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include <glib.h>
 
@@ -106,9 +107,20 @@
 #include "cliserv.h"
 #include "nbd-debug.h"
 #include "netdb-compat.h"
+#include "backend.h"
+#include "treefiles.h"
 
 #ifdef WITH_SDP
 #include <sdp_inet.h>
+#endif
+
+#if HAVE_FSCTL_SET_ZERO_DATA
+#include <io.h>
+/* don't include <windows.h> to avoid redefining eg the ERROR macro */
+#define NOMINMAX 1
+#include <windef.h>
+#include <winbase.h>
+#include <winioctl.h>
 #endif
 
 /** Default position of the config file */
@@ -133,25 +145,6 @@ int dontfork = 0;
 #define OFFT_MAX ~((off_t)1<<(sizeof(off_t)*8-1))
 #define BUFSIZE ((1024*1024)+sizeof(struct nbd_reply)) /**< Size of buffer that can hold requests */
 #define DIFFPAGESIZE 4096 /**< diff file uses those chunks */
-#define TREEPAGESIZE 4096 /**< tree (block) files uses those chunks */
-#define TREEDIRSIZE  1024 /**< number of files per subdirectory (or subdirs per subdirectory) */
-
-/** Per-export flags: */
-#define F_READONLY 1      /**< flag to tell us a file is readonly */
-#define F_MULTIFILE 2	  /**< flag to tell us a file is exported using -m */
-#define F_COPYONWRITE 4	  /**< flag to tell us a file is exported using
-			    copyonwrite */
-#define F_AUTOREADONLY 8  /**< flag to tell us a file is set to autoreadonly */
-#define F_SPARSE 16	  /**< flag to tell us copyronwrite should use a sparse file */
-#define F_SDP 32	  /**< flag to tell us the export should be done using the Socket Direct Protocol for RDMA */
-#define F_SYNC 64	  /**< Whether to fsync() after a write */
-#define F_FLUSH 128	  /**< Whether server wants FLUSH to be sent by the client */
-#define F_FUA 256	  /**< Whether server wants FUA to be sent by the client */
-#define F_ROTATIONAL 512  /**< Whether server wants the client to implement the elevator algorithm */
-#define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
-#define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
-#define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
-#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
 
 /** Global flags: */
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
@@ -159,7 +152,6 @@ int dontfork = 0;
 #define F_NO_ZEROES 4	  /**< Do not send zeros to client */
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
-char pidftemplate[256]; /**< template to be used for the filename of the PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
 
 #define NEG_INIT	(1 << 0)
@@ -167,6 +159,16 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_MODERN	(1 << 2)
 
 #include <nbdsrv.h>
+
+/* Our thread pool */
+GThreadPool *tpool;
+
+/* A work package for the thread pool functions */
+struct work_package {
+	CLIENT* client;
+	struct nbd_request* req;
+	void* data; /**< for read requests */
+};
 
 static volatile sig_atomic_t is_sigchld_caught; /**< Flag set by
 						     SIGCHLD handler
@@ -194,14 +196,6 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       e.g., FreeBSD) */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
-
-/**
- * Variables associated with an open file
- **/
-typedef struct {
-	int fhandle;      /**< file descriptor */
-	off_t startoff;   /**< starting offset of this file */
-} FILE_INFO;
 
 /**
  * Type of configuration file values
@@ -240,6 +234,7 @@ struct generic_conf {
         gchar *modernport;      /**< port of the modern socket    */
         gchar *unixsock;	/**< file name of the unix domain socket */
         gint flags;             /**< global flags                 */
+	gint threads;		/**< maximum number of parallel threads we want to run */
 };
 
 /**
@@ -262,28 +257,6 @@ static inline const char * getcommandname(uint64_t command) {
 		return "NBD_CMD_TRIM";
 	default:
 		return "UNKNOWN";
-	}
-}
-
-/**
- * Read data from a file descriptor into a buffer
- *
- * @param f a file descriptor
- * @param buf a buffer
- * @param len the number of bytes to be read
- **/
-static inline void readit(int f, void *buf, size_t len) {
-	ssize_t res;
-	while (len > 0) {
-		DEBUG("*");
-		if ((res = read(f, buf, len)) <= 0) {
-			if(errno != EAGAIN) {
-				err("Read failed: %m");
-			}
-		} else {
-			len -= res;
-			buf += res;
-		}
 	}
 }
 
@@ -322,98 +295,6 @@ static inline void writeit(int f, void *buf, size_t len) {
 	}
 }
 
-void myseek(int handle,off_t a);
-
-/**
- * Tree structure helper functions
- */
-
-static void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
-	if (lenmax<10)
-		err("Char buffer overflow. This is likely a bug.");
-
-	if (size<TREEDIRSIZE*TREEPAGESIZE) {
-		// we are done, add filename
-		snprintf(name,lenmax,"/FILE%04X",(pos/TREEPAGESIZE) % TREEDIRSIZE);
-		*ppos = pos / (TREEPAGESIZE*TREEDIRSIZE);
-	} else {
-		construct_path(name+9,lenmax-9,size/TREEDIRSIZE,pos,ppos);
-		char buffer[10];
-		snprintf(buffer,sizeof(buffer),"/TREE%04X",*ppos % TREEDIRSIZE);
-		memcpy(name,buffer,9); // copy into string without trailing zero
-		*ppos/=TREEDIRSIZE;
-	}
-}
-
-static void mkdir_path(char * path) {
-	char *subpath=path+1;
-	while (subpath=strchr(subpath,'/')) {
-		*subpath='\0'; // path is modified in place with terminating null char instead of slash
-		if (mkdir(path,0700)==-1) {
-			if (errno!=EEXIST)
-				err("Path access error! %m");
-		}
-		*subpath='/';
-		subpath++;
-	}
-}
-
-static int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
-	char filename[256+strlen(name)];
-	strcpy(filename,name);
-	off_t ppos;
-	construct_path(filename+strlen(name),256,size,pos,&ppos);
-
-	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
-
-	int handle=open(filename, mode, 0600);
-	if (handle<0 && errno==ENOENT) {
-		if (mode & O_RDWR) {
-
-			DEBUG("Creating new treepath");
-
-			mkdir_path(filename);
-			handle=open(filename, O_RDWR|O_CREAT, 0600);
-			if (handle<0) {
-				err("Error opening tree block file %m");
-			}
-		} else {
-
-			DEBUG("Creating a dummy tempfile for reading");
-			gchar * tmpname;
-			tmpname = g_strdup_printf("dummy-XXXXXX");
-			handle = mkstemp(tmpname);
-			if (handle>0) {
-				unlink(tmpname); /* File will stick around whilst FD open */
-			} else {
-				err("Error opening tree block file %m");
-			}
-			g_free(tmpname);
-		}
-		char *n = "\0";
-		myseek(handle,TREEPAGESIZE-1);
-		ssize_t c = write(handle,n,1);
-		if (c<1) {
-			err("Error setting tree block file size %m");
-		}
-	}
-	return handle;
-}
-
-static void delete_treefile(char* name,off_t size,off_t pos) {
-	char filename[256+strlen(name)];
-	strcpy(filename,name);
-	size_t psize=size;
-	off_t ppos;
-	construct_path(filename+strlen(name),256,size,pos,&ppos);
-
-	DEBUG("Deleting treefile: %s",filename);
-
-	if (unlink(filename)==-1)
-		DEBUG("Deleting failed : %s",strerror(errno));
-}
-
-
 /**
  * Print out a message about how to use nbd-server. Split out to a separate
  * function so that we can call it from multiple places
@@ -442,7 +323,6 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	printf("[%s]\n", section_header);
 	printf("\texportname = %s\n", serve->exportname);
 	printf("\tlistenaddr = %s\n", serve->listenaddr);
-	printf("\tport = %d\n", serve->port);
 	if(serve->flags & F_READONLY) {
 		printf("\treadonly = true\n");
 	}
@@ -470,7 +350,7 @@ void dump_section(SERVER* serve, gchar* section_header) {
  * @param argc the argc argument to main()
  * @param argv the argv argument to main()
  **/
-SERVER* cmdline(int argc, char *argv[]) {
+SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	int i=0;
 	int nonspecial=0;
 	int c;
@@ -521,11 +401,12 @@ SERVER* cmdline(int argc, char *argv[]) {
 				}
 
 				if(addr_port[1]) {
-					serve->port=strtol(addr_port[1], NULL, 0);
-					serve->listenaddr=g_strdup(addr_port[0]);
+					genconf->modernport=g_strdup(addr_port[1]);
+					genconf->modernaddr=g_strdup(addr_port[0]);
 				} else {
-					serve->listenaddr=NULL;
-					serve->port=strtol(addr_port[0], NULL, 0);
+					g_free(genconf->modernaddr);
+					genconf->modernaddr=NULL;
+					genconf->modernport=g_strdup(addr_port[0]);
 				}
 				g_strfreev(addr_port);
 				break;
@@ -565,8 +446,8 @@ SERVER* cmdline(int argc, char *argv[]) {
 			section_header = g_strdup(optarg);
 			break;
 		case 'p':
-			strncpy(pidftemplate, optarg, 256);
-			pidftemplate[255]='\0';
+			strncpy(pidfname, optarg, 256);
+			pidfname[255]='\0';
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
@@ -601,7 +482,7 @@ SERVER* cmdline(int argc, char *argv[]) {
 		g_free(serve);
 		serve=NULL;
 	} else {
-		glob_flags |= F_OLDSTYLE;
+		serve->servename = "";
 	}
 	if(do_output) {
 		if(!serve) {
@@ -751,6 +632,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
+		{ "max_threads", FALSE, PARAM_INT,	&(genconftmp.threads),	  0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -898,10 +780,9 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
 		if(i>0 || !expect_generic) {
-			s.socket_family = AF_UNSPEC;
 			s.servename = groups[i];
 
-			append_serve(&s, retval);
+			g_array_append_val(retval, s);
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -1052,18 +933,6 @@ int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* m
 }
 
 /**
- * seek to a position in a file, with error handling.
- * @param handle a filedescriptor
- * @param a position to seek to
- * @todo get rid of this.
- **/
-void myseek(int handle,off_t a) {
-	if (lseek(handle, a, SEEK_SET) < 0) {
-		err("Can not seek locally!\n");
-	}
-}
-
-/**
  * Write an amount of bytes at a given offset to the right file. This
  * abstracts the write-side of the multiple file option.
  *
@@ -1087,8 +956,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 	DEBUG("(WRITE to fd %d offset %llu len %u fua %d), ", fhandle, (long long unsigned)foffset, (unsigned int)len, fua);
 
-	myseek(fhandle, foffset);
-	retval = write(fhandle, buf, len);
+	retval = pwrite(fhandle, buf, len, foffset);
 	if(client->server->flags & F_SYNC) {
 		fsync(fhandle);
 	} else if (fua) {
@@ -1183,8 +1051,7 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
 
 	DEBUG("(READ from fd %d offset %llu len %u), ", fhandle, (long long unsigned int)foffset, (unsigned int)len);
 
-	myseek(fhandle, foffset);
-	retval = read(fhandle, buf, len);
+	retval = pread(fhandle, buf, len, foffset);
         if (client->server->flags & F_TREEFILES) {
 		close(fhandle);
 	}
@@ -1340,46 +1207,20 @@ int expflush(CLIENT *client) {
 	return 0;
 }
 
-/*
- * If the current system supports it, call fallocate() on the backend
- * file to resparsify stuff that isn't needed anymore (see NBD_CMD_TRIM)
- */
-int exptrim(struct nbd_request* req, CLIENT* client) {
-        if (client->server->flags & F_TREEFILES) {
-		if (client->server->flags & F_READONLY)
-			return 0;
-
-		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first to be trimmed block
-		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE; // start address of first not to be trimmed block
-		while (min<max) {
-			delete_treefile(client->exportname,client->exportsize,min);
-			min+=TREEPAGESIZE;
-		}
-		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
-		return 0;
-	}
+void punch_hole(int fd, off_t off, off_t len) {
+	DEBUG("punching hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
 #if HAVE_FALLOC_PH
-	FILE_INFO prev = g_array_index(client->export, FILE_INFO, 0);
-	FILE_INFO cur = prev;
-	int i = 1;
-	/* We're running on a system that supports the
-	 * FALLOC_FL_PUNCH_HOLE option to re-sparsify a file */
-	do {
-		if(i<client->export->len) {
-			cur = g_array_index(client->export, FILE_INFO, i);
-		}
-		if(prev.startoff <= req->from) {
-			off_t curoff = req->from - prev.startoff;
-			off_t curlen = cur.startoff - prev.startoff - curoff;
-			fallocate(prev.fhandle, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, curoff, curlen);
-		}
-		prev = cur;
-	} while(i < client->export->len && cur.startoff < (req->from + req->len));
-	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+	fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len);
+#elif HAVE_FSCTL_SET_ZERO_DATA
+	FILE_ZERO_DATA_INFORMATION zerodata;
+	zerodata.FileOffset.QuadPart = off;
+	zerodata.BeyondFinalZero.QuadPart = off + len;
+	HANDLE w32handle = (HANDLE)_get_osfhandle(fd);
+	DWORD bytesret;
+	DeviceIoControl(w32handle, FSCTL_SET_ZERO_DATA, &zerodata, sizeof(zerodata), NULL, 0, &bytesret, NULL);
 #else
-	DEBUG("Ignoring TRIM request (not supported on current platform");
+	DEBUG("punching holes not supported on this platform\n");
 #endif
-	return 0;
 }
 
 static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasize, void* data) {
@@ -1411,12 +1252,16 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 		return NULL;
 	}
 	namelen = ntohl(namelen);
-	name = malloc(namelen+1);
-	name[namelen]=0;
-	if (read(net, name, namelen) < 0) {
-		err("Negotiation failed/8: %m");
-		free(name);
-		return NULL;
+	if(namelen > 0) {
+		name = malloc(namelen+1);
+		name[namelen]=0;
+		if (read(net, name, namelen) < 0) {
+			err("Negotiation failed/8: %m");
+			free(name);
+			return NULL;
+		}
+	} else {
+		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
@@ -1428,6 +1273,7 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 			client->modern = TRUE;
 			client->transactionlogfd = -1;
 			client->clientfeats = cflags;
+			pthread_mutex_init(&(client->lock), NULL);
 			free(name);
 			return client;
 		}
@@ -1470,7 +1316,6 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
  * @param client The client we're negotiating with.
  **/
 CLIENT* negotiate(int net, GArray* servers) {
-	uint32_t flags = NBD_FLAG_HAS_FLAGS;
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
 	uint32_t cflags = 0;
@@ -1525,11 +1370,13 @@ CLIENT* negotiate(int net, GArray* servers) {
 		err_nonfatal("Session terminated by client");
 		return NULL;
 	}
+	err_nonfatal("Weird things happened: reached end of negotiation without success");
+	return NULL;
 }
 
 void send_export_info(CLIENT* client) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
-	uint16_t flags = 0;
+	uint16_t flags = NBD_FLAG_HAS_FLAGS;
 
 	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed/9: %m");
@@ -1572,6 +1419,158 @@ static int nbd_errno(int errcode) {
 		return htonl(28); // ENOSPC
 	default:
 		return htonl(22); // EINVAL
+	}
+}
+
+static void package_dispose(struct work_package* package) {
+	g_free(package->data);
+	g_free(package->req);
+	g_free(package);
+}
+
+struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
+	struct work_package* rv = calloc(sizeof (struct work_package), 1);
+
+	rv->req = req;
+	rv->client = client;
+
+	if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE)
+		rv->data = malloc(req->len);
+
+	return rv;
+}
+
+static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
+	rep->magic = htonl(NBD_REPLY_MAGIC);
+	rep->error = 0;
+	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
+}
+
+static void handle_read(CLIENT* client, struct nbd_request* req) {
+	struct nbd_reply rep;
+	void* buf = malloc(req->len);
+	if(!buf) {
+		err("Could not allocate memory for request");
+	}
+	DEBUG("handling read request\n");
+	setup_reply(&rep, req);
+	if(expread(req->from, buf, req->len, client)) {
+		DEBUG("Read failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	writeit(client->net, buf, req->len);
+	pthread_mutex_unlock(&(client->lock));
+}
+
+static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
+	struct nbd_reply rep;
+	DEBUG("handling write request\n");
+	setup_reply(&rep, req);
+
+	if ((client->server->flags & F_READONLY) ||
+	    (client->server->flags & F_AUTOREADONLY)) {
+		DEBUG("[WRITE to READONLY!]");
+		rep.error = nbd_errno(EPERM);
+	} else {
+		if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
+			DEBUG("Write failed: %m");
+			rep.error = nbd_errno(errno);
+		}
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
+}
+
+static void handle_flush(CLIENT* client, struct nbd_request* req) {
+	struct nbd_reply rep;
+	DEBUG("handling flush request\n");
+	setup_reply(&rep, req);
+	if(expflush(client)) {
+		DEBUG("Flush failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
+}
+
+static void handle_trim(CLIENT* client, struct nbd_request* req) {
+	struct nbd_reply rep;
+	DEBUG("handling trim request\n");
+	setup_reply(&rep, req);
+	if(exptrim(req, client)) {
+		DEBUG("Trim failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
+}
+
+static void handle_request(gpointer data, gpointer user_data) {
+	struct work_package* package = (struct work_package*) data;
+
+	switch(package->req->type & NBD_CMD_MASK_COMMAND) {
+		case NBD_CMD_READ:
+			handle_read(package->client, package->req);
+			break;
+		case NBD_CMD_WRITE:
+			handle_write(package->client, package->req, package->data);
+			break;
+		case NBD_CMD_FLUSH:
+			handle_flush(package->client, package->req);
+			break;
+		case NBD_CMD_TRIM:
+			handle_trim(package->client, package->req);
+			break;
+		default:
+			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
+			struct nbd_reply rep;
+			setup_reply(&rep, package->req);
+			rep.error = nbd_errno(EINVAL);
+			pthread_mutex_lock(&(package->client->lock));
+			writeit(package->client->net, &rep, sizeof rep);
+			pthread_mutex_unlock(&(package->client->lock));
+			break;
+	}
+
+	package_dispose(package);
+}
+
+static int mainloop_threaded(CLIENT* client) {
+	struct nbd_request* req;
+	struct work_package* pkg;
+
+	send_export_info(client);
+	DEBUG("Entering request loop\n");
+	while(1) {
+		req = calloc(sizeof (struct nbd_request), 1);
+
+		readit(client->net, req, sizeof(struct nbd_request));
+		if(client->transactionlogfd != -1) {
+			writeit(client->transactionlogfd, req, sizeof(struct nbd_request));
+		}
+
+		req->from = ntohll(req->from);
+		req->type = ntohl(req->type);
+		req->len = ntohl(req->len);
+
+		if(req->magic != htonl(NBD_REQUEST_MAGIC))
+			err("Protocol error: not enough magic.");
+
+		pkg = package_create(client, req);
+
+		if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
+			readit(client->net, pkg->data, req->len);
+		}
+		if(req->type == NBD_CMD_DISC) {
+			g_thread_pool_free(tpool, FALSE, TRUE);
+			return 0;
+		}
+		g_thread_pool_push(tpool, pkg, NULL);
 	}
 }
 
@@ -1772,7 +1771,6 @@ void setupexport(CLIENT* client) {
 		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
 		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
 	} else {
-
 		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
 		/* If multi-file, open as many files as we can.
@@ -1784,7 +1782,7 @@ void setupexport(CLIENT* client) {
 			gchar* error_string;
 
 			if (i)
-			  cancreate = 0;
+				cancreate = 0;
 			/* if expected_size is specified, and this is the first file, we can create the file */
 			mode_t mode = (client->server->flags & F_READONLY) ?
 			  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
@@ -1823,8 +1821,9 @@ void setupexport(CLIENT* client) {
 				err(error_string);
 			}
 
-			if (temporary)
+			if (temporary) {
 				unlink(tmpname); /* File will stick around whilst FD open */
+			}
 
 			fi.startoff = laststartoff + lastsize;
 			g_array_append_val(client->export, fi);
@@ -1868,7 +1867,7 @@ void setupexport(CLIENT* client) {
 		msg(LOG_INFO, "Total number of files: %d", i);
 	}
 	if(treefile) {
-		msg(LOG_INFO, "Total number of (potential) files: %d", (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
+		msg(LOG_INFO, "Total number of (potential) files: %" PRId64, (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
 	}
 }
 
@@ -1944,7 +1943,7 @@ void serveconnection(CLIENT *client) {
 
 	setmysockopt(client->net);
 
-	mainloop(client);
+	mainloop_threaded(client);
 	do_run(client->server->postrun, client->exportname);
 
 	if (-1 != client->transactionlogfd)
@@ -1983,7 +1982,7 @@ int set_peername(int net, CLIENT *client) {
 		return -1;
 	}
 
-	if(addr->sa_family == AF_UNIX) {
+	if(client->clientaddr.ss_family == AF_UNIX) {
 		strcpy(peername, "unix");
 	} else {
 		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
@@ -2001,6 +2000,10 @@ int set_peername(int net, CLIENT *client) {
 			freeaddrinfo(ai);
 			return -1;
 		}
+	}
+
+	if(strncmp(peername, "::ffff:", 7) == 0) {
+		memmove(peername, peername+7, strlen(peername));
 	}
 
 	switch(client->server->virtstyle) {
@@ -2198,12 +2201,6 @@ handle_modern_connection(GArray *const servers, const int sock)
                 /* Now that we are in the child process after a
                  * succesful negotiation, we do not need the list of
                  * servers anymore, get rid of it.*/
-
-                for (i = 0; i < servers->len; i++) {
-                        const SERVER *const server = &g_array_index(servers, SERVER, i);
-                        close(server->socket);
-                }
-
                 /* FALSE does not free the
                    actual data. This is required,
                    because the client has a
@@ -2224,107 +2221,6 @@ handler_err:
         if (!dontfork) {
                 exit(EXIT_FAILURE);
         }
-}
-
-static void
-handle_oldstyle_connection(GArray *const servers, SERVER *const serve)
-{
-	int net;
-	CLIENT *client = NULL;
-	int sock_flags_old;
-	int sock_flags_new;
-
-	net = socket_accept(serve->socket);
-	if (net < 0)
-		return;
-
-	if(serve->max_connections > 0 &&
-	   g_hash_table_size(children) >= serve->max_connections) {
-		msg(LOG_INFO, "Max connections reached");
-		goto handle_connection_out;
-	}
-	if((sock_flags_old = fcntl(net, F_GETFL, 0)) == -1) {
-		err("fcntl F_GETFL");
-	}
-	sock_flags_new = sock_flags_old & ~O_NONBLOCK;
-	if (sock_flags_new != sock_flags_old &&
-	    fcntl(net, F_SETFL, sock_flags_new) == -1) {
-		err("fcntl F_SETFL ~O_NONBLOCK");
-	}
-
-	client = g_new0(CLIENT, 1);
-	client->server=serve;
-	client->exportsize=OFFT_MAX;
-	client->net=net;
-	client->transactionlogfd = -1;
-
-	if (set_peername(net, client)) {
-		goto handle_connection_out;
-	}
-	if (!authorized_client(client)) {
-		msg(LOG_INFO, "Unauthorized client");
-		goto handle_connection_out;
-	}
-	msg(LOG_INFO, "Authorized client");
-
-	if (!dontfork) {
-		pid_t pid;
-		int i;
-		sigset_t newset;
-		sigset_t oldset;
-
-		sigemptyset(&newset);
-		sigaddset(&newset, SIGCHLD);
-		sigaddset(&newset, SIGTERM);
-		sigprocmask(SIG_BLOCK, &newset, &oldset);
-		if ((pid = fork()) < 0) {
-			msg(LOG_INFO, "Could not fork (%s)", strerror(errno));
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			goto handle_connection_out;
-		}
-		if (pid > 0) { /* parent */
-			pid_t *pidp;
-
-			pidp = g_malloc(sizeof(pid_t));
-			*pidp = pid;
-			g_hash_table_insert(children, pidp, pidp);
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			goto handle_connection_out;
-		}
-		/* child */
-
-		/* Child's signal disposition is reset to default. */
-		signal(SIGCHLD, SIG_DFL);
-		signal(SIGTERM, SIG_DFL);
-		signal(SIGHUP, SIG_DFL);
-		sigemptyset(&oldset);
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
-
-		g_hash_table_destroy(children);
-		children = NULL;
-		for(i=0;i<servers->len;i++) {
-			close(g_array_index(servers, SERVER, i).socket);
-		}
-		/* FALSE does not free the
-		   actual data. This is required,
-		   because the client has a
-		   direct reference into that
-		   data, and otherwise we get a
-		   segfault... */
-		g_array_free(servers, FALSE);
-		for(i=0;i<modernsocks->len;i++) {
-			close(g_array_index(modernsocks, int, i));
-		}
-		g_array_free(modernsocks, TRUE);
-	}
-
-	msg(LOG_INFO, "Starting to serve");
-	serveconnection(client);
-	exit(EXIT_SUCCESS);
-
-handle_connection_out:
-	g_free(client);
-	close(net);
 }
 
 /**
@@ -2350,8 +2246,6 @@ static int get_index_by_servename(const gchar *const servename,
         return -1;
 }
 
-int setup_serve(SERVER *const serve, GError **const gerror);
-
 /**
  * Parse configuration files and add servers to the array if they don't
  * already exist there. The existence is tested by comparing
@@ -2370,6 +2264,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
         struct generic_conf genconf;
 
         new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
+	g_thread_pool_set_max_threads(tpool, genconf.threads, NULL);
         if (!new_servers)
                 goto out;
 
@@ -2379,10 +2274,7 @@ static int append_new_servers(GArray *const servers, GError **const gerror) {
                 if (new_server.servename
                     && -1 == get_index_by_servename(new_server.servename,
                                                     servers)) {
-                        if (setup_serve(&new_server, gerror) == -1)
-                                goto out;
-                        if (append_serve(&new_server, servers) == -1)
-                                goto out;
+			g_array_append_val(servers, new_server);
                 }
         }
 
@@ -2413,13 +2305,6 @@ void serveloop(GArray* servers) {
 	 */
 	max=0;
 	FD_ZERO(&mset);
-	for(i=0;i<servers->len;i++) {
-		int sock;
-		if((sock=(g_array_index(servers, SERVER, i)).socket) >= 0) {
-			FD_SET(sock, &mset);
-			max=sock>max?sock:max;
-		}
-	}
 	for(i=0;i<modernsocks->len;i++) {
 		int sock = g_array_index(modernsocks, int, i);
 		FD_SET(sock, &mset);
@@ -2498,11 +2383,6 @@ void serveloop(GArray* servers) {
                                 const SERVER server = g_array_index(servers,
                                                                     SERVER, i);
 
-                                if (server.socket >= 0) {
-                                        FD_SET(server.socket, &mset);
-                                        max = server.socket > max ? server.socket : max;
-                                }
-
                                 msg(LOG_INFO, "reconfigured new server: %s",
                                     server.servename);
                         }
@@ -2518,17 +2398,6 @@ void serveloop(GArray* servers) {
 				}
 
 				handle_modern_connection(servers, sock);
-			}
-			for(i=0; i < servers->len; i++) {
-				SERVER *serve;
-
-				serve=&(g_array_index(servers, SERVER, i));
-				if(serve->socket < 0) {
-					continue;
-				}
-				if(FD_ISSET(serve->socket, &rset)) {
-					handle_oldstyle_connection(servers, serve);
-				}
 			}
 		}
 	}
@@ -2577,117 +2446,6 @@ int dosockopts(const int socket, GError **const gerror) {
 	}
 
         return 0;
-}
-
-/**
- * Connect a server's socket.
- *
- * @param serve the server we want to connect.
- **/
-int setup_serve(SERVER *const serve, GError **const gerror) {
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	gchar *port = NULL;
-	int e;
-        int retval = -1;
-
-        /* Without this, it's possible that socket == 0, even if it's
-         * not initialized at all. And that would be wrong because 0 is
-         * totally legal value for properly initialized descriptor. This
-         * line is required to ensure that unused/uninitialized
-         * descriptors are marked as such (new style configuration
-         * case). Currently, servers are being initialized in multiple
-         * places, and some of the them do the socket initialization
-         * incorrectly. This is the only point common to all code paths,
-         * and therefore setting -1 is put here. However, the whole
-         * server initialization procedure should be extracted to its
-         * own function and all code paths wanting to mess with servers
-         * should initialize servers with that function.
-         * 
-         * TODO: fix server initialization */
-        serve->socket = -1;
-
-	if(!(glob_flags & F_OLDSTYLE)) {
-		return serve->servename ? 1 : 0;
-	}
-	memset(&hints,'\0',sizeof(hints));
-	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG | AI_NUMERICSERV;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = serve->socket_family;
-
-	port = g_strdup_printf("%d", serve->port);
-	if (!port) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SYS,
-                            "failed to open an export socket: "
-                            "failed to convert a port number to a string: %s",
-                            strerror(errno));
-                goto out;
-        }
-
-	e = getaddrinfo(serve->listenaddr,port,&hints,&ai);
-
-	g_free(port);
-
-	if(e != 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
-                            "failed to open an export socket: "
-                            "failed to get address info: %s",
-                            gai_strerror(e));
-                goto out;
-	}
-
-	if(serve->socket_family == AF_UNSPEC)
-		serve->socket_family = ai->ai_family;
-
-#ifdef WITH_SDP
-	if ((serve->flags) && F_SDP) {
-		if (ai->ai_family == AF_INET)
-			ai->ai_family = AF_INET_SDP;
-		else (ai->ai_family == AF_INET6)
-			ai->ai_family = AF_INET6_SDP;
-	}
-#endif
-	if ((serve->socket = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
-                            "failed to open an export socket: "
-                            "failed to create a socket: %s",
-                            strerror(errno));
-                goto out;
-        }
-
-	if (dosockopts(serve->socket, gerror) == -1) {
-                g_prefix_error(gerror, "failed to open an export socket: ");
-                goto out;
-        }
-
-	DEBUG("Waiting for connections... bind, ");
-	e = bind(serve->socket, ai->ai_addr, ai->ai_addrlen);
-	if (e != 0 && errno != EADDRINUSE) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-                            "failed to open an export socket: "
-                            "failed to bind an address to a socket: %s",
-                            strerror(errno));
-                goto out;
-        }
-	DEBUG("listen, ");
-	if (listen(serve->socket, 1) < 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-                            "failed to open an export socket: "
-                            "failed to start listening on a socket: %s",
-                            strerror(errno));
-                goto out;
-        }
-
-        retval = serve->servename ? 1 : 0;
-out:
-
-        if (retval == -1 && serve->socket >= 0) {
-                close(serve->socket);
-                serve->socket = -1;
-        }
-	freeaddrinfo (ai);
-
-        return retval;
 }
 
 int open_unix(const gchar *const sockname, GError **const gerror) {
@@ -2739,71 +2497,87 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	int e;
         int retval = -1;
 	int sock = -1;
+	gchar** addrs;
+	gchar const* l_addr = addr;
 
-	memset(&hints, '\0', sizeof(hints));
-	hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_protocol = IPPROTO_TCP;
-	e = getaddrinfo(addr, port ? port : NBD_DEFAULT_PORT, &hints, &ai);
-	ai_bak = ai;
-	if(e != 0) {
-                g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
-                            "failed to open a modern socket: "
-                            "failed to get address info: %s",
-                            gai_strerror(e));
-                goto out;
+	if(!addr || strlen(addr) == 0) {
+		l_addr = "::, 0.0.0.0";
 	}
 
-	while(ai != NULL) {
-		sock = -1;
+	addrs = g_strsplit_set(l_addr, ", \t", -1);
 
-		if((sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
-			g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+	for(int i=0; addrs[i]!=NULL; i++) {
+		if(addrs[i][0] == '\0') {
+			continue;
+		}
+		memset(&hints, '\0', sizeof(hints));
+		hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_protocol = IPPROTO_TCP;
+		e = getaddrinfo(addrs[i], port ? port : NBD_DEFAULT_PORT, &hints, &ai);
+		ai_bak = ai;
+		if(e != 0) {
+			g_set_error(gerror, NBDS_ERR, NBDS_ERR_GAI,
 				    "failed to open a modern socket: "
-				    "failed to create a socket: %s",
-				    strerror(errno));
+				    "failed to get address info: %s",
+				    gai_strerror(e));
 			goto out;
 		}
 
-		if (dosockopts(sock, gerror) == -1) {
-			g_prefix_error(gerror, "failed to open a modern socket: ");
-			goto out;
-		}
+		while(ai != NULL) {
+			sock = -1;
 
-		if(bind(sock, ai->ai_addr, ai->ai_addrlen)) {
-			/* This is so wrong. 
-			 * 
-			 * Linux will return multiple entries for the
-			 * same system when we ask it for something
-			 * AF_UNSPEC, even though the first entry will
-			 * listen to both protocols. Other systems will
-			 * return multiple entries too, but we actually
-			 * do need to open both. Sigh.
-			 *
-			 * Handle it by ignoring EADDRINUSE if we've
-			 * already got at least one socket open
-			 */
-			if(errno == EADDRINUSE && modernsocks->len > 0) {
-				goto next;
+			if((sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
+				g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
+					    "failed to open a modern socket: "
+					    "failed to create a socket: %s",
+					    strerror(errno));
+				goto out;
 			}
-			g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-				    "failed to open a modern socket: "
-				    "failed to bind an address to a socket: %s",
-				    strerror(errno));
-			goto out;
-		}
 
-		if(listen(sock, 10) <0) {
-			g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
-				    "failed to open a modern socket: "
-				    "failed to start listening on a socket: %s",
-				    strerror(errno));
-			goto out;
+			if (dosockopts(sock, gerror) == -1) {
+				g_prefix_error(gerror, "failed to open a modern socket: ");
+				goto out;
+			}
+
+			if(bind(sock, ai->ai_addr, ai->ai_addrlen)) {
+				/*
+				 * Some systems will return multiple entries for the
+				 * same address when we ask it for something
+				 * AF_UNSPEC, even though the first entry will
+				 * listen to both protocols. Other systems will
+				 * return multiple entries too, but we actually
+				 * do need to open both.
+				 *
+				 * Handle this by ignoring EADDRINUSE if we've
+				 * already got at least one socket open
+				 */
+				if(errno == EADDRINUSE && modernsocks->len > 0) {
+					goto next;
+				}
+				g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+					    "failed to open a modern socket: "
+					    "failed to bind an address to a socket: %s",
+					    strerror(errno));
+				goto out;
+			}
+
+			if(listen(sock, 10) <0) {
+				g_set_error(gerror, NBDS_ERR, NBDS_ERR_BIND,
+					    "failed to open a modern socket: "
+					    "failed to start listening on a socket: %s",
+					    strerror(errno));
+				goto out;
+			}
+			g_array_append_val(modernsocks, sock);
+		next:
+			ai = ai->ai_next;
 		}
-		g_array_append_val(modernsocks, sock);
-	next:
-		ai = ai->ai_next;
+		if(ai_bak) {
+			freeaddrinfo(ai_bak);
+			ai_bak=NULL;
+		}
 	}
 
         retval = 0;
@@ -2823,32 +2597,14 @@ out:
  **/
 void setup_servers(GArray *const servers, const gchar *const modernaddr,
                    const gchar *const modernport, const gchar* unixsock) {
-	int i;
 	struct sigaction sa;
-	int want_modern=0;
 
-	for(i=0;i<servers->len;i++) {
-                GError *gerror = NULL;
-                SERVER *server = &g_array_index(servers, SERVER, i);
-                int ret;
-
-		ret = setup_serve(server, &gerror);
-                if (ret == -1) {
-                        msg(LOG_ERR, "failed to setup servers: %s",
-                            gerror->message);
-                        g_clear_error(&gerror);
-                        exit(EXIT_FAILURE);
-                }
-                want_modern |= ret;
-	}
-	if(want_modern) {
-                GError *gerror = NULL;
-                if (open_modern(modernaddr, modernport, &gerror) == -1) {
-                        msg(LOG_ERR, "failed to setup servers: %s",
-                            gerror->message);
-                        g_clear_error(&gerror);
-                        exit(EXIT_FAILURE);
-                }
+        GError *gerror = NULL;
+        if (open_modern(modernaddr, modernport, &gerror) == -1) {
+                msg(LOG_ERR, "failed to setup servers: %s",
+                    gerror->message);
+                g_clear_error(&gerror);
+                exit(EXIT_FAILURE);
 	}
 	if(unixsock != NULL) {
 		GError* gerror = NULL;
@@ -2890,23 +2646,15 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
  * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
  **/
 #if !defined(NODAEMON)
-void daemonize(SERVER* serve) {
+void daemonize() {
 	FILE*pidf;
 
-	if(serve && !(serve->port)) {
-		return;
-	}
 	if(daemon(0,0)<0) {
 		err("daemon");
 	}
-	if(!*pidftemplate) {
-		if(serve) {
-			strncpy(pidftemplate, "/var/run/nbd-server.%d.pid", 255);
-		} else {
-			strncpy(pidftemplate, "/var/run/nbd-server.pid", 255);
-		}
+	if(!*pidfname) {
+		strncpy(pidfname, "/var/run/nbd-server.pid", 255);
 	}
-	snprintf(pidfname, 255, pidftemplate, serve ? serve->port : 0);
 	pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
@@ -2992,53 +2740,42 @@ void glib_message_syslog_redirect(const gchar *log_domain,
 int main(int argc, char *argv[]) {
 	SERVER *serve;
 	GArray *servers;
-	GError *err=NULL;
-        struct generic_conf genconf;
+	GError *gerr=NULL;
+	struct generic_conf genconf;
 
-        memset(&genconf, 0, sizeof(struct generic_conf));
+	memset(&genconf, 0, sizeof(struct generic_conf));
 
 	if (sizeof( struct nbd_request )!=28) {
 		fprintf(stderr,"Bad size of structure. Alignment problems?\n");
 		exit(EXIT_FAILURE) ;
 	}
 
-	memset(pidftemplate, '\0', 256);
-
 	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
 	logging(MY_NAME);
 	config_file_pos = g_strdup(CFILE);
-	serve=cmdline(argc, argv);
+	serve=cmdline(argc, argv, &genconf);
 
-        servers = parse_cfile(config_file_pos, &genconf, true, &err);
+	genconf.threads = 4;
+        servers = parse_cfile(config_file_pos, &genconf, true, &gerr);
 	
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
         glob_flags   |= genconf.flags;
 
 	if(serve) {
-		serve->socket_family = AF_UNSPEC;
+		g_array_append_val(servers, *serve);
 
-		append_serve(serve, servers);
-     
-		if (!(serve->port)) {
-			CLIENT *client;
+		if(strcmp(genconf.modernport, "0")==0) {
 #ifndef ISSERVER
-			/* You really should define ISSERVER if you're going to use
-			 * inetd mode, but if you don't, closing stdout and stderr
-			 * (which inetd had connected to the client socket) will let it
-			 * work. */
-			close(1);
-			close(2);
-			open("/dev/null", O_WRONLY);
-			open("/dev/null", O_WRONLY);
-			g_log_set_default_handler( glib_message_syslog_redirect, NULL );
+			err("inetd mode requires syslog");
 #endif
-			client=g_malloc(sizeof(CLIENT));
-			client->server=serve;
-			client->net=-1;
-			client->exportsize=OFFT_MAX;
-			if (set_peername(0, client))
+			CLIENT* client = g_malloc(sizeof(CLIENT));
+			client->server = serve;
+			client->net = -1;
+			client->modern = TRUE;
+			client->exportsize = OFFT_MAX;
+			if(set_peername(0, client))
 				exit(EXIT_FAILURE);
 			serveconnection(client);
 			return 0;
@@ -3046,24 +2783,26 @@ int main(int argc, char *argv[]) {
 	}
     
 	if(!servers || !servers->len) {
-                if(err && !(err->domain == NBDS_ERR
-                            && err->code == NBDS_ERR_CFILE_NOTFOUND)) {
+                if(gerr && !(gerr->domain == NBDS_ERR
+                            && gerr->code == NBDS_ERR_CFILE_NOTFOUND)) {
 			g_warning("Could not parse config file: %s", 
-					err ? err->message : "Unknown error");
+					gerr ? gerr->message : "Unknown error");
 		}
 	}
 	if(serve) {
-		g_warning("Specifying an export on the command line is deprecated.");
-		g_warning("Please use a configuration file instead.");
+		g_warning("Specifying an export on the command line no longer uses the oldstyle protocol.");
 	}
 
 	if((!serve) && (!servers||!servers->len)) {
-		if(err)
+		if(gerr)
 			g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
 	if (!dontfork)
-		daemonize(serve);
+		daemonize();
+
+	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
+
 	setup_servers(servers, genconf.modernaddr, genconf.modernport,
 			genconf.unixsock);
 	dousers(genconf.user, genconf.group);

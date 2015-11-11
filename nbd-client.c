@@ -40,6 +40,8 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdarg.h>
+#include <stdbool.h>
+#include <time.h>
 
 #include <linux/ioctl.h>
 #define MY_NAME "nbd_client"
@@ -219,7 +221,7 @@ void ask_list(int sock) {
 					break;
 			}
 			if(len > 0 && len < BUF_SIZE) {
-				if(len=read(sock, buf, len) < 0) {
+				if((len=read(sock, buf, len)) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
 				}
 				buf[len] = '\0';
@@ -269,15 +271,11 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	uint32_t namesize;
 
 	printf("Negotiation: ");
-	if (read(sock, buf, 8) < 0)
-		err("Failed/1: %m");
-	if (strlen(buf)==0)
-		err("Server closed connection");
+	readit(sock, buf, 8);
 	if (strcmp(buf, INIT_PASSWD))
 		err("INIT_PASSWD bad");
 	printf(".");
-	if (read(sock, &magic, sizeof(magic)) < 0)
-		err("Failed/2: %m");
+	readit(sock, &magic, sizeof(magic));
 	magic = ntohll(magic);
 	if (magic != opts_magic) {
 		if(magic == cliserv_magic) {
@@ -285,9 +283,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 		}
 	}
 	printf(".");
-	if(read(sock, &tmp, sizeof(uint16_t)) < 0) {
-		err("Failed reading flags: %m");
-	}
+	readit(sock, &tmp, sizeof(uint16_t));
 	global_flags = ntohs(tmp);
 	if((needed_flags & global_flags) != needed_flags) {
 		/* There's currently really only one reason why this
@@ -324,11 +320,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	if (write(sock, name, strlen(name)) < 0)
 		err("Failed/2.4: %m");
 
-	if (read(sock, &size64, sizeof(size64)) <= 0) {
-		if (!errno)
-			err("Server closed connection");
-		err("Failed/3: %m\n");
-	}
+	readit(sock, &size64, sizeof(size64));
 	size64 = ntohll(size64);
 
 	if ((size64>>12) > (uint64_t)~0UL) {
@@ -337,17 +329,109 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	} else
 		printf("size = %luMB", (unsigned long)(size64>>20));
 
-	if(read(sock, &tmp, sizeof(tmp)) < 0)
-		err("Failed/4: %m\n");
+	readit(sock, &tmp, sizeof(tmp));
 	*flags = (uint32_t)ntohs(tmp);
 
 	if (!(global_flags & NBD_FLAG_NO_ZEROES)) {
-		if (read(sock, &buf, 124) < 0)
-			err("Failed/5: %m\n");
+		readit(sock, &buf, 124);
 	}
 	printf("\n");
 
 	*rsize64 = size64;
+}
+
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port) {
+	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
+	if(fd < 0) {
+		fprintf(stderr, "while opening %s: ", SYSCONFDIR "/nbdtab");
+		perror("could not open config file");
+		return false;
+	}
+	off_t size = lseek(fd, 0, SEEK_END);
+	lseek(fd, 0, SEEK_SET);
+	void *data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
+	char *fsep = "\n\t# ";
+	char *lsep = "\n#";
+
+	char *loc = strstr((const char*)data, cfgname);
+	if(!loc) {
+		return false;
+	}
+	size_t l = strlen(cfgname) + 6;
+	*dev_ptr = malloc(l);
+	snprintf(*dev_ptr, l, "/dev/%s", cfgname);
+
+	size_t line_len, field_len, ws_len;
+#define CHECK_LEN field_len = strcspn(loc, fsep); ws_len = strspn(loc+field_len, fsep); if(field_len > line_len || line_len <= 0) { return false; }
+#define MOVE_NEXT line_len -= field_len + ws_len; loc += field_len + ws_len
+	// find length of line
+	line_len = strcspn(loc, lsep);
+	// first field is the device node name, which we already know, so skip it
+	CHECK_LEN;
+	MOVE_NEXT;
+	// next field is the hostname
+	CHECK_LEN;
+	*hostn_ptr = strndup(loc, field_len);
+	MOVE_NEXT;
+	// third field is the export name
+	CHECK_LEN;
+	*name_ptr = strndup(loc, field_len);
+	if(ws_len + field_len > line_len) {
+		// optional last field is not there, so return success
+		return true;
+	}
+	MOVE_NEXT;
+	CHECK_LEN;
+#undef CHECK_LEN
+#undef MOVE_NEXT
+	// fourth field is the options field, a comma-separated field of options
+	do {
+		if(!strncmp(loc, "bs=", 3)) {
+			*bs = (int)strtol(loc+3, &loc, 0);
+			goto next;
+		}
+		if(!strncmp(loc, "timeout=", 8)) {
+			*timeout = (int)strtol(loc+8, &loc, 0);
+			goto next;
+		}
+		if(!strncmp(loc, "port=", 5)) {
+			*port = strndup(loc+5, strcspn(loc+5, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "persist", 7)) {
+			loc += 7;
+			*persist = 1;
+			goto next;
+		}
+		if(!strncmp(loc, "swap", 4)) {
+			*swap = 1;
+			loc += 4;
+			goto next;
+		}
+		if(!strncmp(loc, "sdp", 3)) {
+			*sdp = 1;
+			loc += 3;
+			goto next;
+		}
+		if(!strncmp(loc, "unix", 4)) {
+			*b_unix = 1;
+			loc += 4;
+			goto next;
+		}
+		// skip unknown options, with a warning unless they start with a '_'
+		l = strcspn(loc, ",");
+		if(*loc != '_') {
+			char* s = strndup(loc, l);
+			fprintf(stderr, "Warning: unknown option '%s' found in nbdtab file", s);
+			free(s);
+		}
+		loc += l;
+next:
+		if(*loc == ',') {
+			loc++;
+		}
+	} while(strcspn(loc, lsep) > 0);
+	return true;
 }
 
 void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
@@ -420,7 +504,9 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
 	}
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device [-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S] [-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
+	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
+	fprintf(stderr, "Or   : nbd-client nbdX\n");
 	fprintf(stderr, "Or   : nbd-client -d nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
@@ -429,7 +515,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
 	fprintf(stderr, "blocksizes other than 1024 without patches\n");
-	fprintf(stderr, "Default value for port with -N is 10809. Note that port must always be numeric\n");
+	fprintf(stderr, "Default value for port is 10809. Note that port must always be numeric\n");
 }
 
 void disconnect(char* device) {
@@ -447,7 +533,7 @@ void disconnect(char* device) {
 }
 
 int main(int argc, char *argv[]) {
-	char* port=NULL;
+	char* port=NBD_DEFAULT_PORT;
 	int sock, nbd;
 	int blocksize=1024;
 	char *hostname=NULL;
@@ -462,7 +548,7 @@ int main(int argc, char *argv[]) {
 	int c;
 	int nonspecial=0;
 	int b_unix=0;
-	char* name=NULL;
+	char* name="";
 	uint16_t needed_flags=0;
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
@@ -545,9 +631,7 @@ int main(int argc, char *argv[]) {
 		case 'l':
 			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
 			opts |= NBDC_DO_LIST;
-			name="";
 			nbddev="";
-			port = NBD_DEFAULT_PORT;
 			break;
 		case 'm':
 			argv[0][0] = '@';
@@ -557,9 +641,6 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'N':
 			name=optarg;
-			if(!port) {
-				port = NBD_DEFAULT_PORT;
-			}
 			break;
 		case 'p':
 			cont=1;
@@ -587,10 +668,25 @@ int main(int argc, char *argv[]) {
   if (swap)
     err("swap option unsupported on Android because mlockall is unsupported.");
 #endif
-
-	if(!hostname || ((!name || !nbddev) && !(opts & NBDC_DO_LIST))) {
-		usage("not enough information specified");
+	if(hostname) {
+		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
+			if(!strncmp(hostname, "nbd", 3)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port)) {
+					usage("no valid configuration for specified device found", hostname);
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				usage("not enough information specified, and argument didn't look like an nbd device");
+				exit(EXIT_FAILURE);
+			}
+		}
+	} else {
+		usage("no information specified");
 		exit(EXIT_FAILURE);
+	}
+
+	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
+		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
 	if (b_unix)
@@ -650,8 +746,12 @@ int main(int argc, char *argv[]) {
 			 * does not return until the NBD device has
 			 * disconnected.
 			 */
+			struct timespec req = {
+				.tv_sec = 0,
+				.tv_nsec = 100000000,
+			};
 			while(check_conn(nbddev, 0)) {
-				sleep(1);
+				nanosleep(&req, NULL);
 			}
 			open(nbddev, O_RDONLY);
 			exit(0);

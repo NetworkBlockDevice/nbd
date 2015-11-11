@@ -69,6 +69,23 @@ manpage.1: manpage.sgml
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
+      <arg choice=plain><option>-unix <replaceable>path</replaceable></option></arg>
+      <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-sdp</arg>
+      <arg>-swap</arg>
+      <arg>-persist</arg>
+      <arg>-nofork</arg>
+      <arg>-systemd-mark</arg>
+      <arg>-block-size <replaceable>block size</replaceable></arg>
+      <arg>-timeout <replaceable>seconds</replaceable></arg>
+      <arg>-name <replaceable>name</replaceable></arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
+      <arg choice=plain><replaceable>short-device</replaceable></arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
       <arg choice=plain><option>-d <replaceable>nbd-device</replaceable></option></arg>
     </cmdsynopsis>
     <cmdsynopsis>
@@ -136,21 +153,29 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The TCP port on which <command>nbd-server</command> is
 	    running at the server.</para>
-	  <para>For the deprecated oldstyle protocol, passing a port
-	    number is required. In the oldstyle protocol, exports are
-	    defined by the port on which they are running.</para>
-	  <para>For the newstyle protocol, the port number defaults to
-	    10809, the IANA-assigned port number for the NBD protocol.
-	    The newstyle protocol is selected automatically by
-	    nbd-client when one of the -list or -name options are
-	    used.</para>
+          <para>The port number defaults to 10809, the IANA-assigned
+            port number for the NBD protocol.</para>
+          <para>Previous versions of the nbd tools supported an older
+            version of the negotiation protocol known as "oldstyle".
+            This protocol version is no longer supported as of version
+            3.11 of the nbd spport tools.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>nbd-device</option></term>
 	<listitem>
-	  <para>The block special file this nbd-client should connect
-	    to.</para>
+	  <para>The block special file (<filename>/dev</filename> entry) which this
+	  nbd-client should connect to, specified as a full path.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>short-device</option></term>
+	<listitem>
+	  <para>The name of the block special file which this nbd-client should
+	  connect to, but without the leading <filename>/dev</filename> part.</para>
+	  <para>When this mode is used, &dhpackage; will look up the
+	  necessary configuration in the <filename>nbdtab</filename> file. For
+	  more information, see nbdtab(5).
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -187,7 +212,7 @@ manpage.1: manpage.sgml
 	    server is exporting over IPv6 as well as over IPv4, this
 	    will list all exports twice; otherwise, it should list them
 	    all only once.</para>
-	  <para>Note that this option <emph>only</emph> works
+	  <para>Note that this option <emphasis>only</emphasis> works
 	    with nbd-server processes running version 3.1 or above, and
 	    must be enabled in server configuration (with the
 	    "allowlist" option) before it can be used.
@@ -267,6 +292,18 @@ manpage.1: manpage.sgml
 	    used for new configurations.
 	  </para>
 	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-unix</option></term>
+        <term><option>-u</option></term>
+        <listitem>
+          <para>
+            Connect to the server over a unix domain socket at
+            <replaceable>path</replaceable>, rather than to a server
+            over a TCP socket. The server must be listening on the given
+            socket.
+          </para>
+        </listitem>
       </varlistentry>
     </variablelist>
   </refsect1>

@@ -1,8 +1,8 @@
-man_MANS = nbd-server.1 nbd-server.5 nbd-client.8 nbd-trdump.1
+man_MANS = nbd-server.1 nbd-server.5 nbd-client.8 nbd-trdump.1 nbdtab.5
 CLEANFILES = manpage.links manpage.refs
-DISTCLEANFILES = nbd-server.1 nbd-client.8 nbd-server.5 nbd-trdump.1
-MAINTAINERCLEANFILES = nbd-server.1.sh.in nbd-client.8.sh.in nbd-server.5.sh.in nbd-trdump.1.sh.in
-EXTRA_DIST = nbd-server.1.in.sgml nbd-client.8.in.sgml nbd-server.5.in.sgml nbd-trdump.1.in.sgml nbd-server.1.sh.in nbd-server.5.sh.in nbd-client.8.sh.in nbd-trdump.1.sh.in sh.tmpl
+DISTCLEANFILES = nbd-server.1 nbd-client.8 nbd-server.5 nbd-trdump.1 nbdtab.5
+MAINTAINERCLEANFILES = nbd-server.1.sh.in nbd-client.8.sh.in nbd-server.5.sh.in nbd-trdump.1.sh.in nbdtab.5.sh.in
+EXTRA_DIST = nbd-server.1.in.sgml nbd-client.8.in.sgml nbd-server.5.in.sgml nbd-trdump.1.in.sgml nbdtab.5.in.sgml nbd-server.1.sh.in nbd-server.5.sh.in nbd-client.8.sh.in nbd-trdump.1.sh.in nbdtab.5.sh.in sh.tmpl
 
 nbd-server.1: nbd-server.1.sh
 	sh nbd-server.1.sh > nbd-server.1
@@ -12,6 +12,8 @@ nbd-client.8: nbd-client.8.sh
 	sh nbd-client.8.sh > nbd-client.8
 nbd-trdump.1: nbd-trdump.1.sh
 	sh nbd-trdump.1.sh > nbd-trdump.1
+nbdtab.5: nbdtab.5.sh
+	sh nbdtab.5.sh > nbdtab.5
 nbd-server.1.sh.in: nbd-server.1.in.sgml sh.tmpl
 	LC_ALL=C docbook2man nbd-server.1.in.sgml
 	cat sh.tmpl > nbd-server.1.sh.in
@@ -36,3 +38,9 @@ nbd-trdump.1.sh.in: nbd-trdump.1.in.sgml sh.tmpl
 	cat NBD-TRDUMP.1 >> nbd-trdump.1.sh.in
 	echo "EOF" >> nbd-trdump.1.sh.in
 	rm NBD-TRDUMP.1
+nbdtab.5.sh.in: nbdtab.5.in.sgml sh.tmpl
+	LC_ALL=C docbook2man nbdtab.5.in.sgml
+	cat sh.tmpl > nbdtab.5.sh.in
+	cat NBDTAB.5 >> nbdtab.5.sh.in
+	echo "EOF" >> nbdtab.5.sh.in
+	rm NBDTAB.5

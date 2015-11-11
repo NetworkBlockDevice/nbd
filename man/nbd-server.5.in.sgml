@@ -169,14 +169,34 @@ manpage.1: manpage.sgml
 	  <para>
 	    Optional; string
 	  </para>
-	  <para>If this option is set, it should contain the local IP
-	  address on which we should listen to
-	  <command>nbd-client</command>(8) connections. If it is not
-	    set, <command>nbd-server</command> will listen to all
-	  local IPv4 and IPv6 addresses. To limit to IPv6, specify the
-	  address as "::". To limit to IPv4, specify as "0.0.0.0". It
-	  is not possible to specify more than one IP address
-	  here.</para>
+	  <para>If this option is set, it should contain a comma-separated lis
+	  of the local IP addresses on which we should listen to
+	  <command>nbd-client</command>(8) connections. If it is not set,
+	  <command>nbd-server</command> will listen to "::, 0.0.0.0", which
+	  causes nbd-server to listen to all local IPv4 and IPv6 addresses. To
+	  limit to IPv6, specify the address as "::". To limit to IPv4, specify
+	  as "0.0.0.0".</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>max_threads</option></term>
+	<listitem>
+	  <para>
+	    Optional; integer; default 4
+	  </para>
+	  <para>
+	    Since NBD 3.12, nbd-server will read requests in a main
+	    thread, but do the handling of these requests, and the
+	    sending of the reply, in a number of separate worker
+	    threads, which are shared among all exports. With this
+	    parameter, you can configure the number of these worker
+	    threads.
+	  </para>
+	  <para>
+	    The default should be reasonable for a dual-core single-disk
+	    server. You might want to increase it if you have a powerful
+	    server that does little else than serving NBD.
+	  </para>
 	</listitem>
       </varlistentry>
       <varlistentry>

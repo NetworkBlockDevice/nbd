@@ -31,7 +31,7 @@ bool do_test(char* address, char* netmask) {
 					   &(((struct sockaddr_in*)res->ai_addr)->sin_addr),
 					       buf,
 					       res->ai_addrlen));
-		if(address_matches(netmask, (struct sockaddr_in*)res->ai_addr, NULL)) {
+		if(address_matches(netmask, (struct sockaddr*)res->ai_addr, NULL)) {
 			printf("Yes!\n");
 			freeaddrinfo(tmp);
 			return true;

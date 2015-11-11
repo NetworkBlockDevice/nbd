@@ -15,6 +15,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <treefiles.h>
+#include "backend.h"
 
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			       authorization file (yuck) */
@@ -160,14 +162,10 @@ SERVER* dup_serve(const SERVER *const s) {
 	if(s->listenaddr)
 		serve->listenaddr = g_strdup(s->listenaddr);
 
-	serve->port = s->port;
-
 	if(s->authname)
-		serve->authname = strdup(s->authname);
+		serve->authname = g_strdup(s->authname);
 
 	serve->flags = s->flags;
-	serve->socket = s->socket;
-	serve->socket_family = s->socket_family;
 	serve->virtstyle = s->virtstyle;
 	serve->cidrlen = s->cidrlen;
 
@@ -183,69 +181,12 @@ SERVER* dup_serve(const SERVER *const s) {
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
 
+	if(s->cowdir)
+		serve->cowdir = g_strdup(s->cowdir);
+
 	serve->max_connections = s->max_connections;
 
 	return serve;
-}
-
-int append_serve(const SERVER *const s, GArray *const a) {
-	SERVER *ns = NULL;
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	struct addrinfo *rp = NULL;
-	char   host[NI_MAXHOST];
-	gchar  *port = NULL;
-	int e;
-	int ret;
-
-	assert(s != NULL);
-	if(a == NULL) {
-		return -1;
-	}
-
-	port = g_strdup_printf("%d", s->port);
-
-	memset(&hints,'\0',sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
-	hints.ai_protocol = IPPROTO_TCP;
-
-	e = getaddrinfo(s->listenaddr, port, &hints, &ai);
-
-	if (port)
-		g_free(port);
-
-	if(e == 0) {
-		for (rp = ai; rp != NULL; rp = rp->ai_next) {
-			e = getnameinfo(rp->ai_addr, rp->ai_addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
-
-			if (e != 0) { // error
-				fprintf(stderr, "getnameinfo: %s\n", gai_strerror(e));
-				continue;
-			}
-
-			// duplicate server and set listenaddr to resolved IP address
-			ns = dup_serve (s);
-			if (ns) {
-				ns->listenaddr = g_strdup(host);
-				ns->socket_family = rp->ai_family;
-				g_array_append_val(a, *ns);
-				free(ns);
-				ns = NULL;
-			}
-		}
-
-		ret = 0;
-	} else {
-		fprintf(stderr, "getaddrinfo failed on listen host/address: %s (%s)\n", s->listenaddr ? s->listenaddr : "any", gai_strerror(e));
-		ret = -1;
-	}
-
-	if (ai)
-		freeaddrinfo(ai);
-
-	return ret;
 }
 
 uint64_t size_autodetect(int fhandle) {
@@ -289,3 +230,60 @@ uint64_t size_autodetect(int fhandle) {
 	return UINT64_MAX;
 }
 
+int exptrim(struct nbd_request* req, CLIENT* client) {
+	/* Don't trim when we're read only */
+	if(client->server->flags & F_READONLY) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* Don't trim beyond the size of the device, please */
+	if(req->from + req->len > client->exportsize) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* For copy-on-write, we should trim on the diff file. Not yet
+	 * implemented. */
+	if(client->server->flags & F_COPYONWRITE) {
+		DEBUG("TRIM not supported yet on copy-on-write exports");
+		return 0;
+	}
+	if (client->server->flags & F_TREEFILES) {
+		/* start address of first block to be trimmed */
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
+		/* start address of first block NOT to be trimmed */
+		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
+		while (min<max) {
+			delete_treefile(client->exportname,client->exportsize,min);
+			min+=TREEPAGESIZE;
+		}
+		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+		return 0;
+	}
+	FILE_INFO cur = g_array_index(client->export, FILE_INFO, 0);
+	FILE_INFO next;
+	int i = 1;
+	do {
+		if(i<client->export->len) {
+			next = g_array_index(client->export, FILE_INFO, i);
+		} else {
+			next.fhandle = -1;
+			next.startoff = client->exportsize;
+		}
+		if(cur.startoff <= req->from && next.startoff - cur.startoff >= req->len) {
+			off_t reqoff = req->from - cur.startoff;
+			off_t curlen = next.startoff - reqoff;
+			off_t reqlen = curlen - reqoff > req->len ? req->len : curlen - reqoff;
+			punch_hole(cur.fhandle, reqoff, reqlen);
+		}
+		cur = next;
+		i++;
+	} while(i < client->export->len && cur.startoff < (req->from + req->len));
+	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
+	return 0;
+}
+
+void myseek(int handle,off_t a) {
+	if (lseek(handle, a, SEEK_SET) < 0) {
+		err("Can not seek locally!\n");
+	}
+}
