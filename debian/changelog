@@ -1,6 +1,8 @@
 nbd (1:3.12.1-1) unstable; urgency=medium
 
   * New upstream release
+    - Fixes listening on IPv6; Closes: #803795.
+    - Fixes unrepeated use of read() system call; Closes: #703052.
   * Merge never-released branch targeted at experimental, which deals
     with the fact that the oldstyle handshake protocol is no longer
     supported in nbd upstream.
