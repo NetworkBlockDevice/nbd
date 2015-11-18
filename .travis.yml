@@ -1,11 +1,10 @@
 language: c
+os:
+  - linux
+  - osx
 compiler:
   - clang
   - gcc
 install: 
-  - sudo sh .travis/add-trusty
-  - sudo apt-get update
-  - sudo apt-get -t trusty install automake
-  - sudo apt-get install docbook-utils
-  - automake --version
+  - sh .travis/before_install
 script: ./autogen.sh && ./configure && make && make check
