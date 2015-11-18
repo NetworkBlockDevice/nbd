@@ -70,16 +70,16 @@ void logging(const char* name) {
 }
 
 #ifdef WORDS_BIGENDIAN
-u64 ntohll(u64 a) {
+uint64_t ntohll(uint64_t a) {
 	return a;
 }
 #else
-u64 ntohll(u64 a) {
+uint64_t ntohll(uint64_t a) {
 	u32 lo = a & 0xffffffff;
 	u32 hi = a >> 32U;
 	lo = ntohl(lo);
 	hi = ntohl(hi);
-	return ((u64) lo) << 32U | hi;
+	return ((uint64_t) lo) << 32U | hi;
 }
 
 /**
