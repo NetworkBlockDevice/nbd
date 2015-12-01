@@ -69,6 +69,7 @@ void logging(const char* name) {
 	setvbuf(stderr, NULL, _IONBF, 0);
 }
 
+#ifndef ntohll
 #ifdef WORDS_BIGENDIAN
 uint64_t ntohll(uint64_t a) {
 	return a;
@@ -81,6 +82,7 @@ uint64_t ntohll(uint64_t a) {
 	hi = ntohl(hi);
 	return ((uint64_t) lo) << 32U | hi;
 }
+#endif
 #endif
 
 /**
