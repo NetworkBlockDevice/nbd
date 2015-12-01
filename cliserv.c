@@ -81,6 +81,7 @@ uint64_t ntohll(uint64_t a) {
 	hi = ntohl(hi);
 	return ((uint64_t) lo) << 32U | hi;
 }
+#endif
 
 /**
  * Read data from a file descriptor into a buffer
@@ -103,5 +104,3 @@ void readit(int f, void *buf, size_t len) {
 		}
 	}
 }
-
-#endif
