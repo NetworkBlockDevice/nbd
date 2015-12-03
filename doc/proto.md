@@ -290,7 +290,8 @@ of the newstyle negotiation.
 
 - `NBD_OPT_PEEK_EXPORT` (4)
 
-    Defined by the experimental `PEEK_EXPORT` extension; see below.
+    Was defined by the (withdrawn) experimental `PEEK_EXPORT` extension;
+    not in use.
 
 - `NBD_OPT_STARTTLS` (5)
 
@@ -320,8 +321,6 @@ during option haggling in the fixed newstyle negotiation.
       along some details about the export. If the client did not
       explicitly request otherwise, these details are defined to be
       UTF-8 encoded data suitable for direct display to a human being.
-    - The experimental `PEEK_EXPORT` extension (see below) adds extra
-      data to the end of this request.
 
 * `NBD_REP_STARTTLS` (3)
 
@@ -480,46 +479,12 @@ The server SHOULD AVOID returning ENOMEM if at all possible.
 The specifications in this section are non-normative and experimental.
 They are not currently implemented by any known version of the nbd
 protocol; a first implementation may require changes to the
-specifications in this section.
+specifications in this section, or may cause the specifications here to
+be withdrawn altogether.
 
 Therefore, implementors are strongly suggested to contact the
 mailinglist in order to help fine-tune the specifications in this
 section before committing to a particular implementation.
-
-### `PEEK_EXPORT` extension
-
-The STARTTLS extension (see below) needed a way to figure out whether an
-export requires TLS. For that, we need a generic way to request
-information on an export.
-
-This extension adds one option request, and extends one option reply
-
-* `NBD_OPT_PEEK_EXPORT`
-
-    Request one `NBD_REP_SERVER` packet with flags. The server SHOULD NOT
-    finish with an `NBD_REP_ACK` packet.
-
-* `NBD_REP_SERVER`
-
-    If this was sent in reply to an `NBD_OPT_PEEK_EXPORT` command, then the
-    name of the export is followed by a 32-bit "flags" field, describing
-    properties about the export:
-
-    - `NBD_F_EXP_RO` (0): if set, this export is read-only
-    - `NBD_F_EXP_COW` (1): if set, the export has copy-on-write semantics;
-      writes are lost after disconnect, and writes to this device will
-      not be seen by other clients. SHOULD NOT be set if `NBD_F_EXP_RO` is
-      set.
-    - `NBD_F_EXP_TLS_OK` (2): if set, the export allows TLS.
-    - `NBD_F_EXP_TLS_REQ` (3): if set, the export requires TLS. MUST NOT
-      be set unless `NBD_F_EXP_TLS_OK` is also set. If this flag is set, a
-      server MAY vary the state of the other flags in this flags field
-      depending on whether TLS is enabled; a client SHOULD NOT assume
-      that the other data is correct until TLS has been negotiated and
-      this command re-issued.
-
-    It follows that an `NBD_REP_SERVER` packet with flags should have
-    the "length of name" field be equal to "length of reply - 8".
 
 ### `STARTTLS` extension
 
