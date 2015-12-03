@@ -322,10 +322,6 @@ during option haggling in the fixed newstyle negotiation.
       explicitly request otherwise, these details are defined to be
       UTF-8 encoded data suitable for direct display to a human being.
 
-* `NBD_REP_STARTTLS` (3)
-
-    defined by the experimental STARTTLS extension; see below.
-
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
 case that data is an error message suitable for display to the user.
@@ -356,7 +352,7 @@ case that data is an error message suitable for display to the user.
 
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
-    defined by the experimental STARTTLS extension; see below.
+    defined by the experimental `STARTTLS` extension; see below.
 
 ### Transmission phase
 
@@ -491,7 +487,7 @@ section before committing to a particular implementation.
 To implement secure NBD connections, a STARTTLS extension is envisioned.
 This extension adds one option request and one error type.
 
-* `NBD_OPT_STARTTLS` (5)
+* `NBD_OPT_STARTTLS`
 
     The client wishes to initiate TLS. If the server replies with
     `NBD_REP_ACK`, then the client should immediately initiate a TLS
