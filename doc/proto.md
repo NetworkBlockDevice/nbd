@@ -278,6 +278,11 @@ of the newstyle negotiation.
     server which wishes to use any other option MUST support fixed
     newstyle.
 
+    A major problem of this option is that it does not support the
+    return of error messages to the client in case of problems. To
+    remedy this, the experimental `SELECT` extension has been
+    introduced; see below.
+
 - `NBD_OPT_ABORT` (2)
 
     The client desires to abort the negotiation and close the
@@ -296,6 +301,14 @@ of the newstyle negotiation.
 - `NBD_OPT_STARTTLS` (5)
 
     Defined by the experimental `STARTTLS` extension; see below.
+
+- `NBD_OPT_SELECT` (6)
+
+    Defined by the experimental `SELECT` extension; see below.
+
+- `NBD_OPT_GO` (7)
+
+    Defined by the experimental `SELECT` extension; see below.
 
 #### Option reply types
 
@@ -321,6 +334,8 @@ during option haggling in the fixed newstyle negotiation.
       along some details about the export. If the client did not
       explicitly request otherwise, these details are defined to be
       UTF-8 encoded data suitable for direct display to a human being.
+    - The experimental `SELECT` extension (see below) adds extra data to
+      the end of this request.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -353,6 +368,10 @@ case that data is an error message suitable for display to the user.
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
     defined by the experimental `STARTTLS` extension; see below.
+
+* `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
+
+    defined by the experimental `SELECT` extension; see below.
 
 ### Transmission phase
 
@@ -508,6 +527,73 @@ This extension adds one option request and one error type.
 
     If this reply is used, servers SHOULD send it in reply to each and every
     unencrypted `NBD_OPT_*` message (apart from `NBD_OPT_STARTTLS`).
+
+### `SELECT` extension
+
+A major downside of the `NBD_OPT_EXPORT_NAME` option is that it does not
+allow for an error message to be returned by the server (or, in fact,
+any structured message). This is a result of a (misguided) attempt to
+keep backwards compatibility with non-fixed newstyle negotiation.
+
+To remedy this, a `SELECT` extension is envisioned. This extension adds
+two option requests and one error reply type, and extends one existing
+option reply type.
+
+* `NBD_OPT_SELECT`
+
+    The client wishes to select the export with the given name for use
+    in the transmission phase, but does not yet want to move to the
+    transmission phase.
+
+    Data:
+
+    - 32 bits, length of name (unsigned)
+    - Name of the export
+
+    The server replies with one of the following:
+
+    - `NBD_REP_ERR_UNKNOWN`: The chosen export does not exist on this
+      server.
+    - `NBD_REP_ERR_TLS_REQD`: The server does not wish to export this
+      block device unless the client negotiates TLS first.
+    - `NBD_REP_SERVER`: The server accepts the chosen export. In this
+      case, the `NBD_REP_SERVER` message's data contains the following
+      fields:
+
+      - 32 bits, length of name (unsigned)
+      - Name of the export. This name MAY be different from the one
+	given in the `NBD_OPT_SELECT` option in case the server has
+	multiple alternate names for a single export.
+      - 64 bits, size of the export in bytes (unsigned)
+      - 16 bits, export flags
+
+      That is, the `NBD_REP_SERVER` message is extended to also include
+      the data sent in reply to the `NBD_OPT_EXPORT_NAME` option.
+    - For backwards compatibility, clients should be prepared to also
+      handle `NBD_REP_ERR_UNSUP`. In this case, they should fall back to
+      using `NBD_OPT_EXPORT_NAME`.
+
+* `NBD_OPT_GO`
+
+    The client wishes to terminate the negotiation phase and progress to
+    the transmission phase. Possible replies from the server include:
+
+    - `NBD_REP_ACK`: The server acknowledges. After receiving this
+      reply, the client and the server have both moved to the
+      transmission phase.
+    - `NBD_REP_ERR_INVALID`: No `NBD_OPT_SELECT` command was
+      previously issued during this negotiation (there is no default);
+      or, the most recent `NBD_OPT_SELECT` command resulted in an error
+      reply (selecting a different export clears the currently selected
+      export, even if the new export does not exist on the server); or,
+      the most recent `NBD_OPT_SELECT` command issued during this
+      negotiation occurred before TLS was successfully negotiated
+      (negotiating TLS clears the selected export).
+    - Servers MAY also choose to send `NBD_REP_ERR_TLS_REQD` rather than
+      `NBD_REP_ERR_INVALID` if no non-TLS exports are supported.
+    - Servers MUST NOT send `NBD_REP_ERR_UNSUP` as a reply to this
+      message if they do not also send it as a reply to the
+      `NBD_OPT_SELECT` message.
 
 ## About this file
 
