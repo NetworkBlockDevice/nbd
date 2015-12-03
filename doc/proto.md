@@ -51,9 +51,9 @@ those.
 
 ### Handshake
 
-The handshake is the first phase of the protocol. It's main purpose is to
-provide means for both the client and the server to negotiate which export they
-are going to use and how.
+The handshake is the first phase of the protocol. Its main purpose is to
+provide means for both the client and the server to negotiate which
+export they are going to use and how.
 
 There are three versions of the negotiation. They are referred to as
 "oldstyle", "newstyle", and "fixed newstyle" negotiation. Oldstyle was
