@@ -26,7 +26,7 @@ Description: Network Block Device protocol - server
 
 Package: nbd-client
 Architecture: linux-any
-Depends: ${shlibs:Depends}, ${misc:Depends}, debconf | debconf-2.0, initscripts (>= 2.88dsf-13.3)
+Depends: ${shlibs:Depends}, ${misc:Depends}, debconf | debconf-2.0
 Description: Network Block Device protocol - client
  Network Block Device (NBD) is a client/server protocol that
  emulates a block device (such as a hard disk, a floppy, or a CD-ROM)
