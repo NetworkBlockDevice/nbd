@@ -67,4 +67,6 @@ int main(void) {
 	count_assert(g_fd == 123);
 	count_assert(g_off == 0);
 	count_assert(g_len == 1024*1024);
+
+	return 0;
 }
