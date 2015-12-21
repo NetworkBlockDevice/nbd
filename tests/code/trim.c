@@ -1,3 +1,5 @@
+#include <lfs.h>
+
 #include <assert.h>
 #include <pthread.h>
 #include <string.h>
