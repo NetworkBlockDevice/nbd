@@ -1,14 +1,17 @@
-nbd (1:3.12.1-2) UNRELEASED; urgency=medium
+nbd (1:3.12.1-2) unstable; urgency=medium
 
   * Drop dependency on initscripts. Closes: #804991.
   * Install nbdtab.5 manpage
   * tests/code/trim.c: add missing #include for lfs.h, so that off_t is
     typedef'd with the LFS defines active. This should fix various FTBFS
     errors.
+  * Cherry-pick ee0b0c9a from git HEAD to fix the location of the
+    readit() function in cliserv.c, so it is defined if WORDS_BIGENDIAN
+    is active, too.
   * Updated translations:
     - French, by Christian Perrier; Closes: #809020.
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 20 Dec 2015 11:04:08 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 29 Dec 2015 02:40:33 +0100
 
 nbd (1:3.12.1-1) unstable; urgency=medium
 
