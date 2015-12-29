@@ -498,8 +498,9 @@ specifications in this section, or may cause the specifications here to
 be withdrawn altogether.
 
 Therefore, implementors are strongly suggested to contact the
-mailinglist in order to help fine-tune the specifications in this
-section before committing to a particular implementation.
+[mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
+fine-tune the specifications in this section before committing to a particular
+implementation.
 
 ### `STARTTLS` extension
 
