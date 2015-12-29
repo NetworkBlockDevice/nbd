@@ -2495,7 +2495,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
                 GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo* ai = NULL;
-	struct addrinfo* ai_bak;
+	struct addrinfo* ai_bak = NULL;
 	struct sock_flags;
 	int e;
         int retval = -1;
