@@ -350,10 +350,16 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	}
 	off_t size = lseek(fd, 0, SEEK_END);
 	lseek(fd, 0, SEEK_SET);
-	void *data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
+	void *data;
 	char *fsep = "\n\t# ";
 	char *lsep = "\n#";
 
+	if(size < 0) {
+		perror("E: mmap'ing nbdtab");
+		exit(EXIT_FAILURE);
+	}
+
+	data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
 	char *loc = strstr((const char*)data, cfgname);
 	if(!loc) {
 		return false;
