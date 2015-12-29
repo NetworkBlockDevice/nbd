@@ -5,6 +5,8 @@ nbd (1:3.12.1-2) UNRELEASED; urgency=medium
   * tests/code/trim.c: add missing #include for lfs.h, so that off_t is
     typedef'd with the LFS defines active. This should fix various FTBFS
     errors.
+  * Updated translations:
+    - French, by Christian Perrier; Closes: #809020.
 
  -- Wouter Verhelst <wouter@debian.org>  Sun, 20 Dec 2015 11:04:08 +0100
 
