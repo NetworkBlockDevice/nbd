@@ -223,9 +223,10 @@ void ask_list(int sock) {
 			if(len > 0 && len < BUF_SIZE) {
 				if((len=read(sock, buf, len)) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
+				} else {
+					buf[len] = '\0';
+					fprintf(stderr, "Server said: %s\n", buf);
 				}
-				buf[len] = '\0';
-				fprintf(stderr, "Server said: %s\n", buf);
 			}
 			exit(EXIT_FAILURE);
 		} else {
