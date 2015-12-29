@@ -72,9 +72,6 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/param.h>
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>

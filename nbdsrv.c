@@ -17,6 +17,9 @@
 #include <sys/socket.h>
 #include <treefiles.h>
 #include "backend.h"
+#ifdef HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#endif
 
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			       authorization file (yuck) */
