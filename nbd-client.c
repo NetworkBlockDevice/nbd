@@ -172,6 +172,7 @@ void ask_list(int sock) {
 	uint32_t len;
 	uint32_t reptype;
 	uint64_t magic;
+	int rlen;
 	const int BUF_SIZE = 1024;
 	char buf[BUF_SIZE];
 
@@ -221,10 +222,10 @@ void ask_list(int sock) {
 					break;
 			}
 			if(len > 0 && len < BUF_SIZE) {
-				if((len=read(sock, buf, len)) < 0) {
+				if((rlen=read(sock, buf, len)) < 0) {
 					fprintf(stderr, "\nE: could not read error message from server\n");
 				} else {
-					buf[len] = '\0';
+					buf[rlen] = '\0';
 					fprintf(stderr, "Server said: %s\n", buf);
 				}
 			}
