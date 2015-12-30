@@ -9,7 +9,7 @@ tmpdir=`mktemp -d $TMPDIR/tmp.XXXXXX`
 conffile=${tmpdir}/nbd.conf
 pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
-mydir=$(dirname "`readlink -f $0`")
+mydir=$(dirname $0)
 cleanup="$2"
 PID=""
 
