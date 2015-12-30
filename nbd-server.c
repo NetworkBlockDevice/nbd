@@ -60,6 +60,7 @@
 #include "lfs.h"
 #define _XOPEN_SOURCE 500 /* to get pread/pwrite */
 #define _BSD_SOURCE /* to get DT_* macros */
+#define _DARWIN_C_SOURCE /* to get DT_* macros on OS X */
 
 #include <assert.h>
 #include <sys/types.h>
@@ -68,9 +69,6 @@
 #include <sys/select.h>
 #include <sys/wait.h>
 #include <sys/un.h>
-#ifdef HAVE_SYS_DIRENT_H
-#include <sys/dirent.h>
-#endif
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -94,6 +92,12 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
+#ifdef HAVE_SYS_DIR_H
+#include <sys/dir.h>
+#endif
+#ifdef HAVE_SYS_DIRENT_H
+#include <sys/dirent.h>
+#endif
 #include <unistd.h>
 #include <getopt.h>
 #include <pwd.h>
