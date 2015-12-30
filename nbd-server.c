@@ -68,6 +68,9 @@
 #include <sys/select.h>
 #include <sys/wait.h>
 #include <sys/un.h>
+#ifdef HAVE_SYS_DIRENT_H
+#include <sys/dirent.h>
+#endif
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
