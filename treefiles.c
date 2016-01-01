@@ -1,3 +1,4 @@
+#include "lfs.h"
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
