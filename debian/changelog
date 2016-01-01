@@ -1,3 +1,10 @@
+nbd (1:3.12.1-3) UNRELEASED; urgency=medium
+
+  * Add missing LFS includes in the treefiles.c file too, so that it
+    doesn't fail on little-endian 32-bit architectures. Closes: #809581
+
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 01 Jan 2016 18:20:16 +0100
+
 nbd (1:3.12.1-2) unstable; urgency=medium
 
   * Drop dependency on initscripts. Closes: #804991.
