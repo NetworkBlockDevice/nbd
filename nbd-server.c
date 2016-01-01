@@ -902,7 +902,7 @@ int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* m
         if (client->server->flags & F_TREEFILES) {
 		*foffset = a % TREEPAGESIZE;
 		*maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
-		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a);
+		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a, &client->lock);
 		return 0;
 	}
 
