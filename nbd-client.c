@@ -352,7 +352,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	}
 	off_t size = lseek(fd, 0, SEEK_END);
 	lseek(fd, 0, SEEK_SET);
-	void *data;
+	void *data = NULL;
 	char *fsep = "\n\t# ";
 	char *lsep = "\n#";
 
@@ -443,6 +443,9 @@ next:
 	} while(strcspn(loc, lsep) > 0);
 	retval = true;
 out:
+	if(data != NULL) {
+		munmap(data, size);
+	}
 	if(fd >= 0) {
 		close(fd);
 	}
