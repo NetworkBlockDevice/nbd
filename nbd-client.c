@@ -344,10 +344,11 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 
 bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port) {
 	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
+	bool retval = false;
 	if(fd < 0) {
 		fprintf(stderr, "while opening %s: ", SYSCONFDIR "/nbdtab");
 		perror("could not open config file");
-		return false;
+		goto out;
 	}
 	off_t size = lseek(fd, 0, SEEK_END);
 	lseek(fd, 0, SEEK_SET);
@@ -363,14 +364,14 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
 	char *loc = strstr((const char*)data, cfgname);
 	if(!loc) {
-		return false;
+		goto out;
 	}
 	size_t l = strlen(cfgname) + 6;
 	*dev_ptr = malloc(l);
 	snprintf(*dev_ptr, l, "/dev/%s", cfgname);
 
 	size_t line_len, field_len, ws_len;
-#define CHECK_LEN field_len = strcspn(loc, fsep); ws_len = strspn(loc+field_len, fsep); if(field_len > line_len || line_len <= 0) { return false; }
+#define CHECK_LEN field_len = strcspn(loc, fsep); ws_len = strspn(loc+field_len, fsep); if(field_len > line_len || line_len <= 0) { goto out; }
 #define MOVE_NEXT line_len -= field_len + ws_len; loc += field_len + ws_len
 	// find length of line
 	line_len = strcspn(loc, lsep);
@@ -386,7 +387,8 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	*name_ptr = strndup(loc, field_len);
 	if(ws_len + field_len > line_len) {
 		// optional last field is not there, so return success
-		return true;
+		retval = true;
+		goto out;
 	}
 	MOVE_NEXT;
 	CHECK_LEN;
@@ -439,7 +441,12 @@ next:
 			loc++;
 		}
 	} while(strcspn(loc, lsep) > 0);
-	return true;
+	retval = true;
+out:
+	if(fd >= 0) {
+		close(fd);
+	}
+	return retval;
 }
 
 void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
