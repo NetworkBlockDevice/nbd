@@ -82,7 +82,7 @@ manpage.1: manpage.sgml
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
-      <arg choice=plain><replaceable>short-device</replaceable></arg>
+      <arg choice=plain><replaceable>nbd-device</replaceable></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
@@ -167,15 +167,10 @@ manpage.1: manpage.sgml
 	  <para>The block special file (<filename>/dev</filename> entry) which this
 	  nbd-client should connect to, specified as a full path.</para>
 	</listitem>
-      </varlistentry>
-      <varlistentry>
-        <term><option>short-device</option></term>
-	<listitem>
-	  <para>The name of the block special file which this nbd-client should
-	  connect to, but without the leading <filename>/dev</filename> part.</para>
-	  <para>When this mode is used, &dhpackage; will look up the
-	  necessary configuration in the <filename>nbdtab</filename> file. For
-	  more information, see nbdtab(5).
+	  <para>When the mode is used wherein no hostname or export name is
+	  specified, &dhpackage; will look up the necessary configuration in
+	  the <filename>nbdtab</filename> file. For more information, see
+	  nbdtab(5).
 	</listitem>
       </varlistentry>
       <varlistentry>

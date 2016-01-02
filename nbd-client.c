@@ -688,7 +688,7 @@ int main(int argc, char *argv[]) {
 #endif
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
-			if(!strncmp(hostname, "nbd", 3)) {
+			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
 				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
