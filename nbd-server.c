@@ -2033,7 +2033,7 @@ int set_peername(int net, CLIENT *client) {
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &(client->clientaddr), addrinlen);
 			int addrbits;
-			if(addr->sa_family == AF_UNIX) {
+			if(client->clientaddr.ss_family == AF_UNIX) {
 				tmp = g_strdup(peername);
 			} else {
 				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
