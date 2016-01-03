@@ -1984,14 +1984,19 @@ int set_peername(int net, CLIENT *client) {
 	int i;
 	int e;
 
-	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
-		msg(LOG_INFO, "getpeername failed: %m");
+	if (getsockname(net, addr, &addrinlen) < 0) {
+		msg(LOG_INFO, "getsockname failed: %m");
 		return -1;
 	}
 
-	if(client->clientaddr.ss_family == AF_UNIX) {
+	if(netaddr.ss_family == AF_UNIX) {
+		client->clientaddr.ss_family = AF_UNIX;
 		strcpy(peername, "unix");
 	} else {
+		if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
+			msg(LOG_INFO, "getpeername failed: %m");
+			return -1;
+		}
 		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
 				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
 			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
