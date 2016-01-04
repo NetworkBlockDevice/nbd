@@ -58,6 +58,9 @@
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
 #include "lfs.h"
+#define _XOPEN_SOURCE 500 /* to get pread/pwrite */
+#define _BSD_SOURCE /* to get DT_* macros */
+#define _DARWIN_C_SOURCE /* to get DT_* macros on OS X */
 
 #include <assert.h>
 #include <sys/types.h>
@@ -70,9 +73,6 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/param.h>
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
@@ -92,6 +92,12 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
+#ifdef HAVE_SYS_DIR_H
+#include <sys/dir.h>
+#endif
+#ifdef HAVE_SYS_DIRENT_H
+#include <sys/dirent.h>
+#endif
 #include <unistd.h>
 #include <getopt.h>
 #include <pwd.h>
@@ -896,7 +902,7 @@ int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* m
         if (client->server->flags & F_TREEFILES) {
 		*foffset = a % TREEPAGESIZE;
 		*maxbytes = (( 1 + (a/TREEPAGESIZE) ) * TREEPAGESIZE) - a; // start position of next block
-		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a);
+		*fhandle = open_treefile(client->exportname, ((client->server->flags & F_READONLY) ? O_RDONLY : O_RDWR), client->exportsize,a, &client->lock);
 		return 0;
 	}
 
@@ -1462,6 +1468,7 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 	writeit(client->net, &rep, sizeof rep);
 	writeit(client->net, buf, req->len);
 	pthread_mutex_unlock(&(client->lock));
+	free(buf);
 }
 
 static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
@@ -1977,14 +1984,19 @@ int set_peername(int net, CLIENT *client) {
 	int i;
 	int e;
 
-	if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
-		msg(LOG_INFO, "getpeername failed: %m");
+	if (getsockname(net, addr, &addrinlen) < 0) {
+		msg(LOG_INFO, "getsockname failed: %m");
 		return -1;
 	}
 
-	if(client->clientaddr.ss_family == AF_UNIX) {
+	if(netaddr.ss_family == AF_UNIX) {
+		client->clientaddr.ss_family = AF_UNIX;
 		strcpy(peername, "unix");
 	} else {
+		if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
+			msg(LOG_INFO, "getpeername failed: %m");
+			return -1;
+		}
 		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
 				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
 			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
@@ -2026,7 +2038,7 @@ int set_peername(int net, CLIENT *client) {
 			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
 			memcpy(&netaddr, &(client->clientaddr), addrinlen);
 			int addrbits;
-			if(addr->sa_family == AF_UNIX) {
+			if(client->clientaddr.ss_family == AF_UNIX) {
 				tmp = g_strdup(peername);
 			} else {
 				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
@@ -2492,7 +2504,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
                 GError **const gerror) {
 	struct addrinfo hints;
 	struct addrinfo* ai = NULL;
-	struct addrinfo* ai_bak;
+	struct addrinfo* ai_bak = NULL;
 	struct sock_flags;
 	int e;
         int retval = -1;

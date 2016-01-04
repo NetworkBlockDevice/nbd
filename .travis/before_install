@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e
+set -x
+
+case $(uname -s) in
+	Linux)
+		sudo sh .travis/add-trusty
+		sudo apt-get update
+		sudo apt-get -t trusty -y install automake
+		sudo apt-get install -y docbook-utils
+	;;
+	*)
+		for i in man/*sgml
+		do
+			touch ${i%in.sgml}sh.in
+		done
+		brew update
+		brew install glib
+	;;
+esac

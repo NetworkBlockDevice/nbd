@@ -59,7 +59,7 @@ void mkdir_path(char * path) {
 	}
 }
 
-int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
+int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *mutex) {
 	char filename[256+strlen(name)];
 	strcpy(filename,name);
 	off_t ppos;
@@ -67,6 +67,7 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 
 	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 
+	pthread_mutex_lock(mutex);
 	int handle=open(filename, mode, 0600);
 	if (handle<0 && errno==ENOENT) {
 		if (mode & O_RDWR) {
@@ -98,6 +99,7 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos) {
 			err("Error setting tree block file size %m");
 		}
 	}
+	pthread_mutex_unlock(mutex);
 	return handle;
 }
 

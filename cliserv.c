@@ -69,18 +69,20 @@ void logging(const char* name) {
 	setvbuf(stderr, NULL, _IONBF, 0);
 }
 
+#ifndef ntohll
 #ifdef WORDS_BIGENDIAN
-u64 ntohll(u64 a) {
+uint64_t ntohll(uint64_t a) {
 	return a;
 }
 #else
-u64 ntohll(u64 a) {
+uint64_t ntohll(uint64_t a) {
 	u32 lo = a & 0xffffffff;
 	u32 hi = a >> 32U;
 	lo = ntohl(lo);
 	hi = ntohl(hi);
-	return ((u64) lo) << 32U | hi;
+	return ((uint64_t) lo) << 32U | hi;
 }
+#endif
 #endif
 
 /**
@@ -94,13 +96,16 @@ void readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
-		if ((res = read(f, buf, len)) <= 0) {
+		res = read(f, buf, len);
+		if (res > 0) {
+			len -= res;
+			buf += res;
+		} else if (res < 0) {
 			if(errno != EAGAIN) {
 				err("Read failed: %m");
 			}
 		} else {
-			len -= res;
-			buf += res;
+			err("Read failed: End of file");
 		}
 	}
 }

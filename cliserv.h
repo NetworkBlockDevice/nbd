@@ -79,10 +79,14 @@ void err(const char *s) G_GNUC_NORETURN;
 
 void logging(const char* name);
 
+#ifndef ntohll
 uint64_t ntohll(uint64_t a);
+#endif
+#ifndef htonll
+#define htonll ntohll
+#endif
 
 void readit(int f, void *buf, size_t len);
-#define htonll ntohll
 
 #define NBD_DEFAULT_PORT	"10809"	/* Port on which named exports are
 					 * served */

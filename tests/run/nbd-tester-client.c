@@ -699,7 +699,7 @@ int throughput_test(gchar* hostname, gchar* unixsock, int port, char* name, int 
 				}
 				--requests;
 			}
-		} while FD_ISSET(sock, &set);
+		} while (FD_ISSET(sock, &set));
 		/* Now wait until we can write again or until a second have
 		 * passed, whichever comes first*/
 		FD_ZERO(&set);

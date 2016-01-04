@@ -1,1 +1,1 @@
-EXTRA_DIST = README proto.txt todo.txt
+EXTRA_DIST = README proto.md todo.txt
