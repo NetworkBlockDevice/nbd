@@ -1,8 +1,9 @@
 nbd (1:3.13-1) unstable; urgency=medium
 
   * New upstream release.
-    - Adds missing LFS includes in the treefiles.c file too, so that it doesn't
-      fail on little-endian 32-bit architectures. Closes: #809581
+    - Adds missing LFS includes in the treefiles.c file too, and fixes a race
+      condition in the creation of tree files, so that it doesn't fail on
+      little-endian 32-bit architectures and randomly elsewhere. Closes: #809581
 
  -- Wouter Verhelst <wouter@debian.org>  Mon, 04 Jan 2016 11:26:41 +0100
 
