@@ -44,3 +44,5 @@ libtool
 ltmain.sh
 .libs/
 *.la
+support/lt*
+support/libtool.m4
