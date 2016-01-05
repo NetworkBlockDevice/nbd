@@ -9,6 +9,7 @@ DEB_HOST_GNU_SYSTEM := $(shell dpkg-architecture -qDEB_HOST_GNU_SYSTEM)
 
 override_dh_auto_configure: debian/po/templates.pot
 	test -f nbd.h
+	test -d .git && test $$(git status --porcelain | wc -l) -le 0
 	dh_auto_configure -- --enable-lfs --enable-syslog \
 			--prefix=/ --mandir=/usr/share/man
 
