@@ -561,6 +561,7 @@ int main(int argc, char *argv[]) {
 	int timeout=0;
 	int sdp=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
+	pid_t main_pid;
 	u64 size64;
 	uint16_t flags = 0;
 	int c;
@@ -743,6 +744,8 @@ int main(int argc, char *argv[]) {
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGCHLD, &sa, NULL);
 #endif
+	/* For child to check its parent */
+	main_pid = getpid();
 	do {
 #ifndef NOFORK
 
@@ -769,6 +772,13 @@ int main(int argc, char *argv[]) {
 				.tv_nsec = 100000000,
 			};
 			while(check_conn(nbddev, 0)) {
+				if (main_pid != getppid()) {
+					/* check_conn() will not return 0 when nbd disconnected
+					 * and parent exited during this loop. So the child has to
+					 * explicitly check parent identity and exit if parent
+					 * exited */
+					exit(0);
+				}
 				nanosleep(&req, NULL);
 			}
 			open(nbddev, O_RDONLY);
@@ -777,8 +787,8 @@ int main(int argc, char *argv[]) {
 #endif
 
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
-		        int error = errno;
-			fprintf(stderr, "nbd,%d: Kernel call returned: %d", getpid(), error);
+			int error = errno;
+			fprintf(stderr, "nbd,%d: Kernel call returned: %d", main_pid, error);
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
