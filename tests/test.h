@@ -45,7 +45,7 @@
 extern pid_t pid;               /* PID of nbdkit process. */
 extern const char *server[2];   /* server parameter for add_drive */
 
-extern int test_start_nbdkit (const char *plugin, ...);
+extern int test_start_nbdkit (const char *arg, ...);
 
 /* Declare program_name. */
 #if HAVE_DECL_PROGRAM_INVOCATION_SHORT_NAME == 1

@@ -49,6 +49,7 @@
 
 /* main.c */
 extern const char *ipaddr;
+extern int newstyle;
 extern const char *port;
 extern int readonly;
 extern char *unixsocket;

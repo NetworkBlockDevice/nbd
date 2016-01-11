@@ -17,9 +17,9 @@
 
 * Performance - measure and improve it.
 
-* Implement the new protocol and export names.  With export names it
-  should be possible to have multiple plugins on the command line
-  (each responding to a different export of course):
+* Implement export names.  With export names it should be possible to
+  have multiple plugins on the command line (each responding to a
+  different export of course):
 
     nbdkit --export /foo plugin.so --export /bar another-plugin.so
 
@@ -27,8 +27,8 @@
   default that accepts all exportnames, or to divide the export name
   "space" up using regexps or wildcards.
 
-  Annoyingly nbd-client dropped support for the oldstyle protocol (see
-  https://bugzilla.redhat.com/1297100).
+  Export names are not actually paths (although that is how they are
+  often used), but arbitrary UTF-8 text strings.
 
 * Implement true parallel request handling.  Currently
   NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS and

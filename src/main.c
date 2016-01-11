@@ -1,5 +1,5 @@
 /* nbdkit
- * Copyright (C) 2013-2014 Red Hat Inc.
+ * Copyright (C) 2013-2016 Red Hat Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,11 +67,12 @@ static gid_t parsegroup (const char *);
 
 int foreground;                 /* -f */
 const char *ipaddr;             /* -i */
-int listen_stdin;               /* -s */
+int newstyle;                   /* -n */
 char *pidfile;                  /* -P */
 const char *port;               /* -p */
 int readonly;                   /* -r */
 char *run;                      /* --run */
+int listen_stdin;               /* -s */
 char *unixsocket;               /* -U */
 const char *user, *group;       /* -u & -g */
 int verbose;                    /* -v */
@@ -83,7 +84,7 @@ static char *random_fifo = NULL;
 
 enum { HELP_OPTION = CHAR_MAX + 1 };
 
-static const char *short_options = "fg:i:p:P:rsu:U:vV";
+static const char *short_options = "fg:i:nop:P:rsu:U:vV";
 static const struct option long_options[] = {
   { "help",       0, NULL, HELP_OPTION },
   { "dump-config",0, NULL, 0 },
@@ -92,6 +93,10 @@ static const struct option long_options[] = {
   { "group",      1, NULL, 'g' },
   { "ip-addr",    1, NULL, 'i' },
   { "ipaddr",     1, NULL, 'i' },
+  { "new-style",  1, NULL, 'n' },
+  { "newstyle",   1, NULL, 'n' },
+  { "old-style",  1, NULL, 'o' },
+  { "oldstyle",   1, NULL, 'o' },
   { "pid-file",   1, NULL, 'P' },
   { "pidfile",    1, NULL, 'P' },
   { "port",       1, NULL, 'p' },
@@ -111,8 +116,8 @@ static void
 usage (void)
 {
   printf ("nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]\n"
-          "       [-P PIDFILE] [-p PORT] [-r] [--run CMD] [-s]\n"
-          "       [-U SOCKET] [-u USER] [-v] [-V]\n"
+          "       [--newstyle] [--oldstyle] [-P PIDFILE] [-p PORT] [-r]\n"
+          "       [--run CMD] [-s] [-U SOCKET] [-u USER] [-v] [-V]\n"
           "       PLUGIN [key=value [key=value [...]]]\n"
           "\n"
           "Please read the nbdkit(1) manual page for full usage.\n");
@@ -178,6 +183,17 @@ main (int argc, char *argv[])
 
     case 'i':
       ipaddr = optarg;
+      break;
+
+    case 'n':
+      newstyle = 1;
+      break;
+
+    case 'o':
+      /* XXX When we add support for exportnames, we will need to
+       * ensure that the user does not use -o + --export.
+       */
+      newstyle = 0;
       break;
 
     case 'P':

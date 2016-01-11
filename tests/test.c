@@ -68,7 +68,7 @@ cleanup (void)
 }
 
 int
-test_start_nbdkit (const char *plugin, ...)
+test_start_nbdkit (const char *arg, ...)
 {
   size_t i, len;
 
@@ -95,10 +95,10 @@ test_start_nbdkit (const char *plugin, ...)
     argv[4] = pidpath;
     argv[5] = "-f";
     argv[6] = "-v";
-    argv[7] = plugin;
+    argv[7] = arg;
     i = 8;
 
-    va_start (args, plugin);
+    va_start (args, arg);
     while ((p = va_arg (args, const char *)) != NULL) {
       if (i >= MAX_ARGS)
         abort ();

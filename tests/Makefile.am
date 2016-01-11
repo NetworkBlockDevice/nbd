@@ -103,6 +103,14 @@ file-data:
 	for f in `seq 1 512`; do echo -ne '\x01\x02\x03\x04\x05\x06\x07\x08'; done > $@-t
 	mv $@-t $@
 
+# newstyle protocol test.
+check_PROGRAMS += test-newstyle
+TESTS += test-newstyle
+
+test_newstyle_SOURCES = test-newstyle.c test.h
+test_newstyle_CFLAGS = $(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_newstyle_LDADD = libtest.la $(LIBGUESTFS_LIBS)
+
 # gzip plugin test.
 if HAVE_ZLIB
 if HAVE_GUESTFISH

@@ -43,6 +43,7 @@ Makefile.in
 /tests/test-connect
 /tests/test-file
 /tests/test-gzip
+/tests/test-newstyle
 /tests/test-ocaml
 /tests/test-ocaml-plugin.so
 /tests/test-perl

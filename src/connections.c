@@ -1,5 +1,5 @@
 /* nbdkit
- * Copyright (C) 2013 Red Hat Inc.
+ * Copyright (C) 2013-2016 Red Hat Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,12 @@
 
 /* Maximum read or write request that we will handle. */
 #define MAX_REQUEST_SIZE (64 * 1024 * 1024)
+
+/* Maximum number of client options we allow before giving up. */
+#define MAX_NR_OPTIONS 32
+
+/* Maximum length of any option data (bytes). */
+#define MAX_OPTION_LENGTH 4096
 
 static struct connection *new_connection (int sockin, int sockout);
 static void free_connection (struct connection *conn);
@@ -143,11 +149,8 @@ free_connection (struct connection *conn)
   free (conn);
 }
 
-/* XXX Note because we don't support multiple plugins or export names,
- * we are using the old-style handshake.  This will be fixed.
- */
 static int
-_negotiate_handshake (struct connection *conn)
+_negotiate_handshake_oldstyle (struct connection *conn)
 {
   struct old_handshake handshake;
   int64_t r;
@@ -201,7 +204,8 @@ _negotiate_handshake (struct connection *conn)
     conn->can_trim = 1;
   }
 
-  debug ("flags: global 0x%x export 0x%x", gflags, eflags);
+  debug ("oldstyle negotiation: flags: global 0x%x export 0x%x",
+         gflags, eflags);
 
   memset (&handshake, 0, sizeof handshake);
   memcpy (handshake.nbdmagic, "NBDMAGIC", 8);
@@ -218,13 +222,230 @@ _negotiate_handshake (struct connection *conn)
   return 0;
 }
 
+/* Receive newstyle options.
+ *
+ * Currently we ignore NBD_OPT_EXPORT_NAME (see TODO), we close the
+ * connection if sent NBD_OPT_ABORT, we send a canned list of
+ * options for NBD_OPT_LIST, and we send NBD_REP_ERR_UNSUP for
+ * everything else.
+ */
+static int
+send_newstyle_option_reply (struct connection *conn,
+                            uint32_t option, uint32_t reply)
+{
+  struct fixed_new_option_reply fixed_new_option_reply;
+
+  fixed_new_option_reply.magic = htobe64 (NEW_OPTION_REPLY);
+  fixed_new_option_reply.option = htobe32 (option);
+  fixed_new_option_reply.reply = htobe32 (reply);
+  fixed_new_option_reply.replylen = htobe32 (0);
+
+  if (xwrite (conn->sockout,
+              &fixed_new_option_reply, sizeof fixed_new_option_reply) == -1) {
+    nbdkit_error ("write: %m");
+    return -1;
+  }
+
+  return 0;
+}
+
+static int
+_negotiate_handshake_newstyle_options (struct connection *conn)
+{
+  struct new_option new_option;
+  size_t nr_options;
+  uint64_t version;
+  uint32_t option;
+  uint32_t optlen;
+  char data[MAX_OPTION_LENGTH+1];
+
+  for (nr_options = 0; nr_options < MAX_NR_OPTIONS; ++nr_options) {
+    if (xread (conn->sockin, &new_option, sizeof new_option) == -1) {
+      nbdkit_error ("read: %m");
+      return -1;
+    }
+
+    version = be64toh (new_option.version);
+    if (version != NEW_VERSION) {
+      nbdkit_error ("unknown option version %" PRIx64
+                    ", expecting %" PRIx64,
+                    version, NEW_VERSION);
+      return -1;
+    }
+
+    /* There is a maximum option length we will accept, regardless
+     * of the option type.
+     */
+    optlen = be32toh (new_option.optlen);
+    if (optlen > MAX_OPTION_LENGTH) {
+      nbdkit_error ("client option data too long (%" PRIu32 ")", optlen);
+      return -1;
+    }
+
+    option = be32toh (new_option.option);
+    switch (option) {
+    case NBD_OPT_EXPORT_NAME:
+      if (xread (conn->sockin, data, optlen) == -1) {
+        nbdkit_error ("read: %m");
+        return -1;
+      }
+      /* Apart from printing it, ignore the export name. */
+      data[optlen] = '\0';
+      debug ("newstyle negotiation: client requested export '%s' (ignored)",
+             data);
+      break;
+
+    case NBD_OPT_ABORT:
+      if (send_newstyle_option_reply (conn, option, NBD_REP_ACK) == -1)
+        return -1;
+      nbdkit_error ("client sent NBD_OPT_ABORT to abort the connection");
+      return -1;
+
+    case NBD_OPT_LIST:
+      if (optlen != 0) {
+        if (send_newstyle_option_reply (conn, option, NBD_REP_ERR_INVALID)
+            == -1)
+          return -1;
+        continue;
+      }
+
+      /* Since we don't support export names, there is nothing to list. */
+      if (send_newstyle_option_reply (conn, option, NBD_REP_ACK) == -1)
+        return -1;
+      break;
+
+    default:
+      /* Unknown option. */
+      if (send_newstyle_option_reply (conn, option, NBD_REP_ERR_UNSUP) == -1)
+        return -1;
+    }
+
+    /* Note, since it's not very clear from the protocol doc, that the
+     * client must send NBD_OPT_EXPORT_NAME last, and that ends option
+     * negotiation.
+     */
+    if (option == NBD_OPT_EXPORT_NAME)
+      break;
+  }
+
+  if (nr_options >= MAX_NR_OPTIONS) {
+    nbdkit_error ("client exceeded maximum number of options (%d)",
+                  MAX_NR_OPTIONS);
+    return -1;
+  }
+
+  return 0;
+}
+
+static int
+_negotiate_handshake_newstyle (struct connection *conn)
+{
+  struct new_handshake handshake;
+  uint16_t gflags;
+  uint32_t cflags;
+  struct new_handshake_finish handshake_finish;
+  int64_t r;
+  uint64_t exportsize;
+  uint16_t eflags;
+  int fl;
+
+  gflags = NBD_FLAG_FIXED_NEWSTYLE;
+
+  debug ("newstyle negotiation: flags: global 0x%x", gflags);
+
+  memcpy (handshake.nbdmagic, "NBDMAGIC", 8);
+  handshake.version = htobe64 (NEW_VERSION);
+  handshake.gflags = htobe16 (gflags);
+
+  if (xwrite (conn->sockout, &handshake, sizeof handshake) == -1) {
+    nbdkit_error ("write: %m");
+    return -1;
+  }
+
+  /* Client now sends us its 32 bit flags word ... */
+  if (xread (conn->sockin, &cflags, sizeof cflags) == -1) {
+    nbdkit_error ("read: %m");
+    return -1;
+  }
+  cflags = be32toh (cflags);
+  /* ... which other than printing out, we ignore. */
+  debug ("newstyle negotiation: client flags: 0x%x", cflags);
+
+  /* Receive newstyle options. */
+  if (_negotiate_handshake_newstyle_options (conn) == -1)
+    return -1;
+
+  /* Finish the newstyle handshake. */
+  r = plugin_get_size (conn);
+  if (r == -1)
+    return -1;
+  if (r < 0) {
+    nbdkit_error (".get_size function returned invalid value "
+                  "(%" PRIi64 ")", r);
+    return -1;
+  }
+  exportsize = (uint64_t) r;
+  conn->exportsize = exportsize;
+
+  eflags = NBD_FLAG_HAS_FLAGS;
+
+  fl = plugin_can_write (conn);
+  if (fl == -1)
+    return -1;
+  if (readonly || !fl) {
+    eflags |= NBD_FLAG_READ_ONLY;
+    conn->readonly = 1;
+  }
+
+  fl = plugin_can_flush (conn);
+  if (fl == -1)
+    return -1;
+  if (fl) {
+    eflags |= NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA;
+    conn->can_flush = 1;
+  }
+
+  fl = plugin_is_rotational (conn);
+  if (fl == -1)
+    return -1;
+  if (fl) {
+    eflags |= NBD_FLAG_ROTATIONAL;
+    conn->is_rotational = 1;
+  }
+
+  fl = plugin_can_trim (conn);
+  if (fl == -1)
+    return -1;
+  if (fl) {
+    eflags |= NBD_FLAG_SEND_TRIM;
+    conn->can_trim = 1;
+  }
+
+  debug ("newstyle negotiation: flags: export 0x%x", eflags);
+
+  memset (&handshake_finish, 0, sizeof handshake_finish);
+  handshake_finish.exportsize = htobe64 (exportsize);
+  handshake_finish.eflags = htobe16 (eflags);
+
+  if (xwrite (conn->sockout,
+              &handshake_finish, sizeof handshake_finish) == -1) {
+    nbdkit_error ("write: %m");
+    return -1;
+  }
+
+  return 0;
+}
+
 static int
 negotiate_handshake (struct connection *conn)
 {
   int r;
 
   plugin_lock_request (conn);
-  r = _negotiate_handshake (conn);
+  if (!newstyle)
+    r = _negotiate_handshake_oldstyle (conn);
+  else
+    r = _negotiate_handshake_newstyle (conn);
   plugin_unlock_request (conn);
 
   return r;

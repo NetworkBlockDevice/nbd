@@ -7,8 +7,8 @@ nbdkit - A toolkit for creating NBD servers
 =head1 SYNOPSIS
 
  nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]
-        [-P PIDFILE] [-p PORT] [-r] [--run CMD] [-s]
-        [-U SOCKET] [-u USER] [-v] [-V]
+        [--newstyle] [--oldstyle] [-P PIDFILE] [-p PORT] [-r]
+        [--run CMD] [-s] [-U SOCKET] [-u USER] [-v] [-V]
         PLUGIN [key=value [key=value [...]]]
 
 =head1 DESCRIPTION
@@ -102,6 +102,25 @@ See also I<-u>.
 
 Listen on the specified interface.  The default is to listen on all
 interfaces.  See also I<-p>.
+
+=item B<-n>
+
+=item B<--new-style>
+
+=item B<--newstyle>
+
+Use the newstyle NBD protocol instead of the default (oldstyle)
+protocol.  See L</NEW STYLE VS OLD STYLE PROTOCOL> below.
+
+=item B<-o>
+
+=item B<--old-style>
+
+=item B<--oldstyle>
+
+Use the oldstyle NBD protocol.  This is currently the default, so this
+flag does nothing, but it is possible we might change the default
+protocol in future.  See L</NEW STYLE VS OLD STYLE PROTOCOL> below.
 
 =item B<-P> PIDFILE
 
@@ -279,6 +298,50 @@ private captive nbdkit, then you should create a private random
 Unix socket, like this:
 
  nbdkit -U - plugin [args] --run '...'
+
+=head1 NEW STYLE VS OLD STYLE PROTOCOL
+
+The NBD protocol comes in two incompatible forms that we call
+"oldstyle" and "newstyle".  Unfortunately which protocol you should
+use depends on the client and cannot be known in advance, nor can it
+be negotiated from the server side.
+
+nbdkit currently defaults to the oldstyle protocol for compatibility
+with qemu and libguestfs.  This is also the same behaviour as
+qemu-nbd.  Use the I<-n> or I<--newstyle> flag on the command line to
+use the newstyle protocol.  Use the I<-o> or I<--oldstyle> flag to
+force the oldstyle protocol.
+
+Some common clients and the protocol they require:
+
+ Client                       Protocol
+ ------------------------------------------------------------
+ qemu without exportname      oldstyle
+ qemu with exportname         newstyle
+ nbd-client < 3.10            client can talk either protocol
+ nbd-client >= 3.10           newstyle
+
+If you use qemu without the exportname field against a newstyle
+server, it will give the error:
+
+ Server requires an export name
+
+If you use qemu with the exportname field against an oldstyle server,
+it will give the error:
+
+ Server does not support export names
+
+If you use the oldstyle protocol with nbd-client E<ge> 3.10, it will
+give the error:
+
+ Error: It looks like you're trying to connect to an oldstyle server.
+
+If you want to claim compatibility with what the NBD proto.txt
+document says should be the case (which isn't based in reality), then
+you should always use newstyle when using port 10809, and use oldstyle
+on all other ports.
+
+nbdkit ignores export names at present (see also the C<TODO> file).
 
 =head1 SIGNALS
 
