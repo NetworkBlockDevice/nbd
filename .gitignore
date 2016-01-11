@@ -46,6 +46,7 @@ Makefile.in
 /tests/test-newstyle
 /tests/test-ocaml
 /tests/test-ocaml-plugin.so
+/tests/test-oldstyle
 /tests/test-perl
 /tests/test-python
 /tests/test-streaming
