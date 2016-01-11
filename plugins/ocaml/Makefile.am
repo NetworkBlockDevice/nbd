@@ -43,7 +43,7 @@ ocamllib_DATA = NBDKit.mli NBDKit.cmi NBDKit.cmx NBDKit.o
 NBDKit.cmi: NBDKit.mli
 	$(OCAMLC) -c $<
 
-NBDKit.cmx: NBDKit.ml
+NBDKit.cmx: NBDKit.ml NBDKit.cmi
 	$(OCAMLOPT) $(OCAMLOPTFLAGS) -c $<
 NBDKit.o: NBDKit.cmx
 
