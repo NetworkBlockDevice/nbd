@@ -188,8 +188,7 @@ xz_close (void *handle)
 
   blkcache_get_stats (h->c, &stats);
 
-  nbdkit_debug ("cache: hits = %" PRIu64 ", misses = %" PRIu64,
-                stats.hits, stats.misses);
+  nbdkit_debug ("cache: hits = %zu, misses = %zu", stats.hits, stats.misses);
 
   xzfile_close (h->xz);
   free_blkcache (h->c);

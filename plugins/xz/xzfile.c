@@ -453,7 +453,7 @@ xzfile_read_block (xzfile *xz, uint64_t offset,
 
   data = malloc (*size_rtn);
   if (data == NULL) {
-    nbdkit_error ("malloc (%zu bytes): %m\n"
+    nbdkit_error ("malloc (%" PRIu64 " bytes): %m\n"
                   "NOTE: If this error occurs, you need to recompress your xz files with a smaller block size.  Use: 'xz --block-size=16777216 ...'.",
                   *size_rtn);
     goto err1;
