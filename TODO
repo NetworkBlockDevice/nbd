@@ -1,6 +1,8 @@
 * There is a proposal to narrow the range of possible errnos that the
   server can return, and also to encode them in an OS-independent way.
   See: http://article.gmane.org/gmane.linux.drivers.nbd.general/3154
+  Implemented in QEMU already:
+  http://git.qemu.org/?p=qemu.git;a=commitdiff;h=ca4414804114fd0095b317785bc0b51862e62ebb
 
 * Can we do language bindings using #!'s?
   You would enter:
@@ -24,6 +26,9 @@
   Note it should also be possible to either elect one plugin as the
   default that accepts all exportnames, or to divide the export name
   "space" up using regexps or wildcards.
+
+  Annoyingly nbd-client dropped support for the oldstyle protocol (see
+  https://bugzilla.redhat.com/1297100).
 
 * Implement true parallel request handling.  Currently
   NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS and
