@@ -639,6 +639,31 @@ skip_over_write_buffer (int sock, size_t count)
   }
 }
 
+/* Convert a system errno to an NBD_E* error code. */
+static int
+nbd_errno (int error)
+{
+  switch (error) {
+  case 0:
+    return NBD_SUCCESS;
+  case EPERM:
+    return NBD_EPERM;
+  case EIO:
+    return NBD_EIO;
+  case ENOMEM:
+    return NBD_ENOMEM;
+#ifdef EDQUOT
+  case EDQUOT:
+#endif
+  case EFBIG:
+  case ENOSPC:
+    return NBD_ENOSPC;
+  case EINVAL:
+  default:
+    return NBD_EINVAL;
+  }
+}
+
 static int
 recv_request_send_reply (struct connection *conn)
 {
@@ -722,7 +747,16 @@ recv_request_send_reply (struct connection *conn)
  send_reply:
   reply.magic = htobe32 (NBD_REPLY_MAGIC);
   reply.handle = request.handle;
-  reply.error = htobe32 (error);
+  reply.error = htobe32 (nbd_errno (error));
+
+  if (error != 0) {
+    /* Since we're about to send only the limited NBD_E* errno to the
+     * client, don't lose the information about what really happened
+     * on the server side.  Make sure there is a way for the operator
+     * to retrieve the real error.
+     */
+    debug ("sending error reply: %s", strerror (error));
+  }
 
   r = xwrite (conn->sockout, &reply, sizeof reply);
   if (r == -1) {

@@ -1,9 +1,3 @@
-* There is a proposal to narrow the range of possible errnos that the
-  server can return, and also to encode them in an OS-independent way.
-  See: http://article.gmane.org/gmane.linux.drivers.nbd.general/3154
-  Implemented in QEMU already:
-  http://git.qemu.org/?p=qemu.git;a=commitdiff;h=ca4414804114fd0095b317785bc0b51862e62ebb
-
 * Can we do language bindings using #!'s?
   You would enter:
     nbdkit foo [args]

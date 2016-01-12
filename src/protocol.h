@@ -118,7 +118,7 @@ struct request {
 /* Reply (server -> client). */
 struct reply {
   uint32_t magic;               /* NBD_REPLY_MAGIC. */
-  uint32_t error;               /* 0 = ok, error code */
+  uint32_t error;               /* NBD_SUCCESS or one of NBD_E*. */
   uint64_t handle;              /* Opaque handle. */
 } __attribute__((packed));
 
@@ -132,5 +132,15 @@ struct reply {
 #define NBD_CMD_TRIM              4
 #define NBD_CMD_MASK_COMMAND 0xffff
 #define NBD_CMD_FLAG_FUA    (1<<16)
+
+/* Error codes (previously errno).
+ * See http://git.qemu.org/?p=qemu.git;a=commitdiff;h=ca4414804114fd0095b317785bc0b51862e62ebb
+ */
+#define NBD_SUCCESS     0
+#define NBD_EPERM       1
+#define NBD_EIO         5
+#define NBD_ENOMEM     12
+#define NBD_EINVAL     22
+#define NBD_ENOSPC     28
 
 #endif /* NBDKIT_PROTOCOL_H */
