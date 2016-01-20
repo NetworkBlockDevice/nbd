@@ -362,6 +362,9 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	}
 
 	data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
+	if(!strncmp(cfgname, "/dev/", 5)) {
+		cfgname += 5;
+	}
 	char *loc = strstr((const char*)data, cfgname);
 	if(!loc) {
 		goto out;
