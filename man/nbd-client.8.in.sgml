@@ -166,7 +166,6 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The block special file (<filename>/dev</filename> entry) which this
 	  nbd-client should connect to, specified as a full path.</para>
-	</listitem>
 	  <para>When the mode is used wherein no hostname or export name is
 	  specified, &dhpackage; will look up the necessary configuration in
 	  the <filename>nbdtab</filename> file. For more information, see
