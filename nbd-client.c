@@ -464,14 +464,25 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
-		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
+		int tmp_blocksize = 4096;
+		if (size64 / (u64)blocksize <= (uint64_t)~0UL)
+			tmp_blocksize = blocksize;
+		if (ioctl(nbd, NBD_SET_BLKSIZE, tmp_blocksize) < 0) {
+			fprintf(stderr, "Failed to set blocksize %d\n",
+				tmp_blocksize);
 			err("Ioctl/1.1a failed: %m\n");
-		size = (unsigned long)(size64>>12);
+		}
+		size = (unsigned long)(size64 / (u64)tmp_blocksize);
 		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
-		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
-			err("Ioctl/1.1c failed: %m\n");
-		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, 4096ULL*size);
+		if (tmp_blocksize != blocksize) {
+			if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0) {
+				fprintf(stderr, "Failed to set blocksize %d\n",
+					blocksize);
+				err("Ioctl/1.1c failed: %m\n");
+			}
+		}
+		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, (u64)tmp_blocksize * size);
 	}
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
