@@ -2467,7 +2467,7 @@ int open_unix(const gchar *const sockname, GError **const gerror) {
 
 	memset(&sa, 0, sizeof(struct sockaddr_un));
 	sa.sun_family = AF_UNIX;
-	strncpy(sa.sun_path, sockname, 107);
+	strncpy(sa.sun_path, sockname, sizeof sa.sun_path);
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(sock < 0) {
 		g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
