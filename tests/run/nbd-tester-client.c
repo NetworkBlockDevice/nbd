@@ -414,7 +414,7 @@ int setup_unix_connection(gchar* unixsock, gchar* name, CONNECTION_TYPE ctype, i
 	setmysockopt(sock);
 	memset(&addr, 0, sizeof(struct sockaddr_un));
 	addr.sun_family = AF_UNIX;
-	strncpy(addr.sun_path, unixsock, 107);
+	strncpy(addr.sun_path, unixsock, sizeof addr.sun_path);
 	if(connect(sock, (struct sockaddr*)&addr, sizeof(addr))<0) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
