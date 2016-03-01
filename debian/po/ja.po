@@ -2,19 +2,22 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the nbd package.
 # victory <victory.deb@gmail.com>, 2013.
+# Takuma Yamada <tyamada@takumayamada.com>, 2016.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2015-10-17 09:40+0200\n"
-"PO-Revision-Date: 2013-05-19 23:35+0900\n"
-"Last-Translator: victory <victory.deb@gmail.com>\n"
+"PO-Revision-Date: 2016-02-26 12:05+0900\n"
+"Last-Translator: Takuma Yamada <tyamada@takumayamada.com>\n"
 "Language-Team: Japanese <debian-japanese@lists.debian.org>\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Gtranslator 2.91.6\n"
 
 #. Type: error
 #. Description
@@ -45,10 +48,8 @@ msgstr ""
 #. Type: error
 #. Description
 #: ../nbd-client.templates:3001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "A port has been selected for export ${number}"
-msgstr "ポートまたは nbd エクスポート用の名前 (番号: ${number})?"
+msgstr "ポートはエクスポート ${number} 用に選択されました"
 
 #. Type: error
 #. Description
@@ -58,6 +59,8 @@ msgid ""
 "This method of connecting to an NBD export is no longer supported as of NBD "
 "3.10."
 msgstr ""
+"ファイル /etc/nbd-client は、NBD エクスポートのポート番号を設定します。NBD エ"
+"クスポートへ接続するこの方法は、NBD 3.10 からサポートされていません。"
 
 #. Type: error
 #. Description
@@ -66,6 +69,8 @@ msgid ""
 "Please migrate the configuration so it uses name-based exports, rather than "
 "port-based ones."
 msgstr ""
+"ポートベースのエクスポートから名前ベースのエクスポートを使うよう、設定を移行"
+"してください。"
 
 #. Type: string
 #. Description
@@ -150,16 +155,14 @@ msgid ""
 "Please enter the network name or IP address of the machine on which the nbd-"
 "server process is running."
 msgstr ""
-"nbd-server プロセスが動作しているマシンのネットワーク名かIPアドレスを入力して"
-"ください。"
+"nbd-server プロセスが動作しているマシンのネットワーク名か IP アドレスを入力し"
+"てください。"
 
 #. Type: string
 #. Description
 #: ../nbd-client.templates:7001
-#, fuzzy
-#| msgid "Port or name for nbd export (number: ${number})?"
 msgid "Name for NBD export (number: ${number})?"
-msgstr "ポートまたは nbd エクスポート用の名前 (番号: ${number})?"
+msgstr "nbd エクスポート (番号: ${number}) 用の名前?"
 
 #. Type: string
 #. Description
@@ -168,6 +171,8 @@ msgid ""
 "Please enter the NBD export name needed to access nbd-server. The name "
 "entered here should match an existing export on the server."
 msgstr ""
+"nbd-server のアクセスに必要な NBD エクスポート名を入力してください。ここで入"
+"力した名前は、サーバー上の既存のエクスポートと一致する必要があります。"
 
 #. Type: string
 #. Description
@@ -176,6 +181,8 @@ msgid ""
 "Note that as of NBD 3.10, connecting to an NBD export using the older port-"
 "based negotiation protocol is no longer supported."
 msgstr ""
+"NBD 3.10 から、古いポートベースのネゴシエーションプロトコルを使う NBD エクス"
+"ポートへの接続はサポートされなくなったことに注意してください。"
 
 #. Type: string
 #. Description
@@ -192,10 +199,10 @@ msgid ""
 "nbd-client. Note that this needs to be the full path to that entry, not just "
 "the last part."
 msgstr ""
-"各 nbd-client プロセスはメジャー番号43を使った /dev エントリと結びつける必要"
-"があります。この nbd-client 用に使いたい /dev エントリの名前を入力してくださ"
-"い。これはエントリの末尾だけではなくパス全体である必要があることに注意してく"
-"ださい。"
+"各 nbd-client プロセスはメジャー番号 43 を使った /dev エントリと結びつける必"
+"要があります。この nbd-client 用に使いたい /dev エントリの名前を入力してくだ"
+"さい。これはエントリの末尾だけではなくパス全体である必要があることに注意して"
+"ください。"
 
 #. Type: string
 #. Description
@@ -223,8 +230,8 @@ msgid ""
 "only those nbd-client devices that it knows about in its config file."
 msgstr ""
 "nbd-client init スクリプトを呼び出して nbd-client サービスを停止するときの方"
-"法は2つあります: nbd-client デバイスを (使用中ではないという前提で) 全て切断"
-"するか、設定ファイルに書かれている nbd-client デバイスだけを切断するか。"
+"法は 2 つあります: nbd-client デバイスを (使用中ではないという前提で) 全て切"
+"断するか、設定ファイルに書かれている nbd-client デバイスだけを切断するか。"
 
 #. Type: boolean
 #. Description
@@ -311,10 +318,10 @@ msgid ""
 msgstr ""
 "ネットワーク越しにエクスポートするファイル名かブロックデバイスを指定してくだ"
 "さい。実際のブロックデバイス (例えば 「/dev/hda1」) や通常のファイル (例えば"
-"「/export/nbd/bl1」)、あるいはファイル群を全て同時にエクスポートできます。3つ"
-"目の選択肢ではファイル名に「%s」を使うことができます。これは接続してきたクラ"
-"イアントのIPアドレスに展開されます。例えば「/export/swaps/swp%s」のようになり"
-"ます。"
+"「/export/nbd/bl1」)、あるいはファイル群を全て同時にエクスポートできます。3 "
+"つ目の選択肢ではファイル名に「%s」を使うことができます。これは接続してきたク"
+"ライアントの IP アドレスに展開されます。例えば「/export/swaps/swp%s」のように"
+"なります。"
 
 #. Type: string
 #. Description
@@ -367,99 +374,3 @@ msgstr ""
 "AUTO_GEN の行を削除またはコメントアウトすると現在の設定を基にファイル /etc/"
 "nbd-server/config が新しい形式で生成されます。それまでは、nbd-server のインス"
 "トール状態は中途半端になります。"
-
-#~ msgid ""
-#~ "Please enter the TCP port number or NBD export name needed to access nbd-"
-#~ "server."
-#~ msgstr ""
-#~ "nbd-server にアクセスするのに必要となる TCP ポート番号か NBD エクスポート"
-#~ "用の名前を入力してください。"
-
-#~ msgid ""
-#~ "Versions of nbd-server of 2.9.16 or lower did not support specifying a "
-#~ "name for the NBD export. If your NBD server is of an older version, you "
-#~ "should enter the TCP port number here, and should make sure not to enter "
-#~ "any non-numeric characters in the field."
-#~ msgstr ""
-#~ "バージョン 2.9.16 以前の nbd-server では名前による NBD エクスポートの指定"
-#~ "をサポートしていません。NBD サーバのバージョンがこれ以前の場合は、これに"
-#~ "は TCP ポート番号を入力し、数値以外の文字が入力されていないことを確認して"
-#~ "ください。"
-
-#~ msgid ""
-#~ "More recent versions of nbd-server support providing a name for an "
-#~ "export. If the data entered in this field contains any non-numeric "
-#~ "characters, then this configuration system will accept that as a name and "
-#~ "provide it to nbd-client as a name-based export rather than a port-based "
-#~ "one."
-#~ msgstr ""
-#~ "もっと最近のバージョンの nbd-server ではエクスポートでの名前の提供をサポー"
-#~ "トしています。ここに入力されたデータに数値以外の文字があった場合は、この設"
-#~ "定システムはそれを名前として受け付け、ポートベースではなく名前ベースのエク"
-#~ "スポートとして nbd-client に提供します。"
-
-#~ msgid "TCP Port for server number ${number}:"
-#~ msgstr "サーバ番号 ${number} の TCP ポート:"
-
-#~ msgid ""
-#~ "Please specify the TCP port this instance of nbd server will use for "
-#~ "backwards compatibility with older clients."
-#~ msgstr ""
-#~ "この nbd サーバが古めのクライアントとの後方互換性のために利用する TCP ポー"
-#~ "トを指定してください。"
-
-#~ msgid "Convert old-style nbd-server configuration file?"
-#~ msgstr "旧式の nbd-server 設定ファイルを変換しますか?"
-
-#~ msgid ""
-#~ "A pre-2.9 nbd-server configuration file has been found on this system. "
-#~ "The current nbd-server package no longer supports this file and will not "
-#~ "work if it is kept as is."
-#~ msgstr ""
-#~ "2.9 以前の nbd-server 設定ファイルがこのシステム上に見つかりました。現在"
-#~ "の nbd-server パッケージはこのファイルをサポートしなくなっていて、そのまま"
-#~ "では動作しません。"
-
-#~ msgid ""
-#~ "If you choose this option, the system will generate a new style "
-#~ "configuration file based upon the old-style configuration file, which "
-#~ "will be removed. Otherwise, configuration questions will be asked and the "
-#~ "system will generate a new configuration file."
-#~ msgstr ""
-#~ "このオプションを選択するとシステムは削除される旧式の設定ファイルを基にして"
-#~ "新しい形式の設定ファイルを生成します。選択しない場合は設定の質問を聞かれ、"
-#~ "システムは新しい設定ファイルを生成します。"
-
-#~ msgid ""
-#~ "If a new-style configuration file already exists and you choose this "
-#~ "option, you will shortly see a \"modified configuration file\" prompt, as "
-#~ "usual."
-#~ msgstr ""
-#~ "新しい形式の設定ファイルが既に存在している状態でこのオプションを選択すると"
-#~ "いつも通り「modified configuration file」プロンプトをすぐに見ることになり"
-#~ "ます。"
-
-#~ msgid "Support port-based exports?"
-#~ msgstr "ポートベースのエクスポートをサポートしますか?"
-
-#~ msgid ""
-#~ "Since version 2.9.18, nbd-server supports name-based exports, rather than "
-#~ "port-based ones. While this is generally preferable, you may have to "
-#~ "support systems running an older version of nbd-client, or might need to "
-#~ "go through a lot of trouble to update your older configurations in order "
-#~ "to migrate to name-based exports. In either of those cases, you should "
-#~ "accept this option."
-#~ msgstr ""
-#~ "バージョン 2.9.18 から、nbd-server はポートベースではない名前ベースのエク"
-#~ "スポートをサポートしています。通常はこれが好まれますが、古いバージョンの "
-#~ "nbd-client を使っているシステムをサポートする必要がある、あるいは名前ベー"
-#~ "スのエクスポートに移行するために古い設定を更新しようとすると多数の困難に遭"
-#~ "うことが予想されるかもしれません。どちらの場合も、このオプションは受け入れ"
-#~ "てください。"
-
-#~ msgid ""
-#~ "Everyone else should leave the option at the default setting, which will "
-#~ "cause nbd-server to only support name-based exports."
-#~ msgstr ""
-#~ "他の人は全て、名前ベースのエクスポートだけをサポートする nbd-server のデ"
-#~ "フォルト設定を選択すべきです。"
