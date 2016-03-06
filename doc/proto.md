@@ -300,7 +300,18 @@ of the newstyle negotiation.
 
 - `NBD_OPT_STARTTLS` (5)
 
-    Defined by the experimental `STARTTLS` extension; see below.
+    The client wishes to initiate TLS. If the server replies with
+    `NBD_REP_ACK`, then the client should immediately initiate a TLS
+    handshake and continue the negotiation in the encrypted channel. If
+    the server is unwilling to perform TLS, it should reply with
+    `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should
+    also be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent
+    along any data with the request, the server should send back
+    `nbd_REP_ERR_INVALID`.
+
+    This functionality has not yet been implemented by the reference
+    implementation, but was implemented by qemu so has been moved out of
+    the "experimental" section.
 
 - `NBD_OPT_SELECT` (6)
 
@@ -367,7 +378,18 @@ case that data is an error message suitable for display to the user.
 
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
-    defined by the experimental `STARTTLS` extension; see below.
+    The server is unwilling to continue negotiation unless TLS is
+    negotiated first. A server MUST NOT send this error if it has one or
+    more exports that do not require TLS; not even if the client indicated
+    interest (by way of `NBD_OPT_PEEK_EXPORT`) in an export which requires
+    TLS.
+
+    If this reply is used, servers SHOULD send it in reply to each and every
+    unencrypted `NBD_OPT_*` message (apart from `NBD_OPT_STARTTLS`).
+
+    This functionality has not yet been implemented by the reference
+    implementation, but was implemented by qemu so has been moved out of
+    the "experimental" section.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
@@ -501,33 +523,6 @@ Therefore, implementors are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
 fine-tune the specifications in this section before committing to a particular
 implementation.
-
-### `STARTTLS` extension
-
-To implement secure NBD connections, a STARTTLS extension is envisioned.
-This extension adds one option request and one error type.
-
-* `NBD_OPT_STARTTLS`
-
-    The client wishes to initiate TLS. If the server replies with
-    `NBD_REP_ACK`, then the client should immediately initiate a TLS
-    handshake and continue the negotiation in the encrypted channel. If
-    the server is unwilling to perform TLS, it should reply with
-    `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should
-    also be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent
-    along any data with the request, the server should send back
-    `NBD_REP_ERR_INVALID`.
-
-* `NBD_REP_ERR_TLS_REQD`
-
-    The server is unwilling to continue negotiation unless TLS is
-    negotiated first. A server MUST NOT send this error if it has one or
-    more exports that do not require TLS; not even if the client indicated
-    interest (by way of `NBD_OPT_PEEK_EXPORT`) in an export which requires
-    TLS.
-
-    If this reply is used, servers SHOULD send it in reply to each and every
-    unencrypted `NBD_OPT_*` message (apart from `NBD_OPT_STARTTLS`).
 
 ### `SELECT` extension
 
