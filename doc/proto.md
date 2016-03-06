@@ -391,6 +391,9 @@ case that data is an error message suitable for display to the user.
     implementation, but was implemented by qemu so has been moved out of
     the "experimental" section.
 
+    The experimental `SELECT` extension makes small but compatible
+    changes to the semantics of this error message; see below.
+
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
     defined by the experimental `SELECT` extension; see below.
