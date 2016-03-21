@@ -113,12 +113,16 @@ AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
 AC_STRUCT_DIRENT_D_TYPE
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
-AC_CHECK_HEADERS([linux/falloc.h])
 HAVE_FL_PH=no
-if test "x$ac_cv_header_linux_falloc_h" = "xyes"
-then
-	AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
-fi
+AC_CHECK_FUNC(fallocate,
+  [
+    AC_CHECK_HEADERS([linux/falloc.h])
+    if test "x$ac_cv_header_linux_falloc_h" = "xyes"
+    then
+      AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
+    fi
+  ],[]
+)
 
 AC_MSG_CHECKING([for FALLOC_FL_PUNCH_HOLE support])
 if test "x$HAVE_FL_PH" = "xyes"
