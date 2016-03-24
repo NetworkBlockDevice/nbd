@@ -21,7 +21,7 @@ an implementational detail of the server.
 In the below protocol descriptions, the label 'C:' is used for messages
 sent by the client, whereas 'S:' is used for messages sent by the
 server).  `monotype text` is for literal character data or (when used in
-comments) constant names, `0xdeadbeaf` is used for literal hex numbers
+comments) constant names, `0xdeadbeef` is used for literal hex numbers
 (which are always sent in network byte order), and (brackets) are used
 for comments. Anything else is a description of the data that is sent.
 
@@ -307,7 +307,7 @@ of the newstyle negotiation.
     `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should
     also be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent
     along any data with the request, the server should send back
-    `nbd_REP_ERR_INVALID`.
+    `NBD_REP_ERR_INVALID`.
 
     This functionality has not yet been implemented by the reference
     implementation, but was implemented by qemu so has been moved out of
