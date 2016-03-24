@@ -1519,8 +1519,16 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
+	uint32_t type = package->req->type & NBD_CMD_MASK_COMMAND;
+	uint32_t flags = package->req->type & ~NBD_CMD_MASK_COMMAND;
+	struct nbd_reply rep;
 
-	switch(package->req->type & NBD_CMD_MASK_COMMAND) {
+	if(flags != 0 && (type != NBD_CMD_WRITE || flags != NBD_CMD_FLAG_FUA)) {
+		msg(LOG_ERR, "E: received invalid flag %d on command %d, ignoring", flags, type);
+		goto error;
+	}
+
+	switch(type) {
 		case NBD_CMD_READ:
 			handle_read(package->client, package->req);
 			break;
@@ -1535,15 +1543,16 @@ static void handle_request(gpointer data, gpointer user_data) {
 			break;
 		default:
 			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
-			struct nbd_reply rep;
-			setup_reply(&rep, package->req);
-			rep.error = nbd_errno(EINVAL);
-			pthread_mutex_lock(&(package->client->lock));
-			writeit(package->client->net, &rep, sizeof rep);
-			pthread_mutex_unlock(&(package->client->lock));
-			break;
+			goto error;
 	}
-
+	goto end;
+error:
+	setup_reply(&rep, package->req);
+	rep.error = nbd_errno(EINVAL);
+	pthread_mutex_lock(&(package->client->lock));
+	writeit(package->client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(package->client->lock));
+end:
 	package_dispose(package);
 }
 
