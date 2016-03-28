@@ -512,6 +512,13 @@ return `EINVAL` if it receives a read or trim request including one or
 more sectors beyond the size of the device.  It also SHOULD map the
 `EDQUOT` and `EFBIG` errors to `ENOSPC`.  Finally, it SHOULD return
 `EPERM` if it receives a write or trim request on a read-only export.
+
+The server SHOULD return `EINVAL` if it receives an unknown command.
+
+The server SHOULD return `EINVAL` if it receives an unknown command flag. It
+also SHOULD return `EINVAL` if it receives a request with a flag not explicitly
+documented as applicable to the given request.
+
 Which error to return in any other case is not specified by the NBD
 protocol.
 
