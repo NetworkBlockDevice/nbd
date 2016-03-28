@@ -471,6 +471,9 @@ The following request types exist:
     about the contents of the export affected by this command, until
     overwriting it again with `NBD_CMD_WRITE`.
 
+    A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
+    was set in the export flags field.
+
 * Other requests
 
     Some third-party implementations may require additional protocol
