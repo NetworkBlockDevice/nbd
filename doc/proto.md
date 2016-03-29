@@ -411,6 +411,20 @@ case that data is an error message suitable for display to the user.
 
 ### Transmission phase
 
+#### Command flags
+
+This field of 16 bits is sent by the client with every request and provides
+additional information to the server to execute the command. Refer to
+the "Request types" section below for more details about how a given flag
+affects a particular command.  Clients MUST NOT set a command flag bit
+that is not documented for the particular command; and whether a flag is
+valid may depend on negotiation during the handshake phase.
+
+- bit 0, `NBD_CMD_FLAG_FUA`; valid during `NBD_CMD_WRITE`.  SHOULD be
+  set to 1 if the client requires "Force Unit Access" mode of
+  operation.  MUST NOT be set unless export flags included
+  `NBD_FLAG_SEND_FUA`.
+
 #### Request types
 
 The following request types exist:
