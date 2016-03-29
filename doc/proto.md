@@ -103,8 +103,10 @@ C: 32 bits, flags
 
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the newstyle
-handshake, with no options. What follows is a repeating group of
-options. In non-fixed newstyle only one option can be set
+handshake, with no options. The client SHOULD ignore any global flags
+it does not recognize, while the server MUST close the connection if
+it does not recognize the client's flags.  What follows is a repeating
+group of options. In non-fixed newstyle only one option can be set
 (`NBD_OPT_EXPORT_NAME`), and it is not optional.
 
 At this point, we move on to option haggling, during which point the
@@ -126,7 +128,8 @@ about the used export:
 
 S: 64 bits, size of the export in bytes (unsigned)  
 S: 16 bits, export flags  
-S: 124 bytes, zeroes (reserved)
+S: 124 bytes, zeroes (reserved) (unless `NBD_FLAG_C_NO_ZEROES` was
+   negotiated by the client)
 
 If the server is unwilling to allow the export, it should close the
 connection.
@@ -225,6 +228,10 @@ the first magic number.
   `NBD_FLAG_C_NO_ZEROES` in the client flags field, the server MUST NOT
   send the 124 bytes of zero at the end of the negotiation.
 
+The server MUST NOT set any other flags, and SHOULD NOT change behaviour
+unless the client responds with a corresponding flag.  The server MUST
+NOT set any of these flags during oldstyle negotiation.
+
 ##### Export flags
 
 This field of 16 bits is sent by the server after option haggling, or
@@ -254,6 +261,10 @@ receiving the global flags from the server.
 - bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
   set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
   bytes of zeroes at the end of the negotiation.
+
+Clients SHOULD NOT set any other flags; the server MUST drop the
+connection if the client sets an unknown flag, or a flag that does
+not match something advertised by the server.
 
 #### Option types
 
