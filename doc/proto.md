@@ -203,7 +203,13 @@ S: 64 bits, handle
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 
 Replies need not be sent in the same order as requests (i.e., requests
-may be handled by the server asynchronously).
+may be handled by the server asynchronously).  Clients SHOULD use a
+handle that is distinct from all other currently pending transactions,
+but MAY reuse handles that are no longer in flight; handles need not
+be consecutive.  In each reply, the server MUST use the same value for
+handle as was sent by the client in the corresponding request.  In
+this way, the client can correlate which request is receiving a
+response.
 
 ## Values
 
