@@ -46,3 +46,4 @@ libtool
 ltmain.sh
 .libs/
 *.la
+ar-lib
