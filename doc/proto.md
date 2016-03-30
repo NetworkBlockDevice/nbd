@@ -127,7 +127,7 @@ is willing to allow the export, the server replies with information
 about the used export:
 
 S: 64 bits, size of the export in bytes (unsigned)  
-S: 16 bits, export flags  
+S: 16 bits, transmission flags  
 S: 124 bytes, zeroes (reserved) (unless `NBD_FLAG_C_NO_ZEROES` was
    negotiated by the client)
 
@@ -135,7 +135,7 @@ If the server is unwilling to allow the export, it should close the
 connection.
 
 The reason that the flags field is 16 bits large and not 32 as in the
-oldstyle negotiation is that there are now 16 bits of per-export flags,
+oldstyle negotiation is that there are now 16 bits of transmission flags,
 and 16 bits of handshake flags. Concatenated together, this results in
 32 bits, which allows for using a common set of macros for both. If we
 ever run out of flags, the server will set the most significant flag
@@ -238,7 +238,7 @@ The server MUST NOT set any other flags, and SHOULD NOT change behaviour
 unless the client responds with a corresponding flag.  The server MUST
 NOT set any of these flags during oldstyle negotiation.
 
-##### Export flags
+##### Transmission flags
 
 This field of 16 bits is sent by the server after option haggling, or
 immediately after the handshake flags field in oldstyle negotiation:
@@ -428,7 +428,7 @@ valid may depend on negotiation during the handshake phase.
 
 - bit 0, `NBD_CMD_FLAG_FUA`; valid during `NBD_CMD_WRITE`.  SHOULD be
   set to 1 if the client requires "Force Unit Access" mode of
-  operation.  MUST NOT be set unless export flags included
+  operation.  MUST NOT be set unless transmission flags included
   `NBD_FLAG_SEND_FUA`.
 
 #### Request types
@@ -462,7 +462,7 @@ The following request types exist:
     reached permanent storage.
 
     If the `NBD_FLAG_SEND_FUA` flag ("Force Unit Access") was set in the
-    export flags field, the client MAY set the flag `NBD_CMD_FLAG_FUA` in
+    transmission flags field, the client MAY set the flag `NBD_CMD_FLAG_FUA` in
     the command flags field. If this flag was set, the server MUST NOT send
     the reply until it has ensured that the newly-written data has reached
     permanent storage.
@@ -487,7 +487,7 @@ The following request types exist:
     permanent storage (using fsync() or similar).
 
     A client MUST NOT send a flush request unless `NBD_FLAG_SEND_FLUSH`
-    was set in the export flags field.
+    was set in the transmission flags field.
     
     For a flush request, *length* and *offset* are reserved, and MUST be
     set to all-zero.
@@ -503,7 +503,7 @@ The following request types exist:
     overwriting it again with `NBD_CMD_WRITE`.
 
     A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
-    was set in the export flags field.
+    was set in the transmission flags field.
 
 * Other requests
 
@@ -605,7 +605,7 @@ option reply type.
 	given in the `NBD_OPT_SELECT` option in case the server has
 	multiple alternate names for a single export.
       - 64 bits, size of the export in bytes (unsigned)
-      - 16 bits, export flags
+      - 16 bits, transmission flags
 
       That is, the `NBD_REP_SERVER` message is extended to also include
       the data sent in reply to the `NBD_OPT_EXPORT_NAME` option.
