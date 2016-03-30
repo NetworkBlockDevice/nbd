@@ -154,10 +154,10 @@ would have to abort negotiation as well.
 
 To fix these two issues, the following changes were implemented:
 
-- The server will set bit 0 of its global flags field, to
+- The server will set the handshake flag `NBD_FLAG_FIXED_NEWSTYLE`, to
   signal that it supports fixed newstyle negotiation
-- The client should reply with bit 0 set in its flags field too,
-  though its side of the protocol does not change incompatibly.
+- The client should reply with `NBD_FLAG_C_FIXED_NEWSTYLE` set in its flags
+  field too, though its side of the protocol does not change incompatibly.
 - The client may now send other options to the server as appropriate, in
   the generic format for sending an option as described above.
 - The server will reply to any option apart from `NBD_OPT_EXPORT_NAME`
