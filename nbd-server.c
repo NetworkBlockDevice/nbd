@@ -1310,7 +1310,7 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
 		len = htonl(strlen(serve->servename));
 		memcpy(buf, &len, sizeof(len));
-		strcpy(ptr, serve->servename);
+		strncpy(ptr, serve->servename, sizeof(buf) - sizeof(len));
 		send_reply(opt, net, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
 	}
 	send_reply(opt, net, NBD_REP_ACK, 0, NULL);
