@@ -98,12 +98,12 @@ The initial few exchanges in newstyle negotiation look as follows:
 
 S: 64 bits, `NBDMAGIC` (as in the old style handshake)  
 S: 64 bits, `0x49484156454F5054` (note different magic number)  
-S: 16 bits, global flags  
+S: 16 bits, handshake flags  
 C: 32 bits, flags  
 
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the newstyle
-handshake, with no options. The client SHOULD ignore any global flags
+handshake, with no options. The client SHOULD ignore any handshake flags
 it does not recognize, while the server MUST close the connection if
 it does not recognize the client's flags.  What follows is a repeating
 group of options. In non-fixed newstyle only one option can be set
@@ -136,7 +136,7 @@ connection.
 
 The reason that the flags field is 16 bits large and not 32 as in the
 oldstyle negotiation is that there are now 16 bits of per-export flags,
-and 16 bits of per-server flags. Concatenated together, this results in
+and 16 bits of handshake flags. Concatenated together, this results in
 32 bits, which allows for using a common set of macros for both. If we
 ever run out of flags, the server will set the most significant flag
 bit, signalling that an extra flag field will follow, to which the
@@ -241,7 +241,7 @@ NOT set any of these flags during oldstyle negotiation.
 ##### Export flags
 
 This field of 16 bits is sent by the server after option haggling, or
-immediately after the global flags field in oldstyle negotiation:
+immediately after the handshake flags field in oldstyle negotiation:
 
 - bit 0, `NBD_FLAG_HAS_FLAGS`; should always be 1
 - bit 1, `NBD_FLAG_READ_ONLY`; should be set to 1 if the export is
@@ -258,7 +258,7 @@ immediately after the global flags field in oldstyle negotiation:
 ##### Client flags
 
 This field of 32 bits is sent after initial connection and after
-receiving the global flags from the server.
+receiving the handshake flags from the server.
 
 - bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
   support the fixed newstyle protocol. Servers MAY choose to honour
