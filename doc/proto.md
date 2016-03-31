@@ -294,7 +294,8 @@ of the newstyle negotiation.
     haggling, and proceed to the transmission phase. Data: name of the
     export, free-form UTF-8 text (subject to limitations by server
     implementation). The length of the name is determined from the
-    option header, and does NOT include a NUL terminator.  If the
+    option header. The name is not NUL terminated, and may not
+    contain embedded NUL characters. If the
     chosen export does not exist or requirements for the chosen export
     are not met (e.g., the client did not negotiate TLS for an export
     where the server requires it), the server should close the
