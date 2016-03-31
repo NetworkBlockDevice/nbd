@@ -71,7 +71,7 @@ S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)
 S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
 S: 64 bits, size of the export in bytes (unsigned)  
 S: 32 bits, flags  
-S: 124 bytes, zeroes (reserved).
+S: 124 bytes, zeroes (reserved).  
 
 As can be seen, this isn't exactly a negotiation; it's just a matter of
 the server sending a bunch of data to the client. If the client is
@@ -116,7 +116,7 @@ The generic format of setting an option is as follows:
 C: 64 bits, `0x49484156454F5054` (note same newstyle handshake's magic number)  
 C: 32 bits, option  
 C: 32 bits, length of option data (unsigned)  
-C: any data needed for the chosen option, of length as specified above.
+C: any data needed for the chosen option, of length as specified above.  
 
 The presence of the option length in every option allows the server
 to skip any options presented by the client that it does not
@@ -129,7 +129,7 @@ about the used export:
 S: 64 bits, size of the export in bytes (unsigned)  
 S: 16 bits, transmission flags  
 S: 124 bytes, zeroes (reserved) (unless `NBD_FLAG_C_NO_ZEROES` was
-   negotiated by the client)
+   negotiated by the client)  
 
 If the server is unwilling to allow the export, it should close the
 connection.
@@ -171,7 +171,7 @@ S: 32 bits, reply type (e.g., `NBD_REP_ACK` for successful completion,
 S: 32 bits, length of the reply. This may be zero for some replies, in
    which case the next field is not sent  
 S: any data as required by the reply (e.g., an export name in the case
-   of `NBD_REP_SERVER`)
+   of `NBD_REP_SERVER`)  
 
 As there is no unique number for client requests, clients who want to
 differentiate between answers to two instances of the same option during
@@ -193,14 +193,14 @@ C: 16 bits, type
 C: 64 bits, handle  
 C: 64 bits, offset (unsigned)  
 C: 32 bits, length (unsigned)  
-C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)
+C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
 
 The server replies with:
 
 S: 32 bits, 0x67446698, magic (`NBD_REPLY_MAGIC`)  
 S: 32 bits, error  
 S: 64 bits, handle  
-S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
+S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)  
 
 Replies need not be sent in the same order as requests (i.e., requests
 may be handled by the server asynchronously).  Clients SHOULD use a
@@ -223,7 +223,7 @@ order.
 
 #### Flag fields
 
-##### Global flags
+##### Handshake flags
 
 This field of 16 bits is sent by the server after the `INIT_PASSWD` and
 the first magic number.
@@ -254,6 +254,8 @@ immediately after the handshake flags field in oldstyle negotiation:
   schedule I/O accesses as for a rotational medium
 - bit 5, `NBD_FLAG_SEND_TRIM`; should be set to 1 if the server supports
   `NBD_CMD_TRIM` commands
+
+Clients SHOULD ignore unknown flags.
 
 ##### Client flags
 
@@ -384,7 +386,7 @@ case that data is an error message suitable for display to the user.
 
 * `NBD_REP_ERR_INVALID` (2^31 + 3)
 
-    The option sent by the client is know by this server, but was
+    The option sent by the client is known by this server, but was
     determined by the server to be syntactically invalid. For instance,
     the client sent an `NBD_OPT_LIST` with nonzero data length.
 
@@ -456,7 +458,7 @@ The following request types exist:
     A write request. Length and offset define the location and amount of
     data to be written. The client MUST follow the request header with
     *length* number of bytes to be written to the device.
-  
+
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
     reached permanent storage.
@@ -488,7 +490,7 @@ The following request types exist:
 
     A client MUST NOT send a flush request unless `NBD_FLAG_SEND_FLUSH`
     was set in the transmission flags field.
-    
+
     For a flush request, *length* and *offset* are reserved, and MUST be
     set to all-zero.
 
