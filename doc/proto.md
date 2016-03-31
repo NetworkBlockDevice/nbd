@@ -283,11 +283,13 @@ of the newstyle negotiation.
 
     Choose the export which the client would like to use, end option
     haggling, and proceed to the transmission phase. Data: name of the
-    export, free-form UTF8 text (subject to limitations by server
-    implementation). If the chosen export does not exist or requirements
-    for the chosen export are not met (e.g., the client did not
-    negotiate TLS for an export where the server requires it), the
-    server should close the connection.
+    export, free-form UTF-8 text (subject to limitations by server
+    implementation). The length of the name is determined from the
+    option header, and does NOT include a NUL terminator.  If the
+    chosen export does not exist or requirements for the chosen export
+    are not met (e.g., the client did not negotiate TLS for an export
+    where the server requires it), the server should close the
+    connection.
 
     A special, "empty", name (i.e., the length field is zero and no name
     is specified), is reserved for a "default" export, to be used in cases
@@ -355,21 +357,28 @@ during option haggling in the fixed newstyle negotiation.
 
     A description of an export. Data:
 
-    - 32 bits, length of name (unsigned)
-    - Name of the export, as expected by `NBD_OPT_EXPORT_NAME`
-    - If length of name < (length of reply as sent in the reply packet
-      header - 4), then the rest of the data contains some undefined
-      implementation-specific details about the export. This is not
-      currently implemented, but future versions of nbd-server may send
-      along some details about the export. If the client did not
-      explicitly request otherwise, these details are defined to be
-      UTF-8 encoded data suitable for direct display to a human being.
-    - The experimental `SELECT` extension (see below) adds extra data to
-      the end of this request.
+    - 32 bits, length of name (unsigned); MUST be no larger than the
+      reply packet header length - 4
+    - Name of the export, as expected by `NBD_OPT_EXPORT_NAME` (note
+      that the length of name does NOT include a NUL terminator)
+    - If length of name < (reply packet header length - 4), then the
+      rest of the data contains some implementation-specific details
+      about the export. This is not currently implemented, but future
+      versions of nbd-server may send along some details about the
+      export. Therefore, unless explicitly documented otherwise by a
+      particular client request, this field is defined to be UTF-8
+      encoded data suitable for direct display to a human being; a
+      client SHOULD NOT assume that the data is NUL-terminated.
+
+    The experimental `SELECT` extension (see below) is a client
+    request where the extra data has a definition other than a
+    UTF-8 message.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
-case that data is an error message suitable for display to the user.
+case that data is an error message in UTF-8 encoding suitable for
+display to the user, although the client MUST NOT assume that a
+terminating NUL is present.
 
 * `NBD_REP_ERR_UNSUP` (2^31 + 1)
 
@@ -610,7 +619,8 @@ option reply type.
       - 16 bits, transmission flags
 
       That is, the `NBD_REP_SERVER` message is extended to also include
-      the data sent in reply to the `NBD_OPT_EXPORT_NAME` option.
+      the data sent in reply to the `NBD_OPT_EXPORT_NAME` option, and
+      the option reply length MUST be the length of name + 14.
     - For backwards compatibility, clients should be prepared to also
       handle `NBD_REP_ERR_UNSUP`. In this case, they should fall back to
       using `NBD_OPT_EXPORT_NAME`.
