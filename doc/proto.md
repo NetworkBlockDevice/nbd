@@ -261,6 +261,8 @@ immediately after the handshake flags field in oldstyle negotiation:
   schedule I/O accesses as for a rotational medium
 - bit 5, `NBD_FLAG_SEND_TRIM`; should be set to 1 if the server supports
   `NBD_CMD_TRIM` commands
+- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`; should be set to 1 if the server
+  supports `NBD_CMD_WRITE_ZEROES` commands
 
 Clients SHOULD ignore unknown flags.
 
@@ -444,10 +446,13 @@ affects a particular command.  Clients MUST NOT set a command flag bit
 that is not documented for the particular command; and whether a flag is
 valid may depend on negotiation during the handshake phase.
 
-- bit 0, `NBD_CMD_FLAG_FUA`; valid during `NBD_CMD_WRITE`.  SHOULD be
-  set to 1 if the client requires "Force Unit Access" mode of
-  operation.  MUST NOT be set unless transmission flags included
-  `NBD_FLAG_SEND_FUA`.
+- bit 0, `NBD_CMD_FLAG_FUA`; valid during `NBD_CMD_WRITE` and
+  `NBD_CMD_WRITE_ZEROES` commands.  SHOULD be set to 1 if the client requires
+  "Force Unit Access" mode of operation.  MUST NOT be set unless transmission
+  flags included `NBD_FLAG_SEND_FUA`.
+
+- bit 1, `NBD_CMD_MAY_TRIM`; defined by the experimental `WRITE_ZEROES`
+  extension; see below.
 
 #### Request types
 
@@ -522,6 +527,10 @@ The following request types exist:
 
     A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
     was set in the transmission flags field.
+
+* `NBD_CMD_WRITE_ZEROES` (6)
+
+    Defined by the experimental `WRITE_ZEROES` extension; see below.
 
 * Other requests
 
@@ -653,6 +662,53 @@ option reply type.
     - Servers MUST NOT send `NBD_REP_ERR_UNSUP` as a reply to this
       message if they do not also send it as a reply to the
       `NBD_OPT_SELECT` message.
+
+### `WRITE_ZEROES` extension
+
+There exist some cases when a client knows that the data it is going to write
+is all zeroes. Such cases include mirroring or backing up a device implemented
+by a sparse file. With current NBD command set, the client has to issue
+`NBD_CMD_WRITE` command with zeroed payload and transfer these zero bytes
+through the wire. The server has to write the data onto disk, effectively
+losing the sparseness.
+
+To remedy this, a `WRITE_ZEROES` extension is envisioned. This extension adds
+one new command and one new command flag.
+
+* `NBD_CMD_WRITE_ZEROES` (6)
+
+    A write request with no payload. Length and offset define the location
+    and amount of data to be zeroed.
+
+    The server MUST zero out the data on disk, and then send the reply
+    message. The server MAY send the reply message before the data has
+    reached permanent storage.
+
+    A client MUST NOT send a write zeroes request unless
+    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
+
+    If the `NBD_FLAG_SEND_FUA` flag was set in the transmission flags field,
+    the client MAY set the flag `NBD_CMD_FLAG_FUA` in the command flags field.
+    If this flag was set, the server MUST NOT send the reply until it has
+    ensured that the newly-zeroed data has reached permanent storage.
+
+    If the flag `NBD_CMD_FLAG_MAY_TRIM` was set by the client in the command
+    flags field, the server MAY use trimming to zero out the area, but it
+    MUST ensure that the data reads back as zero.
+
+    If an error occurs, the server SHOULD set the appropriate error code
+    in the error field. The server MAY then close the connection.
+
+The server SHOULD return `ENOSPC` if it receives a write zeroes request
+including one or more sectors beyond the size of the device. It SHOULD
+return `EPERM` if it receives a write zeroes request on a read-only export.
+
+The extension adds the following new command flag:
+
+- bit 1, `NBD_CMD_FLAG_MAY_TRIM`; valid during `NBD_CMD_WRITE_ZEROES`.
+  SHOULD be set to 1 if the client allows the server to use trim to perform
+  the requested operation. The client MAY send `NBD_CMD_FLAG_MAY_TRIM` even
+  if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
 
 ## About this file
 
