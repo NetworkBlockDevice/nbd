@@ -182,8 +182,22 @@ required to.
 
 ### Transmission
 
-There are two message types in the transmission phase: the request, and
-the response.
+There are two message types in the transmission phase: the request,
+and the reply.  The phase consists of a series of transactions, where
+the client submits requests and the server sends corresponding
+replies, with a single reply message per request, and continues until
+either side closes the connection.
+
+Replies need not be sent in the same order as requests (i.e., requests
+may be handled by the server asynchronously).  Clients SHOULD use a
+handle that is distinct from all other currently pending transactions,
+but MAY reuse handles that are no longer in flight; handles need not
+be consecutive.  In each reply, the server MUST use the same value for
+handle as was sent by the client in the corresponding request.  In
+this way, the client can correlate which request is receiving a
+response.
+
+#### Request message
 
 The request message, sent by the client, looks as follows:
 
@@ -195,21 +209,14 @@ C: 64 bits, offset (unsigned)
 C: 32 bits, length (unsigned)  
 C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
 
+#### Reply message
+
 The server replies with:
 
 S: 32 bits, 0x67446698, magic (`NBD_REPLY_MAGIC`)  
 S: 32 bits, error  
 S: 64 bits, handle  
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)  
-
-Replies need not be sent in the same order as requests (i.e., requests
-may be handled by the server asynchronously).  Clients SHOULD use a
-handle that is distinct from all other currently pending transactions,
-but MAY reuse handles that are no longer in flight; handles need not
-be consecutive.  In each reply, the server MUST use the same value for
-handle as was sent by the client in the corresponding request.  In
-this way, the client can correlate which request is receiving a
-response.
 
 ## Values
 
