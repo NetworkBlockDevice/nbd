@@ -234,7 +234,8 @@ reply MAY be used as a reply to any request other than `NBD_CMD_READ`,
 but only if the reply has no data payload.  The message looks as
 follows:
 
-S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`)  
+S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`; used to be
+   `NBD_REPLY_MAGIC`)  
 S: 32 bits, error (MAY be zero)  
 S: 64 bits, handle  
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)  
@@ -483,7 +484,6 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_WRITE_ZEROES` commands.  SHOULD be set to 1 if the client requires
   "Force Unit Access" mode of operation.  MUST NOT be set unless transmission
   flags included `NBD_FLAG_SEND_FUA`.
-
 - bit 1, `NBD_CMD_MAY_TRIM`; defined by the experimental `WRITE_ZEROES`
   extension; see below.
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
