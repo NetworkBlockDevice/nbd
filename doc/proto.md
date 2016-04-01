@@ -155,11 +155,13 @@ would have to abort negotiation as well.
 To fix these two issues, the following changes were implemented:
 
 - The server will set the handshake flag `NBD_FLAG_FIXED_NEWSTYLE`, to
-  signal that it supports fixed newstyle negotiation
+  signal that it supports fixed newstyle negotiation.
 - The client should reply with `NBD_FLAG_C_FIXED_NEWSTYLE` set in its flags
   field too, though its side of the protocol does not change incompatibly.
 - The client may now send other options to the server as appropriate, in
   the generic format for sending an option as described above.
+- The server MUST NOT send a response to `NBD_OPT_EXPORT_NAME` until all
+  other pending option requests have had their final reply.
 - The server will reply to any option apart from `NBD_OPT_EXPORT_NAME`
   with reply packets in the following format:
 
@@ -625,8 +627,13 @@ option reply type.
     - `NBD_REP_ERR_TLS_REQD`: The server does not wish to export this
       block device unless the client negotiates TLS first.
     - `NBD_REP_SERVER`: The server accepts the chosen export. In this
-      case, the `NBD_REP_SERVER` message's data contains the following
-      fields:
+      case, the `NBD_REP_SERVER` message's data takes on a different
+      interpretation than the default (so as to provide additional
+      binary information normally sent in reply to
+      `NBD_OPT_EXPORT_NAME`, in place of the default UTF-8 free-form
+      string); this layout is shared with the successful response to
+      `NBD_OPT_GO`.  The option reply length MUST be *length of
+      name* + 14, and the option data has the following layout:
 
       - 32 bits, length of name (unsigned)
       - Name of the export. This name MAY be different from the one
@@ -635,9 +642,6 @@ option reply type.
       - 64 bits, size of the export in bytes (unsigned)
       - 16 bits, transmission flags
 
-      That is, the `NBD_REP_SERVER` message is extended to also include
-      the data sent in reply to the `NBD_OPT_EXPORT_NAME` option, and
-      the option reply length MUST be the length of name + 14.
     - For backwards compatibility, clients should be prepared to also
       handle `NBD_REP_ERR_UNSUP`. In this case, they should fall back to
       using `NBD_OPT_EXPORT_NAME`.
@@ -647,9 +651,19 @@ option reply type.
     The client wishes to terminate the negotiation phase and progress to
     the transmission phase. Possible replies from the server include:
 
-    - `NBD_REP_ACK`: The server acknowledges. After receiving this
-      reply, the client and the server have both moved to the
-      transmission phase.
+    - `NBD_REP_SERVER`: The server acknowledges, using the same format
+      for the reply as in `NBD_OPT_SELECT` (thus allowing the client
+      to receive the same transmission flags as would have been sent
+      by `NBD_OPT_EXPORT_NAME`).  The values of the transmission flags
+      MAY differ from what was sent earlier in response to
+      `NBD_OPT_SELECT`, based on other options that were negotiated in
+      the meantime.  The server MUST NOT send any zero padding bytes
+      after the `NBD_REP_SERVER` data, whether or not the client
+      negotiated the `NBD_FLAG_C_NO_ZEROES` flag.  After receiving
+      this reply, the client and the server have both moved to the
+      transmission phase; therefore, the server MUST NOT send this
+      particular reply until all other pending option requests have
+      had their final reply.
     - `NBD_REP_ERR_INVALID`: No `NBD_OPT_SELECT` command was
       previously issued during this negotiation (there is no default);
       or, the most recent `NBD_OPT_SELECT` command resulted in an error
