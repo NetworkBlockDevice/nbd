@@ -247,7 +247,7 @@ S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 #### Structured reply chunk message
 
 This reply type MUST NOT be used except as documented by the
-experimental `STRUCTURED_READ` extension; see below.
+experimental `STRUCTURED_REPLY` extension; see below.
 
 ## Values
 
@@ -414,8 +414,8 @@ during option haggling in the fixed newstyle negotiation.
       versions of nbd-server may send along some details about the
       export. Therefore, unless explicitly documented otherwise by a
       particular client request, this field is defined to be UTF-8
-      encoded data suitable for direct display to a human being; a
-      client SHOULD NOT assume that the data is NUL-terminated.
+      encoded data suitable for direct display to a human being; with
+      no embedded or terminating NUL characters.
 
     The experimental `SELECT` extension (see below) is a client
     request where the extra data has a definition other than a
@@ -424,8 +424,7 @@ during option haggling in the fixed newstyle negotiation.
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
 case that data is an error message in UTF-8 encoding suitable for
-display to the user, although the client MUST NOT assume that a
-terminating NUL is present.
+display to the user, with no embedded or terminating NUL characters.
 
 * `NBD_REP_ERR_UNSUP` (2^31 + 1)
 
@@ -505,8 +504,8 @@ The following request types exist:
     extension was negotiated.
 
     If structured replies were not negotiated, the server MUST reply
-    with a simple reply header, followed immediately by len bytes of
-    data, read from offset bytes into the file, unless an error
+    with a simple reply header, followed immediately by *length* bytes
+    of data, read from *offset* bytes into the file, unless an error
     condition has occurred.
 
     If an error occurs, the server SHOULD set the appropriate error
@@ -802,18 +801,23 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     structured replies are negotiated, the server MUST use a
     structured reply for any response with a payload, and MUST NOT use
     a simple reply for `NBD_CMD_READ` (even for the case of an early
-    `EINVAL` due to bad flags).
+    `EINVAL` due to bad flags), but MAY use either a simple reply or a
+    structured reply to all other requests.  The server SHOULD prefer
+    sending errors via a structured reply, as the error can then be
+    accompanied by a UTF-8 text payload to present to a human user.
 
     A structured reply MAY occupy multiple structured chunk messages
     (all with the same value for "handle"), and the
     `NBD_REPLY_FLAG_DONE` reply flag is used to identify the final
-    chunk.  Relative ordering of the chunks MAY be important;
-    individual commands will document constraints on whether multiple
-    chunks may be rearranged; however, it is always safe to interleave
-    chunks of the reply to one request with messages related to other
-    requests.  A server SHOULD try to minimize the number of chunks
-    sent in a reply, but MUST NOT send the final chunk if there is
-    still a possibility of detecting an error.  A structured reply is
+    chunk.  Unless further documented by individual requests below,
+    the chunks MAY be sent in any order, except that the chunk with
+    the flag `NBD_REPLY_FLAG_DONE` MUST be sent last.  Even when a
+    command documents further constraints between chunks of one reply,
+    it is always safe to interleave chunks of that reply with messages
+    related to other requests.  A server SHOULD try to minimize the
+    number of chunks sent in a reply, but MUST NOT mark a chunk as
+    final if there is still a possibility of detecting an error before
+    transmission of that chunk completes.  A structured reply is
     considered successful only if it did not contain any error chunks,
     although the client MAY be able to determine partial success based
     on the chunks received.
@@ -855,7 +859,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     Some chunk types can additionally be categorized by role, such as
     *error chunks* or *content chunks*.  Each type determines how to
     interpret the "length" bytes of payload.  If the client receives
-    an unknown or unexpected type, it SHOULD close the connection.
+    an unknown or unexpected type, it MUST close the connection.
 
     - `NBD_REPLY_TYPE_NONE` (0)
 
@@ -878,7 +882,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
 
       32 bits: error (MUST be nonzero)  
       *length - 4* bytes: (optional UTF-8 encoded data suitable for
-         direct display to a human being, not NUL terminated)  
+         direct display to a human being, with no embedded or
+         terminating NUL characters)  
 
     - `NBD_REPLY_TYPE_ERROR_OFFSET` (2)
 
@@ -899,7 +904,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       32 bits: error (MUST be nonzero)  
       64 bits: offset (unsigned)  
       *length - 12* bytes: (optional UTF-8 encoded data suitable for
-         direct display to a human being, not NUL terminated)  
+         direct display to a human being, with no embedded or
+         terminating NUL characters)  
 
     - `NBD_REPLY_TYPE_OFFSET_DATA` (3)
 
@@ -961,11 +967,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     The server MUST set this transmission flag to 1 if the
     `NBD_CMD_READ` request supports the `NBD_CMD_FLAG_DF` flag, and
     MUST leave this flag clear if structured replies have not been
-    negotiated.  Clients MUST NOT rely on the state of this flag prior
-    the final flags value reported by `NBD_OPT_EXPORT_NAME` or
-    experimental `NBD_OPT_GO`.  Additionally, clients MUST NOT set the
-    `NBD_CMD_FLAG_DF` request flag unless this transmission flag is
-    set.
+    negotiated. Clients MUST NOT set the `NBD_CMD_FLAG_DF` request
+    flag unless this transmission flag is set.
 
 * `NBD_CMD_FLAG_DF`
 
@@ -1004,47 +1007,50 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     overhead, the server SHOULD use chunks with lengths and offsets as
     an integer multiple of 512 bytes, where possible (the first and
     last chunk of an unaligned read being the most obvious places for
-    an exception).  The server MUST NOT content chunks that overlap
-    with any earlier content or error chunk, and MUST NOT send chunks
-    that describe data outside the offset and length of the request,
-    but MAY send the chunks in any order (the client MUST reassemble
-    content chunks into the correct order), and MAY send additional
-    data chunks even after reporting an error chunk.  Note that a
-    request for more than 2^32 - 8 bytes MUST be split into at least
-    two chunks, so as not to overflow the length field of a reply
-    while still allowing space for the offset of each chunk.  When no
-    error is detected, the server MUST send enough data chunks to
-    cover the entire region described by the offset and length of the
-    client's request.
+    an exception).  The server MUST NOT send content chunks that
+    overlap with any earlier content or error chunk, and MUST NOT send
+    chunks that describe data outside the offset and length of the
+    request, but MAY send the content chunks in any order (the client
+    MUST reassemble content chunks into the correct order), and MAY
+    send additional content chunks even after reporting an error chunk.
+    Note that a request for more than 2^32 - 8 bytes MUST be split
+    into at least two chunks, so as not to overflow the length field
+    of a reply while still allowing space for the offset of each
+    chunk.  When no error is detected, the server MUST send enough
+    data chunks to cover the entire region described by the offset and
+    length of the client's request.
 
     To minimize traffic, the server MAY use a content or error chunk
     as the final chunk by setting the `NBD_REPLY_FLAG_DONE` flag, but
     MUST NOT do so for a content chunk if it would still be possible
     to detect an error while transmitting the chunk.  The
-    `NBD_REPLY_TYPE_DONE` chunk is always acceptable as the final
+    `NBD_REPLY_TYPE_NONE` chunk is always acceptable as the final
     chunk.
 
     If an error is detected, the server MUST still complete the
-    transmission of any current chunk (it SHOULD use padding bytes of
-    zero for any remaining data portion of a chunk with type
-    `NBD_REPLY_TYPE_OFFSET_DATA`), but MAY omit further content
+    transmission of any current chunk (it MUST use padding bytes which
+    SHOULD be zero, for any remaining data portion of a chunk with
+    type `NBD_REPLY_TYPE_OFFSET_DATA`), but MAY omit further content
     chunks.  The server MUST include an error chunk as one of the
     subsequent chunks, but MAY defer the error reporting behind other
     queued chunks.  An error chunk of type `NBD_REPLY_TYPE_ERROR`
     implies that the client MAY NOT make any assumptions about
-    validity of data chunks, and if used, SHOULD be the only error
-    chunk in the reply.  On the other hand, an error chunk of type
+    validity of data chunks (whether sent before or after the error
+    chunk), and if used, SHOULD be the only error chunk in the reply.
+    On the other hand, an error chunk of type
     `NBD_REPLY_TYPE_ERROR_OFFSET` gives fine-grained information about
-    which earlier data chunk(s) encountered a failure, and MAY also be
-    sent in lieu of a data chunk; as such, a server MAY still usefully
-    follow it with further non-overlapping content chunks or with
-    error offsets for other content chunks.  Generally, a server
-    SHOULD NOT mix errors with offsets with a generic error.  As long
-    as all errors are accompanied by offsets, the client MAY assume
-    that any data chunks with no subsequent error offset are valid,
-    that chunks with an overlapping error offset errors are valid up
-    until the reported offset, and that portions of the read that do
-    not have a corresponding content chunk are not valid.
+    which earlier data chunk(s) encountered a failure; as such, a
+    server MAY still usefully follow it with further non-overlapping
+    content chunks or with error offsets for other content chunks.
+    The server MAY send an error chunk with no corresponding content
+    chunk, but MUST ensure that the content chunk is sent first if a
+    content and error chunk cover the same offset.  Generally, a
+    server SHOULD NOT mix errors with offsets with a generic error.
+    As long as all errors are accompanied by offsets, the client MAY
+    assume that any data chunks with no subsequent error offset are
+    valid, that chunks with an overlapping error offset errors are
+    valid up until the reported offset, and that portions of the read
+    that do not have a corresponding content chunk are not valid.
 
     A client MAY close the connection if it detects that the server
     has sent invalid chunks (such as overlapping data, or not enough
@@ -1060,8 +1066,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     A server MAY reject a client's request with the error `EOVERFLOW`
     if the length is too large to send without fragmentation, in which
     case it MUST NOT send a content chunk; however, the server MUST
-    NOT use this error if the client's requested length does not
-    exceed 65,536 bytes.
+    support unfragmented reads in which the client's request length
+    does not exceed 65,536 bytes.
 
 ## About this file
 
