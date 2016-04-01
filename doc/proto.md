@@ -67,7 +67,8 @@ newstyle negotiation.
 
 #### Oldstyle negotiation
 
-S: 64 bits, `NBDMAGIC` (also known as the `INIT_PASSWD`)  
+S: 64 bits, `0x4e42444d41474943` (ASCII '`NBDMAGIC`') (also known as
+   the `INIT_PASSWD`)  
 S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
 S: 64 bits, size of the export in bytes (unsigned)  
 S: 32 bits, flags  
@@ -96,8 +97,10 @@ production purposes.
 
 The initial few exchanges in newstyle negotiation look as follows:
 
-S: 64 bits, `NBDMAGIC` (as in the old style handshake)  
-S: 64 bits, `0x49484156454F5054` (note different magic number)  
+S: 64 bits, `0x4e42444d41474943` (ASCII '`NBDMAGIC`') (as in the old
+   style handshake)  
+S: 64 bits, `0x49484156454F5054` (ASCII '`IHAVEOPT`') (note different
+   magic number)  
 S: 16 bits, handshake flags  
 C: 32 bits, flags  
 
@@ -113,7 +116,8 @@ At this point, we move on to option haggling, during which point the
 client can send one or (in fixed newstyle) more options to the server.
 The generic format of setting an option is as follows:
 
-C: 64 bits, `0x49484156454F5054` (note same newstyle handshake's magic number)  
+C: 64 bits, `0x49484156454F5054` (ASCII '`IHAVEOPT`') (note same
+   newstyle handshake's magic number)  
 C: 32 bits, option  
 C: 32 bits, length of option data (unsigned)  
 C: any data needed for the chosen option, of length as specified above.  
