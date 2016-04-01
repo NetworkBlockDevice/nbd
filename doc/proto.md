@@ -292,10 +292,10 @@ immediately after the handshake flags field in oldstyle negotiation:
   schedule I/O accesses as for a rotational medium
 - bit 5, `NBD_FLAG_SEND_TRIM`; should be set to 1 if the server supports
   `NBD_CMD_TRIM` commands
-- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`; should be set to 1 if the server
-  supports `NBD_CMD_WRITE_ZEROES` commands
-- bit 7, `NBD_FLAG_SEND_DF`; defined by the `STRUCTURED_REPLY` extension;
-  see below.
+- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`; defined by the experimental
+  `WRITE_ZEROES` extension; see below.
+- bit 7, `NBD_FLAG_SEND_DF`; defined by the experimental `STRUCTURED_REPLY`
+  extension; see below.
 
 Clients SHOULD ignore unknown flags.
 
@@ -487,7 +487,7 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_WRITE_ZEROES` commands.  SHOULD be set to 1 if the client requires
   "Force Unit Access" mode of operation.  MUST NOT be set unless transmission
   flags included `NBD_FLAG_SEND_FUA`.
-- bit 1, `NBD_CMD_MAY_TRIM`; defined by the experimental `WRITE_ZEROES`
+- bit 1, `NBD_CMD_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
   extension; see below.
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
   extension; see below
@@ -740,7 +740,7 @@ losing the sparseness.
 To remedy this, a `WRITE_ZEROES` extension is envisioned. This extension adds
 one new command and one new command flag.
 
-* `NBD_CMD_WRITE_ZEROES` (6)
+* `NBD_CMD_WRITE_ZEROES`
 
     A write request with no payload. Length and offset define the location
     and amount of data to be zeroed.
@@ -757,9 +757,13 @@ one new command and one new command flag.
     If this flag was set, the server MUST NOT send the reply until it has
     ensured that the newly-zeroed data has reached permanent storage.
 
-    If the flag `NBD_CMD_FLAG_MAY_TRIM` was set by the client in the command
-    flags field, the server MAY use trimming to zero out the area, but it
-    MUST ensure that the data reads back as zero.
+    By default, the server MAY use trimming to zero out the area, even
+    if it did not advertise `NBD_FLAG_SEND_TRIM`; but it MUST ensure
+    that the data reads back as zero.  However, the client MAY set the
+    command flag `NBD_CMD_FLAG_NO_HOLE` to inform the server that the
+    area MUST be fully provisioned, ensuring that future writes to the
+    same area will not cause fragmentation or cause failure due to
+    insufficient space.
 
     If an error occurs, the server SHOULD set the appropriate error code
     in the error field. The server MAY then close the connection.
@@ -770,9 +774,9 @@ return `EPERM` if it receives a write zeroes request on a read-only export.
 
 The extension adds the following new command flag:
 
-- bit 1, `NBD_CMD_FLAG_MAY_TRIM`; valid during `NBD_CMD_WRITE_ZEROES`.
-  SHOULD be set to 1 if the client allows the server to use trim to perform
-  the requested operation. The client MAY send `NBD_CMD_FLAG_MAY_TRIM` even
+- `NBD_CMD_FLAG_NO_HOLE`; valid during `NBD_CMD_WRITE_ZEROES`.
+  SHOULD be set to 1 if the client wants to ensure that the server does
+  not create a hole. The client MAY send `NBD_CMD_FLAG_NO_HOLE` even
   if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
 
 ### `STRUCTURED_REPLY` extension
@@ -897,7 +901,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       were sent earlier in the structured reply, the server SHOULD NOT
       send multiple distinct offsets that lie within the bounds of a
       single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-      `NBD_CMD_WRITE`, and `NBD_CMD_TRIM`.
+      `NBD_CMD_WRITE`, `NBD_CMD_WRITE_ZEROES`, and `NBD_CMD_TRIM`.
 
       The payload is structured as:
 
