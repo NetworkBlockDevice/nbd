@@ -308,7 +308,7 @@ receiving the handshake flags from the server.
   set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
   bytes of zeroes at the end of the negotiation.
 
-Clients SHOULD NOT set any other flags; the server MUST drop the
+Clients MUST NOT set any other flags; the server MUST drop the
 connection if the client sets an unknown flag, or a flag that does
 not match something advertised by the server.
 
