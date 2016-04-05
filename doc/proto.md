@@ -372,7 +372,7 @@ of the newstyle negotiation.
 
     A major problem of this option is that it does not support the
     return of error messages to the client in case of problems. To
-    remedy this, the experimental `SELECT` extension has been
+    remedy this, the experimental `INFO` extension has been
     introduced; see below.
 
 - `NBD_OPT_ABORT` (2)
@@ -405,13 +405,13 @@ of the newstyle negotiation.
     implementation, but was implemented by qemu so has been moved out of
     the "experimental" section.
 
-- `NBD_OPT_SELECT` (6)
+- `NBD_OPT_INFO` (6)
 
-    Defined by the experimental `SELECT` extension; see below.
+    Defined by the experimental `INFO` extension; see below.
 
 - `NBD_OPT_GO` (7)
 
-    Defined by the experimental `SELECT` extension; see below.
+    Defined by the experimental `INFO` extension; see below.
 
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
@@ -445,7 +445,7 @@ during option haggling in the fixed newstyle negotiation.
       encoded data suitable for direct display to a human being; with
       no embedded or terminating NUL characters.
 
-    The experimental `SELECT` extension (see below) is a client
+    The experimental `INFO` extension (see below) is a client
     request where the extra data has a definition other than a
     UTF-8 message.
 
@@ -493,12 +493,12 @@ display to the user, with no embedded or terminating NUL characters.
     implementation, but was implemented by qemu so has been moved out of
     the "experimental" section.
 
-    The experimental `SELECT` extension makes small but compatible
+    The experimental `INFO` extension makes small but compatible
     changes to the semantics of this error message; see below.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
-    defined by the experimental `SELECT` extension; see below.
+    defined by the experimental `INFO` extension; see below.
 
 ### Transmission phase
 
@@ -682,27 +682,42 @@ Therefore, implementors are strongly suggested to contact the
 fine-tune the specifications in this section before committing to a particular
 implementation.
 
-### `SELECT` extension
+### `INFO` extension
 
 A major downside of the `NBD_OPT_EXPORT_NAME` option is that it does not
 allow for an error message to be returned by the server (or, in fact,
 any structured message). This is a result of a (misguided) attempt to
 keep backwards compatibility with non-fixed newstyle negotiation.
 
-To remedy this, a `SELECT` extension is envisioned. This extension adds
+To remedy this, an `INFO` extension is envisioned. This extension adds
 two option requests and one error reply type, and extends one existing
 option reply type.
 
-* `NBD_OPT_SELECT`
+Both options have identical formats for requests and replies. The
+only difference is that after a successful reply to `NBD_OPT_GO`
+(i.e. an `NBD_REP_SERVER`), transmission mode is entered immediately.
+Therefore these commands share common documentation.
 
-    The client wishes to select the export with the given name for use
-    in the transmission phase, but does not yet want to move to the
-    transmission phase.
+* `NBD_OPT_INFO` and `NBD_OPT_GO`
 
-    Data:
+    `NBD_OPT_INFO`: The client wishes to get details about export with the
+    given name for use in the transmission phase, but does not yet want
+    to move to the transmission phase.
 
-    - 32 bits, length of name (unsigned)
-    - Name of the export
+    `NBD_OPT_GO`: The client wishes to terminate the negotiation phase and
+    progress to the transmission phase. This client MAY issue this command after
+    an `NBD_OPT_INFO`, or MAY issue it without a previous `NBD_OPT_INFO`.
+    `NBD_OPT_GO` can thus be used as a substitute for `NBD_OPT_EXPORT_NAME`
+    that returns errors.
+
+    Data (both commands):
+
+    - Name of the export (as with `NBD_OPT_EXPORT_NAME`, the length
+      comes from the option header).
+
+    If no name is specified (i.e. a zero length string is provided),
+    this specifies the default export (if any), as with
+    `NBD_OPT_EXPORT_NAME`.
 
     The server replies with one of the following:
 
@@ -710,57 +725,52 @@ option reply type.
       server.
     - `NBD_REP_ERR_TLS_REQD`: The server does not wish to export this
       block device unless the client negotiates TLS first.
-    - `NBD_REP_SERVER`: The server accepts the chosen export. In this
-      case, the `NBD_REP_SERVER` message's data takes on a different
-      interpretation than the default (so as to provide additional
-      binary information normally sent in reply to
-      `NBD_OPT_EXPORT_NAME`, in place of the default UTF-8 free-form
-      string); this layout is shared with the successful response to
-      `NBD_OPT_GO`.  The option reply length MUST be *length of
-      name* + 14, and the option data has the following layout:
+    - `NBD_REP_SERVER`: The server accepts the chosen export.
 
-      - 32 bits, length of name (unsigned)
-      - Name of the export. This name MAY be different from the one
-	given in the `NBD_OPT_SELECT` option in case the server has
-	multiple alternate names for a single export.
-      - 64 bits, size of the export in bytes (unsigned)
-      - 16 bits, transmission flags
+    Additionally, if TLS has not been negotiated, the server MAY reply
+    with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`)
+    to requests for exports that are unknown. This is so that clients
+    that have not negotiated TLS cannot enumerate exports.
 
-    - For backwards compatibility, clients should be prepared to also
-      handle `NBD_REP_ERR_UNSUP`. In this case, they should fall back to
-      using `NBD_OPT_EXPORT_NAME`.
+    In the case of `NBD_REP_SERVER`, the message's data takes on a different
+    interpretation than the default (so as to provide additional
+    binary information normally sent in reply to `NBD_OPT_EXPORT_NAME`,
+    in place of the default UTF-8 free-form string). The option reply length
+    MUST be *length of name* + 14, and the option data has the following layout:
 
-* `NBD_OPT_GO`
+    - 64 bits, size of the export in bytes (unsigned)
+    - 16 bits, transmission flags.
+    - 32 bits, length of name (unsigned)
+    - Name of the export. This name MAY be different from the one
+      given in the `NBD_OPT_INFO` or `NBD_OPT_GO` option in case the server has
+      multiple alternate names for a single export, or a default
+      export was specified.
 
-    The client wishes to terminate the negotiation phase and progress to
-    the transmission phase. Possible replies from the server include:
+    The server MUST NOT fail an NDB_OPT_GO sent with the same parameters
+    as a previous NBD_OPT_INFO which returned successfully (i.e. with
+    `NBD_REP_SERVER`) unless in the intervening time the client has
+    negotiated other options. The server MUST return the same transmission
+    flags with NDB_OPT_GO as a previous NDB_OPT_INFO unless in the
+    intervening time the client has negotiated other options.
+    The values of the transmission flags MAY differ from what was sent
+    earlier in response to an earlier `NBD_OPT_INFO` (if any), and/or
+    the server may fail the request, based on other options that were
+    negotiated in the meantime.
 
-    - `NBD_REP_SERVER`: The server acknowledges, using the same format
-      for the reply as in `NBD_OPT_SELECT` (thus allowing the client
-      to receive the same transmission flags as would have been sent
-      by `NBD_OPT_EXPORT_NAME`).  The values of the transmission flags
-      MAY differ from what was sent earlier in response to
-      `NBD_OPT_SELECT`, based on other options that were negotiated in
-      the meantime.  The server MUST NOT send any zero padding bytes
-      after the `NBD_REP_SERVER` data, whether or not the client
-      negotiated the `NBD_FLAG_C_NO_ZEROES` flag.  After receiving
-      this reply, the client and the server have both moved to the
-      transmission phase; therefore, the server MUST NOT send this
-      particular reply until all other pending option requests have
-      had their final reply.
-    - `NBD_REP_ERR_INVALID`: No `NBD_OPT_SELECT` command was
-      previously issued during this negotiation (there is no default);
-      or, the most recent `NBD_OPT_SELECT` command resulted in an error
-      reply (selecting a different export clears the currently selected
-      export, even if the new export does not exist on the server); or,
-      the most recent `NBD_OPT_SELECT` command issued during this
-      negotiation occurred before TLS was successfully negotiated
-      (negotiating TLS clears the selected export).
-    - Servers MAY also choose to send `NBD_REP_ERR_TLS_REQD` rather than
-      `NBD_REP_ERR_INVALID` if no non-TLS exports are supported.
-    - Servers MUST NOT send `NBD_REP_ERR_UNSUP` as a reply to this
-      message if they do not also send it as a reply to the
-      `NBD_OPT_SELECT` message.
+    For backwards compatibility, clients should be prepared to also
+    handle `NBD_REP_ERR_UNSUP`. In this case, they should fall back to
+    using `NBD_OPT_EXPORT_NAME`.
+
+    The reply to an `NBD_OPT_GO` is identical to the reply to `NBD_OPT_INFO`
+    save that if the reply indicates success (i.e. is `NBD_REP_SERVER`),
+    the client and the server both immediatedly enter the transmission
+    phase. The server MUST NOT send any zero padding bytes after the
+    `NBD_REP_SERVER` data, whether or not the client negotiated the
+    `NBD_FLAG_C_NO_ZEROES` flag. After sending this reply the server MUST
+    immediately move to the transmission phase, and after receiving this
+    reply, the client MUST immediately move to the transmission phase;
+    therefore, the server MUST NOT send this particular reply until all
+    other pending option requests have been sent by the server.
 
 ### `WRITE_ZEROES` extension
 
