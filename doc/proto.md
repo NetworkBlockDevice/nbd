@@ -217,6 +217,34 @@ handle as was sent by the client in the corresponding request.  In
 this way, the client can correlate which request is receiving a
 response.
 
+#### Ordering of messages and writes
+
+The server MAY process commands out of order, and MAY reply out of
+order, except that:
+
+* All write commands (that includes `NBD_CMD_WRITE`,
+  `NBD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
+  completes (i.e. replies to) prior to processing to a
+  `NBD_CMD_FLUSH` MUST be written to non-volatile
+  storage prior to replying to that `NBD_CMD_FLUSH`. This
+  paragraph only applies if `NBD_FLAG_SEND_FLUSH` is set within
+  the transmission flags, as otherwise `NBD_CMD_FLUSH` will never
+  be sent by the client to the server.
+
+* A server MUST NOT reply to a command that has `NBD_CMD_FLAG_FUA` set
+  in its command flags until the data (if any) written by that command
+  is persisted to non-volatile storage. This only applies if
+  `NBD_FLAG_SEND_FUA` is set within the transmission flags, as otherwise
+  `NBD_CMD_FLAG_FUA` will not be set on any commands sent to the server
+  by the client.
+
+`NBD_CMD_FLUSH` is modelled on the Linux kernel empty bio with
+`REQ_FLUSH` set. `NBD_CMD_FLAG_FUA` is modelled on the Linux
+kernel bio with `REQ_FUA` set. In case of ambiguity in this
+specification, the
+[kernel documentation](https://www.kernel.org/doc/Documentation/block/writeback_cache_control.txt)
+may be useful.
+
 #### Request message
 
 The request message, sent by the client, looks as follows:
@@ -483,10 +511,22 @@ affects a particular command.  Clients MUST NOT set a command flag bit
 that is not documented for the particular command; and whether a flag is
 valid may depend on negotiation during the handshake phase.
 
-- bit 0, `NBD_CMD_FLAG_FUA`; valid during `NBD_CMD_WRITE` and
-  `NBD_CMD_WRITE_ZEROES` commands.  SHOULD be set to 1 if the client requires
-  "Force Unit Access" mode of operation.  MUST NOT be set unless transmission
-  flags included `NBD_FLAG_SEND_FUA`.
+- bit 0, `NBD_CMD_FLAG_FUA`; This flag is valid for all commands, provided
+  `NBD_FLAG_SEND_FUA` has been negotiated, in which case the server MUST
+  accept all commands with this bit set (even by ignoring the bit). The
+  client SHOULD NOT set this bit unless the command has the potential of
+  writing data (current commands are `NBD_CMD_WRITE`, `NBD_CMD_WRITE_ZEROES`
+  and `NBD_CMD_TRIM`), however note that existing clients are known to set this
+  bit on other commands. Subject to that, and provided `NBD_FLAG_SEND_FUA`
+  is negotiated, the client MAY set this bit on all, no or some commands
+  as it wishes (see the section on Ordering of messages and writes for
+  details). If the server receives a command with `NBD_CMD_FLAG_FUA`
+  set it MUST NOT send its reply to that command until all write
+  operations (if any) associated with that command have been
+  completed and persisted to non-volatile storage. If the command does
+  not in fact write data (for instance on an `NBD_CMD_TRIM` in a situation
+  where the command as a whole is ignored), the server MAY ignore this bit
+  being set on such a command.
 - bit 1, `NBD_CMD_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
   extension; see below.
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
@@ -534,12 +574,6 @@ The following request types exist:
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
     reached permanent storage.
-
-    If the `NBD_FLAG_SEND_FUA` flag ("Force Unit Access") was set in the
-    transmission flags field, the client MAY set the flag `NBD_CMD_FLAG_FUA` in
-    the command flags field. If this flag was set, the server MUST NOT send
-    the reply until it has ensured that the newly-written data has reached
-    permanent storage.
 
     If an error occurs, the server SHOULD set the appropriate error code
     in the error field. The server MAY then close the connection.
@@ -751,11 +785,6 @@ one new command and one new command flag.
 
     A client MUST NOT send a write zeroes request unless
     `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
-
-    If the `NBD_FLAG_SEND_FUA` flag was set in the transmission flags field,
-    the client MAY set the flag `NBD_CMD_FLAG_FUA` in the command flags field.
-    If this flag was set, the server MUST NOT send the reply until it has
-    ensured that the newly-zeroed data has reached permanent storage.
 
     By default, the server MAY use trimming to zero out the area, even
     if it did not advertise `NBD_FLAG_SEND_TRIM`; but it MUST ensure
