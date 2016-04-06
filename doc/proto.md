@@ -399,7 +399,10 @@ of the newstyle negotiation.
     `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should
     also be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent
     along any data with the request, the server should send back
-    `NBD_REP_ERR_INVALID`.
+    `NBD_REP_ERR_INVALID`. The client MUST NOT send this option if
+    it has already negotiated TLS; if the server receives
+    `NBD_OPT_STARTTLS` when TLS has already been negotiated, the server
+    MUST send back `NBD_REP_ERR_INVALID`.
 
     This functionality has not yet been implemented by the reference
     implementation, but was implemented by qemu so has been moved out of
