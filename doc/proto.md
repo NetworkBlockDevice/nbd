@@ -25,6 +25,15 @@ comments) constant names, `0xdeadbeef` is used for literal hex numbers
 (which are always sent in network byte order), and (brackets) are used
 for comments. Anything else is a description of the data that is sent.
 
+Where this document refers to a string, then unless otherwise stated,
+that string is a sequence of UTF-8 code points, which is not `NUL`
+terminated, MUST NOT contain `NUL` characters, SHOULD be no longer than
+256 bytes and MUST be no longer than 4096 bytes. This applies
+to export names and error messages (amongst others). The length of a
+string is always available through information sent earlier in the same
+message, although it may require some computation based on the size of
+other data also present in the same message.
+
 ## Protocol phases
 
 The NBD protocol has two phases: the handshake and the transmission. During the
@@ -352,11 +361,10 @@ of the newstyle negotiation.
 - `NBD_OPT_EXPORT_NAME` (1)
 
     Choose the export which the client would like to use, end option
-    haggling, and proceed to the transmission phase. Data: name of the
-    export, free-form UTF-8 text (subject to limitations by server
-    implementation). The length of the name is determined from the
-    option header. The name is not NUL terminated, and may not
-    contain embedded NUL characters. If the
+    haggling, and proceed to the transmission phase.
+
+    Data: String, name of the export, as free-form text.
+    The length of the name is determined from the option header. If the
     chosen export does not exist or requirements for the chosen export
     are not met (e.g., the client did not negotiate TLS for an export
     where the server requires it), the server should close the
@@ -437,25 +445,22 @@ during option haggling in the fixed newstyle negotiation.
 
     - 32 bits, length of name (unsigned); MUST be no larger than the
       reply packet header length - 4
-    - Name of the export, as expected by `NBD_OPT_EXPORT_NAME` (note
-      that the length of name does NOT include a NUL terminator)
+    - String, name of the export, as expected by `NBD_OPT_EXPORT_NAME`
     - If length of name < (reply packet header length - 4), then the
       rest of the data contains some implementation-specific details
       about the export. This is not currently implemented, but future
       versions of nbd-server may send along some details about the
       export. Therefore, unless explicitly documented otherwise by a
-      particular client request, this field is defined to be UTF-8
-      encoded data suitable for direct display to a human being; with
-      no embedded or terminating NUL characters.
+      particular client request, this field is defined to be a string
+      suitable for direct display to a human being.
 
     The experimental `INFO` extension (see below) adds two client
     option requests where the extra data has a definition other than a
-    UTF-8 message.
+    text string.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
-case that data is an error message in UTF-8 encoding suitable for
-display to the user, with no embedded or terminating NUL characters.
+case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_UNSUP` (2^31 + 1)
 
@@ -718,7 +723,7 @@ Therefore these commands share common documentation.
 
     Data (both commands):
 
-    - Name of the export (as with `NBD_OPT_EXPORT_NAME`, the length
+    - String: name of the export (as with `NBD_OPT_EXPORT_NAME`, the length
       comes from the option header).
 
     If no name is specified (i.e. a zero length string is provided),
@@ -741,13 +746,13 @@ Therefore these commands share common documentation.
     In the case of `NBD_REP_SERVER`, the message's data takes on a different
     interpretation than the default (so as to provide additional
     binary information normally sent in reply to `NBD_OPT_EXPORT_NAME`,
-    in place of the default UTF-8 free-form string). The option reply length
+    in place of the default free-form string). The option reply length
     MUST be *length of name* + 14, and the option data has the following layout:
 
     - 64 bits, size of the export in bytes (unsigned)
     - 16 bits, transmission flags.
     - 32 bits, length of name (unsigned)
-    - Name of the export. This name MAY be different from the one
+    - String: name of the export. This name MAY be different from the one
       given in the `NBD_OPT_INFO` or `NBD_OPT_GO` option in case the
       server has multiple alternate names for a single export, or a
       default export was specified.
@@ -861,7 +866,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     `EINVAL` due to bad flags), but MAY use either a simple reply or a
     structured reply to all other requests.  The server SHOULD prefer
     sending errors via a structured reply, as the error can then be
-    accompanied by a UTF-8 text payload to present to a human user.
+    accompanied by a string payload to present to a human user.
 
     A structured reply MAY occupy multiple structured chunk messages
     (all with the same value for "handle"), and the
@@ -938,9 +943,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       The payload is structured as:
 
       32 bits: error (MUST be nonzero)  
-      *length - 4* bytes: (optional UTF-8 encoded data suitable for
-         direct display to a human being, with no embedded or
-         terminating NUL characters)  
+      *length - 4* bytes: optional string suitable for
+         direct display to a human being
 
     - `NBD_REPLY_TYPE_ERROR_OFFSET` (2)
 
@@ -960,9 +964,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
 
       32 bits: error (MUST be nonzero)  
       64 bits: offset (unsigned)  
-      *length - 12* bytes: (optional UTF-8 encoded data suitable for
-         direct display to a human being, with no embedded or
-         terminating NUL characters)  
+      *length - 12* bytes: optional string suitable for
+         direct display to a human being
 
     - `NBD_REPLY_TYPE_OFFSET_DATA` (3)
 
