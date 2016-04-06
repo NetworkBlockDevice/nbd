@@ -1523,7 +1523,7 @@ static void handle_request(gpointer data, gpointer user_data) {
 	uint32_t flags = package->req->type & ~NBD_CMD_MASK_COMMAND;
 	struct nbd_reply rep;
 
-	if(flags != 0 && (type != NBD_CMD_WRITE || flags != NBD_CMD_FLAG_FUA)) {
+	if(flags & ~NBD_CMD_FLAG_FUA) {
 		msg(LOG_ERR, "E: received invalid flag %d on command %d, ignoring", flags, type);
 		goto error;
 	}
