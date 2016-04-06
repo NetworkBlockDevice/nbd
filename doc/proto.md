@@ -752,11 +752,11 @@ Therefore these commands share common documentation.
       server has multiple alternate names for a single export, or a
       default export was specified.
 
-    The server MUST NOT fail an NDB_OPT_GO sent with the same parameters
+    The server MUST NOT fail an NBD_OPT_GO sent with the same parameters
     as a previous NBD_OPT_INFO which returned successfully (i.e. with
     `NBD_REP_SERVER`) unless in the intervening time the client has
     negotiated other options. The server MUST return the same transmission
-    flags with NDB_OPT_GO as a previous NDB_OPT_INFO unless in the
+    flags with NBD_OPT_GO as a previous NBD_OPT_INFO unless in the
     intervening time the client has negotiated other options.
     The values of the transmission flags MAY differ from what was sent
     earlier in response to an earlier `NBD_OPT_INFO` (if any), and/or
