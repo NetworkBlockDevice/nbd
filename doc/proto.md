@@ -448,8 +448,8 @@ during option haggling in the fixed newstyle negotiation.
       encoded data suitable for direct display to a human being; with
       no embedded or terminating NUL characters.
 
-    The experimental `INFO` extension (see below) is a client
-    request where the extra data has a definition other than a
+    The experimental `INFO` extension (see below) adds two client
+    option requests where the extra data has a definition other than a
     UTF-8 message.
 
 There are a number of error reply types, all of which are denoted by
@@ -530,7 +530,7 @@ valid may depend on negotiation during the handshake phase.
   not in fact write data (for instance on an `NBD_CMD_TRIM` in a situation
   where the command as a whole is ignored), the server MAY ignore this bit
   being set on such a command.
-- bit 1, `NBD_CMD_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
+- bit 1, `NBD_CMD_FLAG_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
   extension; see below.
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
   extension; see below
@@ -611,7 +611,7 @@ The following request types exist:
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
-    overwriting it again with `NBD_CMD_WRITE`.
+    overwriting it again with `NBD_CMD_WRITE` or `NBD_CMD_WRITE_ZEROES`.
 
     A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
     was set in the transmission flags field.
@@ -703,15 +703,18 @@ Therefore these commands share common documentation.
 
 * `NBD_OPT_INFO` and `NBD_OPT_GO`
 
-    `NBD_OPT_INFO`: The client wishes to get details about export with the
-    given name for use in the transmission phase, but does not yet want
-    to move to the transmission phase.
+    `NBD_OPT_INFO`: The client wishes to get details about an export
+    with the given name for use in the transmission phase, but does
+    not yet want to move to the transmission phase.  When successful,
+    this option provides more details than `NBD_OPT_LIST`, but only
+    for a single export name.
 
-    `NBD_OPT_GO`: The client wishes to terminate the negotiation phase and
-    progress to the transmission phase. This client MAY issue this command after
-    an `NBD_OPT_INFO`, or MAY issue it without a previous `NBD_OPT_INFO`.
-    `NBD_OPT_GO` can thus be used as a substitute for `NBD_OPT_EXPORT_NAME`
-    that returns errors.
+    `NBD_OPT_GO`: The client wishes to terminate the handshake phase
+    and progress to the transmission phase. This client MAY issue this
+    command after an `NBD_OPT_INFO`, or MAY issue it without a
+    previous `NBD_OPT_INFO`.  `NBD_OPT_GO` can thus be used as an
+    improved version of `NBD_OPT_EXPORT_NAME` that is capable of
+    returning errors.
 
     Data (both commands):
 
@@ -745,9 +748,9 @@ Therefore these commands share common documentation.
     - 16 bits, transmission flags.
     - 32 bits, length of name (unsigned)
     - Name of the export. This name MAY be different from the one
-      given in the `NBD_OPT_INFO` or `NBD_OPT_GO` option in case the server has
-      multiple alternate names for a single export, or a default
-      export was specified.
+      given in the `NBD_OPT_INFO` or `NBD_OPT_GO` option in case the
+      server has multiple alternate names for a single export, or a
+      default export was specified.
 
     The server MUST NOT fail an NDB_OPT_GO sent with the same parameters
     as a previous NBD_OPT_INFO which returned successfully (i.e. with
@@ -757,7 +760,7 @@ Therefore these commands share common documentation.
     intervening time the client has negotiated other options.
     The values of the transmission flags MAY differ from what was sent
     earlier in response to an earlier `NBD_OPT_INFO` (if any), and/or
-    the server may fail the request, based on other options that were
+    the server MAY fail the request, based on other options that were
     negotiated in the meantime.
 
     For backwards compatibility, clients should be prepared to also
@@ -766,14 +769,14 @@ Therefore these commands share common documentation.
 
     The reply to an `NBD_OPT_GO` is identical to the reply to `NBD_OPT_INFO`
     save that if the reply indicates success (i.e. is `NBD_REP_SERVER`),
-    the client and the server both immediatedly enter the transmission
+    the client and the server both immediately enter the transmission
     phase. The server MUST NOT send any zero padding bytes after the
     `NBD_REP_SERVER` data, whether or not the client negotiated the
     `NBD_FLAG_C_NO_ZEROES` flag. After sending this reply the server MUST
     immediately move to the transmission phase, and after receiving this
     reply, the client MUST immediately move to the transmission phase;
     therefore, the server MUST NOT send this particular reply until all
-    other pending option requests have been sent by the server.
+    other pending option replies have been sent by the server.
 
 ### `WRITE_ZEROES` extension
 
@@ -784,8 +787,14 @@ by a sparse file. With current NBD command set, the client has to issue
 through the wire. The server has to write the data onto disk, effectively
 losing the sparseness.
 
-To remedy this, a `WRITE_ZEROES` extension is envisioned. This extension adds
-one new command and one new command flag.
+To remedy this, a `WRITE_ZEROES` extension is envisioned. This
+extension adds one new transmission flag, one new command, and one new
+command flag.
+
+* `NBD_FLAG_SEND_WRITE_ZEROES`
+
+    The server SHOULD set this transmission flag to 1 if the
+    `NBD_CMD_WRITE_ZEROES` request is supported.
 
 * `NBD_CMD_WRITE_ZEROES`
 
@@ -820,6 +829,8 @@ The extension adds the following new command flag:
   SHOULD be set to 1 if the client wants to ensure that the server does
   not create a hole. The client MAY send `NBD_CMD_FLAG_NO_HOLE` even
   if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
+  The server MUST support the use of this flag if it advertises
+  `NBD_FLAG_SEND_WRITE_ZEROES`.
 
 ### `STRUCTURED_REPLY` extension
 
