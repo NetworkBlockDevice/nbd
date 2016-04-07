@@ -749,13 +749,13 @@ Therefore these commands share common documentation.
     in place of the default free-form string). The option reply length
     MUST be *length of name* + 14, and the option data has the following layout:
 
-    - 64 bits, size of the export in bytes (unsigned)
-    - 16 bits, transmission flags.
     - 32 bits, length of name (unsigned)
     - String: name of the export. This name MAY be different from the one
       given in the `NBD_OPT_INFO` or `NBD_OPT_GO` option in case the
       server has multiple alternate names for a single export, or a
       default export was specified.
+    - 64 bits, size of the export in bytes (unsigned)
+    - 16 bits, transmission flags.
 
     The server MUST NOT fail an NBD_OPT_GO sent with the same parameters
     as a previous NBD_OPT_INFO which returned successfully (i.e. with
