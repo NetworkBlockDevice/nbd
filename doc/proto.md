@@ -202,7 +202,7 @@ send replies in the order that the requests were received, but is not
 required to.
 
 There is no requirement for the client or server to complete a
-negotiation if it does not wish to do so. Either end may simply
+negotiation if it does not wish to do so. Either end MAY simply
 close the TCP connection (though see below regarding prior use
 of `NBD_OPT_ABORT`). Under certain circumstances either
 the client or the server may be required by this document to close
@@ -215,7 +215,7 @@ by this document, it SHOULD send `NBD_OPT_ABORT` first if the protocol
 permits. There are instances where this is impossible, such as after
 an `NBD_OPT_EXPORT_NAME` has been issued, or on an unsuccessful
 negotiation of TLS.  For instance, if the client does not find an
-export it is looking for, it may simply send an `NBD_OPT_ABORT`
+export it is looking for, it MAY simply send an `NBD_OPT_ABORT`
 and close the TCP connection.
 
 ### Transmission
