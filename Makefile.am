@@ -19,3 +19,8 @@ nbd_server_LDADD = @GLIB_LIBS@ libnbdsrv.la libcliserv.la @GnuTLS_LIBS@
 nbd_trdump_LDADD = libcliserv.la
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h nbd-debug.h
 EXTRA_DIST = maketr CodingStyle autogen.sh README.md support/genver.sh
+TLSSRC = crypto-gnutls.c crypto-gnutls.h buffer.c buffer.h
+if GNUTLS
+nbd_client_SOURCES += $(TLSSRC)
+nbd_server_SOURCES += $(TLSSRC)
+endif

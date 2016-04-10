@@ -121,6 +121,7 @@ AC_CHECK_SIZEOF(unsigned long long int)
 AC_STRUCT_DIRENT_D_TYPE
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
 HAVE_FL_PH=no
+
 AC_CHECK_FUNC(fallocate,
   [
     AC_CHECK_HEADERS([linux/falloc.h])
@@ -211,6 +212,7 @@ dnl fi
 
 PKG_CHECK_MODULES(GnuTLS, [gnutls >= 3.3.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
 AC_DEFINE(HAVE_GNUTLS, $HAVE_GNUTLS, [Define to 1 if you have a GnuTLS version of 3.3 or above])
+AM_CONDITIONAL([GNUTLS], [test "x$HAVE_GNUTLS" = "x1"])
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
 [#include <io.h>

@@ -7,7 +7,16 @@ check_PROGRAMS = nbd-tester-client
 cliserv.c:
 	rm -f cliserv.c
 	ln -s $(top_srcdir)/cliserv.c cliserv.c
+buffer.c:
+	rm -f buffer.c
+	ln -s $(top_srcdir)/buffer.c buffer.c
+crypto-gnutls.c:
+	rm -f crypto-gnutls.c
+	ln -s $(top_srcdir)/crypto-gnutls.c crypto-gnutls.c
 nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.c
+if GNUTLS
+nbd_tester_client_SOURCES += buffer.c crypto-gnutls.c
+endif
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_tester_client_CPPFLAGS = -I$(top_srcdir)
 nbd_tester_client_LDADD = @GLIB_LIBS@
