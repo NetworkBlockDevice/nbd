@@ -1,0 +1,6 @@
+organization = Name of your organization
+cn = localhost
+tls_www_server
+encryption_key
+signing_key
+expiration_days = 3650

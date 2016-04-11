@@ -42,6 +42,10 @@
 #define MY_NAME "nbd-tester-client"
 #include "cliserv.h"
 
+#ifdef WITH_GNUTLS
+#include "crypto-gnutls.h"
+#endif
+
 static gchar errstr[1024];
 const static int errstr_len = 1023;
 
@@ -50,6 +54,10 @@ static uint64_t size;
 static int looseordering = 0;
 
 static gchar *transactionlog = "nbd-tester-client.tr";
+static gchar *certfile = NULL;
+static gchar *keyfile = NULL;
+static gchar *cacertfile = NULL;
+static gchar *tlshostname = NULL;
 
 typedef enum {
 	CONNECTION_TYPE_NONE,
@@ -342,6 +350,10 @@ static inline int write_all(int f, void *buf, size_t len)
 	return retval;
 }
 
+static int tlserrout (void *opaque, const char *format, va_list ap) {
+	return vfprintf(stderr, format, ap);
+}
+
 #define READ_ALL_ERRCHK(f, buf, len, whereto, errmsg...) if((read_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); goto whereto; }
 #define READ_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((read_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
@@ -401,6 +413,10 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 	/* negotiation flags */
 	if (handshakeflags & NBD_FLAG_FIXED_NEWSTYLE)
 		negotiationflags |= NBD_FLAG_C_FIXED_NEWSTYLE;
+	else if (keyfile) {
+		snprintf(errstr, errstr_len, "Cannot negotiate TLS without NBD_FLAG_FIXED_NEWSTYLE");
+		goto err;
+	}
 	negotiationflags = htonl(negotiationflags);
 	WRITE_ALL_ERRCHK(sock, &negotiationflags, sizeof(negotiationflags), err,
 			 "Could not write reserved field: %s", strerror(errno));
@@ -412,6 +428,111 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		}
 		goto end;
 	}
+#ifdef WITH_GNUTLS
+	/* TLS */
+	if (keyfile) {
+		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
+		tlssession_t *s = NULL;
+		int ret;
+
+		/* magic */
+		tmp64 = htonll(opts_magic);
+		WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
+				 "Could not write magic: %s", strerror(errno));
+		/* starttls */
+		tmp32 = htonl(NBD_OPT_STARTTLS);
+		WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option: %s", strerror(errno));
+		/* length of data */
+		tmp32 = htonl(0);
+		WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option length: %s", strerror(errno));
+
+		READ_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
+				"Could not read cliserv_magic: %s", strerror(errno));
+		tmp64 = ntohll(tmp64);
+		if (tmp64 != NBD_OPT_REPLY_MAGIC) {
+			strncpy(errstr, "reply magic does not match", errstr_len);
+			goto err;
+		}
+		READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+				"Could not read option type: %s", strerror(errno));
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != NBD_OPT_STARTTLS) {
+			strncpy(errstr, "Reply to wrong option", errstr_len);
+			goto err;
+		}
+		READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+				"Could not read option reply type: %s", strerror(errno));
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != NBD_REP_ACK) {
+			strncpy(errstr, "Option reply type != NBD_REP_ACK", errstr_len);
+			goto err;
+		}
+		READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+				"Could not read option data length: %s", strerror(errno));
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != 0) {
+			strncpy(errstr, "Option reply data length != 0", errstr_len);
+			goto err;
+		}
+
+		s = tlssession_new(FALSE,
+				   keyfile,
+				   certfile,
+				   cacertfile,
+				   tlshostname,
+				   !cacertfile || !tlshostname, // insecure flag
+#ifdef DODBG
+				   1, // debug
+#else
+				   0, // debug
+#endif
+				   NULL, // quitfn
+				   tlserrout, // erroutfn
+				   NULL // opaque
+			);
+		if (!s) {
+			strncpy(errstr, "Cannot establish TLS session", errstr_len);
+			goto err;
+		}
+
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, plainfd) < 0) {
+			strncpy(errstr, "Cannot get socket pair", errstr_len);
+			goto err;
+		}
+
+		if (set_nonblocking(plainfd[0], 0) <0 ||
+		    set_nonblocking(plainfd[1], 0) <0 ||
+		    set_nonblocking(sock, 0) <0) {
+			close(plainfd[0]);
+			close(plainfd[1]);
+			strncpy(errstr, "Cannot set socket options", errstr_len);
+			goto err;
+		}
+
+		ret = fork();
+		if (ret < 0)
+			err("Could not fork");
+		else if (ret == 0) {
+			// we are the child
+			signal (SIGPIPE, SIG_IGN);
+			close(plainfd[1]);
+			tlssession_mainloop(sock, plainfd[0], s);
+			close(sock);
+			close(plainfd[0]);
+			exit(0);
+		}
+		close(plainfd[0]);
+		close(sock);
+		sock = plainfd[1]; /* use the decrypted FD from now on */
+	}
+#else
+	if (keyfile) {
+		strncpy(errstr, "TLS requested but support not compiled in", errstr_len);
+		goto err;
+	}
+#endif
 	/* magic */
 	tmp64 = htonll(opts_magic);
 	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
@@ -1597,6 +1718,10 @@ int main(int argc, char **argv)
 	int testflags = 0;
 	testfunc test = throughput_test;
 
+#ifdef WITH_GNUTLS
+	tlssession_init();
+#endif
+
 	/* Ignore SIGPIPE as we want to pick up the error from write() */
 	signal(SIGPIPE, SIG_IGN);
 
@@ -1613,7 +1738,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	logging(MY_NAME);
-	while ((c = getopt(argc, argv, "FN:t:owfilu:h")) >= 0) {
+	while ((c = getopt(argc, argv, "FN:t:owfilu:hC:K:A:H:")) >= 0) {
 		switch (c) {
 		case 1:
 			handle_nonopt(optarg, &hostname, &p);
@@ -1652,12 +1777,40 @@ int main(int argc, char **argv)
 			test = handshake_test;
 			testflags |= TEST_HANDSHAKE;
 			break;
+#ifdef WITH_GNUTLS
+		case 'C':
+			certfile=g_strdup(optarg);
+			break;
+		case 'K':
+			keyfile=g_strdup(optarg);
+			break;
+		case 'A':
+			cacertfile=g_strdup(optarg);
+			break;
+		case 'H':
+			tlshostname=g_strdup(optarg);
+			break;
+#else
+		case 'C':
+		case 'K':
+		case 'H':
+		case 'A':
+			g_warning("TLS support not compiled in");
+			/* Do not change this - looked for by test suite */
+			exit(77);
+#endif
 		}
 	}
 
 	while (optind < argc) {
 		handle_nonopt(argv[optind++], &hostname, &p);
 	}
+
+	if (keyfile && !certfile)
+		certfile = g_strdup(keyfile);
+
+	if (!tlshostname && hostname)
+		tlshostname = g_strdup(hostname);
 
 	if (test(hostname, unixsock, (int)p, name, sock, FALSE, TRUE, testflags)
 	    < 0) {

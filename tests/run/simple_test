@@ -306,6 +306,51 @@ EOF
 		./nbd-tester-client -h -N export1 localhost
 		retval=$?
 	;;
+	*/tls)
+		# TLS test
+		certdir=$(pwd)/certs
+		cat >${conffile} <<EOF
+[generic]
+	certfile = $certdir/server-cert.pem
+	keyfile = $certdir/server-key.pem
+	cacertfile = $certdir/ca-cert.pem
+[export1]
+	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
+	filesize = 52428800
+	temporary = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -i -t "${mydir}/integrity-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" localhost
+		retval=$?
+	;;
+	*/tlshuge)
+		# TLS test with big operations
+		# takes a while
+		certdir=$(pwd)/certs
+		cat >${conffile} <<EOF
+[generic]
+	certfile = $certdir/server-cert.pem
+	keyfile = $certdir/server-key.pem
+	cacertfile = $certdir/ca-cert.pem
+[export1]
+	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
+	filesize = 52428800
+	temporary = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -i -t "${mydir}/integrityhuge-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" -H 127.0.0.1 localhost
+		retval=$?
+	;;
 	*)
 		echo "E: unknown test $1"
 		exit 1
