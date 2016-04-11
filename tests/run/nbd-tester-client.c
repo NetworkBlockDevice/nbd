@@ -391,9 +391,11 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 	/* handshake flags */
 	READ_ALL_ERRCHK(sock, &handshakeflags, sizeof(handshakeflags), err,
 			"Could not read reserved field: %s", strerror(errno));
+	handshakeflags = ntohs(handshakeflags);
 	/* negotiation flags */
 	if (handshakeflags & NBD_FLAG_FIXED_NEWSTYLE)
 		negotiationflags |= NBD_FLAG_C_FIXED_NEWSTYLE;
+	negotiationflags = htonl(negotiationflags);
 	WRITE_ALL_ERRCHK(sock, &negotiationflags, sizeof(negotiationflags), err,
 			 "Could not write reserved field: %s", strerror(errno));
 	/* magic */
