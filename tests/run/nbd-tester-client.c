@@ -342,6 +342,8 @@ int setup_connection_common(int sock, char* name, CONNECTION_TYPE ctype, int* se
 	u64 tmp64;
 	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
 	uint32_t tmp32 = 0;
+	uint16_t handshakeflags = 0;
+	uint32_t negotiationflags = 0;
 
 	if(ctype<CONNECTION_TYPE_INIT_PASSWD)
 		goto end;
@@ -370,10 +372,12 @@ int setup_connection_common(int sock, char* name, CONNECTION_TYPE ctype, int* se
 		READ_ALL_ERRCHK(sock, buf, 128, err, "Could not read data: %s", strerror(errno));
 		goto end;
 	}
-	/* flags */
-	READ_ALL_ERRCHK(sock, buf, sizeof(uint16_t), err, "Could not read reserved field: %s", strerror(errno));
-	/* reserved field */
-	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err, "Could not write reserved field: %s", strerror(errno));
+	/* handshake flags */
+	READ_ALL_ERRCHK(sock, &handshakeflags, sizeof(handshakeflags), err, "Could not read reserved field: %s", strerror(errno));
+	/* negotiation flags */
+	if (handshakeflags & NBD_FLAG_FIXED_NEWSTYLE)
+		negotiationflags |= NBD_FLAG_C_FIXED_NEWSTYLE;
+	WRITE_ALL_ERRCHK(sock, &negotiationflags, sizeof(negotiationflags), err, "Could not write reserved field: %s", strerror(errno));
 	/* magic */
 	tmp64 = htonll(opts_magic);
 	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err, "Could not write magic: %s", strerror(errno));
