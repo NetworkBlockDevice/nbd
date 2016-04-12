@@ -195,6 +195,23 @@ request before sending the next one of the same type. The server MAY
 send replies in the order that the requests were received, but is not
 required to.
 
+There is no requirement for the client or server to complete a
+negotiation if it does not wish to do so. Either end may simply
+close the TCP connection (though see below regarding prior use
+of NBD_OPT_ABORT). Under certain circumstances either
+the client or the server may be required by this document to close
+the TCP connection. In each case, this is referred to as 'terminate
+the session'.
+
+If the client wishes to terminate the session in the negotiation
+phase, and is not doing so because it is required to do so
+by this document, it SHOULD send NBD_OPT_ABORT first if the protocol
+permits. There are instances where this is impossible, such as after
+an NBD_OPT_EXPORTNAME has been issued, or on an unsuccessful
+negotiation of TLS.  For instance, if the client does not find an
+export it is looking for, it may simply send an NBD_OPT_ABORT
+and close the TCP connection.
+
 ### Transmission
 
 There are three message types in the transmission phase: the request,
@@ -286,6 +303,287 @@ S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 This reply type MUST NOT be used except as documented by the
 experimental `STRUCTURED_REPLY` extension; see below.
 
+## TLS support
+
+The NBD protocol supports Transport Layer Security (TLS) (see
+[RFC5246](https://tools.ietf.org/html/rfc5246)
+as updated by
+[RFC6176](https://tools.ietf.org/html/rfc6176)
+).
+
+TLS is negotiated with the `NBD_OPT_STARTTLS`
+option. This is performed as an in-session upgrade. Below the term
+'negotiation' is used to refer to the sending and receiving of
+NBD options and option replies, and the term 'initiation' of TLS
+is used to refer to the actual upgrade to TLS.
+
+### Certificates, authentication and authorisation
+
+This standard does not specify what encryption, certification
+and signature algorithms are used. This standard does not
+specify authentication and authorisation (for instance
+whether client and/or server certificates are required and
+what they should contain); this is implementation dependent.
+
+TLS requires fixed newstyle negotiation to have completed.
+
+### Server-side requirements
+
+There are three modes of operation for a server. The
+server MUST support one of these modes.
+
+* The server operates entirely without TLS ('NOTLS'); OR
+
+* The server insists upon TLS, and forces the client to
+  upgrade by erroring any NBD options other than `NBD_OPT_STARTTLS`
+  with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this in practice means
+  that all option negotiation (apart from the `NBD_OPT_STARTTLS`
+  itself) is carried out with TLS; OR
+
+* The server provides TLS, and it is mandatory on zero or more
+  exports, and is available at the client's option on all
+  other exports ('SELECTIVETLS'). The server does not force
+  the client to upgrade to TLS during option haggling (as
+  if the client ultimately were to choose a non-TLS-only export,
+  stopping TLS is not possible). Instead it permits the client
+  to upgrade as and when it chooses, but unless an upgrade to
+  TLS has already taken place, the server errors attempts
+  to enter transmission mode on TLS-only exports, MAY
+  refuse to provide information about TLS-only exports
+  via `NBD_OPT_INFO`, MAY refuse to provide information
+  about non-existent exports via `NBD_OPT_INFO`, and MAY omit
+  exports that are TLS-only from `NBD_OPT_LIST`.
+
+The server MAY determine the mode in which it operates
+dependent upon the session (for instance it might be
+more liberal with TCP connections made over the loopback
+interface) but it MUST be consistent in its mode
+of operation across the lifespan of a single TCP connection
+to the server. A client MUST NOT assume indications from
+a prior TCP session to a given server will be relevant
+to a subsequent session.
+
+The server MUST operate in NOTLS mode unless the server
+set flag NBD_FLAG_FIXED_NEWSTYLE and the client replied
+with NBD_FLAG_C_FIXED_NEWSTYLE in the fixed newstyle
+negotiation.
+
+These modes of operations are described in detail below.
+
+#### NOTLS mode
+
+If the server receives `NBD_OPT_STARTTLS` it MUST respond with
+`NBD_REP_ERR_POLICY` (if it does not support TLS for
+policy reasons) or `NBD_REP_ERR_UNSUP` (if it does not
+support the `NBD_OPT_STARTTLS` option at all). The server MUST NOT
+respond to any option request with `NBD_REP_ERR_TLS_REQD`.
+
+#### FORCEDTLS mode
+
+If the server receives `NBD_OPT_STARTTLS` prior to negotiating
+TLS, it MUST reply with `NBD_REP_ACK`. If the server receives
+`NBD_OPT_STARTTLS` when TLS has already been negotiated, it
+it MUST reply with `NBD_REP_ERR_INVALID`.
+
+After an `NBD_REP_ACK` reply has been sent, the server MUST be
+prepared for a TLS handshake, and all further data MUST be sent
+and received over TLS. There is no downgrade to a non-TLS session.
+
+As per the TLS standard, the handshake MAY be initiated either
+by the server (having sent the `NBD_REP_ACK`) or by the client.
+If the handshake is unsuccessful (for instance the client's
+certificate does not match) the server MUST terminate the
+session as by this stage it is too late to continue without TLS
+as the acknowledgement has been sent.
+
+If the server receives any other option, including `NBD_OPT_INFO`
+and unsupported options, it MUST reply with `NBD_REP_ERR_TLS_REQD`
+if TLS has not been initiated; `NBD_OPT_INFO` is included as in this
+mode, all exports are TLS-only. If the server receives a request to
+enter transmission mode via `NBD_OPT_EXPORT_NAME` when TLS has not
+been initiated, then as this request cannot error, it MUST
+terminate the session. If the server receives a request to
+enter transmission mode via `NBD_OPT_GO` when TLS has not been
+initiated, it MUST error with `NBD_REP_ERR_TLS_REQD`.
+
+The server MUST NOT send `NBD_REP_ERR_TLS_REQD` in reply to
+any option if TLS has already been initiated.
+
+The FORCEDTLS mode of operation has an implementation problem in
+that the client MAY legally simply send a `NBD_OPT_EXPORT_NAME`
+to enter transmission mode without previously sending any options.
+Therefore, if a server uses FORCEDTLS, it SHOULD implement the
+INFO extension.
+
+#### SELECTIVETLS mode
+
+If the server receives `NBD_OPT_STARTTLS` prior to negotiating
+TLS, it MUST reply with `NBD_REP_ACK` and initiate TLS as set
+out under 'FORCEDTLS' above. If the server receives
+`NBD_OPT_STARTTLS` when TLS has already been negotiated, it
+it MUST reply with `NBD_REP_ERR_INVALID`.
+
+If the server receives `NBD_OPT_INFO` or `NBD_OPT_GO` and TLS
+has not been initiated, it MAY reply with `NBD_REP_ERR_TLS_REQD`
+if that export is non-existent, and MUST reply with
+`NBD_REP_ERR_TLS_REQD` if that export is TLS-only.
+
+If the server receives a request to enter transmission mode
+via `NBD_OPT_EXPORT_NAME` on a TLS-only export when TLS has not
+been initiated, then as this request cannot error, it MUST
+terminate the session.
+
+The server MUST NOT send `NBD_REP_ERR_TLS_REQD` in reply to
+any option if TLS has already been negotiated. The server
+MUST NOT send `NBD_REP_ERR_TLS_REQD` in response to any
+option other than `NBD_OPT_INFO`, `NBD_OPT_GO` and
+`NBD_OPT_EXPORT_NAME`, and only in those cases in respect of
+a TLS-only or non-existent export.
+
+There is a degenerate case of SELECTIVETLS where all
+exports are TLS-only. This is permitted in part to make programming
+of servers easier. Operation is a little different from FORCEDTLS,
+as the client is not forced to upgrade to TLS prior to any options
+being processed, and the server MAY choose to give information on
+non-existent exports via NBD_OPT_INFO exports prior to an upgrade
+to TLS.
+
+The SELECTIVETLS mode of operation has an implementation problem
+in that unless the INFO extension is supported, the client that
+does not use TLS may have its access to exports denied without
+it being able to ascertain the reason. For instance it may
+go into transmission mode using `NBD_OPT_EXPORT_NAME` - which
+does not return an error as no options will be denied with
+`NBD_REP_ERR_TLS_REQD`. Further there is no way to remotely
+determine whether an export requires TLS, and therefore this
+must be initiated between client and server out of band.
+Therefore, if a server uses SELECTIVETLS, it MUST implement
+the INFO extension.
+
+## Client-side requirements
+
+If the client supports TLS at all, it MUST be prepared
+to deal with servers operating in any of the above modes.
+Notwithstanding, a client MAY always terminate the session or
+refuse to connect to a particular export if TLS is
+not available and the user requires TLS.
+
+The client MUST NOT issue `NBD_OPT_STARTTLS` unless the server
+set flag NBD_FLAG_FIXED_NEWSTYLE and the client replied
+with NBD_FLAG_C_FIXED_NEWSTYLE in the fixed newstyle
+negotiation.
+
+The client MUST NOT issue `NBD_OPT_STARTTLS` if TLS has already
+been initiated.
+
+Subject to the above two limitations, the client MAY send
+`NBD_OPT_STARTTLS` at any time to initiate a TLS session. If the
+client receives `NBD_REP_ACK` in response, it MUST immediately
+upgrade the session to TLS. If it receives `NBD_REP_ERR_UNSUP`,
+`NBD_REP_ERR_POLICY` or any other error in response, it indicates
+that the server cannot or will not upgrade the session to TLS,
+and therefore the client MUST either continue the session
+without TLS, or terminate the session.
+
+A client that prefers to use TLS irrespective of whether
+the server makes TLS mandatory SHOULD send `NBD_OPT_STARTTLS`
+as the first option. This will ensure option haggling is subject
+to TLS, and will thus prevent the possibility of options being
+compromised by a Man-in-the-Middle attack. Note that the
+`NBD_OPT_STARTTLS` itself may be compromised - see 'downgrade
+attacks' for more details. For this reason, a client which only
+wishes to use TLS SHOULD terminate the session if the
+`NBD_OPT_STARTTLS` replies with an error.
+
+If the TLS handshake is unsuccessful (for instance the server's
+certificate does not validate) the client MUST terminate the
+session as by this stage it is too late to continue without TLS.
+
+If the client receives an `NBD_REP_ERR_TLS_REQD` in response
+to any option, it implies that this option cannot be executed
+unless a TLS upgrade is performed. If the option is any
+option other than `NBD_OPT_INFO` or `NBD_OPT_GO`, this
+indicates that no option will succeed unless a TLS upgrade
+is performed; the client MAY therefore choose to issue
+an `NBD_OPT_STARTTLS`, or MAY terminate the session (if
+for instance it does not support TLS or does not have
+appropriate credentials for this server). If the client
+receives `NBD_REP_ERR_TLS_REQD` in response to
+`NBD_OPT_INFO` or `NBD_OPT_GO` this indicates that the
+export referred to within the option is either non-existent
+or requires TLS; the client MAY therefore choose to issue
+an `NBD_OPT_STARTTLS`, MAY terminate the session (if
+for instance it does not support TLS or does not have
+appropriate credentials for this server), or MAY continue
+in another manner without TLS, for instance by querying
+or using other exports.
+
+If a client supports TLS, it SHOULD also support the INFO
+extension, and SHOULD use `NBD_OPT_GO` if available in place
+of `NBD_OPT_EXPORT_NAME`. The reason for this is set out in
+the final paragraphs of the sections under 'FORCEDTLS'
+and 'SELECTIVETLS': this gives an opportunity for the
+server to transmit that an error going into transmission
+mode is due to the client's failure to initiate TLS,
+and the fact that the client may obtain information about
+which exports are TLS-only through `NBD_OPT_INFO`.
+
+### Security considerations
+
+#### TLS versions
+
+NBD implementations supporting TLS MUST support TLS version 1.2,
+SHOULD support any later versions. NBD implementations
+MAY support older versions but SHOULD NOT do so by default
+(i.e. they SHOULD only be available by a configuration change).
+Older versions SHOULD NOT be used where there is a risk of security
+problems with those older versions or of a downgrade attack
+against TLS versions.
+
+#### Protocol downgrade attacks
+
+A danger inherent in any scheme relying on the negotiation
+of whether TLS should be employed is downgrade attacks within
+the NBD protocol.
+
+There are two main dangers:
+
+* A Man-in-the-Middle (MitM) hijacks a session and impersonates
+  the server (possibly by proxying it) claiming not to support
+  TLS. In this manner, the client is confused into operating
+  in a plain-text manner with the MitM (with the session possibly
+  being proxied in plain-text to the server using the method
+  below).
+
+* The MitM hijacks a session and impersonates the client
+  (possibly by proxying it) claiming not to support TLS. In
+  this manner the server is confused into operating in a plain-text
+  manner with the MitM (with the session being possibly
+  proxied to the client with the method above).
+
+With regard to the first, any client that does not wish
+to be subject to potential downgrade attack SHOULD ensure
+that if a TLS endpoint is specified by the client, it
+ensures that TLS is negotiated prior to sending or
+requesting sensitive data. To recap, the client MAY send
+`NBD_OPT_STARTTLS` at any point during option haggling,
+and MAY terminate the session if `NBD_REP_ACK` is not
+provided.
+
+With regard to the second, any server that does not wish
+to be subject to a potential downgrade attack SHOULD either
+used FORCEDTLS mode, or should force TLS on those exports
+it is concerned about using SELECTIVE mode and TLS-only
+exports. It is not possible to avoid downgrade attacks
+on exports which may be served either via TLS or in plain
+text unless the client insists on TLS.
+
+### Status
+
+This functionality has not yet been implemented by the reference
+implementation, but was implemented by qemu and subsequently
+by other users, so has been moved out of the "experimental" section.
+
 ## Values
 
 This section describes the value and meaning of constants (other than
@@ -366,7 +664,7 @@ of the newstyle negotiation.
     Data: String, name of the export, as free-form text.
     The length of the name is determined from the option header. If the
     chosen export does not exist or requirements for the chosen export
-    are not met (e.g., the client did not negotiate TLS for an export
+    are not met (e.g., the client did not initiate TLS for an export
     where the server requires it), the server should close the
     connection.
 
@@ -391,7 +689,9 @@ of the newstyle negotiation.
 - `NBD_OPT_LIST` (3)
 
     Return a number of `NBD_REP_SERVER` replies, one for each export,
-    followed by `NBD_REP_ACK`.
+    followed by `NBD_REP_ACK`. The server SHOULD omit entries from this
+    list if TLS has not been negotiated, the server is operating in
+    SELECTIVETLS mode, and the entry concerned is a TLS-only export.
 
 - `NBD_OPT_PEEK_EXPORT` (4)
 
@@ -400,21 +700,15 @@ of the newstyle negotiation.
 
 - `NBD_OPT_STARTTLS` (5)
 
-    The client wishes to initiate TLS. If the server replies with
-    `NBD_REP_ACK`, then the client should immediately initiate a TLS
-    handshake and continue the negotiation in the encrypted channel. If
-    the server is unwilling to perform TLS, it should reply with
-    `NBD_REP_ERR_POLICY`. For backwards compatibility, a client should
-    also be prepared to handle `NBD_REP_ERR_UNSUP`. If the client sent
-    along any data with the request, the server should send back
-    `NBD_REP_ERR_INVALID`. The client MUST NOT send this option if
-    it has already negotiated TLS; if the server receives
-    `NBD_OPT_STARTTLS` when TLS has already been negotiated, the server
-    MUST send back `NBD_REP_ERR_INVALID`.
+    The client wishes to initiate TLS.
 
-    This functionality has not yet been implemented by the reference
-    implementation, but was implemented by qemu so has been moved out of
-    the "experimental" section.
+    The server MUST either reply with `NBD_REP_ACK` after which
+    point the connection is upgraded to TLS, or reply with
+    `NBD_REP_ERR_POLICY` (or if it does not support the option
+    at all, `NBD_REP_ERR_UNSUP`, or if TLS has already been
+    negotiated, `NBD_REP_ERR_INVALID`).
+
+    See the section on TLS above for further details.
 
 - `NBD_OPT_INFO` (6)
 
@@ -489,20 +783,10 @@ case that data is an error message string suitable for display to the user.
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
     The server is unwilling to continue negotiation unless TLS is
-    negotiated first. A server MUST NOT send this error if it has one or
-    more exports that do not require TLS; not even if the client indicated
-    interest (by way of `NBD_OPT_PEEK_EXPORT`) in an export which requires
-    TLS.
-
-    If this reply is used, servers SHOULD send it in reply to each and every
-    unencrypted `NBD_OPT_*` message (apart from `NBD_OPT_STARTTLS`).
-
-    This functionality has not yet been implemented by the reference
-    implementation, but was implemented by qemu so has been moved out of
-    the "experimental" section.
-
-    The experimental `INFO` extension makes small but compatible
-    changes to the semantics of this error message; see below.
+    initiated first. In the case of `NBD_OPT_INFO` and `NBD_OPT_GO`
+    this unwillingness MAY (depending on the TLS mode) be limited
+    to the export in question. See the section on TLS above for
+    further details.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
@@ -735,13 +1019,13 @@ Therefore these commands share common documentation.
     - `NBD_REP_ERR_UNKNOWN`: The chosen export does not exist on this
       server.
     - `NBD_REP_ERR_TLS_REQD`: The server does not wish to export this
-      block device unless the client negotiates TLS first.
+      block device unless the client initiates TLS first.
     - `NBD_REP_SERVER`: The server accepts the chosen export.
 
-    Additionally, if TLS has not been negotiated, the server MAY reply
+    Additionally, if TLS has not been initiated, the server MAY reply
     with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`)
     to requests for exports that are unknown. This is so that clients
-    that have not negotiated TLS cannot enumerate exports.
+    that have not initiated TLS cannot enumerate exports.
 
     In the case of `NBD_REP_SERVER`, the message's data takes on a different
     interpretation than the default (so as to provide additional
