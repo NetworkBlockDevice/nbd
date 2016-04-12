@@ -451,7 +451,7 @@ exports are TLS-only. This is permitted in part to make programming
 of servers easier. Operation is a little different from FORCEDTLS,
 as the client is not forced to upgrade to TLS prior to any options
 being processed, and the server MAY choose to give information on
-non-existent exports via NBD_OPT_INFO exports prior to an upgrade
+non-existent exports via NBD_OPT_INFO responses prior to an upgrade
 to TLS.
 
 The SELECTIVETLS mode of operation has an implementation problem
@@ -466,7 +466,7 @@ must be initiated between client and server out of band.
 Therefore, if a server uses SELECTIVETLS, it MUST implement
 the INFO extension.
 
-## Client-side requirements
+### Client-side requirements
 
 If the client supports TLS at all, it MUST be prepared
 to deal with servers operating in any of the above modes.
