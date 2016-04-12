@@ -25,6 +25,12 @@ comments) constant names, `0xdeadbeef` is used for literal hex numbers
 (which are always sent in network byte order), and (brackets) are used
 for comments. Anything else is a description of the data that is sent.
 
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
+"SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",
+"MAY", and "OPTIONAL" in this document are to be interpreted as
+described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
+The same words in lower case carry their natural meaning.
+
 Where this document refers to a string, then unless otherwise stated,
 that string is a sequence of UTF-8 code points, which is not `NUL`
 terminated, MUST NOT contain `NUL` characters, SHOULD be no longer than
@@ -101,7 +107,7 @@ the IANA-reserved port for NBD, 10809. The server MAY listen on other
 ports as well, but it SHOULD use the old style handshake on those. The
 server SHOULD refuse to allow oldstyle negotiations on the newstyle
 port. For debugging purposes, the server MAY change the port on which to
-listen for newstyle negotiation, but this should not happen for
+listen for newstyle negotiation, but this SHOULD NOT happen for
 production purposes.
 
 The initial few exchanges in newstyle negotiation look as follows:
@@ -144,7 +150,7 @@ S: 16 bits, transmission flags
 S: 124 bytes, zeroes (reserved) (unless `NBD_FLAG_C_NO_ZEROES` was
    negotiated by the client)  
 
-If the server is unwilling to allow the export, it should close the
+If the server is unwilling to allow the export, it SHOULD close the
 connection.
 
 The reason that the flags field is 16 bits large and not 32 as in the
@@ -169,9 +175,9 @@ To fix these two issues, the following changes were implemented:
 
 - The server will set the handshake flag `NBD_FLAG_FIXED_NEWSTYLE`, to
   signal that it supports fixed newstyle negotiation.
-- The client should reply with `NBD_FLAG_C_FIXED_NEWSTYLE` set in its flags
+- The client SHOULD reply with `NBD_FLAG_C_FIXED_NEWSTYLE` set in its flags
   field too, though its side of the protocol does not change incompatibly.
-- The client may now send other options to the server as appropriate, in
+- The client MAY now send other options to the server as appropriate, in
   the generic format for sending an option as described above.
 - The server MUST NOT send a response to `NBD_OPT_EXPORT_NAME` until all
   other pending option requests have had their final reply.
@@ -183,7 +189,7 @@ S: 32 bits, the option as sent by the client to which this is a reply
 S: 32 bits, reply type (e.g., `NBD_REP_ACK` for successful completion,
    or `NBD_REP_ERR_UNSUP` to mark use of an option not known by this
    server  
-S: 32 bits, length of the reply. This may be zero for some replies, in
+S: 32 bits, length of the reply. This MAY be zero for some replies, in
    which case the next field is not sent  
 S: any data as required by the reply (e.g., an export name in the case
    of `NBD_REP_SERVER`)  
@@ -601,7 +607,7 @@ order.
 This field of 16 bits is sent by the server after the `INIT_PASSWD` and
 the first magic number.
 
-- bit 0, `NBD_FLAG_FIXED_NEWSTYLE`; should be set by servers that
+- bit 0, `NBD_FLAG_FIXED_NEWSTYLE`; MUST be set by servers that
   support the fixed newstyle protocol
 - bit 1, `NBD_FLAG_NO_ZEROES`; if set, and if the client replies with
   `NBD_FLAG_C_NO_ZEROES` in the client flags field, the server MUST NOT
@@ -614,22 +620,34 @@ NOT set any of these flags during oldstyle negotiation.
 ##### Transmission flags
 
 This field of 16 bits is sent by the server after option haggling, or
-immediately after the handshake flags field in oldstyle negotiation:
+immediately after the handshake flags field in oldstyle negotiation.
 
-- bit 0, `NBD_FLAG_HAS_FLAGS`; should always be 1
-- bit 1, `NBD_FLAG_READ_ONLY`; should be set to 1 if the export is
-  read-only
-- bit 2, `NBD_FLAG_SEND_FLUSH`; should be set to 1 if the server
-  supports `NBD_CMD_FLUSH` commands
-- bit 3, `NBD_FLAG_SEND_FUA`; should be set to 1 if the server supports
-  the `NBD_CMD_FLAG_FUA` flag
-- bit 4, `NBD_FLAG_ROTATIONAL`; should be set to 1 to let the client
-  schedule I/O accesses as for a rotational medium
-- bit 5, `NBD_FLAG_SEND_TRIM`; should be set to 1 if the server supports
-  `NBD_CMD_TRIM` commands
-- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`; defined by the experimental
-  `WRITE_ZEROES` extension; see below.
-- bit 7, `NBD_FLAG_SEND_DF`; defined by the experimental `STRUCTURED_REPLY`
+Many of these flags allow the server to expose to the client which
+features it understands (in which case they are documented below
+as "`NBD_FLAG_XXX` exposes feature `YYY`"). In each case, the server
+MAY set the flag for features it supports. The server MUST NOT set the
+flag for features it does not support. The client MUST NOT use a feature
+documented as 'exposed' by a flag unless that flag was set.
+
+The field has the following format:
+
+- bit 0, `NBD_FLAG_HAS_FLAGS`: MUST always be 1.
+- bit 1, `NBD_FLAG_READ_ONLY`: The server MAY set this flag to indicate
+  to the client that the export is read-only (exports might be read-only
+  in a manner undetectable to the server, for instance because of
+  permissions). If this flag is set, the server MUST error subsequent
+  write operations to the export.
+- bit 2, `NBD_FLAG_SEND_FLUSH`: exposes support for `NBD_CMD_FLUSH`.
+- bit 3, `NBD_FLAG_SEND_FUA`: exposes support for `NBD_CMD_FLAG_FUA`.
+- bit 4, `NBD_FLAG_ROTATIONAL`: the server MAY set this flag to 1 to
+  inform the client that the export has the characteristics of a rotational
+  medium, and the client MAY schedule I/O accesses in a manner corresponding
+  to the setting of this flag.
+- bit 5, `NBD_FLAG_SEND_TRIM`: exposes support for `NBD_CMD_TRIM`.
+- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: exposes support for
+  `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_FLAG_NO_HOLE`, all defined by the
+  experimental `WRITE_ZEROES` extension; see below.
+- bit 7, `NBD_FLAG_SEND_DF`: defined by the experimental `STRUCTURED_REPLY`
   extension; see below.
 
 Clients SHOULD ignore unknown flags.
@@ -665,8 +683,8 @@ of the newstyle negotiation.
     The length of the name is determined from the option header. If the
     chosen export does not exist or requirements for the chosen export
     are not met (e.g., the client did not initiate TLS for an export
-    where the server requires it), the server should close the
-    connection.
+    where the server requires it), the server MUST terminate the
+    session.
 
     A special, "empty", name (i.e., the length field is zero and no name
     is specified), is reserved for a "default" export, to be used in cases
@@ -959,7 +977,7 @@ documented as applicable to the given request.
 Which error to return in any other case is not specified by the NBD
 protocol.
 
-The server SHOULD AVOID returning ENOMEM if at all possible.
+The server SHOULD NOT return `ENOMEM` if at all possible.
 
 ## Experimental extensions
 
@@ -1041,20 +1059,19 @@ Therefore these commands share common documentation.
     - 64 bits, size of the export in bytes (unsigned)
     - 16 bits, transmission flags.
 
-    The server MUST NOT fail an NBD_OPT_GO sent with the same parameters
-    as a previous NBD_OPT_INFO which returned successfully (i.e. with
-    `NBD_REP_SERVER`) unless in the intervening time the client has
+    The server MUST NOT fail an `NBD_OPT_GO` sent with the same parameters
+    as a previous `NBD_OPT_INFO` which returned successfully (i.e. with
+    `NBD_REP_SERVER`), unless in the intervening time the client has
     negotiated other options. The server MUST return the same transmission
-    flags with NBD_OPT_GO as a previous NBD_OPT_INFO unless in the
-    intervening time the client has negotiated other options.
-    The values of the transmission flags MAY differ from what was sent
+    flags with `NBD_OPT_GO` as a previous `NBD_OPT_INFO` with the same
+    parameters unless in the intervening time the client has negotiated other
+    options. The values of the transmission flags MAY differ from what was sent
     earlier in response to an earlier `NBD_OPT_INFO` (if any), and/or
     the server MAY fail the request, based on other options that were
     negotiated in the meantime.
 
-    For backwards compatibility, clients should be prepared to also
-    handle `NBD_REP_ERR_UNSUP`. In this case, they should fall back to
-    using `NBD_OPT_EXPORT_NAME`.
+    For backwards compatibility, clients SHOULD be prepared to also
+    handle `NBD_REP_ERR_UNSUP` by falling back to using `NBD_OPT_EXPORT_NAME`.
 
     The reply to an `NBD_OPT_GO` is identical to the reply to `NBD_OPT_INFO`
     save that if the reply indicates success (i.e. is `NBD_REP_SERVER`),
@@ -1082,12 +1099,13 @@ command flag.
 
 * `NBD_FLAG_SEND_WRITE_ZEROES`
 
-    The server SHOULD set this transmission flag to 1 if the
-    `NBD_CMD_WRITE_ZEROES` request is supported.
+    This transmission flag exposes support for the `NBD_CMD_WRITE_ZEROES`
+    command. See the section on transmission flags for the meaning
+    of 'exposes support'.
 
 * `NBD_CMD_WRITE_ZEROES`
 
-    A write request with no payload. Length and offset define the location
+    A write request with no payload. *Offset* and *length* define the location
     and amount of data to be zeroed.
 
     The server MUST zero out the data on disk, and then send the reply
@@ -1246,7 +1264,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
 
       The payload is structured as:
 
-      32 bits: error (MUST be nonzero)  
+      32 bits: error (MUST be non-zero)  
       64 bits: offset (unsigned)  
       *length - 12* bytes: optional string suitable for
          direct display to a human being
@@ -1258,7 +1276,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       of the file, starting at *offset*.  The data MUST lie within the
       bounds of the original offset and length of the client's
       request, and MUST NOT overlap with the bounds of any earlier
-      content chunk or error chunk in the same reply.  This chunk may
+      content chunk or error chunk in the same reply.  This chunk MAY
       be used more than once in a reply, unless the `NBD_CMD_FLAG_DF`
       flag was set.  Valid as a reply to `NBD_CMD_READ`.
 
@@ -1275,7 +1293,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       lie within the bounds of the original offset and length of the
       client's request, and MUST NOT overlap with the bounds of any
       earlier content chunk or error chunk in the same reply.  This
-      chunk may be used more than once in a reply, unless the
+      chunk MAY be used more than once in a reply, unless the
       `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to
       `NBD_CMD_READ`.
 
@@ -1295,7 +1313,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       server MUST use structured replies to the `NBD_CMD_READ`
       transmission request.  Other extensions that require structured
       replies may now be negotiated.
-    - For backwards compatibility, clients should be prepared to also
+    - For backwards compatibility, clients SHOULD be prepared to also
       handle `NBD_REP_ERR_UNSUP`; in this case, no structured replies
       will be sent.
 
