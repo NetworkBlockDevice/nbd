@@ -47,6 +47,10 @@
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
 
+#ifdef WITH_GNUTLS
+#include "crypto-gnutls.h"
+#endif
+
 #ifdef WITH_SDP
 #include <sdp_inet.h>
 #endif
@@ -266,13 +270,14 @@ void ask_list(int sock) {
 		err("Failed writing length");
 }
 
-void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
+void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname) {
 	u64 magic, size64;
 	uint16_t tmp;
 	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
 	uint32_t opt;
 	uint32_t namesize;
+	int sock = *sockp;
 
 	printf("Negotiation: ");
 	readit(sock, buf, 8);
@@ -303,6 +308,108 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	client_flags = htonl(client_flags);
 	if (write(sock, &client_flags, sizeof(client_flags)) < 0)
 		err("Failed/2.1: %m");
+
+#ifdef WITH_GNUTLS
+        /* TLS */
+        if (keyfile) {
+		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
+		tlssession_t *s = NULL;
+		int ret;
+		uint32_t tmp32;
+		uint64_t tmp64;
+
+		/* magic */
+		tmp64 = htonll(opts_magic);
+		if (write(sock, &tmp64, sizeof(tmp64)) < 0)
+			err( "Could not write magic: %m");
+		/* starttls */
+		tmp32 = htonl(NBD_OPT_STARTTLS);
+		if (write(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not write option: %m");
+		/* length of data */
+		tmp32 = htonl(0);
+		if (write(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not write option length: %m");
+
+		if (read(sock, &tmp64, sizeof(tmp64)) < 0)
+			err("Could not read cliserv_magic: %m");
+		tmp64 = ntohll(tmp64);
+		if (tmp64 != NBD_OPT_REPLY_MAGIC) {
+			err("reply magic does not match");
+		}
+		if (read(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not read option type: %m");
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != NBD_OPT_STARTTLS)
+			err("Reply to wrong option");
+		if (read(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not read option reply type: %m");
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != NBD_REP_ACK) {
+			err("Option reply type != NBD_REP_ACK");
+		}
+		if (read(sock, &tmp32, sizeof(tmp32)) < 0) err(
+			"Could not read option data length: %m");
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != 0) {
+			err("Option reply data length != 0");
+		}
+		s = tlssession_new(0,
+				   keyfile,
+				   certfile,
+				   cacertfile,
+				   tlshostname,
+				   !cacertfile || !tlshostname, // insecure flag
+#ifdef DODBG
+				   1, // debug
+#else
+				   0, // debug
+#endif
+				   NULL, // quitfn
+				   NULL, // erroutfn
+				   NULL // opaque
+			);
+		if (!s)
+			err("Cannot establish TLS session");
+
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, plainfd) < 0)
+			err("Cannot get socket pair");
+
+		if (set_nonblocking(plainfd[0], 0) <0 ||
+		    set_nonblocking(plainfd[1], 0) <0 ||
+		    set_nonblocking(sock, 0) <0) {
+			close(plainfd[0]);
+			close(plainfd[1]);
+			err("Cannot set socket options");
+		}
+
+		ret = fork();
+		if (ret < 0)
+			err("Could not fork");
+		else if (ret == 0) {
+			// we are the child
+			if (daemon(0, 0) < 0) {
+				/* no one will see this */
+				fprintf(stderr, "Can't detach from the terminal");
+				exit(1);
+			}
+			signal (SIGPIPE, SIG_IGN);
+			close(plainfd[1]);
+			tlssession_mainloop(sock, plainfd[0], s);
+			close(sock);
+			close(plainfd[0]);
+			exit(0);
+		}
+		close(plainfd[0]);
+		close(sock);
+		sock = plainfd[1]; /* use the decrypted FD from now on */
+		*sockp = sock;
+	}
+#else
+	if (keyfile) {
+		err("TLS requested but support not compiled in");
+	}
+#endif
 
 	if(do_opts & NBDC_DO_LIST) {
 		ask_list(sock);
@@ -646,7 +753,11 @@ int main(int argc, char *argv[]) {
 
 	logging(MY_NAME);
 
-	while((c=getopt_long_only(argc, argv, "-b:c:C:d:hlnN:pSst:uF:K:A:H:", long_options, NULL))>=0) {
+#ifdef WITH_GNUTLS
+        tlssession_init();
+#endif
+
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -806,13 +917,15 @@ int main(int argc, char *argv[]) {
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
-		negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
+		negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname);
 		if (i == 0) {
 			setsizes(nbd, size64, blocksize, flags);
 			set_timeout(nbd, timeout);
 		}
 		finish_sock(sock, nbd, swap);
 		if (swap) {
+			if (keyfile)
+				fprintf(stderr, "Warning: using swap and TLS is prone to deadlock\n");
 			/* try linux >= 2.6.36 interface first */
 			if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
 				/* fall back to linux <= 2.6.35 interface */
@@ -901,7 +1014,7 @@ int main(int argc, char *argv[]) {
 					nbd = open(nbddev, O_RDWR);
 					if (nbd < 0)
 						err("Cannot open NBD: %m");
-					negotiate(sock, &new_size, &new_flags, name, needed_flags, cflags, opts);
+					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}
