@@ -344,7 +344,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	*rsize64 = size64;
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns) {
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname) {
 	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
 	bool retval = false;
 	if(fd < 0) {
@@ -435,6 +435,22 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 		if(!strncmp(loc, "unix", 4)) {
 			*b_unix = 1;
 			loc += 4;
+			goto next;
+		}
+		if(!strncmp(loc, "certfile=", 9)) {
+			*certfile = strndup(loc+9, strcspn(loc+9, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "keyfile=", 8)) {
+			*keyfile = strndup(loc+8, strcspn(loc+8, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "cacertfile=", 11)) {
+			*cacertfile = strndup(loc+11, strcspn(loc+11, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "hostname=", 9)) {
+			*tlshostname = strndup(loc+9, strcspn(loc+9, ","));
 			goto next;
 		}
 		// skip unknown options, with a warning unless they start with a '_'
@@ -553,6 +569,9 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
+#ifdef WITH_GNUTLS
+	fprintf(stderr, "All commands that connect to a host also take: [-C|-certfile certfile] [-K|-keyfile keyfile] [-A|-cacertfile cacertfile] [-H|-hostname hostname]\n");
+#endif
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
@@ -596,6 +615,10 @@ int main(int argc, char *argv[]) {
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
 	sigset_t block, old;
+	char *certfile = NULL;
+	char *keyfile = NULL;
+	char *cacertfile = NULL;
+	char *tlshostname = NULL;
 	struct sigaction sa;
 	int num_connections = 1;
 	struct option long_options[] = {
@@ -613,13 +636,17 @@ int main(int argc, char *argv[]) {
 		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ "unix", no_argument, NULL, 'u' },
+		{ "certfile", required_argument, NULL, 'F' },
+		{ "keyfile", required_argument, NULL, 'K' },
+		{ "cacertfile", required_argument, NULL, 'A' },
+		{ "hostname", required_argument, NULL, 'H' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
 
 	logging(MY_NAME);
 
-	while((c=getopt_long_only(argc, argv, "-b:c:C:d:hlnN:pSst:u", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:C:d:hlnN:pSst:uF:K:A:H:", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -707,6 +734,27 @@ int main(int argc, char *argv[]) {
 		case 'u':
 			b_unix = 1;
 			break;
+#ifdef WITH_GNUTLS
+                case 'F':
+                        certfile=strdup(optarg);
+                        break;
+                case 'K':
+                        keyfile=strdup(optarg);
+                        break;
+                case 'A':
+                        cacertfile=strdup(optarg);
+                        break;
+                case 'H':
+                        tlshostname=strdup(optarg);
+                        break;
+#else
+                case 'F':
+                case 'K':
+                case 'H':
+                case 'A':
+			fprintf(stderr, "E: TLS support not compiled in\n");
+                        exit(EXIT_FAILURE);
+#endif
 		default:
 			fprintf(stderr, "E: option eaten by 42 mice\n");
 			exit(EXIT_FAILURE);
@@ -720,7 +768,7 @@ int main(int argc, char *argv[]) {
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &hostname)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
 				}
@@ -733,6 +781,12 @@ int main(int argc, char *argv[]) {
 		usage("no information specified");
 		exit(EXIT_FAILURE);
 	}
+
+        if (keyfile && !certfile)
+		certfile = strdup(keyfile);
+
+        if (!tlshostname && hostname)
+                tlshostname = strdup(hostname);
 
 	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
