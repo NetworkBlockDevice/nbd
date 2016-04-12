@@ -122,7 +122,7 @@ C: 32 bits, flags
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the newstyle
 handshake, with no options. The client SHOULD ignore any handshake flags
-it does not recognize, while the server MUST close the connection if
+it does not recognize, while the server MUST close the TCP connection if
 it does not recognize the client's flags.  What follows is a repeating
 group of options. In non-fixed newstyle only one option can be set
 (`NBD_OPT_EXPORT_NAME`), and it is not optional.
@@ -150,8 +150,8 @@ S: 16 bits, transmission flags
 S: 124 bytes, zeroes (reserved) (unless `NBD_FLAG_C_NO_ZEROES` was
    negotiated by the client)  
 
-If the server is unwilling to allow the export, it SHOULD close the
-connection.
+If the server is unwilling to allow the export, it MUST terminate
+the session.
 
 The reason that the flags field is 16 bits large and not 32 as in the
 oldstyle negotiation is that there are now 16 bits of transmission flags,
@@ -201,22 +201,69 @@ request before sending the next one of the same type. The server MAY
 send replies in the order that the requests were received, but is not
 required to.
 
+#### Termination of the session during option haggling
+
+There are three possible mechanisms to end option haggling:
+
+* Transmission mode can be entered (by the client sending
+  `NBD_OPT_EXPORT_NAME` or by the server responding to an
+  `NBD_OPT_GO` with `NBD_REP_SERVER`). This is documented
+  elsewhere.
+
+* The client can send (and the server can reply to) an
+  `NBD_OPT_ABORT`. This MUST be followed by the client
+  shutting down TLS (if it is running), and the client
+  dropping the connection. This is referred to as
+  'initiating a soft disconnect'; soft disconnects can
+  only be initiated by the client.
+
+* The client or the server can disconnect the TCP session
+  without activity at the NBD protocol level. If TLS is
+  negotiated, the party initiating the transaction SHOULD
+  shutdown TLS first if it is running. This is referred
+  to as 'initiating a hard disconnect'.
+
+This section concerns the second and third of these, together
+called 'terminating the session', and under which circumstances
+they are valid.
+
+If either the client or the server detects a violation of a
+mandatory condition ('MUST' etc.) by the other party, it MAY
+initiate a hard disconnect.
+
+A client MAY use a soft disconnect to terminate the session
+whenever it wishes.
+
+A party that is mandated by this document to terminate the
+session MUST initiate a hard disconnect if it is not possible
+to use a soft disconnect. Such circumstances include: where
+that party is the server and it cannot return an error
+(e.g. after an `NBD_OPT_EXPORT_NAME` it cannot satisfy),
+and where that party is the client following a failed TLS
+negotiation.
+
+A party MUST NOT initiate a hard disconnect save where set out
+in this section. Therefore, unless a client's situation falls
+within the provisions of the previous paragraph or the
+client detects a breach of a mandatory condition, it MUST NOT
+use a hard disconnect, and hence its only option to terminate
+the session is via a soft disconnect.
+
 There is no requirement for the client or server to complete a
 negotiation if it does not wish to do so. Either end MAY simply
-close the TCP connection (though see below regarding prior use
-of `NBD_OPT_ABORT`). Under certain circumstances either
-the client or the server may be required by this document to close
-the TCP connection. In each case, this is referred to as 'terminate
-the session'.
+terminate the session. In the client's case, if it wishes to
+do so it MUST use soft disconnect.
 
-If the client wishes to terminate the session in the negotiation
-phase, and is not doing so because it is required to do so
-by this document, it SHOULD send `NBD_OPT_ABORT` first if the protocol
-permits. There are instances where this is impossible, such as after
-an `NBD_OPT_EXPORT_NAME` has been issued, or on an unsuccessful
-negotiation of TLS.  For instance, if the client does not find an
-export it is looking for, it MAY simply send an `NBD_OPT_ABORT`
-and close the TCP connection.
+In the server's case it MUST (save where set out above) simply
+error inbound options until the client gets the hint that it is
+unwelcome, except that if a server believes a client's behaviour
+constitutes a denial of service, it MAY initiate a hard disconnect.
+If the server is in the process of being shut down it MAY
+error inflight options and SHOULD error further options received
+(other than an `NBD_OPT_ABORT`) with `NBD_REP_ERR_SHUTDOWN`.
+
+If the client receives `NBD_REP_ERR_SHUTDOWN` it MUST initiate
+a soft disconnect.
 
 ### Transmission
 
@@ -225,8 +272,9 @@ the simple reply, and the experimental structured reply chunk.  The
 transmission phase consists of a series of transactions, where the
 client submits requests and the server sends corresponding replies
 with either a single simple reply or a series of one or more
-structured reply chunks per request.  The phase continues until either
-side closes the connection.
+structured reply chunks per request.  The phase continues until
+either side terminates transmission; this can be performed cleanly
+only by the client.
 
 Note that without client negotiation, the server MUST use only simple
 replies, and that it is impossible to tell by reading the server
@@ -309,6 +357,41 @@ S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 This reply type MUST NOT be used except as documented by the
 experimental `STRUCTURED_REPLY` extension; see below.
 
+#### Terminating the transmission phase
+
+There are two methods of terminating the transmission phase:
+
+* The client sends `NBD_CMD_DISC` whereupon the server MUST
+  close down the TLS session (if one is running) and then
+  close the TCP connection. This is referred to as 'initiating
+  a soft disconnect'. Soft disconnects can only be
+  initiated by the client.
+
+* The client or the server drops the TCP session (in which
+  case it SHOULD shut down the TLS session first). This is
+  referred to as 'initiating a hard disconnect'.
+
+Together these are referred to as 'terminating transmission'.
+
+Either side MAY initiate a hard disconnect if it detects
+a violation by the other party of a mandatory condition
+within this document.
+
+On a server shutdown, the server SHOULD wait for inflight
+requests to be serviced prior to initiating a hard disconnect.
+A server MAY speed this process up by issuing error replies.
+The error value issued in respect of these requests and
+any subsequently received requests SHOULD be `ESHUTDOWN`.
+
+If the client receives an `ESHUTDOWN` error it MUST initiate
+a soft disconnect.
+
+The client MAY issue a soft disconnect at any time, but
+SHOULD wait until there are no inflight requests first.
+
+The client and the server MUST NOT initiate any form
+of disconnect other than in one of the above circumstances.
+
 ## TLS support
 
 The NBD protocol supports Transport Layer Security (TLS) (see
@@ -380,8 +463,9 @@ These modes of operations are described in detail below.
 
 If the server receives `NBD_OPT_STARTTLS` it MUST respond with
 `NBD_REP_ERR_POLICY` (if it does not support TLS for
-policy reasons) or `NBD_REP_ERR_UNSUP` (if it does not
-support the `NBD_OPT_STARTTLS` option at all). The server MUST NOT
+policy reasons), `NBD_REP_ERR_UNSUP` (if it does not
+support the `NBD_OPT_STARTTLS` option at all) or another
+error explicitly permitted by this document. The server MUST NOT
 respond to any option request with `NBD_REP_ERR_TLS_REQD`.
 
 #### FORCEDTLS mode
@@ -665,7 +749,7 @@ receiving the handshake flags from the server.
   set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
   bytes of zeroes at the end of the negotiation.
 
-Clients MUST NOT set any other flags; the server MUST drop the
+Clients MUST NOT set any other flags; the server MUST drop the TCP
 connection if the client sets an unknown flag, or a flag that does
 not match something advertised by the server.
 
@@ -701,8 +785,16 @@ of the newstyle negotiation.
 
 - `NBD_OPT_ABORT` (2)
 
-    The client desires to abort the negotiation and close the
-    connection.
+    The client desires to abort the negotiation and terminate the
+    session. The server MUST reply with `NBD_REP_ACK`.
+
+    Previous versions of this document were unclear on whether
+    the server should send a reply to `NBD_OPT_ABORT`. Therefore
+    the client SHOULD gracefully handle the server closing the
+    connection after receiving an `NBD_OPT_ABORT` without it
+    sending a reply. Similarly the server SHOULD gracefully handle
+    the client sending an `NBD_OPT_ABORT` and closing the connection
+    without waiting for a reply.
 
 - `NBD_OPT_LIST` (3)
 
@@ -721,10 +813,8 @@ of the newstyle negotiation.
     The client wishes to initiate TLS.
 
     The server MUST either reply with `NBD_REP_ACK` after which
-    point the connection is upgraded to TLS, or reply with
-    `NBD_REP_ERR_POLICY` (or if it does not support the option
-    at all, `NBD_REP_ERR_UNSUP`, or if TLS has already been
-    negotiated, `NBD_REP_ERR_INVALID`).
+    point the connection is upgraded to TLS, or an error reply
+    explicitly permitted by this document.
 
     See the section on TLS above for further details.
 
@@ -808,7 +898,12 @@ case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
-    defined by the experimental `INFO` extension; see below.
+    Defined by the experimental `INFO` extension; see below.
+
+* `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
+
+    The server is unwilling to continue negotiation as it is in the
+    process of being shut down.
 
 ### Transmission phase
 
@@ -859,16 +954,16 @@ The following request types exist:
     condition has occurred.
 
     If an error occurs, the server SHOULD set the appropriate error
-    code in the error field. The server MUST then either close the
-    connection, or send *length* bytes of data (these bytes MAY be
+    code in the error field. The server MUST then either initiate
+    a hard disconnect, or send *length* bytes of data (these bytes MAY be
     invalid, in which case they SHOULD be zero); this is true even if
     the error is `EINVAL` for bad flags detected before even
     attempting to read.
 
     If an error occurs while reading after the server has already sent
     out the reply header with an error field set to zero (i.e.,
-    signalling no error), the server MUST immediately close the
-    connection; it MUST NOT send any further data to the client.
+    signalling no error), the server MUST immediately initiate a
+    hard disconnect; it MUST NOT send any further data to the client.
 
     The experimental `STRUCTURED_REPLY` extension changes the reply
     from a simple reply to a structured reply, in part to allow
@@ -885,17 +980,20 @@ The following request types exist:
     message. The server MAY send the reply message before the data has
     reached permanent storage.
 
-    If an error occurs, the server SHOULD set the appropriate error code
-    in the error field. The server MAY then close the connection.
+    If an error occurs, the server MUST set the appropriate error code
+    in the error field.
 
 * `NBD_CMD_DISC` (2)
 
     A disconnect request. The server MUST handle all outstanding
-    requests, and then close the connection.  A client MUST NOT send
+    requests, shut down the TLS session (if one is running), and
+    close the TCP session.  A client MUST NOT send
     anything to the server after sending an `NBD_CMD_DISC` command.
 
     The values of the length and offset fields in a disconnect request
-    are not defined.
+    MUST be zero.
+
+    There is no reply to an `NBD_CMD_DISC`.
 
 * `NBD_CMD_FLUSH` (3)
 
@@ -960,6 +1058,7 @@ The following error values are defined:
 * `ENOSPC` (28), No space left on device.
 * `EOVERFLOW` (75), Value too large; SHOULD NOT be sent outside of the
   experimental `STRUCTURED_REPLY` extension; see below.
+* `ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `ENOSPC` if it receives a write request
 including one or more sectors beyond the size of the device.  It SHOULD
@@ -1123,8 +1222,8 @@ command flag.
     same area will not cause fragmentation or cause failure due to
     insufficient space.
 
-    If an error occurs, the server SHOULD set the appropriate error code
-    in the error field. The server MAY then close the connection.
+    If an error occurs, the server MUST set the appropriate error code
+    in the error field.
 
 The server SHOULD return `ENOSPC` if it receives a write zeroes request
 including one or more sectors beyond the size of the device. It SHOULD
@@ -1144,8 +1243,8 @@ The extension adds the following new command flag:
 Some of the major downsides of the default simple reply to
 `NBD_CMD_READ` are as follows.  First, it is not possible to support
 partial reads or early errors (the command must succeed or fail as a
-whole, and either len bytes of data must be sent or the connection
-must be closed, even if the failure is `EINVAL` due to bad flags).
+whole, and either len bytes of data must be sent or a hard disconnect
+must be initiated, even if the failure is `EINVAL` due to bad flags).
 Second, there is no way to efficiently skip over portions of a sparse
 file that are known to contain all zeroes.  Finally, it is not
 possible to reliably decode the server traffic without also having
@@ -1223,7 +1322,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     Some chunk types can additionally be categorized by role, such as
     *error chunks* or *content chunks*.  Each type determines how to
     interpret the "length" bytes of payload.  If the client receives
-    an unknown or unexpected type, it MUST close the connection.
+    an unknown or unexpected type, it MUST initiate a hard disconnect.
 
     - `NBD_REPLY_TYPE_NONE` (0)
 
@@ -1354,8 +1453,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     MUST always be answered by a simple reply, as documented above
     (using magic 0x67446698 `NBD_SIMPLE_REPLY_MAGIC`, and containing
     length bytes of data according to the client's request, although
-    those bytes MAY be invalid if an error is returned, and the
-    connection MUST be closed if an error occurs after a header
+    those bytes MAY be invalid if an error is returned, and a hard
+    disconnect MUST be initiated if an error occurs after a header
     claiming no error).
 
     If structured replies are negotiated, then a read request MUST
@@ -1414,7 +1513,7 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     valid up until the reported offset, and that portions of the read
     that do not have a corresponding content chunk are not valid.
 
-    A client MAY close the connection if it detects that the server
+    A client MAY initiate a hard disconnect if it detects that the server
     has sent invalid chunks (such as overlapping data, or not enough
     data before claiming success).
 
