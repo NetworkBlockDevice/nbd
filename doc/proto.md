@@ -14,7 +14,7 @@ For matters of clarity, in this document we will refer to an export from
 a server as a block device, even though the actual backing on the server
 need not be an actual block device; it may be a block device, a regular
 file, or a more complex configuration involving several files. That is
-an implementational detail of the server.
+an implementation detail of the server.
 
 ## Conventions
 
@@ -213,7 +213,7 @@ If the client wishes to terminate the session in the negotiation
 phase, and is not doing so because it is required to do so
 by this document, it SHOULD send `NBD_OPT_ABORT` first if the protocol
 permits. There are instances where this is impossible, such as after
-an `NBD_OPT_EXPORTNAME` has been issued, or on an unsuccessful
+an `NBD_OPT_EXPORT_NAME` has been issued, or on an unsuccessful
 negotiation of TLS.  For instance, if the client does not find an
 export it is looking for, it may simply send an `NBD_OPT_ABORT`
 and close the TCP connection.
