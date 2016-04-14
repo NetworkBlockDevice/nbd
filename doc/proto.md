@@ -204,18 +204,18 @@ required to.
 There is no requirement for the client or server to complete a
 negotiation if it does not wish to do so. Either end may simply
 close the TCP connection (though see below regarding prior use
-of NBD_OPT_ABORT). Under certain circumstances either
+of `NBD_OPT_ABORT`). Under certain circumstances either
 the client or the server may be required by this document to close
 the TCP connection. In each case, this is referred to as 'terminate
 the session'.
 
 If the client wishes to terminate the session in the negotiation
 phase, and is not doing so because it is required to do so
-by this document, it SHOULD send NBD_OPT_ABORT first if the protocol
+by this document, it SHOULD send `NBD_OPT_ABORT` first if the protocol
 permits. There are instances where this is impossible, such as after
-an NBD_OPT_EXPORTNAME has been issued, or on an unsuccessful
+an `NBD_OPT_EXPORTNAME` has been issued, or on an unsuccessful
 negotiation of TLS.  For instance, if the client does not find an
-export it is looking for, it may simply send an NBD_OPT_ABORT
+export it is looking for, it may simply send an `NBD_OPT_ABORT`
 and close the TCP connection.
 
 ### Transmission
@@ -370,8 +370,8 @@ a prior TCP session to a given server will be relevant
 to a subsequent session.
 
 The server MUST operate in NOTLS mode unless the server
-set flag NBD_FLAG_FIXED_NEWSTYLE and the client replied
-with NBD_FLAG_C_FIXED_NEWSTYLE in the fixed newstyle
+set flag `NBD_FLAG_FIXED_NEWSTYLE` and the client replied
+with `NBD_FLAG_C_FIXED_NEWSTYLE` in the fixed newstyle
 negotiation.
 
 These modes of operations are described in detail below.
@@ -451,7 +451,7 @@ exports are TLS-only. This is permitted in part to make programming
 of servers easier. Operation is a little different from FORCEDTLS,
 as the client is not forced to upgrade to TLS prior to any options
 being processed, and the server MAY choose to give information on
-non-existent exports via NBD_OPT_INFO responses prior to an upgrade
+non-existent exports via `NBD_OPT_INFO` responses prior to an upgrade
 to TLS.
 
 The SELECTIVETLS mode of operation has an implementation problem
@@ -475,8 +475,8 @@ refuse to connect to a particular export if TLS is
 not available and the user requires TLS.
 
 The client MUST NOT issue `NBD_OPT_STARTTLS` unless the server
-set flag NBD_FLAG_FIXED_NEWSTYLE and the client replied
-with NBD_FLAG_C_FIXED_NEWSTYLE in the fixed newstyle
+set flag `NBD_FLAG_FIXED_NEWSTYLE` and the client replied
+with `NBD_FLAG_C_FIXED_NEWSTYLE` in the fixed newstyle
 negotiation.
 
 The client MUST NOT issue `NBD_OPT_STARTTLS` if TLS has already
