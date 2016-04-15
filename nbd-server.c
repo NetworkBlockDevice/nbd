@@ -261,6 +261,8 @@ static inline const char * getcommandname(uint64_t command) {
 		return "NBD_CMD_FLUSH";
 	case NBD_CMD_TRIM:
 		return "NBD_CMD_TRIM";
+	case NBD_CMD_WRITE_ZEROES:
+		return "NBD_CMD_WRITE_ZEROES";
 	default:
 		return "UNKNOWN";
 	}
@@ -1183,6 +1185,39 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	return 0;
 }
 
+
+/**
+ * Write an amount of zeroes at a given offset to the right file.
+ * This routine could be optimised by not calling expwrite. However,
+ * this is by far the simplest way to do it.
+ *
+ * @param req the request
+ * @param client The client we're going to write for.
+ * @return 0 on success, nonzero on failure
+ **/
+int expwrite_zeroes(struct nbd_request* req, CLIENT* client) {
+	off_t a = req->from;
+	size_t len = req->len;
+	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
+	size_t maxsize = 64LL*1024LL*1024LL;
+	/* use calloc() as sadly MAP_ANON is apparently not POSIX standard */
+	char *buf = calloc (1, maxsize);
+	int ret;
+	while (len > 0) {
+		size_t l = len;
+		if (l > maxsize)
+			l = maxsize;
+		ret = expwrite(a, buf, l, client, fua);
+		if (ret) {
+			free(buf);
+			return ret;
+		}
+		len -= l;
+	}
+	free(buf);
+	return 0;
+}
+
 /**
  * Flush data to a client
  *
@@ -1382,7 +1417,7 @@ CLIENT* negotiate(int net, GArray* servers) {
 
 void send_export_info(CLIENT* client) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
-	uint16_t flags = NBD_FLAG_HAS_FLAGS;
+	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
 	if (write(client->net, &size_host, 8) < 0)
 		err("Negotiation failed/9: %m");
@@ -1481,7 +1516,7 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 		DEBUG("[WRITE to READONLY!]");
 		rep.error = nbd_errno(EPERM);
 	} else {
-		if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
+		if(expwrite(req->from, data, req->len, client, !!(req->type & NBD_CMD_FLAG_FUA))) {
 			DEBUG("Write failed: %m");
 			rep.error = nbd_errno(errno);
 		}
@@ -1517,13 +1552,29 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 	pthread_mutex_unlock(&(client->lock));
 }
 
+static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
+	struct nbd_reply rep;
+	DEBUG("handling write_zeroes request\n");
+	setup_reply(&rep, req);
+	if(expwrite_zeroes(req, client)) {
+		DEBUG("Write_zeroes failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	// For now, don't trim
+	// TODO: handle this far more efficiently with reference to the
+	// actual backing driver
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
+}
+
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
 	uint32_t type = package->req->type & NBD_CMD_MASK_COMMAND;
 	uint32_t flags = package->req->type & ~NBD_CMD_MASK_COMMAND;
 	struct nbd_reply rep;
 
-	if(flags & ~NBD_CMD_FLAG_FUA) {
+	if(flags & ~(NBD_CMD_FLAG_FUA | NBD_CMD_FLAG_NO_HOLE)) {
 		msg(LOG_ERR, "E: received invalid flag %d on command %d, ignoring", flags, type);
 		goto error;
 	}
@@ -1540,6 +1591,9 @@ static void handle_request(gpointer data, gpointer user_data) {
 			break;
 		case NBD_CMD_TRIM:
 			handle_trim(package->client, package->req);
+			break;
+		case NBD_CMD_WRITE_ZEROES:
+			handle_write_zeroes(package->client, package->req);
 			break;
 		default:
 			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
@@ -1646,7 +1700,7 @@ int mainloop(CLIENT *client) {
 		memcpy(reply.handle, request.handle, sizeof(reply.handle));
 
 		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ) ||
-		    (command==NBD_CMD_TRIM)) {
+		    (command==NBD_CMD_TRIM) || (command==NBD_CMD_WRITE_ZEROES)) {
 			if (request.from + len < request.from) { // 64 bit overflow!!
 				DEBUG("[Number too large!]");
 				ERROR(client, reply, EINVAL);
@@ -1655,7 +1709,7 @@ int mainloop(CLIENT *client) {
 
 			if (((off_t)request.from + len) > client->exportsize) {
 				DEBUG("[RANGE!]");
-				ERROR(client, reply, (command==NBD_CMD_WRITE) ? ENOSPC : EINVAL);
+				ERROR(client, reply, (command==NBD_CMD_WRITE || command==NBD_CMD_WRITE_ZEROES) ? ENOSPC : EINVAL);
 				continue;
 			}
 
@@ -1756,6 +1810,21 @@ int mainloop(CLIENT *client) {
 			}
 			if (exptrim(&request, client)) {
 				DEBUG("Trim failed: %m");
+				ERROR(client, reply, errno);
+				continue;
+			}
+			SEND(client->net, reply);
+			continue;
+
+		case NBD_CMD_WRITE_ZEROES:
+			if ((client->server->flags & F_READONLY) ||
+			    (client->server->flags & F_AUTOREADONLY)) {
+				DEBUG("[WRITE_ZEROES to READONLY!]");
+				ERROR(client, reply, EPERM);
+				continue;
+			}
+			if (expwrite_zeroes(&request, client)) {
+				DEBUG("Write zeroes failed: %m");
 				ERROR(client, reply, errno);
 				continue;
 			}
