@@ -674,6 +674,87 @@ This functionality has not yet been implemented by the reference
 implementation, but was implemented by qemu and subsequently
 by other users, so has been moved out of the "experimental" section.
 
+## Block sizes
+
+During transmission phase, several operations are constrained by the
+export size sent by the final `NBD_OPT_EXPORT_NAME` or `NBD_OPT_GO`,
+as well as by three block sizes defined here (minimum, preferred, and
+maximum).  If a client can honor server block sizes (as set out in the
+experimental `BLOCK_SIZE` extension below), it SHOULD announce this
+during the handshake phase, and SHOULD use `NBD_OPT_GO` rather than
+`NBD_OPT_EXPORT_NAME`.  A server SHOULD advertise the block size
+contraints during handshake phase via the experimental `INFO`
+extension; see below.  A server and client MAY agree on block sizes
+via out of band means.
+
+If block sizes have not been advertised or agreed on externally, then
+a client SHOULD assume a default minimum block size of 1, a preferred
+block size of 2^12 (4,096), and a maximum block size of the smaller of
+the export size or 0xffffffff (effectively unlimited).  A server that
+wants to enforce block sizes other than the defaults specified here
+MUST support the experimental `INFO` extension, and MAY refuse to go
+into transmission phase with a client that uses `NBD_OPT_EXPORT_NAME`
+or failed to use `NBD_OPT_BLOCK_SIZE`, although a server SHOULD permit
+such clients if block sizes can be agreed on externally.  When
+allowing such clients, the server MUST cleanly error commands that
+fall outside block size parameters without corrupting data; even so,
+this may limit interoperability.
+
+A client MAY choose to operate as if tighter block sizes had been
+specified (for example, even when the server advertises the default
+minimum block size of 1, a client may safely use a minimum block size
+of 2^9 (512), a preferred block size of 2^16 (65,536), and a maximum
+block size of 2^25 (33,554,432)).  Notwithstanding any maximum block
+size advertised, either the server or the client MAY initiate a hard
+disconnect if the size of a request or a reply is large enough to be
+deemed a denial of service attack.
+
+The minimum block size represents the smallest addressable length and
+alignment within the export, although writing to an area that small
+may require the server to use a less-efficient read-modify-write
+action.  If advertised, this value MUST be a power of 2, MUST NOT be
+larger than 2^16 (65,536), and MAY be as small as 1 for an export
+backed by a regular file, although the values of 2^9 (512) or 2^12
+(4,096) are more typical for an export backed by a block device.  If a
+server advertises a minimum block size, the advertised export size
+SHOULD be an integer multiple of that block size, since otherwise, the
+client would be unable to access the final few bytes of the export.
+
+The preferred block size represents the minimum size at which aligned
+requests will have efficient I/O, avoiding behaviour such as
+read-modify-write.  If advertised, this MUST be a power of 2 at least
+as large as the smaller of the minimum block size and 2^12 (4,096),
+although larger values (such as the minimum granularity of a hole) are
+also appropriate.  The preferred block size MAY be larger than the
+export size, in which case the client is unable to utilize the
+preferred block size for that export.  The server MAY advertise an
+export size that is not an integer multiple of the preferred block
+size.
+
+The maximum block size represents the maximum length that the server
+is willing to handle in one request.  If advertised, it MUST be either
+an integer multiple of the minimum block size or the value 0xffffffff
+for no inherent limit, MUST be at least as large as the smaller of the
+preferred block size or export size, and SHOULD be at least 2^25
+(33,554,432) if the export is that large, but MAY be something other
+than a power of 2.  For convenience, the server MAY advertise a
+maximum block size that is larger than the export size, although in
+that case, the client MUST treat the export size as the effective
+maximum block size (as further constrained by a non-zero offset).
+
+Where a transmission request can have a non-zero *offset* and/or
+*length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
+the client MUST ensure that *offset* and *length* are integer
+multiples of any advertised minimum block size, and SHOULD use integer
+multiples of any advertised preferred block size where possible.  For
+those requests, the client MUST NOT use a *length* larger than any
+advertised maximum block size or which, when added to *offset*, would
+exceed the export size.  The server SHOULD report an `EINVAL` error if
+the client's request is not aligned to advertised minimum block size
+boundaries, or is larger than the advertised maximum block size,
+although the server MAY instead initiate a hard disconnect if a large
+*length* could be deemed as a denial of service attack.
+
 ## Values
 
 This section describes the value and meaning of constants (other than
@@ -830,6 +911,10 @@ of the newstyle negotiation.
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
     Defined by the experimental `STRUCTURED_REPLY` extension; see below.
+
+- `NBD_OPT_BLOCK_SIZE` (9)
+
+    Defined by the experimental `BLOCK_SIZE` extension; see below.
 
 #### Option reply types
 
@@ -1063,11 +1148,13 @@ The following error values are defined:
 * `ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `ENOSPC` if it receives a write request
-including one or more sectors beyond the size of the device.  It SHOULD
+including one or more sectors beyond the size of the device.  It also
+SHOULD map the `EDQUOT` and `EFBIG` errors to `ENOSPC`.  It SHOULD
 return `EINVAL` if it receives a read or trim request including one or
-more sectors beyond the size of the device.  It also SHOULD map the
-`EDQUOT` and `EFBIG` errors to `ENOSPC`.  Finally, it SHOULD return
-`EPERM` if it receives a write or trim request on a read-only export.
+more sectors beyond the size of the device, or if a read or write
+request is not aligned to advertised minimum block sizes. Finally, it
+SHOULD return `EPERM` if it receives a write or trim request on a
+read-only export.
 
 The server SHOULD return `EINVAL` if it receives an unknown command.
 
@@ -1252,9 +1339,56 @@ documentation.
       - 16 bits, `NBD_INFO_DESCRIPTION`  
       - String: description of the export, *length - 2* bytes  
 
+    * `NBD_INFO_BLOCK_SIZE` (3)
+
+      Represents the server's advertised block sizes; see the "Block
+      sizes" section for more details on what these values represent,
+      and on constraints on their values.  The server MAY send this
+      info whether or not the client has negotiated
+      `NBD_OPT_BLOCK_SIZE`, and SHOULD send this info if it intends to
+      enforce block sizes other than the defaults. The *length* MUST
+      be 14, and the reply payload is interpreted as:
+
+      - 16 bits, `NBD_INFO_BLOCK_SIZE`  
+      - 32 bits, minimum block size  
+      - 32 bits, preferred block size  
+      - 32 bits, maximum block size  
+
 * `NBD_REP_ERR_UNKNOWN`
 
     The requested export is not available.
+
+### `BLOCK_SIZE` extension
+
+Some servers are able to make optimizations, such as opening files
+with O_DIRECT, if they know that the client will obey a particular
+minimum block size, where it must fall back to safer but slower code
+if the client might send unaligned requests.  To facilitate optimum
+coordination between client and server, a `BLOCK_SIZE` extension is
+envisioned, which adds one new option request.
+
+Note that a client MAY obey non-default block sizes even without
+advertising intent or even when the server does not advertise block
+sizes; and that a server MAY advertise block sizes even when a client
+does not advertise intent.  Therefore, the use of this option is
+independent of whether the server uses `NBD_INFO_BLOCK_SIZE`, as
+documented in the `INFO` extension.
+
+* `NBD_OPT_BLOCK_SIZE`
+
+    The client wishes to inform the server of its intent to obey block
+    sizes.  The option request has no additional data.
+
+    The server MUST reply with `NBD_REP_ACK`, after which point the
+    client SHOULD use `NBD_OPT_GO` rather than `NBD_OPT_EXPORT_NAME`,
+    and the server SHOULD include `NBD_INFO_BLOCK_SIZE` in its reply.
+    If successfully negotiated, and the server advertises block sizes,
+    the client MUST NOT send unaligned requests.
+
+    For backwards compatibility, clients SHOULD be prepared to also
+    handle `NBD_REP_ERR_UNSUP`, which means the server SHOULD NOT be
+    advertising block sizes, and the client MAY assume the server will
+    honor default block sizes.
 
 ### `WRITE_ZEROES` extension
 
@@ -1426,13 +1560,15 @@ error, and alters the reply to the `NBD_CMD_READ` request.
       be at least 12.  This reply represents that an error occurred at
       a given offset, which MUST lie within the original offset and
       length of the request; the client can use this offset to
-      determine if request had any partial success.  This chunk type
-      MAY appear multiple times in a structured reply, although the
-      same offset SHOULD NOT be repeated.  Likewise, if content chunks
-      were sent earlier in the structured reply, the server SHOULD NOT
-      send multiple distinct offsets that lie within the bounds of a
-      single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-      `NBD_CMD_WRITE`, `NBD_CMD_WRITE_ZEROES`, and `NBD_CMD_TRIM`.
+      determine if request had any partial success.  The server MAY
+      use an offset that is not a multiple of any advertised minimum
+      block size.  This chunk type MAY appear multiple times in a
+      structured reply, although the same offset SHOULD NOT be
+      repeated.  Likewise, if content chunks were sent earlier in the
+      structured reply, the server SHOULD NOT send multiple distinct
+      offsets that lie within the bounds of a single content chunk.
+      Valid as a reply to `NBD_CMD_READ`, `NBD_CMD_WRITE`,
+      `NBD_CMD_WRITE_ZEROES`, and `NBD_CMD_TRIM`.
 
       The payload is structured as:
 
@@ -1517,8 +1653,9 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     The server SHOULD return `EOVERFLOW`, rather than `EINVAL`, when a
     client has requested `NBD_CMD_FLAG_DF` for a length that is too
     large to read without fragmentation.  The server MUST NOT return
-    this error if the read request did not exceed 65,536 bytes, and
-    SHOULD NOT return this error if `NBD_CMD_FLAG_DF` is not set.
+    this error if the read request did not exceed the larger of 65,536
+    bytes or the advertised preferred block size, and SHOULD NOT
+    return this error if `NBD_CMD_FLAG_DF` is not set.
 
 * `NBD_CMD_READ`
 
@@ -1539,14 +1676,19 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     The server MAY split the reply into any number of content chunks;
     each chunk MUST describe at least one byte, although to minimize
     overhead, the server SHOULD use chunks with lengths and offsets as
-    an integer multiple of 512 bytes, where possible (the first and
-    last chunk of an unaligned read being the most obvious places for
-    an exception).  The server MUST NOT send content chunks that
-    overlap with any earlier content or error chunk, and MUST NOT send
-    chunks that describe data outside the offset and length of the
-    request, but MAY send the content chunks in any order (the client
-    MUST reassemble content chunks into the correct order), and MAY
-    send additional content chunks even after reporting an error chunk.
+    an integer multiple of the preferred block size (whether the
+    advertised value or the default of 4,096 bytes) where that is
+    possible (the first and last chunk of an unaligned read being the
+    most obvious places for an exception).  If the server advertised
+    block sizes, it MUST ensure that every chunk has a length and
+    offset which are an integer multiple of the minimum block size.
+
+    The server MUST NOT send content chunks that overlap with any
+    earlier content or error chunk, and MUST NOT send chunks that
+    describe data outside the offset and length of the request, but
+    MAY send the content chunks in any order (the client MUST
+    reassemble content chunks into the correct order), and MAY send
+    additional content chunks even after reporting an error chunk.
     Note that a request for more than 2^32 - 8 bytes MUST be split
     into at least two chunks, so as not to overflow the length field
     of a reply while still allowing space for the offset of each
@@ -1601,7 +1743,8 @@ error, and alters the reply to the `NBD_CMD_READ` request.
     if the length is too large to send without fragmentation, in which
     case it MUST NOT send a content chunk; however, the server MUST
     support unfragmented reads in which the client's request length
-    does not exceed 65,536 bytes.
+    does not exceed the larger of 65,536 bytes or the advertised
+    preferred block size.
 
 ## About this file
 
