@@ -798,8 +798,9 @@ of the newstyle negotiation.
 
 - `NBD_OPT_LIST` (3)
 
-    Return a number of `NBD_REP_SERVER` replies, one for each export,
-    followed by `NBD_REP_ACK`. The server SHOULD omit entries from this
+    Return zero or more `NBD_REP_SERVER` replies, one for each export,
+    followed by `NBD_REP_ACK` or an error (such as
+    `NBD_REP_ERR_SHUTDOWN`). The server MAY omit entries from this
     list if TLS has not been negotiated, the server is operating in
     SELECTIVETLS mode, and the entry concerned is a TLS-only export.
 
@@ -847,7 +848,8 @@ during option haggling in the fixed newstyle negotiation.
 
     - 32 bits, length of name (unsigned); MUST be no larger than the
       reply packet header length - 4
-    - String, name of the export, as expected by `NBD_OPT_EXPORT_NAME`
+    - String, name of the export, as expected by `NBD_OPT_EXPORT_NAME`,
+      `NBD_OPT_INFO`, or `NBD_OPT_GO`
     - If length of name < (reply packet header length - 4), then the
       rest of the data contains some implementation-specific details
       about the export. This is not currently implemented, but future
@@ -856,9 +858,9 @@ during option haggling in the fixed newstyle negotiation.
       particular client request, this field is defined to be a string
       suitable for direct display to a human being.
 
-    The experimental `INFO` extension (see below) adds two client
-    option requests where the extra data has a definition other than a
-    text string.
+* `NBD_REP_INFO` (3)
+
+    Defined by the experimental `INFO` extension; see below.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -1099,13 +1101,14 @@ any structured message). This is a result of a (misguided) attempt to
 keep backwards compatibility with non-fixed newstyle negotiation.
 
 To remedy this, an `INFO` extension is envisioned. This extension adds
-two option requests and one error reply type, and extends one existing
-option reply type.
+two option requests, one option reply type, and one error reply type,
+along with additional rules on the use of `NBD_REP_ERR_TLS_REQD`.
 
-Both options have identical formats for requests and replies. The
-only difference is that after a successful reply to `NBD_OPT_GO`
-(i.e. an `NBD_REP_SERVER`), transmission mode is entered immediately.
-Therefore these commands share common documentation.
+Both options have identical formats for requests and replies. The only
+difference is that after a successful reply to `NBD_OPT_GO` (i.e. one
+or more `NBD_REP_INFO` then an `NBD_REP_ACK`), transmission mode is
+entered immediately.  Therefore these commands share common
+documentation.
 
 * `NBD_OPT_INFO` and `NBD_OPT_GO`
 
@@ -1131,57 +1134,127 @@ Therefore these commands share common documentation.
     this specifies the default export (if any), as with
     `NBD_OPT_EXPORT_NAME`.
 
-    The server replies with one of the following:
+    The server replies with a number of `NBD_REP_INFO` replies (as few
+    as zero if an error is reported, at least one on success), then
+    concludes the list of information with a final error reply or with
+    a declaration of success, as follows:
 
+    - `NBD_REP_ACK`: The server accepts the chosen export, and has
+      completed providing information.  In this case, the server MUST
+      send at least one `NBD_REP_INFO`, with an `NBD_INFO_EXPORT`
+      information type.
     - `NBD_REP_ERR_UNKNOWN`: The chosen export does not exist on this
-      server.
-    - `NBD_REP_ERR_TLS_REQD`: The server does not wish to export this
-      block device unless the client initiates TLS first.
-    - `NBD_REP_SERVER`: The server accepts the chosen export.
+      server.  In this case, the server SHOULD NOT send `NBD_REP_INFO`
+      replies.
+    - `NBD_REP_ERR_TLS_REQD`: The server requires the client to
+      initiate TLS before any revealing any further details about this
+      export.  In this case, a FORCEDTLS server MUST NOT send
+      `NBD_REP_INFO` replies, but a SELECTIVETLS server MAY do so if
+      this is a TLS-only export.
 
     Additionally, if TLS has not been initiated, the server MAY reply
-    with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`)
-    to requests for exports that are unknown. This is so that clients
-    that have not initiated TLS cannot enumerate exports.
-
-    In the case of `NBD_REP_SERVER`, the message's data takes on a different
-    interpretation than the default (so as to provide additional
-    binary information normally sent in reply to `NBD_OPT_EXPORT_NAME`,
-    in place of the default free-form string). The option reply length
-    MUST be *length of name* + 14, and the option data has the following layout:
-
-    - 32 bits, length of name (unsigned)
-    - String: name of the export. This name MAY be different from the one
-      given in the `NBD_OPT_INFO` or `NBD_OPT_GO` option in case the
-      server has multiple alternate names for a single export, or a
-      default export was specified.
-    - 64 bits, size of the export in bytes (unsigned)
-    - 16 bits, transmission flags.
-
-    The server MUST NOT fail an `NBD_OPT_GO` sent with the same parameters
-    as a previous `NBD_OPT_INFO` which returned successfully (i.e. with
-    `NBD_REP_SERVER`), unless in the intervening time the client has
-    negotiated other options. The server MUST return the same transmission
-    flags with `NBD_OPT_GO` as a previous `NBD_OPT_INFO` with the same
-    parameters unless in the intervening time the client has negotiated other
-    options. The values of the transmission flags MAY differ from what was sent
-    earlier in response to an earlier `NBD_OPT_INFO` (if any), and/or
-    the server MAY fail the request, based on other options that were
-    negotiated in the meantime.
+    with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`) to
+    requests for exports that are unknown. This is so that clients
+    that have not initiated TLS cannot enumerate exports.  A
+    SELECTIVETLS server that chooses to hide unknown exports in this
+    manner SHOULD NOT send `NBD_REP_INFO` replies for a TLS-only
+    export.
 
     For backwards compatibility, clients SHOULD be prepared to also
     handle `NBD_REP_ERR_UNSUP` by falling back to using `NBD_OPT_EXPORT_NAME`.
 
-    The reply to an `NBD_OPT_GO` is identical to the reply to `NBD_OPT_INFO`
-    save that if the reply indicates success (i.e. is `NBD_REP_SERVER`),
-    the client and the server both immediately enter the transmission
-    phase. The server MUST NOT send any zero padding bytes after the
-    `NBD_REP_SERVER` data, whether or not the client negotiated the
-    `NBD_FLAG_C_NO_ZEROES` flag. After sending this reply the server MUST
-    immediately move to the transmission phase, and after receiving this
-    reply, the client MUST immediately move to the transmission phase;
-    therefore, the server MUST NOT send this particular reply until all
-    other pending option replies have been sent by the server.
+    Other errors (such as `NBD_REP_ERR_SHUTDOWN`) are also possible,
+    as permitted elsewhere in this document, with no constraints on
+    the number of preceeding `NBD_REP_INFO`.
+
+    If there are no intervening option requests between a successful
+    `NBD_OPT_INFO` (that is, one where the reply ended with a final
+    `NBD_REP_ACK`) and an `NBD_OPT_GO` with the same parameters, then
+    the server MUST reply with the same set of information, such as
+    transmission flags in the `NBD_INFO_EXPORT` reply, although the
+    ordering of the intermediate `NBD_REP_INFO` messages MAY differ.
+    Otherwise, due to the intervening option requests or the use of
+    different parameters, the server MAY send different data in the
+    successful response, and/or MAY fail the second request.
+
+    The reply to an `NBD_OPT_GO` is identical to the reply to
+    `NBD_OPT_INFO` save that if the reply indicates success (i.e. ends
+    with `NBD_REP_ACK`), the client and the server both immediately
+    enter the transmission phase. The server MUST NOT send any zero
+    padding bytes after the `NBD_REP_ACK` data, whether or not the
+    client negotiated the `NBD_FLAG_C_NO_ZEROES` flag. The server MUST
+    NOT send the final `NBD_REP_ACK` reply until all other pending
+    option replies have been sent by the server, and a client MUST NOT
+    send any further option requests after `NBD_OPT_GO` unless it
+    first receives an error reply.
+
+* `NBD_REP_INFO`
+
+    A detailed description about an aspect of an export.  The response
+    to `NBD_OPT_INFO` and `NBD_OPT_GO` includes zero or more of these
+    messages prior to a final error reply, or at least one before an
+    `NBD_REP_ACK` reply indicating success.  The server MUST send an
+    `NBD_INFO_EXPORT` information type at some point before sending an
+    `NBD_REP_ACK`, so that `NBD_OPT_GO` can provide a superset of the
+    information given in response to `NBD_OPT_EXPORT_NAME`; all other
+    information types are optional.  A particular information type
+    SHOULD only appear once for a given export unless documented
+    otherwise.
+
+    A client MUST NOT rely on any particular ordering amongst the
+    `NBD_OPT_INFO` replies, and MUST ignore information types that it
+    does not recognize.
+
+    The acceptable values for the header *length* field are determined
+    by the information type, and includes the 2 bytes for the type
+    designator, in the following general layout:
+
+    - 16 bits, information type (e.g. `NBD_INFO_EXPORT`)  
+    - *length - 2* bytes, information payload  
+
+    The following information types are defined:
+
+    * `NBD_INFO_EXPORT` (0)
+
+      Mandatory information before a successful completion of
+      `NBD_OPT_INFO` or `NBD_OPT_GO`.  Describes the same information
+      that is sent in response to the older `NBD_OPT_EXPORT_NAME`,
+      except that there are no trailing zeroes whether or not
+      `NBD_FLAG_C_NO_ZEROES` was negotiated.  *length* MUST be 12, and
+      the reply payload is interpreted as follows:
+
+      - 16 bits, `NBD_INFO_EXPORT`  
+      - 64 bits, size of the export in bytes (unsigned)  
+      - 16 bits, transmission flags  
+
+    * `NBD_INFO_NAME` (1)
+
+      Represents the server's canonical name of the export. The name
+      MAY differ from the name presented in the client's option
+      request, and the information item MAY be omitted if the client
+      option request already used the canonical name.  This
+      information type represents the same name that would appear in
+      the name portion of an `NBD_REP_SERVER` in response to
+      `NBD_OPT_LIST`. The *length* MUST be at least 2, and the reply
+      payload is interpreted as:
+
+      - 16 bits, `NBD_INFO_NAME`  
+      - String: name of the export, *length - 2* bytes  
+
+    * `NBD_INFO_DESCRIPTION` (2)
+
+      A description of the export, suitable for direct display to the
+      human being.  This information type represents the same optional
+      description that may appear after the name portion of an
+      `NBD_REP_SERVER` in response to `NBD_OPT_LIST`. The *length*
+      MUST be at least 2, and the reply payload is interpreted as:
+
+      - 16 bits, `NBD_INFO_DESCRIPTION`  
+      - String: description of the export, *length - 2* bytes  
+
+* `NBD_REP_ERR_UNKNOWN`
+
+    The requested export is not available.
 
 ### `WRITE_ZEROES` extension
 
