@@ -158,7 +158,7 @@ manpage.1: manpage.sgml
           <para>Previous versions of the nbd tools supported an older
             version of the negotiation protocol known as "oldstyle".
             This protocol version is no longer supported as of version
-            3.11 of the nbd spport tools.</para>
+            3.11 of the nbd support tools.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

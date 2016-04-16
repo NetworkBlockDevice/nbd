@@ -44,10 +44,6 @@ this:
         group = nbd
     [export1]
         exportname = /export/nbd/export1-file
-        # The following line will be ignored unless the 
-        # "oldstyle = true" line in the generic section above is
-        # enabled.
-        port = 12345
         authfile = /export/nbd/export1-authfile
         timeout = 30
         filesize = 10000000
@@ -58,9 +54,7 @@ this:
         postrun = rm -f %s
     [otherexport]
         exportname = /export/nbd/experiment
-        # The other options are all optional, except this one in case
-        # the oldstyle option is used in [generic]:
-        # port = 12346
+        # The other options are all optional
 
 The configuration file is parsed with GLib's GKeyFile, which parses key
 files as they are specified in the Freedesktop.org Desktop Entry
@@ -92,9 +86,6 @@ will use the second export in the above example (the one that exports
 (but do make sure that /var/run is writeable by the server that
 `nbd-server` runs as; otherwise, you won't get a PID file, though the
 server will keep running).
-
-The old command-line port-only way of exporting something is still
-supported, but it is deprecated.
 
 There are packages (or similar) available for the following operating
 systems:
