@@ -206,7 +206,8 @@ required to.
 There are three possible mechanisms to end option haggling:
 
 * Transmission mode can be entered (by the client sending
-  `NBD_OPT_EXPORT_NAME`). This is documented
+  `NBD_OPT_EXPORT_NAME` or by the server responding to an
+  `NBD_OPT_GO` with `NBD_REP_SERVER`). This is documented
   elsewhere.
 
 * The client can send (and the server can reply to) an
@@ -415,7 +416,10 @@ server MUST support one of these modes.
   stopping TLS is not possible). Instead it permits the client
   to upgrade as and when it chooses, but unless an upgrade to
   TLS has already taken place, the server errors attempts
-  to enter transmission mode on TLS-only exports, and MAY omit
+  to enter transmission mode on TLS-only exports, MAY
+  refuse to provide information about TLS-only exports
+  via `NBD_OPT_INFO`, MAY refuse to provide information
+  about non-existent exports via `NBD_OPT_INFO`, and MAY omit
   exports that are TLS-only from `NBD_OPT_LIST`.
 
 The server MAY determine the mode in which it operates
@@ -461,12 +465,15 @@ certificate does not match) the server MUST terminate the
 session as by this stage it is too late to continue without TLS
 as the acknowledgement has been sent.
 
-If the server receives any other option, it MUST reply with
-`NBD_REP_ERR_TLS_REQD` if TLS has not been initiated.
-If the server receives a request to
+If the server receives any other option, including `NBD_OPT_INFO`
+and unsupported options, it MUST reply with `NBD_REP_ERR_TLS_REQD`
+if TLS has not been initiated; `NBD_OPT_INFO` is included as in this
+mode, all exports are TLS-only. If the server receives a request to
 enter transmission mode via `NBD_OPT_EXPORT_NAME` when TLS has not
 been initiated, then as this request cannot error, it MUST
-terminate the session.
+terminate the session. If the server receives a request to
+enter transmission mode via `NBD_OPT_GO` when TLS has not been
+initiated, it MUST error with `NBD_REP_ERR_TLS_REQD`.
 
 The server MUST NOT send `NBD_REP_ERR_TLS_REQD` in reply to
 any option if TLS has already been initiated.
@@ -474,6 +481,7 @@ any option if TLS has already been initiated.
 The FORCEDTLS mode of operation has an implementation problem in
 that the client MAY legally simply send a `NBD_OPT_EXPORT_NAME`
 to enter transmission mode without previously sending any options.
+This is avoided by use of `NBD_OPT_INFO` and `NBD_OPT_GO`.
 
 #### SELECTIVETLS mode
 
@@ -483,29 +491,30 @@ out under 'FORCEDTLS' above. If the server receives
 `NBD_OPT_STARTTLS` when TLS has already been negotiated, it
 it MUST reply with `NBD_REP_ERR_INVALID`.
 
+If the server receives `NBD_OPT_INFO` or `NBD_OPT_GO` and TLS
+has not been initiated, it MAY reply with `NBD_REP_ERR_TLS_REQD`
+if that export is non-existent, and MUST reply with
+`NBD_REP_ERR_TLS_REQD` if that export is TLS-only.
+
 If the server receives a request to enter transmission mode
 via `NBD_OPT_EXPORT_NAME` on a TLS-only export when TLS has not
 been initiated, then as this request cannot error, it MUST
 terminate the session.
 
 The server MUST NOT send `NBD_REP_ERR_TLS_REQD` in reply to
-any option if TLS has already been negotiated.
+any option if TLS has already been negotiated. The server
+MUST NOT send `NBD_REP_ERR_TLS_REQD` in response to any
+option other than `NBD_OPT_INFO`, `NBD_OPT_GO` and
+`NBD_OPT_EXPORT_NAME`, and only in those cases in respect of
+a TLS-only or non-existent export.
 
 There is a degenerate case of SELECTIVETLS where all
 exports are TLS-only. This is permitted in part to make programming
 of servers easier. Operation is a little different from FORCEDTLS,
 as the client is not forced to upgrade to TLS prior to any options
-being processed.
-
-The SELECTIVETLS mode of operation has an implementation problem
-in that unless the INFO extension is supported, the client that
-does not use TLS may have its access to exports denied without
-it being able to ascertain the reason. For instance it may
-go into transmission mode using `NBD_OPT_EXPORT_NAME` - which
-does not return an error as no options will be denied with
-`NBD_REP_ERR_TLS_REQD`. Further there is no way to remotely
-determine whether an export requires TLS, and therefore this
-must be initiated between client and server out of band.
+being processed, and the server MAY choose to give information on
+non-existent exports via `NBD_OPT_INFO` responses prior to an upgrade
+to TLS.
 
 ### Client-side requirements
 
@@ -548,12 +557,32 @@ session as by this stage it is too late to continue without TLS.
 
 If the client receives an `NBD_REP_ERR_TLS_REQD` in response
 to any option, it implies that this option cannot be executed
-unless a TLS upgrade is performed. This
+unless a TLS upgrade is performed. If the option is any
+option other than `NBD_OPT_INFO` or `NBD_OPT_GO`, this
 indicates that no option will succeed unless a TLS upgrade
 is performed; the client MAY therefore choose to issue
 an `NBD_OPT_STARTTLS`, or MAY terminate the session (if
 for instance it does not support TLS or does not have
-appropriate credentials for this server).
+appropriate credentials for this server). If the client
+receives `NBD_REP_ERR_TLS_REQD` in response to
+`NBD_OPT_INFO` or `NBD_OPT_GO` this indicates that the
+export referred to within the option is either non-existent
+or requires TLS; the client MAY therefore choose to issue
+an `NBD_OPT_STARTTLS`, MAY terminate the session (if
+for instance it does not support TLS or does not have
+appropriate credentials for this server), or MAY continue
+in another manner without TLS, for instance by querying
+or using other exports.
+
+If a client supports TLS, it SHOULD use `NBD_OPT_GO`
+(if the server supports it) in place
+of `NBD_OPT_EXPORT_NAME`. The reason for this is set out in
+the final paragraphs of the sections under 'FORCEDTLS'
+and 'SELECTIVETLS': this gives an opportunity for the
+server to transmit that an error going into transmission
+mode is due to the client's failure to initiate TLS,
+and the fact that the client may obtain information about
+which exports are TLS-only through `NBD_OPT_INFO`.
 
 ### Security considerations
 
@@ -610,6 +639,85 @@ text unless the client insists on TLS.
 This functionality has not yet been implemented by the reference
 implementation, but was implemented by qemu and subsequently
 by other users, so has been moved out of the "experimental" section.
+
+## Block sizes
+
+During transmission phase, several operations are constrained by the
+export size sent by the final `NBD_OPT_EXPORT_NAME` or `NBD_OPT_GO`,
+as well as by three block sizes defined here (minimum, preferred, and
+maximum).  If a client can honor server block sizes (as set out in
+`NBD_OPT_BLOCK_SIZE`), it SHOULD announce this
+during the handshake phase, and SHOULD use `NBD_OPT_GO` rather than
+`NBD_OPT_EXPORT_NAME`.  A server SHOULD advertise the block size
+contraints during handshake phase via `NBD_OPT_INFO`.  A server
+and client MAY agree on block sizes via out of band means.
+
+If block sizes have not been advertised or agreed on externally, then
+a client SHOULD assume a default minimum block size of 1, a preferred
+block size of 2^12 (4,096), and a maximum block size of the smaller of
+the export size or 0xffffffff (effectively unlimited).  A server that
+wants to enforce block sizes other than the defaults specified here
+MAY refuse to go into transmission phase with a client that uses `NBD_OPT_EXPORT_NAME`
+or failed to use `NBD_OPT_BLOCK_SIZE`, although a server SHOULD permit
+such clients if block sizes can be agreed on externally.  When
+allowing such clients, the server MUST cleanly error commands that
+fall outside block size parameters without corrupting data; even so,
+this may limit interoperability.
+
+A client MAY choose to operate as if tighter block sizes had been
+specified (for example, even when the server advertises the default
+minimum block size of 1, a client may safely use a minimum block size
+of 2^9 (512), a preferred block size of 2^16 (65,536), and a maximum
+block size of 2^25 (33,554,432)).  Notwithstanding any maximum block
+size advertised, either the server or the client MAY initiate a hard
+disconnect if the size of a request or a reply is large enough to be
+deemed a denial of service attack.
+
+The minimum block size represents the smallest addressable length and
+alignment within the export, although writing to an area that small
+may require the server to use a less-efficient read-modify-write
+action.  If advertised, this value MUST be a power of 2, MUST NOT be
+larger than 2^16 (65,536), and MAY be as small as 1 for an export
+backed by a regular file, although the values of 2^9 (512) or 2^12
+(4,096) are more typical for an export backed by a block device.  If a
+server advertises a minimum block size, the advertised export size
+SHOULD be an integer multiple of that block size, since otherwise, the
+client would be unable to access the final few bytes of the export.
+
+The preferred block size represents the minimum size at which aligned
+requests will have efficient I/O, avoiding behaviour such as
+read-modify-write.  If advertised, this MUST be a power of 2 at least
+as large as the smaller of the minimum block size and 2^12 (4,096),
+although larger values (such as the minimum granularity of a hole) are
+also appropriate.  The preferred block size MAY be larger than the
+export size, in which case the client is unable to utilize the
+preferred block size for that export.  The server MAY advertise an
+export size that is not an integer multiple of the preferred block
+size.
+
+The maximum block size represents the maximum length that the server
+is willing to handle in one request.  If advertised, it MUST be either
+an integer multiple of the minimum block size or the value 0xffffffff
+for no inherent limit, MUST be at least as large as the smaller of the
+preferred block size or export size, and SHOULD be at least 2^25
+(33,554,432) if the export is that large, but MAY be something other
+than a power of 2.  For convenience, the server MAY advertise a
+maximum block size that is larger than the export size, although in
+that case, the client MUST treat the export size as the effective
+maximum block size (as further constrained by a non-zero offset).
+
+Where a transmission request can have a non-zero *offset* and/or
+*length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
+the client MUST ensure that *offset* and *length* are integer
+multiples of any advertised minimum block size, and SHOULD use integer
+multiples of any advertised preferred block size where possible.  For
+those requests, the client MUST NOT use a *length* larger than any
+advertised maximum block size or which, when added to *offset*, would
+exceed the export size.  The server SHOULD report an `EINVAL` error if
+the client's request is not aligned to advertised minimum block size
+boundaries, or is larger than the advertised maximum block size,
+although the server MAY instead initiate a hard disconnect if a large
+*length* could be deemed as a denial of service attack.
 
 ## Values
 
@@ -715,7 +823,8 @@ of the newstyle negotiation.
     newstyle.
 
     A major problem of this option is that it does not support the
-    return of error messages to the client in case of problems.
+    return of error messages to the client in case of problems. To
+    remedy this, `NBD_OPT_GO` has been introduced (see below).
 
 - `NBD_OPT_ABORT` (2)
 
@@ -753,13 +862,93 @@ of the newstyle negotiation.
 
     See the section on TLS above for further details.
 
-- `NBD_OPT_INFO` (6)
+- `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Both options have identical formats for requests and replies. The only
+    difference is that after a successful reply to `NBD_OPT_GO` (i.e. one
+    or more `NBD_REP_INFO` then an `NBD_REP_ACK`), transmission mode is
+    entered immediately.  Therefore these commands share common
+    documentation.
+
+    `NBD_OPT_INFO`: The client wishes to get details about an export
+    with the given name for use in the transmission phase, but does
+    not yet want to move to the transmission phase.  When successful,
+    this option provides more details than `NBD_OPT_LIST`, but only
+    for a single export name.
+
+    `NBD_OPT_GO`: The client wishes to terminate the handshake phase
+    and progress to the transmission phase. This client MAY issue this
+    command after an `NBD_OPT_INFO`, or MAY issue it without a
+    previous `NBD_OPT_INFO`.  `NBD_OPT_GO` can thus be used as an
+    improved version of `NBD_OPT_EXPORT_NAME` that is capable of
+    returning errors.
+
+    Data (both commands):
+
+    - String: name of the export (as with `NBD_OPT_EXPORT_NAME`, the length
+      comes from the option header).
+
+    If no name is specified (i.e. a zero length string is provided),
+    this specifies the default export (if any), as with
+    `NBD_OPT_EXPORT_NAME`.
+
+    The server replies with a number of `NBD_REP_INFO` replies (as few
+    as zero if an error is reported, at least one on success), then
+    concludes the list of information with a final error reply or with
+    a declaration of success, as follows:
+
+    - `NBD_REP_ACK`: The server accepts the chosen export, and has
+      completed providing information.  In this case, the server MUST
+      send at least one `NBD_REP_INFO`, with an `NBD_INFO_EXPORT`
+      information type.
+    - `NBD_REP_ERR_UNKNOWN`: The chosen export does not exist on this
+      server.  In this case, the server SHOULD NOT send `NBD_REP_INFO`
+      replies.
+    - `NBD_REP_ERR_TLS_REQD`: The server requires the client to
+      initiate TLS before any revealing any further details about this
+      export.  In this case, a FORCEDTLS server MUST NOT send
+      `NBD_REP_INFO` replies, but a SELECTIVETLS server MAY do so if
+      this is a TLS-only export.
+
+    Additionally, if TLS has not been initiated, the server MAY reply
+    with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`) to
+    requests for exports that are unknown. This is so that clients
+    that have not initiated TLS cannot enumerate exports.  A
+    SELECTIVETLS server that chooses to hide unknown exports in this
+    manner SHOULD NOT send `NBD_REP_INFO` replies for a TLS-only
+    export.
+
+    For backwards compatibility, clients SHOULD be prepared to also
+    handle `NBD_REP_ERR_UNSUP` by falling back to using `NBD_OPT_EXPORT_NAME`.
+
+    Other errors (such as `NBD_REP_ERR_SHUTDOWN`) are also possible,
+    as permitted elsewhere in this document, with no constraints on
+    the number of preceeding `NBD_REP_INFO`.
+
+    If there are no intervening option requests between a successful
+    `NBD_OPT_INFO` (that is, one where the reply ended with a final
+    `NBD_REP_ACK`) and an `NBD_OPT_GO` with the same parameters, then
+    the server MUST reply with the same set of information, such as
+    transmission flags in the `NBD_INFO_EXPORT` reply, although the
+    ordering of the intermediate `NBD_REP_INFO` messages MAY differ.
+    Otherwise, due to the intervening option requests or the use of
+    different parameters, the server MAY send different data in the
+    successful response, and/or MAY fail the second request.
+
+    The reply to an `NBD_OPT_GO` is identical to the reply to
+    `NBD_OPT_INFO` save that if the reply indicates success (i.e. ends
+    with `NBD_REP_ACK`), the client and the server both immediately
+    enter the transmission phase. The server MUST NOT send any zero
+    padding bytes after the `NBD_REP_ACK` data, whether or not the
+    client negotiated the `NBD_FLAG_C_NO_ZEROES` flag. The server MUST
+    NOT send the final `NBD_REP_ACK` reply until all other pending
+    option replies have been sent by the server, and a client MUST NOT
+    send any further option requests after `NBD_OPT_GO` unless it
+    first receives an error reply.
 
 - `NBD_OPT_GO` (7)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    See above under `NBD_OPT_INFO`.
 
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
@@ -767,7 +956,30 @@ of the newstyle negotiation.
 
 - `NBD_OPT_BLOCK_SIZE` (9)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    The client wishes to inform the server of its intent to obey block
+    sizes.  The option request has no additional data.
+
+    Some servers are able to make optimizations, such as opening files
+    with O_DIRECT, if they know that the client will obey a particular
+    minimum block size, where it must fall back to safer but slower code
+    if the client might send unaligned requests.
+
+    The server MUST reply with `NBD_REP_ACK`, after which point the
+    client SHOULD use `NBD_OPT_GO` rather than `NBD_OPT_EXPORT_NAME`,
+    and the server SHOULD include `NBD_INFO_BLOCK_SIZE` in its reply.
+    If successfully negotiated, and the server advertises block sizes,
+    the client MUST NOT send unaligned requests.
+
+    For backwards compatibility, clients SHOULD be prepared to also
+    handle `NBD_REP_ERR_UNSUP`, which means the server SHOULD NOT be
+    advertising block sizes, and the client MAY assume the server will
+    honor default block sizes.
+
+    Note that a client MAY obey non-default block sizes even without
+    advertising intent or even when the server does not advertise block
+    sizes; and that a server MAY advertise block sizes even when a client
+    does not advertise intent.  Therefore, the use of this option is
+    independent of whether the server uses `NBD_INFO_BLOCK_SIZE`.
 
 #### Option reply types
 
@@ -786,7 +998,8 @@ during option haggling in the fixed newstyle negotiation.
 
     - 32 bits, length of name (unsigned); MUST be no larger than the
       reply packet header length - 4
-    - String, name of the export, as expected by `NBD_OPT_EXPORT_NAME`
+    - String, name of the export, as expected by `NBD_OPT_EXPORT_NAME`,
+      `NBD_OPT_INFO`, or `NBD_OPT_GO`
     - If length of name < (reply packet header length - 4), then the
       rest of the data contains some implementation-specific details
       about the export. This is not currently implemented, but future
@@ -797,7 +1010,83 @@ during option haggling in the fixed newstyle negotiation.
 
 * `NBD_REP_INFO` (3)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    A detailed description about an aspect of an export.  The response
+    to `NBD_OPT_INFO` and `NBD_OPT_GO` includes zero or more of these
+    messages prior to a final error reply, or at least one before an
+    `NBD_REP_ACK` reply indicating success.  The server MUST send an
+    `NBD_INFO_EXPORT` information type at some point before sending an
+    `NBD_REP_ACK`, so that `NBD_OPT_GO` can provide a superset of the
+    information given in response to `NBD_OPT_EXPORT_NAME`; all other
+    information types are optional.  A particular information type
+    SHOULD only appear once for a given export unless documented
+    otherwise.
+
+    A client MUST NOT rely on any particular ordering amongst the
+    `NBD_OPT_INFO` replies, and MUST ignore information types that it
+    does not recognize.
+
+    The acceptable values for the header *length* field are determined
+    by the information type, and includes the 2 bytes for the type
+    designator, in the following general layout:
+
+    - 16 bits, information type (e.g. `NBD_INFO_EXPORT`)  
+    - *length - 2* bytes, information payload  
+
+    The following information types are defined:
+
+    * `NBD_INFO_EXPORT` (0)
+
+      Mandatory information before a successful completion of
+      `NBD_OPT_INFO` or `NBD_OPT_GO`.  Describes the same information
+      that is sent in response to the older `NBD_OPT_EXPORT_NAME`,
+      except that there are no trailing zeroes whether or not
+      `NBD_FLAG_C_NO_ZEROES` was negotiated.  *length* MUST be 12, and
+      the reply payload is interpreted as follows:
+
+      - 16 bits, `NBD_INFO_EXPORT`  
+      - 64 bits, size of the export in bytes (unsigned)  
+      - 16 bits, transmission flags  
+
+    * `NBD_INFO_NAME` (1)
+
+      Represents the server's canonical name of the export. The name
+      MAY differ from the name presented in the client's option
+      request, and the information item MAY be omitted if the client
+      option request already used the canonical name.  This
+      information type represents the same name that would appear in
+      the name portion of an `NBD_REP_SERVER` in response to
+      `NBD_OPT_LIST`. The *length* MUST be at least 2, and the reply
+      payload is interpreted as:
+
+      - 16 bits, `NBD_INFO_NAME`  
+      - String: name of the export, *length - 2* bytes  
+
+    * `NBD_INFO_DESCRIPTION` (2)
+
+      A description of the export, suitable for direct display to the
+      human being.  This information type represents the same optional
+      description that may appear after the name portion of an
+      `NBD_REP_SERVER` in response to `NBD_OPT_LIST`. The *length*
+      MUST be at least 2, and the reply payload is interpreted as:
+
+      - 16 bits, `NBD_INFO_DESCRIPTION`  
+      - String: description of the export, *length - 2* bytes  
+
+    * `NBD_INFO_BLOCK_SIZE` (3)
+
+      Represents the server's advertised block sizes; see the "Block
+      sizes" section for more details on what these values represent,
+      and on constraints on their values.  The server MAY send this
+      info whether or not the client has negotiated
+      `NBD_OPT_BLOCK_SIZE`, and SHOULD send this info if it intends to
+      enforce block sizes other than the defaults. The *length* MUST
+      be 14, and the reply payload is interpreted as:
+
+      - 16 bits, `NBD_INFO_BLOCK_SIZE`  
+      - 32 bits, minimum block size  
+      - 32 bits, preferred block size  
+      - 32 bits, maximum block size  
+
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -830,11 +1119,14 @@ case that data is an error message string suitable for display to the user.
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
     The server is unwilling to continue negotiation unless TLS is
-    initiated first.
+    initiated first. In the case of `NBD_OPT_INFO` and `NBD_OPT_GO`
+    this unwillingness MAY (depending on the TLS mode) be limited
+    to the export in question. See the section on TLS above for
+    further details.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    The requested export is not available.
 
 * `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
 
@@ -991,7 +1283,10 @@ The following error values are defined:
 
 The server SHOULD return `ENOSPC` if it receives a write request
 including one or more sectors beyond the size of the device.  It also
-SHOULD map the `EDQUOT` and `EFBIG` errors to `ENOSPC`.  Finally, it
+SHOULD map the `EDQUOT` and `EFBIG` errors to `ENOSPC`.  It SHOULD
+return `EINVAL` if it receives a read or trim request including one or
+more sectors beyond the size of the device, or if a read or write
+request is not aligned to advertised minimum block sizes. Finally, it
 SHOULD return `EPERM` if it receives a write or trim request on a
 read-only export.
 
