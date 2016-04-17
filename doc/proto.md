@@ -1008,16 +1008,36 @@ The server SHOULD NOT return `ENOMEM` if at all possible.
 
 ## Experimental extensions
 
-The specifications in this section are non-normative and experimental.
-They are not currently implemented by any known version of the nbd
-protocol; a first implementation may require changes to the
-specifications in this section, or may cause the specifications here to
+In additional to the normative elements of the specification set out
+herein, various experimental non-normative extensions have been
+proposed. These may not be implemented in any known server or client,
+and are subject to change at any point. A full implementation may
+require changes to the specifications, or cause the specifications to
 be withdrawn altogether.
 
-Therefore, implementors are strongly suggested to contact the
+These experimental extensions are set out in git branches starting
+with names starting with the word 'extension'.
+
+Currently known are:
+
+* The `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+
+* The `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md)
+
+* The `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+
+Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
-fine-tune the specifications in this section before committing to a particular
+fine-tune the specifications before committing to a particular
 implementation.
+
+Those proposing further extensions should also contact the
+[mailinglist](mailto:nbd-general@lists.sourceforge.net). It is
+possible to reserve command codes etc. within this document
+for such proposed extensions. Aside from that, extensions are
+written as branches which can be merged into master if and
+when those extensions are promoted to the normative version
+of the document in the master branch.
 
 ## About this file
 
