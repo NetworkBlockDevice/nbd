@@ -1008,7 +1008,7 @@ The server SHOULD NOT return `ENOMEM` if at all possible.
 
 ## Experimental extensions
 
-In additional to the normative elements of the specification set out
+In addition to the normative elements of the specification set out
 herein, various experimental non-normative extensions have been
 proposed. These may not be implemented in any known server or client,
 and are subject to change at any point. A full implementation may
