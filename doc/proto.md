@@ -207,7 +207,7 @@ There are three possible mechanisms to end option haggling:
 
 * Transmission mode can be entered (by the client sending
   `NBD_OPT_EXPORT_NAME` or by the server responding to an
-  `NBD_OPT_GO` with `NBD_REP_SERVER`). This is documented
+  `NBD_OPT_GO` with `NBD_REP_ACK`). This is documented
   elsewhere.
 
 * The client can send (and the server can reply to) an
