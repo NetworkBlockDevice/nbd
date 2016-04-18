@@ -657,12 +657,14 @@ a client SHOULD assume a default minimum block size of 1, a preferred
 block size of 2^12 (4,096), and a maximum block size of the smaller of
 the export size or 0xffffffff (effectively unlimited).  A server that
 wants to enforce block sizes other than the defaults specified here
-MAY refuse to go into transmission phase with a client that uses `NBD_OPT_EXPORT_NAME`
-or failed to use `NBD_OPT_BLOCK_SIZE`, although a server SHOULD permit
-such clients if block sizes can be agreed on externally.  When
-allowing such clients, the server MUST cleanly error commands that
-fall outside block size parameters without corrupting data; even so,
-this may limit interoperability.
+MAY refuse to go into transmission phase with a client that uses
+`NBD_OPT_EXPORT_NAME` (via a hard disconnect) or which fails to use
+`NBD_OPT_BLOCK_SIZE` (where the server uses
+`NBD_REP_ERR_BLOCK_SIZE_REQD` in response to `NBD_OPT_GO`), although a
+server SHOULD permit such clients if block sizes can be agreed on
+externally.  When allowing such clients, the server MUST cleanly error
+commands that fall outside block size parameters without corrupting
+data; even so, this may limit interoperability.
 
 A client MAY choose to operate as if tighter block sizes had been
 specified (for example, even when the server advertises the default
@@ -909,6 +911,13 @@ of the newstyle negotiation.
       export.  In this case, a FORCEDTLS server MUST NOT send
       `NBD_REP_INFO` replies, but a SELECTIVETLS server MAY do so if
       this is a TLS-only export.
+    - `NBD_REP_ERR_BLOCK_SIZE_REQD`: The server requires the client to
+      negotiate `NBD_OPT_BLOCK_SIZE` prior to entering transmission
+      phase, because the server will be using non-default block sizes.
+      In this case, the server SHOULD first send at least an
+      `NBD_REP_INFO` reply with `NBD_INFO_BLOCK_SIZE` data.  This
+      error MUST NOT be used if the client has already negotiated
+      `NBD_OPT_BLOCK_SIZE`.
 
     Additionally, if TLS has not been initiated, the server MAY reply
     with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`) to
@@ -1132,6 +1141,13 @@ case that data is an error message string suitable for display to the user.
 
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
+
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+
+    The server is unwilling to enter transmission phase for a given
+    export unless the client first acknowledges (via
+    `NBD_OPT_BLOCK_SIZE`) that it will obey non-default block sizing
+    requirements.
 
 ### Transmission phase
 
