@@ -117,7 +117,7 @@ S: 64 bits, `0x4e42444d41474943` (ASCII '`NBDMAGIC`') (as in the old
 S: 64 bits, `0x49484156454F5054` (ASCII '`IHAVEOPT`') (note different
    magic number)  
 S: 16 bits, handshake flags  
-C: 32 bits, flags  
+C: 32 bits, client flags  
 
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the newstyle
