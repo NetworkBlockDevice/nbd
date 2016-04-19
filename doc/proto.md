@@ -841,6 +841,10 @@ case that data is an error message string suitable for display to the user.
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
 
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+
+    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+
 ### Transmission phase
 
 #### Command flags
