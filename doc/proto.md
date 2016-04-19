@@ -356,7 +356,7 @@ S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)
 Some of the major downsides of the default simple reply to
 `NBD_CMD_READ` are as follows.  First, it is not possible to support
 partial reads or early errors (the command must succeed or fail as a
-whole, and either len bytes of data must be sent or a hard disconnect
+whole, and either *length* bytes of data must be sent or a hard disconnect
 must be initiated, even if the failure is `EINVAL` due to bad flags).
 Second, there is no way to efficiently skip over portions of a sparse
 file that are known to contain all zeroes.  Finally, it is not
@@ -374,7 +374,7 @@ a simple reply for `NBD_CMD_READ` (even for the case of an early
 `EINVAL` due to bad flags), but MAY use either a simple reply or a
 structured reply to all other requests.  The server SHOULD prefer
 sending errors via a structured reply, as the error can then be
- accompanied by a string payload to present to a human user.
+accompanied by a string payload to present to a human user.
 
 A structured reply MAY occupy multiple structured chunk messages
 (all with the same value for "handle"), and the
@@ -404,109 +404,6 @@ S: *length* bytes of payload data (if *length* is non-zero)
 The use of *length* in the reply allows context-free division of
 the overall server traffic into individual reply messages; the
 *type* field describes how to further interpret the payload.
-
-##### Structured reply flags
-
-This field of 16 bits is sent by the server as part of every
-structured reply.
-
-- bit 0, `NBD_REPLY_FLAG_DONE`; the server MUST clear this bit if
-  more structured reply chunks will be sent for the same client
-  request, and MUST set this bit if this is the final reply.  This
-  bit MUST always be set for the `NBD_REPLY_TYPE_NONE` chunk,
-  although any other chunk type can also be used as the final
-  chunk.
-
-The server MUST NOT set any other flags without first negotiating
-the extension with the client, unless the client can usefully
-react to the response without interpreting the flag (for instance
-if the flag is some form of hint).  Clients MUST ignore
-unrecognized flags.
-
-##### Structured reply types
-
-These values are used in the "type" field of a structured reply.
-Some chunk types can additionally be categorized by role, such as
-*error chunks* or *content chunks*.  Each type determines how to
-interpret the "length" bytes of payload.  If the client receives
-an unknown or unexpected type, it MUST initiate a hard disconnect.
-
-- `NBD_REPLY_TYPE_NONE` (0)
-
-  *length* MUST be 0 (and the payload field omitted).  This chunk
-  type MUST always be used with the `NBD_REPLY_FLAG_DONE` bit set
-  (that is, it may appear at most once in a structured reply, and
-  is only useful as the final reply chunk).  If no earlier error
-  chunks were sent, then this type implies that the overall client
-  request is successful.  Valid as a reply to any request.
-
-- `NBD_REPLY_TYPE_ERROR` (1)
-
-  This chunk type is in the error chunk category.  *length* MUST
-  be at least 4.  This chunk represents that an error occurred,
-  and the client MAY NOT make any assumptions about partial
-  success. This type SHOULD NOT be used more than once in a
-  structured reply.  Valid as a reply to any request.
-
-  The payload is structured as:
-
-  32 bits: error (MUST be nonzero)  
-  *length - 4* bytes: optional string suitable for
-     direct display to a human being
-
-- `NBD_REPLY_TYPE_ERROR_OFFSET` (2)
-
-  This chunk type is in the error chunk category.  *length* MUST
-  be at least 12.  This reply represents that an error occurred at
-  a given offset, which MUST lie within the original offset and
-  length of the request; the client can use this offset to
-  determine if request had any partial success.  This chunk type
-  MAY appear multiple times in a structured reply, although the
-  same offset SHOULD NOT be repeated.  Likewise, if content chunks
-  were sent earlier in the structured reply, the server SHOULD NOT
-  send multiple distinct offsets that lie within the bounds of a
-  single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-  `NBD_CMD_WRITE` and `NBD_CMD_TRIM`.
-
-  The payload is structured as:
-
-  32 bits: error (MUST be non-zero)  
-  64 bits: offset (unsigned)  
-  *length - 12* bytes: optional string suitable for
-     direct display to a human being
-
-- `NBD_REPLY_TYPE_OFFSET_DATA` (3)
-
-  This chunk type is in the content chunk category.  *length* MUST
-  be at least 9.  It represents the contents of *length - 8* bytes
-  of the file, starting at *offset*.  The data MUST lie within the
-  bounds of the original offset and length of the client's
-  request, and MUST NOT overlap with the bounds of any earlier
-  content chunk or error chunk in the same reply.  This chunk MAY
-  be used more than once in a reply, unless the `NBD_CMD_FLAG_DF`
-  flag was set.  Valid as a reply to `NBD_CMD_READ`.
-
-  The payload is structured as:
-
-  64 bits: offset (unsigned)  
-  *length - 8* bytes: data  
-
-- `NBD_REPLY_TYPE_OFFSET_HOLE` (4)
-
-  This chunk type is in the content chunk category.  *length* MUST
-  be exactly 12.  It represents that the contents of *hole size*
-  bytes starting at *offset* read as all zeroes.  The hole MUST
-  lie within the bounds of the original offset and length of the
-  client's request, and MUST NOT overlap with the bounds of any
-  earlier content chunk or error chunk in the same reply.  This
-  chunk MAY be used more than once in a reply, unless the
-  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to
-  `NBD_CMD_READ`.
-
-  The payload is structured as:
-
-  64 bits: offset (unsigned)  
-  32 bits: hole size (unsigned, MUST be nonzero)  
 
 #### Terminating the transmission phase
 
@@ -1052,7 +949,9 @@ case that data is an error message string suitable for display to the user.
 
 ### Transmission phase
 
-#### Command flags
+#### Flag fields
+
+##### Command flags
 
 This field of 16 bits is sent by the client with every request and provides
 additional information to the server to execute the command. Refer to
@@ -1085,6 +984,109 @@ valid may depend on negotiation during the handshake phase.
    flags include `NBD_FLAG_SEND_DF`.  Use of this flag MAY trigger an
    `EOVERFLOW` error chunk, if the request length is too large.
 
+##### Structured reply flags
+
+This field of 16 bits is sent by the server as part of every
+structured reply.
+
+- bit 0, `NBD_REPLY_FLAG_DONE`; the server MUST clear this bit if
+  more structured reply chunks will be sent for the same client
+  request, and MUST set this bit if this is the final reply.  This
+  bit MUST always be set for the `NBD_REPLY_TYPE_NONE` chunk,
+  although any other chunk type can also be used as the final
+  chunk.
+
+The server MUST NOT set any other flags without first negotiating
+the extension with the client, unless the client can usefully
+react to the response without interpreting the flag (for instance
+if the flag is some form of hint).  Clients MUST ignore
+unrecognized flags.
+
+#### Structured reply types
+
+These values are used in the "type" field of a structured reply.
+Some chunk types can additionally be categorized by role, such as
+*error chunks* or *content chunks*.  Each type determines how to
+interpret the "length" bytes of payload.  If the client receives
+an unknown or unexpected type, it MUST initiate a hard disconnect.
+
+- `NBD_REPLY_TYPE_NONE` (0)
+
+  *length* MUST be 0 (and the payload field omitted).  This chunk
+  type MUST always be used with the `NBD_REPLY_FLAG_DONE` bit set
+  (that is, it may appear at most once in a structured reply, and
+  is only useful as the final reply chunk).  If no earlier error
+  chunks were sent, then this type implies that the overall client
+  request is successful.  Valid as a reply to any request.
+
+- `NBD_REPLY_TYPE_ERROR` (1)
+
+  This chunk type is in the error chunk category.  *length* MUST
+  be at least 4.  This chunk represents that an error occurred,
+  and the client MAY NOT make any assumptions about partial
+  success. This type SHOULD NOT be used more than once in a
+  structured reply.  Valid as a reply to any request.
+
+  The payload is structured as:
+
+  32 bits: error (MUST be nonzero)  
+  *length - 4* bytes: optional string suitable for
+     direct display to a human being  
+
+- `NBD_REPLY_TYPE_ERROR_OFFSET` (2)
+
+  This chunk type is in the error chunk category.  *length* MUST
+  be at least 12.  This reply represents that an error occurred at
+  a given offset, which MUST lie within the original offset and
+  length of the request; the client can use this offset to
+  determine if request had any partial success.  This chunk type
+  MAY appear multiple times in a structured reply, although the
+  same offset SHOULD NOT be repeated.  Likewise, if content chunks
+  were sent earlier in the structured reply, the server SHOULD NOT
+  send multiple distinct offsets that lie within the bounds of a
+  single content chunk.  Valid as a reply to `NBD_CMD_READ`,
+  `NBD_CMD_WRITE` and `NBD_CMD_TRIM`.
+
+  The payload is structured as:
+
+  32 bits: error (MUST be non-zero)  
+  64 bits: offset (unsigned)  
+  *length - 12* bytes: optional string suitable for
+     direct display to a human being  
+
+- `NBD_REPLY_TYPE_OFFSET_DATA` (3)
+
+  This chunk type is in the content chunk category.  *length* MUST
+  be at least 9.  It represents the contents of *length - 8* bytes
+  of the file, starting at *offset*.  The data MUST lie within the
+  bounds of the original offset and length of the client's
+  request, and MUST NOT overlap with the bounds of any earlier
+  content chunk or error chunk in the same reply.  This chunk MAY
+  be used more than once in a reply, unless the `NBD_CMD_FLAG_DF`
+  flag was set.  Valid as a reply to `NBD_CMD_READ`.
+
+  The payload is structured as:
+
+  64 bits: offset (unsigned)  
+  *length - 8* bytes: data  
+
+- `NBD_REPLY_TYPE_OFFSET_HOLE` (4)
+
+  This chunk type is in the content chunk category.  *length* MUST
+  be exactly 12.  It represents that the contents of *hole size*
+  bytes starting at *offset* read as all zeroes.  The hole MUST
+  lie within the bounds of the original offset and length of the
+  client's request, and MUST NOT overlap with the bounds of any
+  earlier content chunk or error chunk in the same reply.  This
+  chunk MAY be used more than once in a reply, unless the
+  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to
+  `NBD_CMD_READ`.
+
+  The payload is structured as:
+
+  64 bits: offset (unsigned)  
+  32 bits: hole size (unsigned, MUST be nonzero)  
+
 #### Request types
 
 The following request types exist:
@@ -1101,10 +1103,7 @@ The following request types exist:
     If structured replies were not negotiated, then a read request
     MUST always be answered by a simple reply, as documented above
     (using magic 0x67446698 `NBD_SIMPLE_REPLY_MAGIC`, and containing
-    length bytes of data according to the client's request, although
-    those bytes MAY be invalid if an error is returned, and a hard
-    disconnect MUST be initiated if an error occurs after a header
-    claiming no error).
+    length bytes of data according to the client's request).
 
     If an error occurs, the server SHOULD set the appropriate error code
     in the error field. The server MAY then initiate a hard disconnect.
