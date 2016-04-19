@@ -638,6 +638,23 @@ The server MUST NOT set any other flags, and SHOULD NOT change behaviour
 unless the client responds with a corresponding flag.  The server MUST
 NOT set any of these flags during oldstyle negotiation.
 
+##### Client flags
+
+This field of 32 bits is sent after initial connection and after
+receiving the handshake flags from the server.
+
+- bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
+  support the fixed newstyle protocol. Servers MAY choose to honour
+  fixed newstyle from clients that didn't set this bit, but relying on
+  this isn't recommended.
+- bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
+  set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
+  bytes of zeroes at the end of the negotiation.
+
+Clients MUST NOT set any other flags; the server MUST drop the TCP
+connection if the client sets an unknown flag, or a flag that does
+not match something advertised by the server.
+
 ##### Transmission flags
 
 This field of 16 bits is sent by the server after option haggling, or
@@ -671,23 +688,6 @@ The field has the following format:
   [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
-
-##### Client flags
-
-This field of 32 bits is sent after initial connection and after
-receiving the handshake flags from the server.
-
-- bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
-  support the fixed newstyle protocol. Servers MAY choose to honour
-  fixed newstyle from clients that didn't set this bit, but relying on
-  this isn't recommended.
-- bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
-  set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
-  bytes of zeroes at the end of the negotiation.
-
-Clients MUST NOT set any other flags; the server MUST drop the TCP
-connection if the client sets an unknown flag, or a flag that does
-not match something advertised by the server.
 
 #### Option types
 
