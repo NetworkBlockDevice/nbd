@@ -20,8 +20,18 @@ dance. You'll need to install it on both the client and the server.
 Note that released nbd tarballs are found on
 [sourceforge](http://sourceforge.net/projects/nbd/files/nbd/).
 
-Using NBD is quite easy. First, on the client, you need to load the
-module and, if you're not using udev, to create the device nodes:
+Contributing
+------------
+
+If you want to send a patch, please do not open a pull request; instead, send
+it to the
+[mailinglist](https://lists.sourceforge.net/lists/listinfo/nbd-general)
+
+Using NBD
+---------
+
+NBD is quite easy to use. First, on the client, you need to load the module
+and, if you're not using udev, to create the device nodes:
 
     # modprobe nbd
     # cd /dev
