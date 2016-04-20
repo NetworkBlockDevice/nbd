@@ -176,7 +176,7 @@ AC_SEARCH_LIBS(daemon, resolv,, AC_MSG_ERROR([Could not find an implementation o
 AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h sys/uio.h])
 AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T

@@ -58,8 +58,10 @@
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
 #include "lfs.h"
+
+#if defined(__linux__)
 #define _XOPEN_SOURCE 500 /* to get pread/pwrite */
-#define _BSD_SOURCE /* to get DT_* macros */
+#endif
 #define _DARWIN_C_SOURCE /* to get DT_* macros on OS X */
 
 #include <assert.h>
@@ -71,6 +73,9 @@
 #include <sys/un.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
+#endif
+#ifdef HAVE_SYS_UIO_H
+#include <sys/uio.h>
 #endif
 #include <sys/param.h>
 #include <signal.h>
