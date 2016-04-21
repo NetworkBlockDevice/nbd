@@ -179,8 +179,6 @@ To fix these two issues, the following changes were implemented:
   field too, though its side of the protocol does not change incompatibly.
 - The client MAY now send other options to the server as appropriate, in
   the generic format for sending an option as described above.
-- The server MUST NOT send a response to `NBD_OPT_EXPORT_NAME` until all
-  other pending option requests have had their final reply.
 - The server will reply to any option apart from `NBD_OPT_EXPORT_NAME`
   with reply packets in the following format:
 
@@ -256,7 +254,7 @@ error inbound options until the client gets the hint that it is
 unwelcome, except that if a server believes a client's behaviour
 constitutes a denial of service, it MAY initiate a hard disconnect.
 If the server is in the process of being shut down it MAY
-error inflight options and SHOULD error further options received
+error any inflight option and SHOULD error further options received
 (other than an `NBD_OPT_ABORT`) with `NBD_REP_ERR_SHUTDOWN`.
 
 If the client receives `NBD_REP_ERR_SHUTDOWN` it MUST initiate
