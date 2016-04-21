@@ -947,11 +947,9 @@ of the newstyle negotiation.
     with `NBD_REP_ACK`), the client and the server both immediately
     enter the transmission phase. The server MUST NOT send any zero
     padding bytes after the `NBD_REP_ACK` data, whether or not the
-    client negotiated the `NBD_FLAG_C_NO_ZEROES` flag. The server MUST
-    NOT send the final `NBD_REP_ACK` reply until all other pending
-    option replies have been sent by the server, and a client MUST NOT
-    send any further option requests after `NBD_OPT_GO` unless it
-    first receives an error reply.
+    client negotiated the `NBD_FLAG_C_NO_ZEROES` flag. The client MUST
+    NOT send further option requests unless the final reply from the
+    server indicates an error.
 
 - `NBD_OPT_GO` (7)
 
