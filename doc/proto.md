@@ -117,7 +117,7 @@ S: 64 bits, `0x4e42444d41474943` (ASCII '`NBDMAGIC`') (as in the old
 S: 64 bits, `0x49484156454F5054` (ASCII '`IHAVEOPT`') (note different
    magic number)  
 S: 16 bits, handshake flags  
-C: 32 bits, flags  
+C: 32 bits, client flags  
 
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the newstyle
@@ -194,12 +194,10 @@ S: 32 bits, length of the reply. This MAY be zero for some replies, in
 S: any data as required by the reply (e.g., an export name in the case
    of `NBD_REP_SERVER`)  
 
-As there is no unique number for client requests, clients who want to
-differentiate between answers to two instances of the same option during
-any negotiation must make sure they've seen the answer to an outstanding
-request before sending the next one of the same type. The server MAY
-send replies in the order that the requests were received, but is not
-required to.
+The client MUST NOT send any option until it has received a final
+reply to any option it has sent (note that some options e.g.
+`NBD_OPT_LIST` have multiple replies, and the final reply is
+the last of those).
 
 #### Termination of the session during option haggling
 
@@ -638,6 +636,23 @@ The server MUST NOT set any other flags, and SHOULD NOT change behaviour
 unless the client responds with a corresponding flag.  The server MUST
 NOT set any of these flags during oldstyle negotiation.
 
+##### Client flags
+
+This field of 32 bits is sent after initial connection and after
+receiving the handshake flags from the server.
+
+- bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
+  support the fixed newstyle protocol. Servers MAY choose to honour
+  fixed newstyle from clients that didn't set this bit, but relying on
+  this isn't recommended.
+- bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
+  set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
+  bytes of zeroes at the end of the negotiation.
+
+Clients MUST NOT set any other flags; the server MUST drop the TCP
+connection if the client sets an unknown flag, or a flag that does
+not match something advertised by the server.
+
 ##### Transmission flags
 
 This field of 16 bits is sent by the server after option haggling, or
@@ -671,23 +686,6 @@ The field has the following format:
   [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
-
-##### Client flags
-
-This field of 32 bits is sent after initial connection and after
-receiving the handshake flags from the server.
-
-- bit 0, `NBD_FLAG_C_FIXED_NEWSTYLE`; SHOULD be set by clients that
-  support the fixed newstyle protocol. Servers MAY choose to honour
-  fixed newstyle from clients that didn't set this bit, but relying on
-  this isn't recommended.
-- bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
-  set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
-  bytes of zeroes at the end of the negotiation.
-
-Clients MUST NOT set any other flags; the server MUST drop the TCP
-connection if the client sets an unknown flag, or a flag that does
-not match something advertised by the server.
 
 #### Option types
 
@@ -840,6 +838,10 @@ case that data is an error message string suitable for display to the user.
 
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
+
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+
+    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
 
 ### Transmission phase
 
@@ -1035,7 +1037,7 @@ The server SHOULD NOT return `ENOMEM` if at all possible.
 
 ## Experimental extensions
 
-In additional to the normative elements of the specification set out
+In addition to the normative elements of the specification set out
 herein, various experimental non-normative extensions have been
 proposed. These may not be implemented in any known server or client,
 and are subject to change at any point. A full implementation may
