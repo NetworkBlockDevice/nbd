@@ -1511,7 +1511,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	logging(MY_NAME);
-	while ((c = getopt(argc, argv, "-FN:t:owfilu:")) >= 0) {
+	while ((c = getopt(argc, argv, "FN:t:owfilu:")) >= 0) {
 		switch (c) {
 		case 1:
 			handle_nonopt(optarg, &hostname, &p);
