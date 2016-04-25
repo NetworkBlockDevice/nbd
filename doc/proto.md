@@ -636,34 +636,51 @@ This functionality has not yet been implemented by the reference
 implementation, but was implemented by qemu and subsequently
 by other users, so has been moved out of the "experimental" section.
 
-## Block sizes
+## Block size constraints
 
 During transmission phase, several operations are constrained by the
 export size sent by the final `NBD_OPT_EXPORT_NAME` or `NBD_OPT_GO`,
-as well as by three block sizes defined here (minimum, preferred, and
-maximum).  If a client can honor server block sizes (as set out in
-`NBD_OPT_BLOCK_SIZE`), it SHOULD announce this
-during the handshake phase, and SHOULD use `NBD_OPT_GO` rather than
-`NBD_OPT_EXPORT_NAME`.  A server SHOULD advertise the block size
-contraints during handshake phase via `NBD_OPT_INFO`.  A server
-and client MAY agree on block sizes via out of band means.
+as well as by three block size constraints defined here (minimum,
+preferred, and maximum).
 
-If block sizes have not been advertised or agreed on externally, then
-a client SHOULD assume a default minimum block size of 1, a preferred
+If a client can honour server block size constraints (as set out below
+and under `NBD_INFO_BLOCK_SIZE`), it SHOULD announce this during the
+handshake phase by using `NBD_OPT_GO` (and `NBD_OPT_INFO` if used) with
+an `NBD_INFO_BLOCK_SIZE` information request, and MUST use `NBD_OPT_GO`
+rather than `NBD_OPT_EXPORT_NAME` (except in the case of a fallback
+where the server did not support `NBD_OPT_INFO` or `NBD_OPT_GO`).
+
+A server with block size constraints other than the default SHOULD
+advertise the block size constraints during handshake phase via
+`NBD_INFO_BLOCK_SIZE` in response to `NBD_OPT_INFO` or `NBD_OPT_GO`,
+and MUST do so unless it has agreed on block size constraints via out
+of band means.
+
+Some servers are able to make optimizations, such as opening files
+with O_DIRECT, if they know that the client will obey a particular
+minimum block size, where it must fall back to safer but slower code
+if the client might send unaligned requests. For that reason, if a
+client issues an `NBD_OPT_GO` including an `NBD_INFO_BLOCK_SIZE`
+information request, it MUST abide by the block size constraints it
+receives. Clients MAY issue `NBD_OPT_INFO` with `NBD_INFO_BLOCK_SIZE` to
+learn the server's constraints without committing to them.
+
+If block size constraints have not been advertised or agreed on externally,
+then a client SHOULD assume a default minimum block size of 1, a preferred
 block size of 2^12 (4,096), and a maximum block size of the smaller of
 the export size or 0xffffffff (effectively unlimited).  A server that
 wants to enforce block sizes other than the defaults specified here
 MAY refuse to go into transmission phase with a client that uses
 `NBD_OPT_EXPORT_NAME` (via a hard disconnect) or which fails to use
-`NBD_OPT_BLOCK_SIZE` (where the server uses
-`NBD_REP_ERR_BLOCK_SIZE_REQD` in response to `NBD_OPT_GO`), although a
-server SHOULD permit such clients if block sizes can be agreed on
+`NBD_INFO_BLOCK_SIZE` with `NBD_OPT_GO` (where the server uses
+`NBD_REP_ERR_BLOCK_SIZE_REQD`), although a server SHOULD permit such
+clients if block size constraints are the default or can be agreed on
 externally.  When allowing such clients, the server MUST cleanly error
-commands that fall outside block size parameters without corrupting
+commands that fall outside block size constraints without corrupting
 data; even so, this may limit interoperability.
 
-A client MAY choose to operate as if tighter block sizes had been
-specified (for example, even when the server advertises the default
+A client MAY choose to operate as if tighter block size constraints had
+been specified (for example, even when the server advertises the default
 minimum block size of 1, a client may safely use a minimum block size
 of 2^9 (512), a preferred block size of 2^16 (65,536), and a maximum
 block size of 2^25 (33,554,432)).  Notwithstanding any maximum block
@@ -823,6 +840,10 @@ of the newstyle negotiation.
     A major problem of this option is that it does not support the
     return of error messages to the client in case of problems. To
     remedy this, `NBD_OPT_GO` has been introduced (see below).
+    A client thus SHOULD use `NBD_OPT_GO` in preference to
+    `NBD_OPT_EXPORT_NAME` but SHOULD fall back to `NBD_OPT_EXPORT_NAME`
+    if `NBD_OPT_GO` is not supported (not falling back will prevent
+    it from connecting to old servers).
 
 - `NBD_OPT_ABORT` (2)
 
@@ -883,8 +904,26 @@ of the newstyle negotiation.
 
     Data (both commands):
 
-    - String: name of the export (as with `NBD_OPT_EXPORT_NAME`, the length
-      comes from the option header).
+    - 16 bits, number of information requests
+    - 16 bits x n - list of `NBD_INFO` information requests
+    - 32 bits, length of name (unsigned); MUST be no larger than the
+      option data length - 6
+    - String: name of the export
+
+    The client MAY list one or more items of specific information it
+    is seeking in the list of information requests, or it MAY specify
+    an empty list. The client MUST NOT include any information request
+    in the list more than once. The server MUST ignore any information
+    requests it does not understand. The server MAY reply to the
+    information requests in any order. The server MAY ignore information
+    requests that it does not wish to supply for policy reasons (other
+    than `NBD_INFO_EXPORT`). Equally the client MAY refuse to negotiate
+    if not supplied information it has requested. The server MAY send
+    information requests back which are not explicitly requested, but
+    the server MUST NOT assume that such information requests are
+    understood and respected by the client unless the client explicitly
+    asked for them. The client MUST ignore information replies it
+    does not understand.
 
     If no name is specified (i.e. a zero length string is provided),
     this specifies the default export (if any), as with
@@ -908,12 +947,14 @@ of the newstyle negotiation.
       `NBD_REP_INFO` replies, but a SELECTIVETLS server MAY do so if
       this is a TLS-only export.
     - `NBD_REP_ERR_BLOCK_SIZE_REQD`: The server requires the client to
-      negotiate `NBD_OPT_BLOCK_SIZE` prior to entering transmission
-      phase, because the server will be using non-default block sizes.
-      In this case, the server SHOULD first send at least an
-      `NBD_REP_INFO` reply with `NBD_INFO_BLOCK_SIZE` data.  This
-      error MUST NOT be used if the client has already negotiated
-      `NBD_OPT_BLOCK_SIZE`.
+      request block size constraints using `NBD_INFO_BLOCK_SIZE` prior
+      to entering transmission phase, because the server will be using
+      non-default block sizes constraints. The server MUST NOT send this
+      error if block size constraints were requested with
+      `NBD_INFO_BLOCK_SIZE` with the `NBD_OPT_INFO` or `NBD_OPT_GO`
+      request. The server SHOULD NOT send this error if it is using
+      default block size constraints or block size constraints
+      negotiated out of band.
 
     Additionally, if TLS has not been initiated, the server MAY reply
     with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`) to
@@ -932,7 +973,8 @@ of the newstyle negotiation.
 
     If there are no intervening option requests between a successful
     `NBD_OPT_INFO` (that is, one where the reply ended with a final
-    `NBD_REP_ACK`) and an `NBD_OPT_GO` with the same parameters, then
+    `NBD_REP_ACK`) and an `NBD_OPT_GO` with the same parameters
+    (including the list of information items requested), then
     the server MUST reply with the same set of information, such as
     transmission flags in the `NBD_INFO_EXPORT` reply, although the
     ordering of the intermediate `NBD_REP_INFO` messages MAY differ.
@@ -956,33 +998,6 @@ of the newstyle negotiation.
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
     Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
-
-- `NBD_OPT_BLOCK_SIZE` (9)
-
-    The client wishes to inform the server of its intent to obey block
-    sizes.  The option request has no additional data.
-
-    Some servers are able to make optimizations, such as opening files
-    with O_DIRECT, if they know that the client will obey a particular
-    minimum block size, where it must fall back to safer but slower code
-    if the client might send unaligned requests.
-
-    The server MUST reply with `NBD_REP_ACK`, after which point the
-    client SHOULD use `NBD_OPT_GO` rather than `NBD_OPT_EXPORT_NAME`,
-    and the server SHOULD include `NBD_INFO_BLOCK_SIZE` in its reply.
-    If successfully negotiated, and the server advertises block sizes,
-    the client MUST NOT send unaligned requests.
-
-    For backwards compatibility, clients SHOULD be prepared to also
-    handle `NBD_REP_ERR_UNSUP`, which means the server SHOULD NOT be
-    advertising block sizes, and the client MAY assume the server will
-    honor default block sizes.
-
-    Note that a client MAY obey non-default block sizes even without
-    advertising intent or even when the server does not advertise block
-    sizes; and that a server MAY advertise block sizes even when a client
-    does not advertise intent.  Therefore, the use of this option is
-    independent of whether the server uses `NBD_INFO_BLOCK_SIZE`.
 
 #### Option reply types
 
@@ -1077,13 +1092,19 @@ during option haggling in the fixed newstyle negotiation.
 
     * `NBD_INFO_BLOCK_SIZE` (3)
 
-      Represents the server's advertised block sizes; see the "Block
-      sizes" section for more details on what these values represent,
-      and on constraints on their values.  The server MAY send this
-      info whether or not the client has negotiated
-      `NBD_OPT_BLOCK_SIZE`, and SHOULD send this info if it intends to
-      enforce block sizes other than the defaults. The *length* MUST
-      be 14, and the reply payload is interpreted as:
+      Represents the server's advertised block size constraints; see the
+      "Block size constraints" section for more details on what these
+      values represent, and on constraints on their values.  The server
+      MUST send this info if it is requested and it intends to enforce
+      block size constraints other than the defaults. After
+      sending this information in response to an `NBD_OPT_GO` in which
+      the client specifically requested `NBD_INFO_BLOCK_SIZE`, the server
+      can legitimately assume that any client that continues the session
+      will support the block size constraints supplied (note that this
+      assumption cannot be made solely on the basis of an `NBD_OPT_INFO`
+      with an `NBD_INFO_BLOCK_SIZE` request, or an `NBD_OPT_GO` without
+      an explicit `NBD_INFO_BLOCK_SIZE` request). The *length* MUST be 14,
+      and the reply payload is interpreted as:
 
       - 16 bits, `NBD_INFO_BLOCK_SIZE`  
       - 32 bits, minimum block size  
