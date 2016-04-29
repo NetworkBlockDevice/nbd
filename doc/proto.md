@@ -954,7 +954,10 @@ of the newstyle negotiation.
       `NBD_INFO_BLOCK_SIZE` with the `NBD_OPT_INFO` or `NBD_OPT_GO`
       request. The server SHOULD NOT send this error if it is using
       default block size constraints or block size constraints
-      negotiated out of band.
+      negotiated out of band. A server sending an
+      `NBD_REP_ERR_BLOCK_SIZE_REQD` error SHOULD ensure it first
+      sends an `NBD_INFO_BLOCK_SIZE` information reply in order
+      to help avoid a potentially unnecessary round trip.
 
     Additionally, if TLS has not been initiated, the server MAY reply
     with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`) to
