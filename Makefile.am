@@ -1,4 +1,4 @@
-SUBDIRS = . man doc tests gznbd
+SUBDIRS = . man doc tests systemd gznbd
 bin_PROGRAMS = nbd-server nbd-trdump
 sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client make-integrityhuge

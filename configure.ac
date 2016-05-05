@@ -103,6 +103,7 @@ AC_ARG_ENABLE(
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
+PKG_PROG_PKG_CONFIG
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
@@ -132,6 +133,39 @@ then
 else
 	AC_DEFINE(HAVE_FALLOC_PH, 0, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([no])
+fi
+
+AC_MSG_CHECKING([for systemd unit file locations])
+AC_ARG_ENABLE(
+  systemd,
+  AS_HELP_STRING([--disable-systemd],[Do not install systemd support files (or use --enable-systemd to fail build when not available)]),
+  [
+    if test "x$enableval" = "xyes"; then
+      ENABLE_SYSTEMD=yes
+    else
+      ENABLE_SYSTEMD=no
+    fi
+  ],[]
+)
+
+if test "x$ENABLE_SYSTEMD" != "xno"; then
+	PKG_CHECK_VAR([SYSTEMDUNIT],[systemd],systemdsystemunitdir],[AC_SUBST([systemdunitdir], [$SYSTEMDUNIT])])
+fi
+AM_CONDITIONAL(SYSTEMD, [test ! -z "$SYSTEMDUNIT"])
+if test ! -z $SYSTEMDUNIT; then
+	AC_MSG_RESULT([$SYSTEMDUNIT])
+else
+	case $ENABLE_SYSTEMD in
+		no)
+			AC_MSG_RESULT([disabled])
+		;;
+		yes)
+			AC_MSG_ERROR([systemd not found])
+		;;
+		*)
+			AC_MSG_RESULT([not found])
+		;;
+	esac
 fi
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
@@ -197,6 +231,9 @@ AC_CONFIG_FILES([Makefile
 		 man/nbd-server.5.sh
 		 man/nbd-server.1.sh
 		 man/nbd-trdump.1.sh
-		 man/nbdtab.5.sh])
+		 man/nbdtab.5.sh
+		 systemd/Makefile
+		 systemd/nbd@.service
+		])
 AC_OUTPUT
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=NBD client connection for %i
+Documentation=man:nbd-client
+PartOf=nbd.service
+[Service]
+Type=forking
+ExecStart=@sbindir@/nbd-client %i
+Before=dev-%i.device
+RequiredBy=dev-%i.device
+[Install]
+RequiredBy=dev-%i.device
