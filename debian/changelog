@@ -1,3 +1,11 @@
+nbd (1:3.8-4+deb8u3) jessie; urgency=medium
+
+  * nbd-client.c: stop mixing global flags into the flags field that
+    gets sent to the kernel, so that connecting to nbd-server >= 3.9
+    does not cause every export to be (incorrectly) marked as read-only.
+
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 05 May 2016 16:26:48 +0200
+
 nbd (1:3.8-4+deb8u2) jessie; urgency=low
 
   * Cherry-pick two commits from 3.10 to fix authfile parsing.
