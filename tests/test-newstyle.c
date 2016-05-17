@@ -44,6 +44,8 @@
 
 #include "test.h"
 
+#define EXPORTNAME "/"
+
 int
 main (int argc, char *argv[])
 {
@@ -52,7 +54,8 @@ main (int argc, char *argv[])
   char *data;
   size_t i, size;
 
-  if (test_start_nbdkit ("-n", NBDKIT_PLUGIN ("file"), "file=file-data",
+  if (test_start_nbdkit ("-e", EXPORTNAME,
+                         "-n", NBDKIT_PLUGIN ("file"), "file=file-data",
                          NULL) == -1)
     exit (EXIT_FAILURE);
 
@@ -63,7 +66,7 @@ main (int argc, char *argv[])
   }
 
   /* Using any exportname causes qemu to use the newstyle protocol. */
-  r = guestfs_add_drive_opts (g, "/" /* exportname */,
+  r = guestfs_add_drive_opts (g, EXPORTNAME,
                               GUESTFS_ADD_DRIVE_OPTS_FORMAT, "raw",
                               GUESTFS_ADD_DRIVE_OPTS_PROTOCOL, "nbd",
                               GUESTFS_ADD_DRIVE_OPTS_SERVER, server,

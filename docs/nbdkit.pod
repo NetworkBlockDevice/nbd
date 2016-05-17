@@ -6,7 +6,7 @@ nbdkit - A toolkit for creating NBD servers
 
 =head1 SYNOPSIS
 
- nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]
+ nbdkit [--dump-config] [-e EXPORTNAME] [-f] [-g GROUP] [-i IPADDR]
         [--newstyle] [--oldstyle] [-P PIDFILE] [-p PORT] [-r]
         [--run CMD] [-s] [-U SOCKET] [-u USER] [-v] [-V]
         PLUGIN [key=value [key=value [...]]]
@@ -74,6 +74,19 @@ Display brief command line usage information and exit.
 
 Dump out the compile-time configuration values and exit.
 
+=item B<-e> EXPORTNAME
+
+=item B<--export> EXPORTNAME
+
+=item B<--export-name> EXPORTNAME
+
+=item B<--exportname> EXPORTNAME
+
+Set the exportname and use the newstyle protocol (implies I<-n>).
+
+If not set, exportname C<""> (empty string) is used.  Exportnames are
+not allowed with the oldstyle protocol.
+
 =item B<-f>
 
 =item B<--foreground>
@@ -118,9 +131,10 @@ protocol.  See L</NEW STYLE VS OLD STYLE PROTOCOL> below.
 
 =item B<--oldstyle>
 
-Use the oldstyle NBD protocol.  This is currently the default, so this
-flag does nothing, but it is possible we might change the default
-protocol in future.  See L</NEW STYLE VS OLD STYLE PROTOCOL> below.
+Use the oldstyle NBD protocol.  This is currently the default (unless
+you use I<-n> or I<-e>), so this flag does nothing, but it is possible
+we might change the default protocol in future.  See L</NEW STYLE VS
+OLD STYLE PROTOCOL> below.
 
 =item B<-P> PIDFILE
 
@@ -307,27 +321,29 @@ use depends on the client and cannot be known in advance, nor can it
 be negotiated from the server side.
 
 nbdkit currently defaults to the oldstyle protocol for compatibility
-with qemu and libguestfs.  This is also the same behaviour as
-qemu-nbd.  Use the I<-n> or I<--newstyle> flag on the command line to
-use the newstyle protocol.  Use the I<-o> or I<--oldstyle> flag to
-force the oldstyle protocol.
+with qemu and libguestfs.  This is also the same behaviour as qemu-nbd
+E<le> 2.5.  Use the I<-n> or I<--newstyle> flag on the command line to
+use the newstyle protocol.  Use the I<-e> or I<--exportname> flag to
+set the exportname for the newstyle protocol.  Use the I<-o> or
+I<--oldstyle> flag to force the oldstyle protocol.
 
 Some common clients and the protocol they require:
 
- Client                       Protocol
+ Client                          Protocol
  ------------------------------------------------------------
- qemu without exportname      oldstyle
- qemu with exportname         newstyle
- nbd-client < 3.10            client can talk either protocol
- nbd-client >= 3.10           newstyle
+ qemu <= 2.5 without exportname  oldstyle
+ qemu <= 2.5 with exportname     newstyle
+ qemu >= 2.6                     client can talk either protocol
+ nbd-client < 3.10               client can talk either protocol
+ nbd-client >= 3.10              newstyle
 
-If you use qemu without the exportname field against a newstyle
-server, it will give the error:
+If you use qemu E<le> 2.5 without the exportname field against a
+newstyle server, it will give the error:
 
  Server requires an export name
 
-If you use qemu with the exportname field against an oldstyle server,
-it will give the error:
+If you use qemu E<le> 2.5 with the exportname field against an
+oldstyle server, it will give the error:
 
  Server does not support export names
 
@@ -340,8 +356,6 @@ If you want to claim compatibility with what the NBD proto.txt
 document says should be the case (which isn't based in reality), then
 you should always use newstyle when using port 10809, and use oldstyle
 on all other ports.
-
-nbdkit ignores export names at present (see also the C<TODO> file).
 
 =head1 SIGNALS
 

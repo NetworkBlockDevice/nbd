@@ -48,6 +48,7 @@
 #endif
 
 /* main.c */
+extern const char *exportname;
 extern const char *ipaddr;
 extern int newstyle;
 extern const char *port;

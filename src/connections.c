@@ -222,13 +222,8 @@ _negotiate_handshake_oldstyle (struct connection *conn)
   return 0;
 }
 
-/* Receive newstyle options.
- *
- * Currently we ignore NBD_OPT_EXPORT_NAME (see TODO), we close the
- * connection if sent NBD_OPT_ABORT, we send a canned list of
- * options for NBD_OPT_LIST, and we send NBD_REP_ERR_UNSUP for
- * everything else.
- */
+/* Receive newstyle options. */
+
 static int
 send_newstyle_option_reply (struct connection *conn,
                             uint32_t option, uint32_t reply)
@@ -242,6 +237,39 @@ send_newstyle_option_reply (struct connection *conn,
 
   if (xwrite (conn->sockout,
               &fixed_new_option_reply, sizeof fixed_new_option_reply) == -1) {
+    nbdkit_error ("write: %m");
+    return -1;
+  }
+
+  return 0;
+}
+
+static int
+send_newstyle_option_reply_exportname (struct connection *conn,
+                                       uint32_t option, uint32_t reply,
+                                       const char *exportname)
+{
+  struct fixed_new_option_reply fixed_new_option_reply;
+  size_t name_len = strlen (exportname);
+  uint32_t len;
+
+  fixed_new_option_reply.magic = htobe64 (NBD_REP_MAGIC);
+  fixed_new_option_reply.option = htobe32 (option);
+  fixed_new_option_reply.reply = htobe32 (reply);
+  fixed_new_option_reply.replylen = htobe32 (name_len + sizeof (len));
+
+  if (xwrite (conn->sockout,
+              &fixed_new_option_reply, sizeof fixed_new_option_reply) == -1) {
+    nbdkit_error ("write: %m");
+    return -1;
+  }
+
+  len = htobe32 (name_len);
+  if (xwrite (conn->sockout, &len, sizeof len) == -1) {
+    nbdkit_error ("write: %m");
+    return -1;
+  }
+  if (xwrite (conn->sockout, exportname, name_len) == -1) {
     nbdkit_error ("write: %m");
     return -1;
   }
@@ -309,7 +337,12 @@ _negotiate_handshake_newstyle_options (struct connection *conn)
         continue;
       }
 
-      /* Since we don't support export names, there is nothing to list. */
+      /* Send back the exportname. */
+      debug ("newstyle negotiation: advertising export '%s'", exportname);
+      if (send_newstyle_option_reply_exportname (conn, option, NBD_REP_SERVER,
+                                                 exportname) == -1)
+        return -1;
+
       if (send_newstyle_option_reply (conn, option, NBD_REP_ACK) == -1)
         return -1;
       break;

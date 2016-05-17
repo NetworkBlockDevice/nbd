@@ -11,19 +11,6 @@
 
 * Performance - measure and improve it.
 
-* Implement export names.  With export names it should be possible to
-  have multiple plugins on the command line (each responding to a
-  different export of course):
-
-    nbdkit --export /foo plugin.so --export /bar another-plugin.so
-
-  Note it should also be possible to either elect one plugin as the
-  default that accepts all exportnames, or to divide the export name
-  "space" up using regexps or wildcards.
-
-  Export names are not actually paths (although that is how they are
-  often used), but arbitrary UTF-8 text strings.
-
 * Implement true parallel request handling.  Currently
   NBDKIT_THREAD_MODEL_SERIALIZE_REQUESTS and
   NBDKIT_THREAD_MODEL_PARALLEL are the same, because we handle

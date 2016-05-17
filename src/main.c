@@ -65,6 +65,7 @@ static void fork_into_background (void);
 static uid_t parseuser (const char *);
 static gid_t parsegroup (const char *);
 
+const char *exportname;         /* -e */
 int foreground;                 /* -f */
 const char *ipaddr;             /* -i */
 int newstyle;                   /* -n */
@@ -84,10 +85,13 @@ static char *random_fifo = NULL;
 
 enum { HELP_OPTION = CHAR_MAX + 1 };
 
-static const char *short_options = "fg:i:nop:P:rsu:U:vV";
+static const char *short_options = "e:fg:i:nop:P:rsu:U:vV";
 static const struct option long_options[] = {
   { "help",       0, NULL, HELP_OPTION },
   { "dump-config",0, NULL, 0 },
+  { "export",     1, NULL, 'e' },
+  { "export-name",1, NULL, 'e' },
+  { "exportname", 1, NULL, 'e' },
   { "foreground", 0, NULL, 'f' },
   { "no-fork",    0, NULL, 'f' },
   { "group",      1, NULL, 'g' },
@@ -115,7 +119,7 @@ static const struct option long_options[] = {
 static void
 usage (void)
 {
-  printf ("nbdkit [--dump-config] [-f] [-g GROUP] [-i IPADDR]\n"
+  printf ("nbdkit [--dump-config] [-e EXPORTNAME] [-f] [-g GROUP] [-i IPADDR]\n"
           "       [--newstyle] [--oldstyle] [-P PIDFILE] [-p PORT] [-r]\n"
           "       [--run CMD] [-s] [-U SOCKET] [-u USER] [-v] [-V]\n"
           "       PLUGIN [key=value [key=value [...]]]\n"
@@ -173,6 +177,11 @@ main (int argc, char *argv[])
       }
       break;
 
+    case 'e':
+      exportname = optarg;
+      newstyle = 1;
+      break;
+
     case 'f':
       foreground = 1;
       break;
@@ -190,9 +199,6 @@ main (int argc, char *argv[])
       break;
 
     case 'o':
-      /* XXX When we add support for exportnames, we will need to
-       * ensure that the user does not use -o + --export.
-       */
       newstyle = 0;
       break;
 
@@ -263,12 +269,22 @@ main (int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
 
+  /* Oldstyle protocol + exportname not allowed. */
+  if (newstyle == 0 && exportname != NULL) {
+    fprintf (stderr,
+             "%s: cannot use oldstyle protocol (-o) and exportname (-e)\n",
+             program_name);
+    exit (EXIT_FAILURE);
+  }
+
+  /* If exportname was not set on the command line, use "". */
+  if (exportname == NULL)
+    exportname = "";
+
   /* Remaining command line arguments define the plugins and plugin
    * configuration.  If --help or --version was specified, we still
    * partially parse these in order that we can display the per-plugin
-   * help/version information.  In future (when the new protocol and
-   * export names are permitted) we will allow multiple plugins to be
-   * given, but at the moment only one plugin is allowed.
+   * help/version information.
    */
   while (optind < argc) {
     const char *filename = argv[optind];
