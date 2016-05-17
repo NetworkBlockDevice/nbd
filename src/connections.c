@@ -235,7 +235,7 @@ send_newstyle_option_reply (struct connection *conn,
 {
   struct fixed_new_option_reply fixed_new_option_reply;
 
-  fixed_new_option_reply.magic = htobe64 (NEW_OPTION_REPLY);
+  fixed_new_option_reply.magic = htobe64 (NBD_REP_MAGIC);
   fixed_new_option_reply.option = htobe32 (option);
   fixed_new_option_reply.reply = htobe32 (reply);
   fixed_new_option_reply.replylen = htobe32 (0);

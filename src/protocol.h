@@ -67,14 +67,14 @@ struct new_option {
 
 /* Fixed newstyle handshake reply message. */
 struct fixed_new_option_reply {
-  uint64_t magic;             /* NEW_OPTION_REPLY, network byte order */
+  uint64_t magic;             /* NBD_REP_MAGIC, network byte order */
   uint32_t option;            /* option we are replying to */
   uint32_t reply;             /* NBD_REP_* */
   uint32_t replylen;          /* we always send zero at the moment */
   /* reply data follows, but we currently never send any */
 } __attribute__((packed));
 
-#define NEW_OPTION_REPLY UINT64_C(0x3e889045565a9)
+#define NBD_REP_MAGIC UINT64_C(0x3e889045565a9)
 
 /* New-style handshake server reply. */
 struct new_handshake_finish {
