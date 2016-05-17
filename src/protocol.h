@@ -72,7 +72,7 @@ struct fixed_new_option_reply {
   uint32_t reply;             /* NBD_REP_* */
   uint32_t replylen;          /* we always send zero at the moment */
   /* reply data follows, but we currently never send any */
-};
+} __attribute__((packed));
 
 #define NEW_OPTION_REPLY UINT64_C(0x3e889045565a9)
 
