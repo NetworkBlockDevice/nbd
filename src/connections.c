@@ -334,6 +334,10 @@ _negotiate_handshake_newstyle_options (struct connection *conn)
         if (send_newstyle_option_reply (conn, option, NBD_REP_ERR_INVALID)
             == -1)
           return -1;
+        if (xread (conn->sockin, data, optlen) == -1) {
+          nbdkit_error ("read: %m");
+          return -1;
+        }
         continue;
       }
 
@@ -351,6 +355,10 @@ _negotiate_handshake_newstyle_options (struct connection *conn)
       /* Unknown option. */
       if (send_newstyle_option_reply (conn, option, NBD_REP_ERR_UNSUP) == -1)
         return -1;
+      if (xread (conn->sockin, data, optlen) == -1) {
+        nbdkit_error ("read: %m");
+        return -1;
+      }
     }
 
     /* Note, since it's not very clear from the protocol doc, that the
