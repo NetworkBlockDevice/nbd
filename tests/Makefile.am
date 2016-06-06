@@ -44,6 +44,7 @@ EXTRA_DIST = \
 	test.py \
 	test_ocaml_plugin.ml \
 	test-ocaml.c \
+	test.rb \
 	test-single.sh \
 	test-start.sh \
 	test-random-sock.sh
@@ -211,6 +212,20 @@ test-ocaml-plugin.so: test_ocaml_plugin.ml ../plugins/ocaml/libnbdkitocaml.la ..
 	  -output-obj -runtime-variant _pic -o $@ \
 	  NBDKit.cmx $< \
 	  -cclib -L../plugins/ocaml/.libs -cclib -lnbdkitocaml
+
+endif
+
+# Ruby plugin test.
+if HAVE_RUBY
+
+check_PROGRAMS += test-ruby
+TESTS += test-ruby
+
+test_ruby_SOURCES = test-lang-plugins.c test.h
+test_ruby_CFLAGS = \
+	-DLANG='"ruby"' -DSCRIPT='"test.rb"' \
+	$(WARNINGS_CFLAGS) $(LIBGUESTFS_CFLAGS)
+test_ruby_LDADD = libtest.la $(LIBGUESTFS_LIBS)
 
 endif
 

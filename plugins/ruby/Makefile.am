@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013-2014 Red Hat Inc.
+# Copyright (C) 2013-2016 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,19 +30,40 @@
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIRS = \
-	curl \
-	example1 \
-	example2 \
-	example3 \
-	file \
-	guestfs \
-	gzip \
-	libvirt \
-	ocaml \
-	perl \
-	python \
-	ruby \
-	streaming \
-	vddk \
-	xz
+EXTRA_DIST = \
+	nbdkit-ruby-plugin.pod \
+	example.rb
+
+plugindir = $(libdir)/nbdkit/plugins
+
+if HAVE_RUBY
+
+plugin_LTLIBRARIES = nbdkit-ruby-plugin.la
+
+nbdkit_ruby_plugin_la_SOURCES = \
+	ruby.c \
+	$(top_srcdir)/include/nbdkit-plugin.h
+
+nbdkit_ruby_plugin_la_CPPFLAGS = \
+	-I$(top_srcdir)/include
+nbdkit_ruby_plugin_la_CFLAGS = \
+	$(WARNINGS_CFLAGS) \
+	$(RUBY_CFLAGS)
+nbdkit_ruby_plugin_la_LIBADD = \
+	$(RUBY_LIBS)
+nbdkit_ruby_plugin_la_LDFLAGS = \
+	-module -avoid-version -shared \
+	$(RUBY_LDFLAGS)
+
+if HAVE_POD2MAN
+
+man_MANS = nbdkit-ruby-plugin.3
+
+nbdkit-ruby-plugin.3: nbdkit-ruby-plugin.pod
+	$(POD2MAN) -u --stderr --section=3 --center=nbdkit --release=nbdkit --name=`basename $@ .3` $< $@
+
+endif
+
+endif
+
+CLEANFILES = *~

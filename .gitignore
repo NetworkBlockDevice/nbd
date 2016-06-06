@@ -49,6 +49,7 @@ Makefile.in
 /tests/test-oldstyle
 /tests/test-perl
 /tests/test-python
+/tests/test-ruby
 /tests/test-streaming
 /tests/test-xz
 /test-driver

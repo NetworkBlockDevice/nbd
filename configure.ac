@@ -1,5 +1,5 @@
 # nbdkit
-# Copyright (C) 2013-2014 Red Hat Inc.
+# Copyright (C) 2013-2016 Red Hat Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -222,6 +222,24 @@ AS_IF([test "x$OCAMLOPT" != "xno" && test "x$enable_ocaml" != "xno"],[
 AM_CONDITIONAL([HAVE_OCAML],[test "x$OCAMLOPT" != "xno" &&
                              test "x$ocaml_link_shared" = "xyes"])
 
+dnl Check for Ruby, for embedding in the Ruby plugin.
+AC_CHECK_PROG([RUBY],[ruby],[ruby],[no])
+AC_ARG_ENABLE([ruby],
+    AS_HELP_STRING([--disable-ruby], [disable Ruby plugin]),
+    [],
+    [enable_ruby=yes])
+AS_IF([test "x$RUBY" != "xno" && test "x$enable_ruby" != "xno"],[
+    PKG_CHECK_MODULES([RUBY], [ruby], [
+        AC_SUBST([RUBY_CFLAGS])
+        AC_SUBST([RUBY_LIBS])
+    ],[
+        AC_MSG_WARN([ruby not found])
+        enable_ruby=no
+    ])
+])
+AM_CONDITIONAL([HAVE_RUBY],[test "x$RUBY" != "xno" &&
+                            test "x$enable_ruby" = "xyes"])
+
 dnl Check for curl (only if you want to compile the curl plugin).
 AC_ARG_WITH([curl],[
     AS_HELP_STRING([--without-curl],
@@ -350,6 +368,7 @@ AC_CONFIG_FILES([Makefile
                  plugins/ocaml/Makefile
                  plugins/perl/Makefile
                  plugins/python/Makefile
+                 plugins/ruby/Makefile
                  plugins/streaming/Makefile
                  plugins/vddk/Makefile
                  plugins/xz/Makefile
