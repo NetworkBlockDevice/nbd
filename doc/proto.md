@@ -887,12 +887,9 @@ The following request types exist:
     of data, read from *offset* bytes into the file, unless an error
     condition has occurred.
 
-    If an error occurs, the server SHOULD set the appropriate error
-    code in the error field. The server MUST then either initiate
-    a hard disconnect, or send *length* bytes of data (these bytes MAY be
-    invalid, in which case they SHOULD be zero); this is true even if
-    the error is `EINVAL` for bad flags detected before even
-    attempting to read.
+    If an error occurs, the server SHOULD set the appropriate error code
+    in the error field. The server MAY then initiate a hard disconnect.
+    If it chooses not to, it MUST NOT send any payload for this request.
 
     If an error occurs while reading after the server has already sent
     out the reply header with an error field set to zero (i.e.,

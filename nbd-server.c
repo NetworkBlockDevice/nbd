@@ -1466,7 +1466,9 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 	}
 	pthread_mutex_lock(&(client->lock));
 	writeit(client->net, &rep, sizeof rep);
-	writeit(client->net, buf, req->len);
+	if(!rep.error) {
+		writeit(client->net, buf, req->len);
+	}
 	pthread_mutex_unlock(&(client->lock));
 	free(buf);
 }
