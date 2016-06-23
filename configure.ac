@@ -135,38 +135,38 @@ else
 	AC_MSG_RESULT([no])
 fi
 
-AC_MSG_CHECKING([for systemd unit file locations])
-AC_ARG_ENABLE(
-  systemd,
-  AS_HELP_STRING([--disable-systemd],[Do not install systemd support files (or use --enable-systemd to fail build when not available)]),
-  [
-    if test "x$enableval" = "xyes"; then
-      ENABLE_SYSTEMD=yes
-    else
-      ENABLE_SYSTEMD=no
-    fi
-  ],[]
-)
-
-if test "x$ENABLE_SYSTEMD" != "xno"; then
-	PKG_CHECK_VAR([SYSTEMDUNIT],[systemd],systemdsystemunitdir],[AC_SUBST([systemdunitdir], [$SYSTEMDUNIT])])
-fi
-AM_CONDITIONAL(SYSTEMD, [test ! -z "$SYSTEMDUNIT"])
-if test ! -z $SYSTEMDUNIT; then
-	AC_MSG_RESULT([$SYSTEMDUNIT])
-else
-	case $ENABLE_SYSTEMD in
-		no)
-			AC_MSG_RESULT([disabled])
-		;;
-		yes)
-			AC_MSG_ERROR([systemd not found])
-		;;
-		*)
-			AC_MSG_RESULT([not found])
-		;;
-	esac
-fi
+dnl AC_MSG_CHECKING([where to puth systemd unit files])
+dnl AC_ARG_WITH(
+dnl   systemd,
+dnl   AS_HELP_STRING([--with-systemd=loc|pkgconfig],[Install systemd files in loc; if passing pkgconfig, use pkg-config to detect the correct location and install there.])
+dnl   [
+dnl     if test "x$enableval" = "xyes"; then
+dnl       ENABLE_SYSTEMD=yes
+dnl     else
+dnl       ENABLE_SYSTEMD=no
+dnl     fi
+dnl   ],[]
+dnl )
+dnl 
+dnl if test "x$ENABLE_SYSTEMD" != "xno"; then
+dnl 	PKG_CHECK_VAR([SYSTEMDUNIT],[systemd],systemdsystemunitdir],[AC_SUBST([SYSTEMDLOC], [$SYSTEMDUNIT])])
+dnl fi
+dnl AM_CONDITIONAL(SYSTEMD, [test ! -z "$SYSTEMDUNIT"])
+dnl if test ! -z $SYSTEMDUNIT; then
+dnl 	AC_MSG_RESULT([$SYSTEMDUNIT])
+dnl else
+dnl 	case $ENABLE_SYSTEMD in
+dnl 		no)
+dnl 			AC_MSG_RESULT([disabled])
+dnl 		;;
+dnl 		yes)
+dnl 			AC_MSG_ERROR([systemd not found])
+dnl 		;;
+dnl 		*)
+dnl 			AC_MSG_RESULT([not found])
+dnl 		;;
+dnl 	esac
+dnl fi
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
 [#include <io.h>
