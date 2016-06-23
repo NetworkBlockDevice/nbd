@@ -3,6 +3,9 @@
 #systemdunit_DATA = nbd@.service
 #endif
 
+noinst_DATA = nbd@.service
+DISTCLEANFILES = nbd@.service
+
 nbd@.service: nbd@.service.sh
 	sh nbd@.service.sh > nbd@.service
 
