@@ -49,3 +49,5 @@ ltmain.sh
 support/lt*
 support/libtool.m4
 ar-lib
+.debhelper
+*debhelper.log
