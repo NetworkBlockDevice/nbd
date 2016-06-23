@@ -1,5 +1,7 @@
-nbd (1:3.13-2) UNRELEASED; urgency=medium
+nbd (1:3.14-1) UNRELEASED; urgency=medium
 
+  * New upstream release.
+    - Adds systemd unit for nbd-client; Closes: #796633.
   * Remove cruft from build directory.
   * debian/rules:override_dh_auto_build: test for cruft in git checkout
     before allowing a build, to avoid unclean uploads in the future.
