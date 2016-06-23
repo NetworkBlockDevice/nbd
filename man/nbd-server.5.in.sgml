@@ -424,10 +424,8 @@ manpage.1: manpage.sgml
 	    Optional; string
 	  </para>
 	  <para>
-	    If the 'oldstyle' global parameter is specified, works
-	    similarly to the global listenaddr parameter, but for the
-	    individual port of this particular export. If the 'oldstyle'
-	    parameter is not set, this parameter is ignored.
+	    Ignored, kept for compatibility with the obsolete
+	    'oldstyle' global parameter.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -886,15 +884,6 @@ manpage.1: manpage.sgml
       127.0.0.1
       192.168.0.0/8
       192.168.1.1
-    </programlisting>
-    <para>To be compatible with older nbd-client systems, one might wish
-    to enable the old-style, port-based, negotation:</para>
-    <programlisting>
-      [generic]
-          oldstyle = true
-      [export]
-          exportname = /export/blkdev
-	  port = 12345
     </programlisting>
   </refsect1>
 </refentry>

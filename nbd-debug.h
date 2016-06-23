@@ -1,6 +1,6 @@
 #ifndef NBD_DEBUG_H
 #define NBD_DEBUG_H
-#include <config.h>
+#include "config.h"
 /* Debugging macros */
 #ifdef DODBG
 #define DEBUG(...) printf(__VA_ARGS__)

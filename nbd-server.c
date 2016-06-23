@@ -1310,7 +1310,7 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
 		len = htonl(strlen(serve->servename));
 		memcpy(buf, &len, sizeof(len));
-		strcpy(ptr, serve->servename);
+		strncpy(ptr, serve->servename, sizeof(buf) - sizeof(len));
 		send_reply(opt, net, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
 	}
 	send_reply(opt, net, NBD_REP_ACK, 0, NULL);
@@ -1466,7 +1466,9 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 	}
 	pthread_mutex_lock(&(client->lock));
 	writeit(client->net, &rep, sizeof rep);
-	writeit(client->net, buf, req->len);
+	if(!rep.error) {
+		writeit(client->net, buf, req->len);
+	}
 	pthread_mutex_unlock(&(client->lock));
 	free(buf);
 }
@@ -1519,8 +1521,16 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
+	uint32_t type = package->req->type & NBD_CMD_MASK_COMMAND;
+	uint32_t flags = package->req->type & ~NBD_CMD_MASK_COMMAND;
+	struct nbd_reply rep;
 
-	switch(package->req->type & NBD_CMD_MASK_COMMAND) {
+	if(flags & ~NBD_CMD_FLAG_FUA) {
+		msg(LOG_ERR, "E: received invalid flag %d on command %d, ignoring", flags, type);
+		goto error;
+	}
+
+	switch(type) {
 		case NBD_CMD_READ:
 			handle_read(package->client, package->req);
 			break;
@@ -1535,15 +1545,16 @@ static void handle_request(gpointer data, gpointer user_data) {
 			break;
 		default:
 			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
-			struct nbd_reply rep;
-			setup_reply(&rep, package->req);
-			rep.error = nbd_errno(EINVAL);
-			pthread_mutex_lock(&(package->client->lock));
-			writeit(package->client->net, &rep, sizeof rep);
-			pthread_mutex_unlock(&(package->client->lock));
-			break;
+			goto error;
 	}
-
+	goto end;
+error:
+	setup_reply(&rep, package->req);
+	rep.error = nbd_errno(EINVAL);
+	pthread_mutex_lock(&(package->client->lock));
+	writeit(package->client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(package->client->lock));
+end:
 	package_dispose(package);
 }
 
@@ -2467,7 +2478,7 @@ int open_unix(const gchar *const sockname, GError **const gerror) {
 
 	memset(&sa, 0, sizeof(struct sockaddr_un));
 	sa.sun_family = AF_UNIX;
-	strncpy(sa.sun_path, sockname, 107);
+	strncpy(sa.sun_path, sockname, sizeof sa.sun_path);
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(sock < 0) {
 		g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,

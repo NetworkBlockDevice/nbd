@@ -38,7 +38,8 @@ enum {
 };
 
 #define NBD_CMD_MASK_COMMAND 0x0000ffff
-#define NBD_CMD_FLAG_FUA (1<<16)
+#define NBD_CMD_SHIFT (16)
+#define NBD_CMD_FLAG_FUA ((1 << 0) << NBD_CMD_SHIFT)
 
 /* values for flags field */
 #define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */

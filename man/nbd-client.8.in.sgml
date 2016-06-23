@@ -158,7 +158,7 @@ manpage.1: manpage.sgml
           <para>Previous versions of the nbd tools supported an older
             version of the negotiation protocol known as "oldstyle".
             This protocol version is no longer supported as of version
-            3.11 of the nbd spport tools.</para>
+            3.11 of the nbd support tools.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -166,7 +166,6 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The block special file (<filename>/dev</filename> entry) which this
 	  nbd-client should connect to, specified as a full path.</para>
-	</listitem>
 	  <para>When the mode is used wherein no hostname or export name is
 	  specified, &dhpackage; will look up the necessary configuration in
 	  the <filename>nbdtab</filename> file. For more information, see

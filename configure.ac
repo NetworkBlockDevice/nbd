@@ -103,6 +103,7 @@ AC_ARG_ENABLE(
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
+PKG_PROG_PKG_CONFIG
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
@@ -113,12 +114,16 @@ AC_CHECK_SIZEOF(unsigned long int)
 AC_CHECK_SIZEOF(unsigned long long int)
 AC_STRUCT_DIRENT_D_TYPE
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
-AC_CHECK_HEADERS([linux/falloc.h])
 HAVE_FL_PH=no
-if test "x$ac_cv_header_linux_falloc_h" = "xyes"
-then
-	AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
-fi
+AC_CHECK_FUNC(fallocate,
+  [
+    AC_CHECK_HEADERS([linux/falloc.h])
+    if test "x$ac_cv_header_linux_falloc_h" = "xyes"
+    then
+      AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
+    fi
+  ],[]
+)
 
 AC_MSG_CHECKING([for FALLOC_FL_PUNCH_HOLE support])
 if test "x$HAVE_FL_PH" = "xyes"
@@ -129,6 +134,39 @@ else
 	AC_DEFINE(HAVE_FALLOC_PH, 0, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([no])
 fi
+
+dnl AC_MSG_CHECKING([where to puth systemd unit files])
+dnl AC_ARG_WITH(
+dnl   systemd,
+dnl   AS_HELP_STRING([--with-systemd=loc|pkgconfig],[Install systemd files in loc; if passing pkgconfig, use pkg-config to detect the correct location and install there.])
+dnl   [
+dnl     if test "x$enableval" = "xyes"; then
+dnl       ENABLE_SYSTEMD=yes
+dnl     else
+dnl       ENABLE_SYSTEMD=no
+dnl     fi
+dnl   ],[]
+dnl )
+dnl 
+dnl if test "x$ENABLE_SYSTEMD" != "xno"; then
+dnl 	PKG_CHECK_VAR([SYSTEMDUNIT],[systemd],systemdsystemunitdir],[AC_SUBST([SYSTEMDLOC], [$SYSTEMDUNIT])])
+dnl fi
+dnl AM_CONDITIONAL(SYSTEMD, [test ! -z "$SYSTEMDUNIT"])
+dnl if test ! -z $SYSTEMDUNIT; then
+dnl 	AC_MSG_RESULT([$SYSTEMDUNIT])
+dnl else
+dnl 	case $ENABLE_SYSTEMD in
+dnl 		no)
+dnl 			AC_MSG_RESULT([disabled])
+dnl 		;;
+dnl 		yes)
+dnl 			AC_MSG_ERROR([systemd not found])
+dnl 		;;
+dnl 		*)
+dnl 			AC_MSG_RESULT([not found])
+dnl 		;;
+dnl 	esac
+dnl fi
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
 [#include <io.h>
@@ -193,6 +231,9 @@ AC_CONFIG_FILES([Makefile
 		 man/nbd-server.5.sh
 		 man/nbd-server.1.sh
 		 man/nbd-trdump.1.sh
-		 man/nbdtab.5.sh])
+		 man/nbdtab.5.sh
+		 systemd/Makefile
+		 systemd/nbd@.service.sh
+		])
 AC_OUTPUT
 

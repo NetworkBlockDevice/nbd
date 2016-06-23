@@ -53,7 +53,7 @@ EOF
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
 		sleep 1
-		./nbd-tester-client -o 127.0.0.1 -N export
+		./nbd-tester-client -o -N export 127.0.0.1
 		retval=$?
 	;;
 	*/cfg1)
@@ -66,7 +66,7 @@ EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client 127.0.0.1 -N export
+		./nbd-tester-client -N export 127.0.0.1
 		retval=$?
 	;;
 	*/cfgmulti)
@@ -86,7 +86,7 @@ EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client localhost -N export1
+		./nbd-tester-client -N export1 localhost
 		retval=$?
 		if [ $retval -ne 0 ]
 		then
@@ -102,7 +102,7 @@ EOF
 			fi
 			exit $retval
 		fi
-		./nbd-tester-client localhost -N export2
+		./nbd-tester-client -N export2 localhost
 		retval=$?
 	;;
 	*/cfgnew)

@@ -77,10 +77,12 @@ int check_conn(char* devname, int do_print) {
 	len=read(fd, buf, 256);
 	if(len < 0) {
 		perror("could not read from server");
+		close(fd);
 		return 2;
 	}
 	buf[(len < 256) ? len : 255]='\0';
 	if(do_print) printf("%s\n", buf);
+	close(fd);
 	return 0;
 }
 
@@ -362,6 +364,9 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	}
 
 	data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
+	if(!strncmp(cfgname, "/dev/", 5)) {
+		cfgname += 5;
+	}
 	char *loc = strstr((const char*)data, cfgname);
 	if(!loc) {
 		goto out;
@@ -459,14 +464,25 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 	if (size64>>12 > (uint64_t)~0UL)
 		err("Device too large.\n");
 	else {
-		if (ioctl(nbd, NBD_SET_BLKSIZE, 4096UL) < 0)
+		int tmp_blocksize = 4096;
+		if (size64 / (u64)blocksize <= (uint64_t)~0UL)
+			tmp_blocksize = blocksize;
+		if (ioctl(nbd, NBD_SET_BLKSIZE, tmp_blocksize) < 0) {
+			fprintf(stderr, "Failed to set blocksize %d\n",
+				tmp_blocksize);
 			err("Ioctl/1.1a failed: %m\n");
-		size = (unsigned long)(size64>>12);
+		}
+		size = (unsigned long)(size64 / (u64)tmp_blocksize);
 		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
-		if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0)
-			err("Ioctl/1.1c failed: %m\n");
-		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, 4096ULL*size);
+		if (tmp_blocksize != blocksize) {
+			if (ioctl(nbd, NBD_SET_BLKSIZE, (unsigned long)blocksize) < 0) {
+				fprintf(stderr, "Failed to set blocksize %d\n",
+					blocksize);
+				err("Ioctl/1.1c failed: %m\n");
+			}
+		}
+		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, (u64)tmp_blocksize * size);
 	}
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
@@ -561,6 +577,7 @@ int main(int argc, char *argv[]) {
 	int timeout=0;
 	int sdp=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
+	pid_t main_pid;
 	u64 size64;
 	uint16_t flags = 0;
 	int c;
@@ -743,6 +760,8 @@ int main(int argc, char *argv[]) {
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGCHLD, &sa, NULL);
 #endif
+	/* For child to check its parent */
+	main_pid = getpid();
 	do {
 #ifndef NOFORK
 
@@ -769,6 +788,13 @@ int main(int argc, char *argv[]) {
 				.tv_nsec = 100000000,
 			};
 			while(check_conn(nbddev, 0)) {
+				if (main_pid != getppid()) {
+					/* check_conn() will not return 0 when nbd disconnected
+					 * and parent exited during this loop. So the child has to
+					 * explicitly check parent identity and exit if parent
+					 * exited */
+					exit(0);
+				}
 				nanosleep(&req, NULL);
 			}
 			open(nbddev, O_RDONLY);
@@ -777,8 +803,8 @@ int main(int argc, char *argv[]) {
 #endif
 
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
-		        int error = errno;
-			fprintf(stderr, "nbd,%d: Kernel call returned: %d", getpid(), error);
+			int error = errno;
+			fprintf(stderr, "nbd,%d: Kernel call returned: %d", main_pid, error);
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */

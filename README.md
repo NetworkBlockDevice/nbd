@@ -20,8 +20,18 @@ dance. You'll need to install it on both the client and the server.
 Note that released nbd tarballs are found on
 [sourceforge](http://sourceforge.net/projects/nbd/files/nbd/).
 
-Using NBD is quite easy. First, on the client, you need to load the
-module and, if you're not using udev, to create the device nodes:
+Contributing
+------------
+
+If you want to send a patch, please do not open a pull request; instead, send
+it to the
+[mailinglist](https://lists.sourceforge.net/lists/listinfo/nbd-general)
+
+Using NBD
+---------
+
+NBD is quite easy to use. First, on the client, you need to load the module
+and, if you're not using udev, to create the device nodes:
 
     # modprobe nbd
     # cd /dev
@@ -44,10 +54,6 @@ this:
         group = nbd
     [export1]
         exportname = /export/nbd/export1-file
-        # The following line will be ignored unless the 
-        # "oldstyle = true" line in the generic section above is
-        # enabled.
-        port = 12345
         authfile = /export/nbd/export1-authfile
         timeout = 30
         filesize = 10000000
@@ -58,9 +64,7 @@ this:
         postrun = rm -f %s
     [otherexport]
         exportname = /export/nbd/experiment
-        # The other options are all optional, except this one in case
-        # the oldstyle option is used in [generic]:
-        # port = 12346
+        # The other options are all optional
 
 The configuration file is parsed with GLib's GKeyFile, which parses key
 files as they are specified in the Freedesktop.org Desktop Entry
@@ -92,9 +96,6 @@ will use the second export in the above example (the one that exports
 (but do make sure that /var/run is writeable by the server that
 `nbd-server` runs as; otherwise, you won't get a PID file, though the
 server will keep running).
-
-The old command-line port-only way of exporting something is still
-supported, but it is deprecated.
 
 There are packages (or similar) available for the following operating
 systems:
