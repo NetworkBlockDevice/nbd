@@ -233,7 +233,7 @@ AC_CONFIG_FILES([Makefile
 		 man/nbd-trdump.1.sh
 		 man/nbdtab.5.sh
 		 systemd/Makefile
-		 systemd/nbd@.service
+		 systemd/nbd@.service.sh
 		])
 AC_OUTPUT
 
