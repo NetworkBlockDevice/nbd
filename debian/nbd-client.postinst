@@ -100,6 +100,7 @@ convert_from_sh() {
                 i=$(( $i + 1 ))
         done
         mv $TMPFILE /etc/nbdtab
+        chmod 644 /etc/nbdtab
         mv /etc/nbd-client /etc/nbd-client.old
 }
 
