@@ -95,7 +95,7 @@ convert_from_sh() {
         do
                 NBD_DEVICE[$i]=${NBD_DEVICE[$i]#/dev/}
                 NBD_OPT=""
-                convert_opts ${NBD_OPTS[$i]}
+                translate_extra ${NBD_EXTRA[$i]}
                 echo -e "${NBD_DEVICE[$i]}\t${NBD_HOST[$i]}\t${NBD_NAME[$i]}${NBD_OPT}" >> $TMPFILE
                 i=$(( $i + 1 ))
         done
