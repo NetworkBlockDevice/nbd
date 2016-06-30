@@ -2,6 +2,8 @@ nbd (1:3.14-1) unstable; urgency=medium
 
   * New upstream release.
     - Adds systemd unit for nbd-client; Closes: #796633.
+    - Fixes usage of AF_UNIX addresses, fixing the build on kFreeBSD;
+      Closes: 815445
   * Remove cruft from build directory.
   * debian/rules:override_dh_auto_build: test for cruft in git checkout
     before allowing a build, to avoid unclean uploads in the future.
