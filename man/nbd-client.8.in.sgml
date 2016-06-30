@@ -169,7 +169,7 @@ manpage.1: manpage.sgml
 	  <para>When the mode is used wherein no hostname or export name is
 	  specified, &dhpackage; will look up the necessary configuration in
 	  the <filename>nbdtab</filename> file. For more information, see
-	  nbdtab(5).
+	  nbdtab(5).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
