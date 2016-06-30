@@ -42,6 +42,9 @@ translate_extra() {
                         -sdp|-S)
                                 NBD_OPT="${NBD_OPT}${sep}sdp"
                         ;;
+                        -p*)
+                                NBD_OPT="${NBD_OPT}${sep}persist"
+                        ;;
                         -unix|-u)
                                 NBD_OPT="${NBD_OPT}${sep}unix"
                         ;;
