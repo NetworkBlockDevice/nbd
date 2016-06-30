@@ -29,7 +29,7 @@ case "$1" in
        purge)
 
         db_purge ||:
-	rm -f /etc/nbd-client /etc/nbd-client.bak
+	rm -f /etc/nbd-client /etc/nbd-client.bak /etc/nbd-client.old
         ;;
 
     *)
