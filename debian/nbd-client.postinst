@@ -103,7 +103,7 @@ convert_from_sh() {
         mv /etc/nbd-client /etc/nbd-client.old
 }
 
-case "$3" in
+case "$1" in
         configure)
                 convert_from_sh
                 # Invoke initramfs trigger
