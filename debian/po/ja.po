@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-10-17 09:40+0200\n"
+"POT-Creation-Date: 2016-06-30 21:30+0200\n"
 "PO-Revision-Date: 2016-02-26 12:05+0900\n"
 "Last-Translator: Takuma Yamada <tyamada@takumayamada.com>\n"
 "Language-Team: Japanese <debian-japanese@lists.debian.org>\n"
@@ -28,9 +28,14 @@ msgstr "AUTO_GEN が /etc/nbd-client で「n」をセットされています。
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
+#, fuzzy
+#| msgid ""
+#| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
+#| "to \"n\". The file will therefore not be regenerated automatically."
 msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
+"\"n\". This indicates that you prefer that the nbd configuration is not "
+"automatically generated."
 msgstr ""
 "/etc/nbd-client ファイルに AUTO_GEN 変数に「n」をセットする行があります。した"
 "がってファイルは自動的に再生成されません。"
@@ -39,225 +44,50 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:2001
 msgid ""
-"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
-"afterwards."
+"Since nbd-client 1:3.14-1, the file /etc/nbd-client is no longer used for "
+"boot-time configuration; instead, a file /etc/nbdtab is used, with a "
+"different format. The debconf configuration options have been removed, and "
+"this file is therefore never automatically generated, except that this "
+"upgrade would have generated a /etc/nbdtab file from your /etc/nbd-client if "
+"AUTO_GEN had not been set to \"n\". As such, you'll need to either disable "
+"the AUTO_GEN line in /etc/nbd-client and call `dpkg-reconfigure nbd-client' "
+"to allow the configuration to be migrated, or write the nbdtab file yourself "
+"manually."
 msgstr ""
-"それでは良くないという場合は当該行を削除してから「dpkg-reconfigure nbd-"
-"client」を呼び出してください。"
 
 #. Type: error
 #. Description
-#: ../nbd-client.templates:3001
-msgid "A port has been selected for export ${number}"
-msgstr "ポートはエクスポート ${number} 用に選択されました"
+#: ../nbd-client.templates:2001
+msgid ""
+"If you do not take either of those steps, your nbd-client boot-time "
+"configuration will not be functional."
+msgstr ""
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
-msgid ""
-"The file /etc/nbd-client configures an NBD export by way of a port number. "
-"This method of connecting to an NBD export is no longer supported as of NBD "
-"3.10."
+msgid "KILLALL is no longer supported"
 msgstr ""
-"ファイル /etc/nbd-client は、NBD エクスポートのポート番号を設定します。NBD エ"
-"クスポートへ接続するこの方法は、NBD 3.10 からサポートされていません。"
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid ""
-"Please migrate the configuration so it uses name-based exports, rather than "
-"port-based ones."
+"You have a file /etc/nbd-client which does not set the shell variable "
+"KILLALL to false. Since nbd-client 1:3.14-1, the boot sequence has been "
+"changed to use /etc/nbdtab instead of /etc/nbd-client, and this mode of "
+"operation no longer supports killing devices that are not specified in "
+"nbdtab."
 msgstr ""
-"ポートベースのエクスポートから名前ベースのエクスポートを使うよう、設定を移行"
-"してください。"
 
-#. Type: string
+#. Type: note
 #. Description
-#: ../nbd-client.templates:4001
-msgid "Number of nbd-client connections to use:"
-msgstr "利用する nbd-client 接続の数:"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:3001
 msgid ""
-"nbd-client can handle multiple concurrent connections. Please specify the "
-"number of connections you'd like this configuration script to set up."
+"Your configuration has been migrated to /etc/nbdtab and the /etc/nbd-client "
+"file moved to /etc/nbd-client.old, but please note that you must bring down "
+"any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
-"nbd-client は同時接続を複数処理できます。この設定スクリプトに用意させたい接続"
-"数を指定してください。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
-msgid ""
-"Note that if something has already been specified in /etc/nbd-client, the "
-"current configuration will be used as defaults in these dialogs."
-msgstr ""
-"/etc/nbd-client で既に何か指定されている場合、ここで表示されるダイアログでは"
-"現在の設定がデフォルトとして使われることに注意してください。"
-
-#. Type: select
-#. Choices
-#: ../nbd-client.templates:5001
-msgid "swap, filesystem, raw"
-msgstr "swap、filesystem、raw"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid "Intended use of the network block device number ${number}:"
-msgstr "ネットワークブロックデバイス番号 ${number} の使用目的:"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"The network block device can serve multiple purposes. One of the most "
-"interesting is to provide swap space over the network for diskless clients, "
-"but you can store a filesystem on it, or do other things with it for which a "
-"block device is interesting."
-msgstr ""
-"ネットワークブロックデバイスは多目的に使えます。最も面白いものの一つがネット"
-"ワーク越しにディスクレスクライアント用の swap 空間を提供することですが、その"
-"ブロックデバイス上にファイルシステムを格納できる等、他のことをしてみるのも興"
-"味深いものです。"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"If you intend to use the network block device as a swap device, choose \"swap"
-"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
-"it the option \"_netdev\" (else init will try to mount it before it's "
-"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
-"The only thing the nbd-client boot script will do then is start an nbd-"
-"client process; you will have to set it up manually."
-msgstr ""
-"ネットワークブロックデバイスを swap デバイスとして使う場合は「swap」を選択し"
-"てください。ファイルシステムとして使う場合は /etc/fstab に行を追加してオプ"
-"ション「_netdev」を与え (これをしないと使えるようになる前に init がマウントを"
-"試みます)、「filesystem」を選択してください。それ以外の目的の場合は全て"
-"「raw」を選択してください。nbd-client ブートスクリプトが行うのは nbd-client "
-"プロセスを開始させることだけです。その準備は手作業で行う必要があります。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid "Hostname of the server (number: ${number})?"
-msgstr "サーバ (番号: ${number}) のホスト名?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"Please enter the network name or IP address of the machine on which the nbd-"
-"server process is running."
-msgstr ""
-"nbd-server プロセスが動作しているマシンのネットワーク名か IP アドレスを入力し"
-"てください。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid "Name for NBD export (number: ${number})?"
-msgstr "nbd エクスポート (番号: ${number}) 用の名前?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Please enter the NBD export name needed to access nbd-server. The name "
-"entered here should match an existing export on the server."
-msgstr ""
-"nbd-server のアクセスに必要な NBD エクスポート名を入力してください。ここで入"
-"力した名前は、サーバー上の既存のエクスポートと一致する必要があります。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Note that as of NBD 3.10, connecting to an NBD export using the older port-"
-"based negotiation protocol is no longer supported."
-msgstr ""
-"NBD 3.10 から、古いポートベースのネゴシエーションプロトコルを使う NBD エクス"
-"ポートへの接続はサポートされなくなったことに注意してください。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid "/dev entry for this nbd-client (number: ${number})?"
-msgstr "この nbd-client 用の /dev エントリ (番号: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"Every nbd-client process needs to be associated with a /dev entry with major "
-"number 43. Please enter the name of the /dev entry you want to use for this "
-"nbd-client. Note that this needs to be the full path to that entry, not just "
-"the last part."
-msgstr ""
-"各 nbd-client プロセスはメジャー番号 43 を使った /dev エントリと結びつける必"
-"要があります。この nbd-client 用に使いたい /dev エントリの名前を入力してくだ"
-"さい。これはエントリの末尾だけではなくパス全体である必要があることに注意して"
-"ください。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"If the /dev entry specified does not exist, it will be created with minor "
-"number ${number}."
-msgstr ""
-"指定された /dev エントリが存在しない場合はマイナー番号 ${number} を使って作成"
-"されます。"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "「stop」時に全 NBD デバイスを切断しますか?"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"When the nbd-client init script is called to stop the nbd-client service, "
-"there are two things that can be done: either it can disconnect all nbd-"
-"client devices (which are assumed not to be in use), or it can disconnect "
-"only those nbd-client devices that it knows about in its config file."
-msgstr ""
-"nbd-client init スクリプトを呼び出して nbd-client サービスを停止するときの方"
-"法は 2 つあります: nbd-client デバイスを (使用中ではないという前提で) 全て切"
-"断するか、設定ファイルに書かれている nbd-client デバイスだけを切断するか。"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"The default (and the traditional behavior) is to disconnect all nbd-client "
-"devices. If the root device or other critical file systems are on NBD this "
-"will cause data loss and should not be accepted."
-msgstr ""
-"デフォルト (従来の挙動でもあります) では nbd-client デバイスを全て切断しま"
-"す。root デバイスその他の重要なファイルシステムが NBD 上にある場合はデータ消"
-"失を引き起こすため受け入れてはいけません。"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid "Extra parameters (number: ${number})"
-msgstr "追加パラメータ (番号: ${number})"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid ""
-"If you wish to add any extra parameters to nbd-client, then please enter "
-"them here."
-msgstr "nbd-client にパラメータを何か追加したい場合はここで入力してください。"
 
 #. Type: string
 #. Description
@@ -374,3 +204,159 @@ msgstr ""
 "AUTO_GEN の行を削除またはコメントアウトすると現在の設定を基にファイル /etc/"
 "nbd-server/config が新しい形式で生成されます。それまでは、nbd-server のインス"
 "トール状態は中途半端になります。"
+
+#~ msgid ""
+#~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+#~ "afterwards."
+#~ msgstr ""
+#~ "それでは良くないという場合は当該行を削除してから「dpkg-reconfigure nbd-"
+#~ "client」を呼び出してください。"
+
+#~ msgid "A port has been selected for export ${number}"
+#~ msgstr "ポートはエクスポート ${number} 用に選択されました"
+
+#~ msgid ""
+#~ "The file /etc/nbd-client configures an NBD export by way of a port "
+#~ "number. This method of connecting to an NBD export is no longer supported "
+#~ "as of NBD 3.10."
+#~ msgstr ""
+#~ "ファイル /etc/nbd-client は、NBD エクスポートのポート番号を設定します。"
+#~ "NBD エクスポートへ接続するこの方法は、NBD 3.10 からサポートされていませ"
+#~ "ん。"
+
+#~ msgid ""
+#~ "Please migrate the configuration so it uses name-based exports, rather "
+#~ "than port-based ones."
+#~ msgstr ""
+#~ "ポートベースのエクスポートから名前ベースのエクスポートを使うよう、設定を移"
+#~ "行してください。"
+
+#~ msgid "Number of nbd-client connections to use:"
+#~ msgstr "利用する nbd-client 接続の数:"
+
+#~ msgid ""
+#~ "nbd-client can handle multiple concurrent connections. Please specify the "
+#~ "number of connections you'd like this configuration script to set up."
+#~ msgstr ""
+#~ "nbd-client は同時接続を複数処理できます。この設定スクリプトに用意させたい"
+#~ "接続数を指定してください。"
+
+#~ msgid ""
+#~ "Note that if something has already been specified in /etc/nbd-client, the "
+#~ "current configuration will be used as defaults in these dialogs."
+#~ msgstr ""
+#~ "/etc/nbd-client で既に何か指定されている場合、ここで表示されるダイアログで"
+#~ "は現在の設定がデフォルトとして使われることに注意してください。"
+
+#~ msgid "swap, filesystem, raw"
+#~ msgstr "swap、filesystem、raw"
+
+#~ msgid "Intended use of the network block device number ${number}:"
+#~ msgstr "ネットワークブロックデバイス番号 ${number} の使用目的:"
+
+#~ msgid ""
+#~ "The network block device can serve multiple purposes. One of the most "
+#~ "interesting is to provide swap space over the network for diskless "
+#~ "clients, but you can store a filesystem on it, or do other things with it "
+#~ "for which a block device is interesting."
+#~ msgstr ""
+#~ "ネットワークブロックデバイスは多目的に使えます。最も面白いものの一つがネッ"
+#~ "トワーク越しにディスクレスクライアント用の swap 空間を提供することですが、"
+#~ "そのブロックデバイス上にファイルシステムを格納できる等、他のことをしてみる"
+#~ "のも興味深いものです。"
+
+#~ msgid ""
+#~ "If you intend to use the network block device as a swap device, choose "
+#~ "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
+#~ "fstab, give it the option \"_netdev\" (else init will try to mount it "
+#~ "before it's usable), and choose \"filesystem\". For all other purposes, "
+#~ "choose \"raw\". The only thing the nbd-client boot script will do then is "
+#~ "start an nbd-client process; you will have to set it up manually."
+#~ msgstr ""
+#~ "ネットワークブロックデバイスを swap デバイスとして使う場合は「swap」を選択"
+#~ "してください。ファイルシステムとして使う場合は /etc/fstab に行を追加してオ"
+#~ "プション「_netdev」を与え (これをしないと使えるようになる前に init がマウ"
+#~ "ントを試みます)、「filesystem」を選択してください。それ以外の目的の場合は"
+#~ "全て「raw」を選択してください。nbd-client ブートスクリプトが行うのは nbd-"
+#~ "client プロセスを開始させることだけです。その準備は手作業で行う必要があり"
+#~ "ます。"
+
+#~ msgid "Hostname of the server (number: ${number})?"
+#~ msgstr "サーバ (番号: ${number}) のホスト名?"
+
+#~ msgid ""
+#~ "Please enter the network name or IP address of the machine on which the "
+#~ "nbd-server process is running."
+#~ msgstr ""
+#~ "nbd-server プロセスが動作しているマシンのネットワーク名か IP アドレスを入"
+#~ "力してください。"
+
+#~ msgid "Name for NBD export (number: ${number})?"
+#~ msgstr "nbd エクスポート (番号: ${number}) 用の名前?"
+
+#~ msgid ""
+#~ "Please enter the NBD export name needed to access nbd-server. The name "
+#~ "entered here should match an existing export on the server."
+#~ msgstr ""
+#~ "nbd-server のアクセスに必要な NBD エクスポート名を入力してください。ここで"
+#~ "入力した名前は、サーバー上の既存のエクスポートと一致する必要があります。"
+
+#~ msgid ""
+#~ "Note that as of NBD 3.10, connecting to an NBD export using the older "
+#~ "port-based negotiation protocol is no longer supported."
+#~ msgstr ""
+#~ "NBD 3.10 から、古いポートベースのネゴシエーションプロトコルを使う NBD エク"
+#~ "スポートへの接続はサポートされなくなったことに注意してください。"
+
+#~ msgid "/dev entry for this nbd-client (number: ${number})?"
+#~ msgstr "この nbd-client 用の /dev エントリ (番号: ${number})?"
+
+#~ msgid ""
+#~ "Every nbd-client process needs to be associated with a /dev entry with "
+#~ "major number 43. Please enter the name of the /dev entry you want to use "
+#~ "for this nbd-client. Note that this needs to be the full path to that "
+#~ "entry, not just the last part."
+#~ msgstr ""
+#~ "各 nbd-client プロセスはメジャー番号 43 を使った /dev エントリと結びつける"
+#~ "必要があります。この nbd-client 用に使いたい /dev エントリの名前を入力して"
+#~ "ください。これはエントリの末尾だけではなくパス全体である必要があることに注"
+#~ "意してください。"
+
+#~ msgid ""
+#~ "If the /dev entry specified does not exist, it will be created with minor "
+#~ "number ${number}."
+#~ msgstr ""
+#~ "指定された /dev エントリが存在しない場合はマイナー番号 ${number} を使って"
+#~ "作成されます。"
+
+#~ msgid "Disconnect all NBD devices on \"stop\"?"
+#~ msgstr "「stop」時に全 NBD デバイスを切断しますか?"
+
+#~ msgid ""
+#~ "When the nbd-client init script is called to stop the nbd-client service, "
+#~ "there are two things that can be done: either it can disconnect all nbd-"
+#~ "client devices (which are assumed not to be in use), or it can disconnect "
+#~ "only those nbd-client devices that it knows about in its config file."
+#~ msgstr ""
+#~ "nbd-client init スクリプトを呼び出して nbd-client サービスを停止するときの"
+#~ "方法は 2 つあります: nbd-client デバイスを (使用中ではないという前提で) 全"
+#~ "て切断するか、設定ファイルに書かれている nbd-client デバイスだけを切断する"
+#~ "か。"
+
+#~ msgid ""
+#~ "The default (and the traditional behavior) is to disconnect all nbd-"
+#~ "client devices. If the root device or other critical file systems are on "
+#~ "NBD this will cause data loss and should not be accepted."
+#~ msgstr ""
+#~ "デフォルト (従来の挙動でもあります) では nbd-client デバイスを全て切断しま"
+#~ "す。root デバイスその他の重要なファイルシステムが NBD 上にある場合はデータ"
+#~ "消失を引き起こすため受け入れてはいけません。"
+
+#~ msgid "Extra parameters (number: ${number})"
+#~ msgstr "追加パラメータ (番号: ${number})"
+
+#~ msgid ""
+#~ "If you wish to add any extra parameters to nbd-client, then please enter "
+#~ "them here."
+#~ msgstr ""
+#~ "nbd-client にパラメータを何か追加したい場合はここで入力してください。"

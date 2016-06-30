@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.25-2\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-10-17 09:40+0200\n"
+"POT-Creation-Date: 2016-06-30 21:30+0200\n"
 "PO-Revision-Date: 2015-10-15 13:21+0200\n"
 "Last-Translator: Wouter Verhelst <wouter@debian.org>\n"
 "Language-Team: Debian l10n Dutch <debian-l10n-dutch@lists.debian.org>\n"
@@ -26,9 +26,14 @@ msgstr "/etc/nbd-client heeft AUTO_GEN op \"n\" staan"
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
+#, fuzzy
+#| msgid ""
+#| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
+#| "to \"n\". The file will therefore not be regenerated automatically."
 msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
+"\"n\". This indicates that you prefer that the nbd configuration is not "
+"automatically generated."
 msgstr ""
 "Het bestand /etc/nbd-client bevat een regel die de variabele 'AUTO_GEN' op "
 "\"n\" zet. Het bestand zal daarom niet automatisch geregenereerd worden."
@@ -37,236 +42,50 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:2001
 msgid ""
-"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
-"afterwards."
+"Since nbd-client 1:3.14-1, the file /etc/nbd-client is no longer used for "
+"boot-time configuration; instead, a file /etc/nbdtab is used, with a "
+"different format. The debconf configuration options have been removed, and "
+"this file is therefore never automatically generated, except that this "
+"upgrade would have generated a /etc/nbdtab file from your /etc/nbd-client if "
+"AUTO_GEN had not been set to \"n\". As such, you'll need to either disable "
+"the AUTO_GEN line in /etc/nbd-client and call `dpkg-reconfigure nbd-client' "
+"to allow the configuration to be migrated, or write the nbdtab file yourself "
+"manually."
 msgstr ""
-"Als dat onjuist is, verwijder dan deze regel en roep later \"dpkg-"
-"reconfigure nbd-client\" aan."
 
 #. Type: error
 #. Description
-#: ../nbd-client.templates:3001
-msgid "A port has been selected for export ${number}"
-msgstr "Een poort is geselecteerd voor export ${number}"
+#: ../nbd-client.templates:2001
+msgid ""
+"If you do not take either of those steps, your nbd-client boot-time "
+"configuration will not be functional."
+msgstr ""
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
-msgid ""
-"The file /etc/nbd-client configures an NBD export by way of a port number. "
-"This method of connecting to an NBD export is no longer supported as of NBD "
-"3.10."
+msgid "KILLALL is no longer supported"
 msgstr ""
-"Het bestand /etc/nbd-client configureert een NBD-export via een poortnummer. "
-"Deze methode van verbinden met een NBD-export wordt niet langer ondersteund "
-"sinds NBD 3.10."
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid ""
-"Please migrate the configuration so it uses name-based exports, rather than "
-"port-based ones."
+"You have a file /etc/nbd-client which does not set the shell variable "
+"KILLALL to false. Since nbd-client 1:3.14-1, the boot sequence has been "
+"changed to use /etc/nbdtab instead of /etc/nbd-client, and this mode of "
+"operation no longer supports killing devices that are not specified in "
+"nbdtab."
 msgstr ""
-"Gelieve de configuratie te migreren naar naam-gebaseerde in plaats van poort-"
-"gebaseerde exports."
 
-#. Type: string
+#. Type: note
 #. Description
-#: ../nbd-client.templates:4001
-msgid "Number of nbd-client connections to use:"
-msgstr "Aantal te gebruiken nbd-client-verbindingen:"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:3001
 msgid ""
-"nbd-client can handle multiple concurrent connections. Please specify the "
-"number of connections you'd like this configuration script to set up."
+"Your configuration has been migrated to /etc/nbdtab and the /etc/nbd-client "
+"file moved to /etc/nbd-client.old, but please note that you must bring down "
+"any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
-"nbd-client kan verscheidene verbindingen tegelijkertijd afhandelen. Hoeveel "
-"verbindingen moet dit configuratiescript instellen?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
-msgid ""
-"Note that if something has already been specified in /etc/nbd-client, the "
-"current configuration will be used as defaults in these dialogs."
-msgstr ""
-"Merk op dat indien /etc/nbd-client reeds informatie bevat, dat dan de "
-"huidige configuratie gebruikt zal worden voor de standaardwaarden in deze "
-"dialogen."
-
-#. Type: select
-#. Choices
-#: ../nbd-client.templates:5001
-msgid "swap, filesystem, raw"
-msgstr "swap, bestandssysteem, geen configuratie"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid "Intended use of the network block device number ${number}:"
-msgstr "Gebruik van netwerkblokapparaat nummer ${number}:"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"The network block device can serve multiple purposes. One of the most "
-"interesting is to provide swap space over the network for diskless clients, "
-"but you can store a filesystem on it, or do other things with it for which a "
-"block device is interesting."
-msgstr ""
-"Het netwerkblokapparaat kan voor verschillende doelen gebruikt worden. Eén "
-"van de meest interessante is om swapruimte via het netwerk aan te bieden aan "
-"computers zonder harde schijf, maar u kunt er ook een bestandssysteem op "
-"plaatsen, of er andere zaken mee doen waar een blokapparaatbestand "
-"interessant voor kan zijn."
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"If you intend to use the network block device as a swap device, choose \"swap"
-"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
-"it the option \"_netdev\" (else init will try to mount it before it's "
-"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
-"The only thing the nbd-client boot script will do then is start an nbd-"
-"client process; you will have to set it up manually."
-msgstr ""
-"Als u van plan bent om het als swapapparaat te gebruiken, kies dan \"swap\". "
-"Bent u van plan om dit als bestandssysteem te gebruiken, voeg dan een regel "
-"toe aan /etc/fstab, geef het de optie \"_netdev\" (als u dat niet doet dan "
-"zal init proberen het bestandssysteem aan te koppelen voordat deze bruikbaar "
-"is), en kies \"bestandssysteem\". Voor alle andere doelen kiest u \"geen "
-"configuratie\". Het enige dat het nbd-client opstartscript dan zal doen is "
-"het starten van een nbd-client proces; u zult alle andere zaken handmatig "
-"moeten instellen."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid "Hostname of the server (number: ${number})?"
-msgstr "Computernaam van de server (nummer: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"Please enter the network name or IP address of the machine on which the nbd-"
-"server process is running."
-msgstr ""
-"Gelieve de netwerknaam of het IP-adres van de machine waarop de nbd-server "
-"draait, in te geven."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid "Name for NBD export (number: ${number})?"
-msgstr "Naam van de nbd-export (nummer: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Please enter the NBD export name needed to access nbd-server. The name "
-"entered here should match an existing export on the server."
-msgstr ""
-"Gelieve de NBD exportnaam in te geven die nodig is om verbinding te maken "
-"met nbd-server. De naam die hier ingegeven wordt, moet overeenkomen met een "
-"bestaande export op de server."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Note that as of NBD 3.10, connecting to an NBD export using the older port-"
-"based negotiation protocol is no longer supported."
-msgstr ""
-"Merk op dat sinds NBD 3.10 het maken van een verbinding met een NBD-export "
-"via het oudere poort-gebaseerde protocol niet langer ondersteund wordt."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid "/dev entry for this nbd-client (number: ${number})?"
-msgstr "/dev-ingang voor deze nbd-client (nummer: ${nummer})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"Every nbd-client process needs to be associated with a /dev entry with major "
-"number 43. Please enter the name of the /dev entry you want to use for this "
-"nbd-client. Note that this needs to be the full path to that entry, not just "
-"the last part."
-msgstr ""
-"Elk nbd-client-proces moet geassocieerd worden met een /dev ingang met major "
-"nummer 43. Gelieve de naam van de /dev-ingang op te geven die u wilt "
-"gebruiken voor deze nbd-client. Merk op dat hier het volledige pad naar die "
-"ingang bedoeld wordt, en niet slechts het laatste deel."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"If the /dev entry specified does not exist, it will be created with minor "
-"number ${number}."
-msgstr ""
-"Wanneer deze ingang nog niet bestaat, zal hij aangemaakt worden met minor "
-"nummer ${number}"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "Alle NBD-apparaten afsluiten bij \"stop\"?"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"When the nbd-client init script is called to stop the nbd-client service, "
-"there are two things that can be done: either it can disconnect all nbd-"
-"client devices (which are assumed not to be in use), or it can disconnect "
-"only those nbd-client devices that it knows about in its config file."
-msgstr ""
-"Wanneer het nbd-client initscript uitgevoerd wordt om de nbd-client service "
-"te stoppen, zijn er twee dingen die gedaan kunnen worden: ofwel kan het "
-"script alle nbd-client apparaten stoppen (waarbij er vanuit gegaan wordt dat "
-"ze niet in gebruik zijn), ofwel kan het enkel die apparaten stoppen waarvan "
-"het weet heeft via de configuratie."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"The default (and the traditional behavior) is to disconnect all nbd-client "
-"devices. If the root device or other critical file systems are on NBD this "
-"will cause data loss and should not be accepted."
-msgstr ""
-"Het standaard (en historisch) gedrag is om alle nbd-client verbindingen te "
-"verbreken. Als het root-apparaat of een ander kritiek bestandssysteem zich "
-"op een NBD bevindt, dan zal dit verlies van gegevens tot gevolg hebben en "
-"dus moet deze optie dan niet geaccepteerd worden."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid "Extra parameters (number: ${number})"
-msgstr "Extra opties (nummer: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid ""
-"If you wish to add any extra parameters to nbd-client, then please enter "
-"them here."
-msgstr ""
-"Indien u extra opties aan nbd-client wenst mee te geven, gelieve ze dan hier "
-"op te geven."
 
 #. Type: string
 #. Description
@@ -387,6 +206,170 @@ msgstr ""
 "Als u de AUTO_GEN-regel verwijdert of uitcommentarieert, dan kan een "
 "bestand /etc/nbd-server/config gegenereerd worden gebaseerd op uw huidige "
 "configuratie. Tot dan zal uw nbd-server installatie niet werken."
+
+#~ msgid ""
+#~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+#~ "afterwards."
+#~ msgstr ""
+#~ "Als dat onjuist is, verwijder dan deze regel en roep later \"dpkg-"
+#~ "reconfigure nbd-client\" aan."
+
+#~ msgid "A port has been selected for export ${number}"
+#~ msgstr "Een poort is geselecteerd voor export ${number}"
+
+#~ msgid ""
+#~ "The file /etc/nbd-client configures an NBD export by way of a port "
+#~ "number. This method of connecting to an NBD export is no longer supported "
+#~ "as of NBD 3.10."
+#~ msgstr ""
+#~ "Het bestand /etc/nbd-client configureert een NBD-export via een "
+#~ "poortnummer. Deze methode van verbinden met een NBD-export wordt niet "
+#~ "langer ondersteund sinds NBD 3.10."
+
+#~ msgid ""
+#~ "Please migrate the configuration so it uses name-based exports, rather "
+#~ "than port-based ones."
+#~ msgstr ""
+#~ "Gelieve de configuratie te migreren naar naam-gebaseerde in plaats van "
+#~ "poort-gebaseerde exports."
+
+#~ msgid "Number of nbd-client connections to use:"
+#~ msgstr "Aantal te gebruiken nbd-client-verbindingen:"
+
+#~ msgid ""
+#~ "nbd-client can handle multiple concurrent connections. Please specify the "
+#~ "number of connections you'd like this configuration script to set up."
+#~ msgstr ""
+#~ "nbd-client kan verscheidene verbindingen tegelijkertijd afhandelen. "
+#~ "Hoeveel verbindingen moet dit configuratiescript instellen?"
+
+#~ msgid ""
+#~ "Note that if something has already been specified in /etc/nbd-client, the "
+#~ "current configuration will be used as defaults in these dialogs."
+#~ msgstr ""
+#~ "Merk op dat indien /etc/nbd-client reeds informatie bevat, dat dan de "
+#~ "huidige configuratie gebruikt zal worden voor de standaardwaarden in deze "
+#~ "dialogen."
+
+#~ msgid "swap, filesystem, raw"
+#~ msgstr "swap, bestandssysteem, geen configuratie"
+
+#~ msgid "Intended use of the network block device number ${number}:"
+#~ msgstr "Gebruik van netwerkblokapparaat nummer ${number}:"
+
+#~ msgid ""
+#~ "The network block device can serve multiple purposes. One of the most "
+#~ "interesting is to provide swap space over the network for diskless "
+#~ "clients, but you can store a filesystem on it, or do other things with it "
+#~ "for which a block device is interesting."
+#~ msgstr ""
+#~ "Het netwerkblokapparaat kan voor verschillende doelen gebruikt worden. "
+#~ "Eén van de meest interessante is om swapruimte via het netwerk aan te "
+#~ "bieden aan computers zonder harde schijf, maar u kunt er ook een "
+#~ "bestandssysteem op plaatsen, of er andere zaken mee doen waar een "
+#~ "blokapparaatbestand interessant voor kan zijn."
+
+#~ msgid ""
+#~ "If you intend to use the network block device as a swap device, choose "
+#~ "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
+#~ "fstab, give it the option \"_netdev\" (else init will try to mount it "
+#~ "before it's usable), and choose \"filesystem\". For all other purposes, "
+#~ "choose \"raw\". The only thing the nbd-client boot script will do then is "
+#~ "start an nbd-client process; you will have to set it up manually."
+#~ msgstr ""
+#~ "Als u van plan bent om het als swapapparaat te gebruiken, kies dan \"swap"
+#~ "\". Bent u van plan om dit als bestandssysteem te gebruiken, voeg dan een "
+#~ "regel toe aan /etc/fstab, geef het de optie \"_netdev\" (als u dat niet "
+#~ "doet dan zal init proberen het bestandssysteem aan te koppelen voordat "
+#~ "deze bruikbaar is), en kies \"bestandssysteem\". Voor alle andere doelen "
+#~ "kiest u \"geen configuratie\". Het enige dat het nbd-client opstartscript "
+#~ "dan zal doen is het starten van een nbd-client proces; u zult alle andere "
+#~ "zaken handmatig moeten instellen."
+
+#~ msgid "Hostname of the server (number: ${number})?"
+#~ msgstr "Computernaam van de server (nummer: ${number})?"
+
+#~ msgid ""
+#~ "Please enter the network name or IP address of the machine on which the "
+#~ "nbd-server process is running."
+#~ msgstr ""
+#~ "Gelieve de netwerknaam of het IP-adres van de machine waarop de nbd-"
+#~ "server draait, in te geven."
+
+#~ msgid "Name for NBD export (number: ${number})?"
+#~ msgstr "Naam van de nbd-export (nummer: ${number})?"
+
+#~ msgid ""
+#~ "Please enter the NBD export name needed to access nbd-server. The name "
+#~ "entered here should match an existing export on the server."
+#~ msgstr ""
+#~ "Gelieve de NBD exportnaam in te geven die nodig is om verbinding te maken "
+#~ "met nbd-server. De naam die hier ingegeven wordt, moet overeenkomen met "
+#~ "een bestaande export op de server."
+
+#~ msgid ""
+#~ "Note that as of NBD 3.10, connecting to an NBD export using the older "
+#~ "port-based negotiation protocol is no longer supported."
+#~ msgstr ""
+#~ "Merk op dat sinds NBD 3.10 het maken van een verbinding met een NBD-"
+#~ "export via het oudere poort-gebaseerde protocol niet langer ondersteund "
+#~ "wordt."
+
+#~ msgid "/dev entry for this nbd-client (number: ${number})?"
+#~ msgstr "/dev-ingang voor deze nbd-client (nummer: ${nummer})?"
+
+#~ msgid ""
+#~ "Every nbd-client process needs to be associated with a /dev entry with "
+#~ "major number 43. Please enter the name of the /dev entry you want to use "
+#~ "for this nbd-client. Note that this needs to be the full path to that "
+#~ "entry, not just the last part."
+#~ msgstr ""
+#~ "Elk nbd-client-proces moet geassocieerd worden met een /dev ingang met "
+#~ "major nummer 43. Gelieve de naam van de /dev-ingang op te geven die u "
+#~ "wilt gebruiken voor deze nbd-client. Merk op dat hier het volledige pad "
+#~ "naar die ingang bedoeld wordt, en niet slechts het laatste deel."
+
+#~ msgid ""
+#~ "If the /dev entry specified does not exist, it will be created with minor "
+#~ "number ${number}."
+#~ msgstr ""
+#~ "Wanneer deze ingang nog niet bestaat, zal hij aangemaakt worden met minor "
+#~ "nummer ${number}"
+
+#~ msgid "Disconnect all NBD devices on \"stop\"?"
+#~ msgstr "Alle NBD-apparaten afsluiten bij \"stop\"?"
+
+#~ msgid ""
+#~ "When the nbd-client init script is called to stop the nbd-client service, "
+#~ "there are two things that can be done: either it can disconnect all nbd-"
+#~ "client devices (which are assumed not to be in use), or it can disconnect "
+#~ "only those nbd-client devices that it knows about in its config file."
+#~ msgstr ""
+#~ "Wanneer het nbd-client initscript uitgevoerd wordt om de nbd-client "
+#~ "service te stoppen, zijn er twee dingen die gedaan kunnen worden: ofwel "
+#~ "kan het script alle nbd-client apparaten stoppen (waarbij er vanuit "
+#~ "gegaan wordt dat ze niet in gebruik zijn), ofwel kan het enkel die "
+#~ "apparaten stoppen waarvan het weet heeft via de configuratie."
+
+#~ msgid ""
+#~ "The default (and the traditional behavior) is to disconnect all nbd-"
+#~ "client devices. If the root device or other critical file systems are on "
+#~ "NBD this will cause data loss and should not be accepted."
+#~ msgstr ""
+#~ "Het standaard (en historisch) gedrag is om alle nbd-client verbindingen "
+#~ "te verbreken. Als het root-apparaat of een ander kritiek bestandssysteem "
+#~ "zich op een NBD bevindt, dan zal dit verlies van gegevens tot gevolg "
+#~ "hebben en dus moet deze optie dan niet geaccepteerd worden."
+
+#~ msgid "Extra parameters (number: ${number})"
+#~ msgstr "Extra opties (nummer: ${number})?"
+
+#~ msgid ""
+#~ "If you wish to add any extra parameters to nbd-client, then please enter "
+#~ "them here."
+#~ msgstr ""
+#~ "Indien u extra opties aan nbd-client wenst mee te geven, gelieve ze dan "
+#~ "hier op te geven."
 
 #~ msgid ""
 #~ "Please enter the TCP port number or NBD export name needed to access nbd-"

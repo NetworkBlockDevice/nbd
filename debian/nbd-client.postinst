@@ -24,93 +24,105 @@ set -e
 #     installation fails and the `postinst' is called with `abort-upgrade',
 #     `abort-remove' or `abort-deconfigure'.
 
-CFTMPL=/usr/share/nbd-client/nbd-client.cf
-[ -e /etc/nbd-client ] && . /etc/nbd-client && CFTMPL=/etc/nbd-client
+translate_extra() {
+        sep="\t"
+        while [ ! -z "$1" ]
+        do
+                case "$1" in
+                        -b*)
+                                opt=$2
+                                NBD_OPT="${NBD_OPT}${sep}bs=${opt}"
+                                shift
+                        ;;
+                        -t*)
+                                opt=$2
+                                NBD_OPT="${NBD_OPT}${sep}timeout=${opt}"
+                                shift
+                        ;;
+                        -sdp|-S)
+                                NBD_OPT="${NBD_OPT}${sep}sdp"
+                        ;;
+                        -unix|-u)
+                                NBD_OPT="${NBD_OPT}${sep}unix"
+                        ;;
+                        -swap|-s)
+                                NBD_OPT="${NBD_OPT}${sep}swap"
+                        ;;
+                esac
+                shift
+                sep=","
+        done
+}
 
-case "$1" in
-    configure)
-        db_get nbd-client/number
-        NUMBER=${RET:-0}
-	db_get nbd-client/killall
-	KILLALL=${RET:-true}
-        if [ "$AUTO_GEN"x != nx ]
+convert_from_sh() {
+        if [ ! -e /etc/nbd-client ]
         then
-            # Rewrite our configfile
-            TMPFILE=`mktemp /tmp/nbd-client.XXXXXX`
-            cat $CFTMPL > $TMPFILE
-	    sed -i -e "s/\(^KILLALL=\).*/\1\"$KILLALL\"/g" $TMPFILE
-	    grep "KILLALL" $TMPFILE >/dev/null || echo "KILLALL=\"$KILLALL\"" >> $TMPFILE
-            if [ "$NUMBER" -gt 0 ]
-            then
-                for i in $(seq 0 $(( $NUMBER - 1 )) )
-                do
-                    if [ $i -eq 0 ]
-                    then
-                        unset i
-                    fi
-                    db_get nbd-client/host$i
-                    host=$RET
-                    db_get nbd-client/port$i
-                    name=$RET
-                    db_get nbd-client/device$i
-                    device=$RET
-		    db_get nbd-client/extra$i
-		    extra=$RET
-                    [ -e "$device" ] || mknod "$device" b 43 $(( $i + 0 ))
-                    db_get nbd-client/type$i
-                    case "$RET" in
-                        "swap")
-                            type_="s" # "type" seems to be a reserved word...
-                            ;;
-                        "filesystem")
-                            type_="f"
-                            ;;
-                        "raw")
-                            type_="r"
-                            ;;
-                    esac
-                    if [ -z "$host" -o -z "$name" -o -z "$device" ]
-                    then
-                        type_= # Ensure device will be skipped
-                    fi
-                    i=$(( $i + 0 ))
-                    sed -i -e 's:\(^NBD_DEVICE\['$i'\]\=\).*:\1"'$device'":g' -e \
-                        's/\(^NBD_TYPE\['$i'\]=\).*/\1"'$type_'"/g' -e \
-                        's/\(^NBD_HOST\['$i'\]=\).*/\1"'$host'"/g'  -e \
-			's/\(^NBD_NAME\['$i'\]=\).*/\1"'$name'"/g' -e \
-			's/\(^NBD_EXTRA\['$i'\]=\).*/\1"'$extra'"/g' \
-                         $TMPFILE
-                    grep "NBD_TYPE\[$i\]=\""$type_ $TMPFILE >/dev/null || (echo "NBD_TYPE[$i]=\""$type_'"'; echo "NBD_DEVICE[$i]=\""$device'"'; echo "NBD_HOST[$i]=\""$host'"'; echo "NBD_NAME[$i]=\""$name'"'; echo "NBD_EXTRA[$i]=\""$extra'"') >> $TMPFILE
-                done
-            fi
-	    [ -e /etc/nbd-client ] && mv /etc/nbd-client /etc/nbd-client.bak
-            mv $TMPFILE /etc/nbd-client
+                # nothing to convert from
+                return
         fi
-        if $(dpkg --compare-versions "$(uname -r)" ge "2.4")
+        local old_md5sum=$(dpkg-query -W -f='${Conffiles}' nbd-client | awk '/nbdtab/{print $2}')
+        local new_md5sum=$(md5sum /etc/nbdtab)
+        if [ $old_md5sum != $new_md5sum ]
         then
-                invoke-rc.d nbd-client restart
+                # nbdtab locally modified
+                return
         fi
-	db_stop
-	# Invoke initramfs trigger
-        if [ -f /$(which update-initramfs) ]
-	then
-		update-initramfs -u
-	fi
-	# Migrate sendsigs.omit.d file
-	if [ -f /lib/init/rw/sendsigs.omit.d/nbd-client ]
-	then
-		mv /lib/init/rw/sendsigs.omit.d/nbd-client /run/sendsigs.omit.d
-	fi
-    ;;
+        TMPFILE=$(mktemp /tmp/nbd-client.XXXXXX)
+        . /etc/nbd-client
+        # check if we may auto-generate
+        if [ "$AUTO_GEN" == "n" ]
+        then
+                db_start
+                db_get nbd-client/no-auto-config
+                db_go
+                db_stop
+                return
+        fi
+        # check for KILLALL, which isn't supported anymore
+        if [ "$KILLALL" != "false" ]
+        then
+                db_start
+                db_get nbd-client/killal_set
+                db_go
+                db_stop
+                return
+        fi
+        i=0
+        while [ ! -z "${NBD_TYPE[$i]}" ]
+        do
+                NBD_DEVICE[$i]=${NBD_DEVICE[$i]#/dev/}
+                NBD_OPT=""
+                convert_opts ${NBD_OPTS[$i]}
+                echo -e "${NBD_DEVICE[$i]}\t${NBD_HOST[$i]}\t${NBD_NAME[$i]}${NBD_OPT}" >> $TMPFILE
+                i=$(( $i + 1 ))
+        done
+        mv $TMPFILE /etc/nbdtab
+        mv /etc/nbd-client /etc/nbd-client.old
+}
 
-    abort-upgrade|abort-remove|abort-deconfigure)
-        # We need not do anything.
-    ;;
+case "$3" in
+        configure)
+                convert_from_sh
+                # Invoke initramfs trigger
+                if [ -f /$(which update-initramfs) ]
+                then
+                        update-initramfs -u
+                fi
+                # Migrate sendsigs.omit.d file
+                if [ -f /lib/init/rw/sendsigs.omit.d/nbd-client ]
+                then
+                        mv /lib/init/rw/sendsigs.omit.d/nbd-client /run/sendsigs.omit.d
+                fi
+        ;;
 
-    *)
-        echo "postinst called with unknown argument \`$1'" >&2
-        exit 0
-    ;;
+        abort-upgrade|abort-remove|abort-deconfigure)
+                # We need not do anything.
+        ;;
+
+        *)
+                echo "postinst called with unknown argument \`$1'" >&2
+                exit 0
+        ;;
 esac
 
 # dh_installdeb will replace this with shell code automatically

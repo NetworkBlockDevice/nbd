@@ -1,0 +1,7 @@
+# This file configures NBD devices for use with nbd-client.
+# Its fields are:
+#
+# device server_hostname_or_ip exportname [options]
+#
+# For more information, see nbdtab(5)
+# This default configuration has no devices configured.

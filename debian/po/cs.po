@@ -15,7 +15,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-09-26 13:20+0200\n"
+"POT-Creation-Date: 2016-06-30 21:30+0200\n"
 "PO-Revision-Date: 2015-10-28 08:52+0100\n"
 "Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
 "Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
@@ -33,9 +33,14 @@ msgstr "Volba AUTO_GEN je v /etc/nbd-client nastavena na „n“"
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
+#, fuzzy
+#| msgid ""
+#| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
+#| "to \"n\". The file will therefore not be regenerated automatically."
 msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
+"\"n\". This indicates that you prefer that the nbd configuration is not "
+"automatically generated."
 msgstr ""
 "V souboru /etc/nbd-client se nachází řádek, který nastavuje proměnnou "
 "AUTO_GEN na hodnotu „n“. To znamená, že nechcete, aby se soubor obnovoval "
@@ -45,228 +50,50 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:2001
 msgid ""
-"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
-"afterwards."
+"Since nbd-client 1:3.14-1, the file /etc/nbd-client is no longer used for "
+"boot-time configuration; instead, a file /etc/nbdtab is used, with a "
+"different format. The debconf configuration options have been removed, and "
+"this file is therefore never automatically generated, except that this "
+"upgrade would have generated a /etc/nbdtab file from your /etc/nbd-client if "
+"AUTO_GEN had not been set to \"n\". As such, you'll need to either disable "
+"the AUTO_GEN line in /etc/nbd-client and call `dpkg-reconfigure nbd-client' "
+"to allow the configuration to be migrated, or write the nbdtab file yourself "
+"manually."
 msgstr ""
-"Pokud to je špatně, odstraňte příslušný řádek a poté spusťte „dpkg-"
-"reconfigure nbd-client“."
 
 #. Type: error
 #. Description
-#: ../nbd-client.templates:3001
-msgid "A port has been selected for export ${number}"
-msgstr "Pro export ${number} byl zadán port"
+#: ../nbd-client.templates:2001
+msgid ""
+"If you do not take either of those steps, your nbd-client boot-time "
+"configuration will not be functional."
+msgstr ""
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
-msgid ""
-"The file /etc/nbd-client configures an NBD export by way of a port number. "
-"This method of connecting to an NBD export is no longer supported as of NBD "
-"3.10."
+msgid "KILLALL is no longer supported"
 msgstr ""
-"Soubor /etc/nbd-client definuje NBD export pomocí čísla portu. Tento "
-"způsob připojení k NBD exportu již není od verze NBD 3.10 podporován."
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid ""
-"Please migrate the configuration so it uses name-based exports, rather than "
-"port-based ones."
+"You have a file /etc/nbd-client which does not set the shell variable "
+"KILLALL to false. Since nbd-client 1:3.14-1, the boot sequence has been "
+"changed to use /etc/nbdtab instead of /etc/nbd-client, and this mode of "
+"operation no longer supports killing devices that are not specified in "
+"nbdtab."
 msgstr ""
-"Upravte prosím nastavení, aby místo portů používalo exporty definované "
-"pomocí jmen."
 
-#. Type: string
+#. Type: note
 #. Description
-#: ../nbd-client.templates:4001
-msgid "Number of nbd-client connections to use:"
-msgstr "Počet nbd-client spojení, která chcete použít:"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:3001
 msgid ""
-"nbd-client can handle multiple concurrent connections. Please specify the "
-"number of connections you'd like this configuration script to set up."
+"Your configuration has been migrated to /etc/nbdtab and the /etc/nbd-client "
+"file moved to /etc/nbd-client.old, but please note that you must bring down "
+"any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
-"nbd-client může obsluhovat více souběžných spojení. Zadejte počet spojení, "
-"která má tento konfigurační skript nastavit."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
-msgid ""
-"Note that if something has already been specified in /etc/nbd-client, the "
-"current configuration will be used as defaults in these dialogs."
-msgstr ""
-"Poznamenejme, že něco již bylo v /etc/nbd-client nastaveno a tak se aktuální "
-"nastavení přednastaví jako výchozí odpovědi na tyto otázky."
-
-#. Type: select
-#. Choices
-#: ../nbd-client.templates:5001
-msgid "swap, filesystem, raw"
-msgstr "swap, souborový systém, raw"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid "Intended use of the network block device number ${number}:"
-msgstr "Zamýšlené použití síťového blokového zařízení číslo ${number}:"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"The network block device can serve multiple purposes. One of the most "
-"interesting is to provide swap space over the network for diskless clients, "
-"but you can store a filesystem on it, or do other things with it for which a "
-"block device is interesting."
-msgstr ""
-"Síťové blokové zařízení může sloužit několika účelům. Jedním z těch "
-"zajímavějších je poskytování odkládacího prostoru (swapu) bezdiskovým "
-"stanicím, ale také na něm můžete zřídit souborový systém, nebo s ním "
-"provádět jiné užitečné věci, pro které je potřeba blokové zařízení."
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"If you intend to use the network block device as a swap device, choose \"swap"
-"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
-"it the option \"_netdev\" (else init will try to mount it before it's "
-"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
-"The only thing the nbd-client boot script will do then is start an nbd-"
-"client process; you will have to set it up manually."
-msgstr ""
-"Plánujete-li používat síťové blokové zařízení jako odkládací prostor, "
-"vyberte „swap“. Chcete-li zařízení používat jako souborový systém, přidejte "
-"do /etc/fstab příslušný řádek (nezapomeňte použít parametr „_netdev“, "
-"protože init by se je pokusil připojit ještě než by bylo použitelné) a "
-"vyberte „souborový systém“. Pro všechny ostatní případy zvolte „raw“. "
-"Jedinou věcí, kterou zaváděcí skript nbd-client udělá, je spuštění procesu "
-"nbd-client; nastavit jej budete muset ručně."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid "Hostname of the server (number: ${number})?"
-msgstr "Jméno serveru (číslo ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"Please enter the network name or IP address of the machine on which the nbd-"
-"server process is running."
-msgstr ""
-"Zadejte síťové jméno nebo IP adresu počítače, na kterém běží nbd-server."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid "Name for NBD export (number: ${number})?"
-msgstr "Jméno NBD exportu (číslo ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Please enter the NBD export name needed to access nbd-server. The name "
-"entered here should match an existing export on the server."
-msgstr ""
-"Zadejte prosím jméno NBD exportu, ke kterému se chce připojit. Toto jméno "
-"by již mělo na serveru existovat."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Note that as of NBD 3.10, connecting to an NBD export using the older port-"
-"based negotiation protocol is no longer supported."
-msgstr ""
-"NBD od verze 3.10 již nepodporuje připojení k NBD exportům používajícím "
-"starší protokol založený na číslech portů."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid "/dev entry for this nbd-client (number: ${number})?"
-msgstr "Záznam v /dev pro tohoto klienta (číslo ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"Every nbd-client process needs to be associated with a /dev entry with major "
-"number 43. Please enter the name of the /dev entry you want to use for this "
-"nbd-client. Note that this needs to be the full path to that entry, not just "
-"the last part."
-msgstr ""
-"Každý proces nbd-client se musí svázat se záznamem v /dev majícím jako "
-"hlavní číslo 43. Zadejte jméno záznamu v /dev, které chcete použít pro "
-"tohoto nbd-clienta. Musí se jednat o absolutní cestu k danému záznamu, ne "
-"pouze jeho poslední část."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"If the /dev entry specified does not exist, it will be created with minor "
-"number ${number}."
-msgstr ""
-"Pokud zadané zařízení v /dev neexistuje, bude vytvořeno s vedlejším číslem "
-"${number}."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "Odpojit všechna NBD zařízení při „stop“?"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"When the nbd-client init script is called to stop the nbd-client service, "
-"there are two things that can be done: either it can disconnect all nbd-"
-"client devices (which are assumed not to be in use), or it can disconnect "
-"only those nbd-client devices that it knows about in its config file."
-msgstr ""
-"Když je init skript nbd-client zavolán, aby zastavil službu nbd-client, může "
-"zareagovat dvěma způsoby. Buď odpojí všechna zařízení nbd-clienta (o kterých "
-"se předpokládá, že se již nepoužívají), nebo odpojí pouze ta zařízení, která "
-"má uvedena ve svém konfiguračním souboru."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"The default (and the traditional behavior) is to disconnect all nbd-client "
-"devices. If the root device or other critical file systems are on NBD this "
-"will cause data loss and should not be accepted."
-msgstr ""
-"Výchozí (a tradiční) chování je odpojit všechna zařízení nbd-clienta. Pokud "
-"však na NBD provozujete kritické souborové systémy (např. kořenový souborový "
-"systém), pak je výchozí chování nevhodné a může způsobit ztrátu dat; v "
-"takovém případě raději tuto možnost zamítněte."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid "Extra parameters (number: ${number})"
-msgstr "Speciální parametry (číslo ${number})"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid ""
-"If you wish to add any extra parameters to nbd-client, then please enter "
-"them here."
-msgstr ""
-"Chcete-li zadat nbd-klientu dodatečné parametry, zadejte je prosím zde."
 
 #. Type: string
 #. Description
@@ -385,6 +212,161 @@ msgstr ""
 "Pokud odstraníte nebo zakomentujete řádek AUTO_GEN, vytvoří se nový soubor /"
 "etc/nbd-server/config na základě stávající konfigurace. Do té doby bude "
 "instalace nbd-serveru porušená."
+
+#~ msgid ""
+#~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+#~ "afterwards."
+#~ msgstr ""
+#~ "Pokud to je špatně, odstraňte příslušný řádek a poté spusťte „dpkg-"
+#~ "reconfigure nbd-client“."
+
+#~ msgid "A port has been selected for export ${number}"
+#~ msgstr "Pro export ${number} byl zadán port"
+
+#~ msgid ""
+#~ "The file /etc/nbd-client configures an NBD export by way of a port "
+#~ "number. This method of connecting to an NBD export is no longer supported "
+#~ "as of NBD 3.10."
+#~ msgstr ""
+#~ "Soubor /etc/nbd-client definuje NBD export pomocí čísla portu. Tento "
+#~ "způsob připojení k NBD exportu již není od verze NBD 3.10 podporován."
+
+#~ msgid ""
+#~ "Please migrate the configuration so it uses name-based exports, rather "
+#~ "than port-based ones."
+#~ msgstr ""
+#~ "Upravte prosím nastavení, aby místo portů používalo exporty definované "
+#~ "pomocí jmen."
+
+#~ msgid "Number of nbd-client connections to use:"
+#~ msgstr "Počet nbd-client spojení, která chcete použít:"
+
+#~ msgid ""
+#~ "nbd-client can handle multiple concurrent connections. Please specify the "
+#~ "number of connections you'd like this configuration script to set up."
+#~ msgstr ""
+#~ "nbd-client může obsluhovat více souběžných spojení. Zadejte počet "
+#~ "spojení, která má tento konfigurační skript nastavit."
+
+#~ msgid ""
+#~ "Note that if something has already been specified in /etc/nbd-client, the "
+#~ "current configuration will be used as defaults in these dialogs."
+#~ msgstr ""
+#~ "Poznamenejme, že něco již bylo v /etc/nbd-client nastaveno a tak se "
+#~ "aktuální nastavení přednastaví jako výchozí odpovědi na tyto otázky."
+
+#~ msgid "swap, filesystem, raw"
+#~ msgstr "swap, souborový systém, raw"
+
+#~ msgid "Intended use of the network block device number ${number}:"
+#~ msgstr "Zamýšlené použití síťového blokového zařízení číslo ${number}:"
+
+#~ msgid ""
+#~ "The network block device can serve multiple purposes. One of the most "
+#~ "interesting is to provide swap space over the network for diskless "
+#~ "clients, but you can store a filesystem on it, or do other things with it "
+#~ "for which a block device is interesting."
+#~ msgstr ""
+#~ "Síťové blokové zařízení může sloužit několika účelům. Jedním z těch "
+#~ "zajímavějších je poskytování odkládacího prostoru (swapu) bezdiskovým "
+#~ "stanicím, ale také na něm můžete zřídit souborový systém, nebo s ním "
+#~ "provádět jiné užitečné věci, pro které je potřeba blokové zařízení."
+
+#~ msgid ""
+#~ "If you intend to use the network block device as a swap device, choose "
+#~ "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
+#~ "fstab, give it the option \"_netdev\" (else init will try to mount it "
+#~ "before it's usable), and choose \"filesystem\". For all other purposes, "
+#~ "choose \"raw\". The only thing the nbd-client boot script will do then is "
+#~ "start an nbd-client process; you will have to set it up manually."
+#~ msgstr ""
+#~ "Plánujete-li používat síťové blokové zařízení jako odkládací prostor, "
+#~ "vyberte „swap“. Chcete-li zařízení používat jako souborový systém, "
+#~ "přidejte do /etc/fstab příslušný řádek (nezapomeňte použít parametr "
+#~ "„_netdev“, protože init by se je pokusil připojit ještě než by bylo "
+#~ "použitelné) a vyberte „souborový systém“. Pro všechny ostatní případy "
+#~ "zvolte „raw“. Jedinou věcí, kterou zaváděcí skript nbd-client udělá, je "
+#~ "spuštění procesu nbd-client; nastavit jej budete muset ručně."
+
+#~ msgid "Hostname of the server (number: ${number})?"
+#~ msgstr "Jméno serveru (číslo ${number})?"
+
+#~ msgid ""
+#~ "Please enter the network name or IP address of the machine on which the "
+#~ "nbd-server process is running."
+#~ msgstr ""
+#~ "Zadejte síťové jméno nebo IP adresu počítače, na kterém běží nbd-server."
+
+#~ msgid "Name for NBD export (number: ${number})?"
+#~ msgstr "Jméno NBD exportu (číslo ${number})?"
+
+#~ msgid ""
+#~ "Please enter the NBD export name needed to access nbd-server. The name "
+#~ "entered here should match an existing export on the server."
+#~ msgstr ""
+#~ "Zadejte prosím jméno NBD exportu, ke kterému se chce připojit. Toto jméno "
+#~ "by již mělo na serveru existovat."
+
+#~ msgid ""
+#~ "Note that as of NBD 3.10, connecting to an NBD export using the older "
+#~ "port-based negotiation protocol is no longer supported."
+#~ msgstr ""
+#~ "NBD od verze 3.10 již nepodporuje připojení k NBD exportům používajícím "
+#~ "starší protokol založený na číslech portů."
+
+#~ msgid "/dev entry for this nbd-client (number: ${number})?"
+#~ msgstr "Záznam v /dev pro tohoto klienta (číslo ${number})?"
+
+#~ msgid ""
+#~ "Every nbd-client process needs to be associated with a /dev entry with "
+#~ "major number 43. Please enter the name of the /dev entry you want to use "
+#~ "for this nbd-client. Note that this needs to be the full path to that "
+#~ "entry, not just the last part."
+#~ msgstr ""
+#~ "Každý proces nbd-client se musí svázat se záznamem v /dev majícím jako "
+#~ "hlavní číslo 43. Zadejte jméno záznamu v /dev, které chcete použít pro "
+#~ "tohoto nbd-clienta. Musí se jednat o absolutní cestu k danému záznamu, ne "
+#~ "pouze jeho poslední část."
+
+#~ msgid ""
+#~ "If the /dev entry specified does not exist, it will be created with minor "
+#~ "number ${number}."
+#~ msgstr ""
+#~ "Pokud zadané zařízení v /dev neexistuje, bude vytvořeno s vedlejším "
+#~ "číslem ${number}."
+
+#~ msgid "Disconnect all NBD devices on \"stop\"?"
+#~ msgstr "Odpojit všechna NBD zařízení při „stop“?"
+
+#~ msgid ""
+#~ "When the nbd-client init script is called to stop the nbd-client service, "
+#~ "there are two things that can be done: either it can disconnect all nbd-"
+#~ "client devices (which are assumed not to be in use), or it can disconnect "
+#~ "only those nbd-client devices that it knows about in its config file."
+#~ msgstr ""
+#~ "Když je init skript nbd-client zavolán, aby zastavil službu nbd-client, "
+#~ "může zareagovat dvěma způsoby. Buď odpojí všechna zařízení nbd-clienta (o "
+#~ "kterých se předpokládá, že se již nepoužívají), nebo odpojí pouze ta "
+#~ "zařízení, která má uvedena ve svém konfiguračním souboru."
+
+#~ msgid ""
+#~ "The default (and the traditional behavior) is to disconnect all nbd-"
+#~ "client devices. If the root device or other critical file systems are on "
+#~ "NBD this will cause data loss and should not be accepted."
+#~ msgstr ""
+#~ "Výchozí (a tradiční) chování je odpojit všechna zařízení nbd-clienta. "
+#~ "Pokud však na NBD provozujete kritické souborové systémy (např. kořenový "
+#~ "souborový systém), pak je výchozí chování nevhodné a může způsobit ztrátu "
+#~ "dat; v takovém případě raději tuto možnost zamítněte."
+
+#~ msgid "Extra parameters (number: ${number})"
+#~ msgstr "Speciální parametry (číslo ${number})"
+
+#~ msgid ""
+#~ "If you wish to add any extra parameters to nbd-client, then please enter "
+#~ "them here."
+#~ msgstr ""
+#~ "Chcete-li zadat nbd-klientu dodatečné parametry, zadejte je prosím zde."
 
 #~ msgid ""
 #~ "Please enter the TCP port number or NBD export name needed to access nbd-"

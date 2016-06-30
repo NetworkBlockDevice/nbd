@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:3.11-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-10-17 09:40+0200\n"
+"POT-Creation-Date: 2016-06-30 21:30+0200\n"
 "PO-Revision-Date: 2015-10-16 00:43+0100\n"
 "Last-Translator: Américo Monteiro <a_monteiro@gmx.com>\n"
 "Language-Team: Portuguese <traduz@debianpt.org>\n"
@@ -27,9 +27,14 @@ msgstr "AUTO_GEN está definido para \"n\" no /etc/nbd-client"
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
+#, fuzzy
+#| msgid ""
+#| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
+#| "to \"n\". The file will therefore not be regenerated automatically."
 msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
+"\"n\". This indicates that you prefer that the nbd configuration is not "
+"automatically generated."
 msgstr ""
 "O ficheiro /etc/nbd-client contém uma linha que define a variável AUTO_GEN "
 "para \"n\". Por isto o ficheiro não será regenerado automaticamente."
@@ -38,233 +43,50 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:2001
 msgid ""
-"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
-"afterwards."
+"Since nbd-client 1:3.14-1, the file /etc/nbd-client is no longer used for "
+"boot-time configuration; instead, a file /etc/nbdtab is used, with a "
+"different format. The debconf configuration options have been removed, and "
+"this file is therefore never automatically generated, except that this "
+"upgrade would have generated a /etc/nbdtab file from your /etc/nbd-client if "
+"AUTO_GEN had not been set to \"n\". As such, you'll need to either disable "
+"the AUTO_GEN line in /etc/nbd-client and call `dpkg-reconfigure nbd-client' "
+"to allow the configuration to be migrated, or write the nbdtab file yourself "
+"manually."
 msgstr ""
-"Se isto está errado, remova a linha e depois chame \"dpkg-reconfigure nbd-"
-"client\"."
 
 #. Type: error
 #. Description
-#: ../nbd-client.templates:3001
-msgid "A port has been selected for export ${number}"
-msgstr "Um porto foi seleccionado para exportar ${number}"
+#: ../nbd-client.templates:2001
+msgid ""
+"If you do not take either of those steps, your nbd-client boot-time "
+"configuration will not be functional."
+msgstr ""
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
-msgid ""
-"The file /etc/nbd-client configures an NBD export by way of a port number. "
-"This method of connecting to an NBD export is no longer supported as of NBD "
-"3.10."
+msgid "KILLALL is no longer supported"
 msgstr ""
-"O ficheiro /etc/nbd-client configura uma exportação NBD pelo método de um "
-"número de porto. Este método de ligação a uma exportação NBD não é mais "
-"suportado a partir do NBD 3.10."
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid ""
-"Please migrate the configuration so it uses name-based exports, rather than "
-"port-based ones."
+"You have a file /etc/nbd-client which does not set the shell variable "
+"KILLALL to false. Since nbd-client 1:3.14-1, the boot sequence has been "
+"changed to use /etc/nbdtab instead of /etc/nbd-client, and this mode of "
+"operation no longer supports killing devices that are not specified in "
+"nbdtab."
 msgstr ""
-"Por favor migre a configuração para que passe a usar exportações baseadas em "
-"nomes, em vez de baseadas em portos."
 
-#. Type: string
+#. Type: note
 #. Description
-#: ../nbd-client.templates:4001
-msgid "Number of nbd-client connections to use:"
-msgstr "Numero de ligações nbd-client a usar:"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:3001
 msgid ""
-"nbd-client can handle multiple concurrent connections. Please specify the "
-"number of connections you'd like this configuration script to set up."
+"Your configuration has been migrated to /etc/nbdtab and the /etc/nbd-client "
+"file moved to /etc/nbd-client.old, but please note that you must bring down "
+"any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
-"O nbd-client pode lidar com várias ligações em simultâneo. Por favor, "
-"indique o número de ligações que deseja que este script prepare."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
-msgid ""
-"Note that if something has already been specified in /etc/nbd-client, the "
-"current configuration will be used as defaults in these dialogs."
-msgstr ""
-"Note que se alguma coisa já estiver especificada em /etc/nbd-client, a "
-"configuração existente será usada como valores pre-definidos nestes diálogos."
-
-#. Type: select
-#. Choices
-#: ../nbd-client.templates:5001
-msgid "swap, filesystem, raw"
-msgstr "swap, sistema de ficheiros, raw"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid "Intended use of the network block device number ${number}:"
-msgstr ""
-"Utilização pretendida do dispositivo de bloco de rede número ${number}:"
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"The network block device can serve multiple purposes. One of the most "
-"interesting is to provide swap space over the network for diskless clients, "
-"but you can store a filesystem on it, or do other things with it for which a "
-"block device is interesting."
-msgstr ""
-"O dispositivo de bloco de rede pode servir para vários propósitos. Um dos "
-"mais interessantes é o de disponibilizar um espaço de memória virtual para "
-"clientes sem disco, mas você pode armazenar um sistema de ficheiros nele, ou "
-"usá-lo para outras coisas em que um dispositivo de bloco seja útil."
-
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"If you intend to use the network block device as a swap device, choose \"swap"
-"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
-"it the option \"_netdev\" (else init will try to mount it before it's "
-"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
-"The only thing the nbd-client boot script will do then is start an nbd-"
-"client process; you will have to set it up manually."
-msgstr ""
-"Se você pretende usar o dispositivo de bloco de rede como uma memória "
-"virtual, escolha \"swap\". Se pretende usá-lo como um sistema de ficheiros, "
-"adicione uma linha em /etc/fstab, dando a opção \"_netdev\" (ou então o "
-"sistema tentará montá-lo antes de estar preparado), e escolha \"sistema de "
-"ficheiros\". Para qualquer outro propósito, escolha \"raw\". A única coisa "
-"que o script de arranque do nbd-client fará depois será arrancar o processo "
-"nbd-client; você terá que configurá-lo manualmente."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid "Hostname of the server (number: ${number})?"
-msgstr "Nome da máquina do servidor (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"Please enter the network name or IP address of the machine on which the nbd-"
-"server process is running."
-msgstr ""
-"Por favor indique o nome de rede ou o endereço IP da máquina na qual corre o "
-"processo nbd-server."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid "Name for NBD export (number: ${number})?"
-msgstr "Nome para exportação NBD (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Please enter the NBD export name needed to access nbd-server. The name "
-"entered here should match an existing export on the server."
-msgstr ""
-"Por favor indique o nome de exportação NBD necessário para aceder ao nbd-"
-"server. O nome indicado deve coincidir a uma exportação existente no "
-"servidor."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Note that as of NBD 3.10, connecting to an NBD export using the older port-"
-"based negotiation protocol is no longer supported."
-msgstr ""
-"Note que a partir do NBD 3.10, já não é suportada a ligação a uma exportação "
-"NBD usando o antigo protocolo baseado em porto."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid "/dev entry for this nbd-client (number: ${number})?"
-msgstr "Entrada /dev para este cliente nbd (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"Every nbd-client process needs to be associated with a /dev entry with major "
-"number 43. Please enter the name of the /dev entry you want to use for this "
-"nbd-client. Note that this needs to be the full path to that entry, not just "
-"the last part."
-msgstr ""
-"Cada processo nbd-client precisa ser associado a uma entrada /dev com o "
-"número maior 43. Por favor indique o nome da entrada /dev que você quer usar "
-"com este cliente nbd. Note que é preciso indicar o caminho completo da "
-"entrada, e não apenas a sua parte final."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"If the /dev entry specified does not exist, it will be created with minor "
-"number ${number}."
-msgstr ""
-"Se a entrada /dev indicada não existir, ela será criada com o número menor "
-"${number}."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "Desligar todos os dispositivos NBD no \"stop\"?"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"When the nbd-client init script is called to stop the nbd-client service, "
-"there are two things that can be done: either it can disconnect all nbd-"
-"client devices (which are assumed not to be in use), or it can disconnect "
-"only those nbd-client devices that it knows about in its config file."
-msgstr ""
-"Quando o script init do nbd-client é chamado para parar o serviço nbd-"
-"client, há duas coisas que pode fazer: ou pode desligar todos os "
-"dispositivos nbd-client, ou pode desligar apenas aqueles dispositivos nbd-"
-"client que conhece pelo seu ficheiro de configuração."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"The default (and the traditional behavior) is to disconnect all nbd-client "
-"devices. If the root device or other critical file systems are on NBD this "
-"will cause data loss and should not be accepted."
-msgstr ""
-"A predefinição (e o comportamento tradicional) é desligar todos os "
-"dispositivos nbd-client. Se o dispositivo de raiz ou qualquer outro sistema "
-"de ficheiros crítico estão em NBD isto irá causar perdas de dados e não "
-"deverá ser aceite."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid "Extra parameters (number: ${number})"
-msgstr "Parâmetros extra (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid ""
-"If you wish to add any extra parameters to nbd-client, then please enter "
-"them here."
-msgstr ""
-"Se deseja adicionar quaisquer parâmetros extra ao nbd-client, então por "
-"favor insira-os aqui."
 
 #. Type: string
 #. Description
@@ -382,6 +204,169 @@ msgstr ""
 "Se você remover ou comentar a linha AUTO_GEN, poderá ser gerado um ficheiro /"
 "etc/nbd-server/config no novo formato baseado na configuração actual. Até "
 "lá, a instalação do nbd-server não estará funcional."
+
+#~ msgid ""
+#~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+#~ "afterwards."
+#~ msgstr ""
+#~ "Se isto está errado, remova a linha e depois chame \"dpkg-reconfigure nbd-"
+#~ "client\"."
+
+#~ msgid "A port has been selected for export ${number}"
+#~ msgstr "Um porto foi seleccionado para exportar ${number}"
+
+#~ msgid ""
+#~ "The file /etc/nbd-client configures an NBD export by way of a port "
+#~ "number. This method of connecting to an NBD export is no longer supported "
+#~ "as of NBD 3.10."
+#~ msgstr ""
+#~ "O ficheiro /etc/nbd-client configura uma exportação NBD pelo método de um "
+#~ "número de porto. Este método de ligação a uma exportação NBD não é mais "
+#~ "suportado a partir do NBD 3.10."
+
+#~ msgid ""
+#~ "Please migrate the configuration so it uses name-based exports, rather "
+#~ "than port-based ones."
+#~ msgstr ""
+#~ "Por favor migre a configuração para que passe a usar exportações baseadas "
+#~ "em nomes, em vez de baseadas em portos."
+
+#~ msgid "Number of nbd-client connections to use:"
+#~ msgstr "Numero de ligações nbd-client a usar:"
+
+#~ msgid ""
+#~ "nbd-client can handle multiple concurrent connections. Please specify the "
+#~ "number of connections you'd like this configuration script to set up."
+#~ msgstr ""
+#~ "O nbd-client pode lidar com várias ligações em simultâneo. Por favor, "
+#~ "indique o número de ligações que deseja que este script prepare."
+
+#~ msgid ""
+#~ "Note that if something has already been specified in /etc/nbd-client, the "
+#~ "current configuration will be used as defaults in these dialogs."
+#~ msgstr ""
+#~ "Note que se alguma coisa já estiver especificada em /etc/nbd-client, a "
+#~ "configuração existente será usada como valores pre-definidos nestes "
+#~ "diálogos."
+
+#~ msgid "swap, filesystem, raw"
+#~ msgstr "swap, sistema de ficheiros, raw"
+
+#~ msgid "Intended use of the network block device number ${number}:"
+#~ msgstr ""
+#~ "Utilização pretendida do dispositivo de bloco de rede número ${number}:"
+
+#~ msgid ""
+#~ "The network block device can serve multiple purposes. One of the most "
+#~ "interesting is to provide swap space over the network for diskless "
+#~ "clients, but you can store a filesystem on it, or do other things with it "
+#~ "for which a block device is interesting."
+#~ msgstr ""
+#~ "O dispositivo de bloco de rede pode servir para vários propósitos. Um dos "
+#~ "mais interessantes é o de disponibilizar um espaço de memória virtual "
+#~ "para clientes sem disco, mas você pode armazenar um sistema de ficheiros "
+#~ "nele, ou usá-lo para outras coisas em que um dispositivo de bloco seja "
+#~ "útil."
+
+#~ msgid ""
+#~ "If you intend to use the network block device as a swap device, choose "
+#~ "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
+#~ "fstab, give it the option \"_netdev\" (else init will try to mount it "
+#~ "before it's usable), and choose \"filesystem\". For all other purposes, "
+#~ "choose \"raw\". The only thing the nbd-client boot script will do then is "
+#~ "start an nbd-client process; you will have to set it up manually."
+#~ msgstr ""
+#~ "Se você pretende usar o dispositivo de bloco de rede como uma memória "
+#~ "virtual, escolha \"swap\". Se pretende usá-lo como um sistema de "
+#~ "ficheiros, adicione uma linha em /etc/fstab, dando a opção \"_netdev"
+#~ "\" (ou então o sistema tentará montá-lo antes de estar preparado), e "
+#~ "escolha \"sistema de ficheiros\". Para qualquer outro propósito, escolha "
+#~ "\"raw\". A única coisa que o script de arranque do nbd-client fará depois "
+#~ "será arrancar o processo nbd-client; você terá que configurá-lo "
+#~ "manualmente."
+
+#~ msgid "Hostname of the server (number: ${number})?"
+#~ msgstr "Nome da máquina do servidor (número: ${number})?"
+
+#~ msgid ""
+#~ "Please enter the network name or IP address of the machine on which the "
+#~ "nbd-server process is running."
+#~ msgstr ""
+#~ "Por favor indique o nome de rede ou o endereço IP da máquina na qual "
+#~ "corre o processo nbd-server."
+
+#~ msgid "Name for NBD export (number: ${number})?"
+#~ msgstr "Nome para exportação NBD (número: ${number})?"
+
+#~ msgid ""
+#~ "Please enter the NBD export name needed to access nbd-server. The name "
+#~ "entered here should match an existing export on the server."
+#~ msgstr ""
+#~ "Por favor indique o nome de exportação NBD necessário para aceder ao nbd-"
+#~ "server. O nome indicado deve coincidir a uma exportação existente no "
+#~ "servidor."
+
+#~ msgid ""
+#~ "Note that as of NBD 3.10, connecting to an NBD export using the older "
+#~ "port-based negotiation protocol is no longer supported."
+#~ msgstr ""
+#~ "Note que a partir do NBD 3.10, já não é suportada a ligação a uma "
+#~ "exportação NBD usando o antigo protocolo baseado em porto."
+
+#~ msgid "/dev entry for this nbd-client (number: ${number})?"
+#~ msgstr "Entrada /dev para este cliente nbd (número: ${number})?"
+
+#~ msgid ""
+#~ "Every nbd-client process needs to be associated with a /dev entry with "
+#~ "major number 43. Please enter the name of the /dev entry you want to use "
+#~ "for this nbd-client. Note that this needs to be the full path to that "
+#~ "entry, not just the last part."
+#~ msgstr ""
+#~ "Cada processo nbd-client precisa ser associado a uma entrada /dev com o "
+#~ "número maior 43. Por favor indique o nome da entrada /dev que você quer "
+#~ "usar com este cliente nbd. Note que é preciso indicar o caminho completo "
+#~ "da entrada, e não apenas a sua parte final."
+
+#~ msgid ""
+#~ "If the /dev entry specified does not exist, it will be created with minor "
+#~ "number ${number}."
+#~ msgstr ""
+#~ "Se a entrada /dev indicada não existir, ela será criada com o número "
+#~ "menor ${number}."
+
+#~ msgid "Disconnect all NBD devices on \"stop\"?"
+#~ msgstr "Desligar todos os dispositivos NBD no \"stop\"?"
+
+#~ msgid ""
+#~ "When the nbd-client init script is called to stop the nbd-client service, "
+#~ "there are two things that can be done: either it can disconnect all nbd-"
+#~ "client devices (which are assumed not to be in use), or it can disconnect "
+#~ "only those nbd-client devices that it knows about in its config file."
+#~ msgstr ""
+#~ "Quando o script init do nbd-client é chamado para parar o serviço nbd-"
+#~ "client, há duas coisas que pode fazer: ou pode desligar todos os "
+#~ "dispositivos nbd-client, ou pode desligar apenas aqueles dispositivos nbd-"
+#~ "client que conhece pelo seu ficheiro de configuração."
+
+#~ msgid ""
+#~ "The default (and the traditional behavior) is to disconnect all nbd-"
+#~ "client devices. If the root device or other critical file systems are on "
+#~ "NBD this will cause data loss and should not be accepted."
+#~ msgstr ""
+#~ "A predefinição (e o comportamento tradicional) é desligar todos os "
+#~ "dispositivos nbd-client. Se o dispositivo de raiz ou qualquer outro "
+#~ "sistema de ficheiros crítico estão em NBD isto irá causar perdas de dados "
+#~ "e não deverá ser aceite."
+
+#~ msgid "Extra parameters (number: ${number})"
+#~ msgstr "Parâmetros extra (número: ${number})?"
+
+#~ msgid ""
+#~ "If you wish to add any extra parameters to nbd-client, then please enter "
+#~ "them here."
+#~ msgstr ""
+#~ "Se deseja adicionar quaisquer parâmetros extra ao nbd-client, então por "
+#~ "favor insira-os aqui."
 
 #~| msgid "Please enter the TCP port number to access nbd-server."
 #~ msgid ""
