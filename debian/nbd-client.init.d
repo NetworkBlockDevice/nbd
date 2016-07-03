@@ -38,7 +38,7 @@ case "$1" in
 	# later on is a kernel thread...
 	modprobe nbd
 	echo -n 'Connecting...'
-	for dev in $(awk '{print $1}' /etc/nbdtab)
+	for dev in $(awk '/^(( \t)*[^#])/{print $1}' /etc/nbdtab)
 	do
 	  # cfq deadlocks NBD devices, so switch to something else if cfq is
 	  # selected by default
@@ -81,7 +81,7 @@ case "$1" in
 	;;
     stop)
 	echo "Stopping $DESC: "
-	for dev in $(awk '{print $1}' /etc/nbdtab)
+	for dev in $(awk '/^(( \t)*[^#])/{print $1}' /etc/nbdtab)
 	do
 	  nbd-client -d /dev/$dev
 	done
