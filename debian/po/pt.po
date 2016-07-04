@@ -2,20 +2,20 @@
 # Copyright (C) 2007 the nbd's copyright holder
 # This file is distributed under the same license as the nbd package.
 #
-# Américo Monteiro <a_monteiro@gmx.com>, 2007, 2009, 2010, 2011, 2015.
+# Américo Monteiro <a_monteiro@gmx.com>, 2007 - 2016.
 msgid ""
 msgstr ""
-"Project-Id-Version: nbd 1:3.11-1\n"
+"Project-Id-Version: nbd 1:3.14-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2016-06-30 21:30+0200\n"
-"PO-Revision-Date: 2015-10-16 00:43+0100\n"
+"PO-Revision-Date: 2016-07-02 23:59+0100\n"
 "Last-Translator: Américo Monteiro <a_monteiro@gmx.com>\n"
 "Language-Team: Portuguese <traduz@debianpt.org>\n"
 "Language: Pt\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Lokalize 1.4\n"
+"X-Generator: Lokalize 1.5\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. Type: error
@@ -27,7 +27,6 @@ msgstr "AUTO_GEN está definido para \"n\" no /etc/nbd-client"
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
-#, fuzzy
 #| msgid ""
 #| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
 #| "to \"n\". The file will therefore not be regenerated automatically."
@@ -37,7 +36,8 @@ msgid ""
 "automatically generated."
 msgstr ""
 "O ficheiro /etc/nbd-client contém uma linha que define a variável AUTO_GEN "
-"para \"n\". Por isto o ficheiro não será regenerado automaticamente."
+"para \"n\". Isto significa que você prefere que a configuração do nbd não "
+"seja gerada automaticamente."
 
 #. Type: error
 #. Description
@@ -53,6 +53,15 @@ msgid ""
 "to allow the configuration to be migrated, or write the nbdtab file yourself "
 "manually."
 msgstr ""
+"Desde o nbd-client 1:3.14-1 que não é mais usado o ficheiro /etc/nbd-client "
+"para configuração do tempo de arranque, em vez disso, é usado um ficheiro "
+"/etc/nbdtab, com um formato diferente. As opções de configuração debconf "
+"foram removidas, e por isso este ficheiro nunca é gerado automaticamente, "
+"excepto se esta actualização tiver gerado um ficheiro /etc/nbdtab a partir "
+"do seu /etc/nbd-client se AUTO_GEN não tiver sido regulado para \"n\". Como "
+"tal, você precisa de ou desactivar a linha AUTO_GEN em /etc/nbd-client e "
+"chamar `dpkg-reconfigure nbd-client' para permitir que o ficheiro de "
+"configuração seja migrado, ou escrever manualmente você o ficheiro nbdtab."
 
 #. Type: error
 #. Description
@@ -61,12 +70,14 @@ msgid ""
 "If you do not take either of those steps, your nbd-client boot-time "
 "configuration will not be functional."
 msgstr ""
+"Se você não fizer nenhum desses passos, a sua configuração par ao tempo "
+"de arranque do nbd-client não será funcional."
 
 #. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid "KILLALL is no longer supported"
-msgstr ""
+msgstr "KILLALL não é mais suportado"
 
 #. Type: note
 #. Description
@@ -78,6 +89,11 @@ msgid ""
 "operation no longer supports killing devices that are not specified in "
 "nbdtab."
 msgstr ""
+"Você tem um ficheiro /etc/nbd-client que não define a variável de shell "
+"KILLALL para falso. Desde o nbd-client 1:3.14-1, a sequência de arranque "
+"foi alterada para usar /etc/nbdtab em vez de /etc/nbd-client, e este modo "
+"de operação já não suporta matar dispositivos que não estejam especificados "
+"em nbdtab."
 
 #. Type: note
 #. Description
@@ -87,6 +103,10 @@ msgid ""
 "file moved to /etc/nbd-client.old, but please note that you must bring down "
 "any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
+"A sua configuração foi migrada para /etc/nbdtab e o ficheiro /etc/nbd-client "
+"foi movido para /etc/nbd-client.old, mas por favor note que a partir de "
+"agora você precisa parar manualmente quaisquer dispositivos que não estejam "
+"especificados em /etc/nbdtab."
 
 #. Type: string
 #. Description
