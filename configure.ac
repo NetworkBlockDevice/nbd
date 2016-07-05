@@ -141,6 +141,41 @@ else
 	AC_MSG_RESULT([no])
 fi
 
+AC_CHECK_FUNC(splice, [HAVE_SPLICE=yes], [HAVE_SPLICE=no])
+if test "$HAVE_SPLICE" = "yes"
+then
+	HAVE_SETPIPE_SZ=no
+	AC_CHECK_DECL(F_SETPIPE_SZ, [HAVE_SETPIPE_SZ=yes],
+		[
+			unset ac_cv_have_decl_F_SETPIPE_SZ
+			AC_CHECK_HEADERS([linux/fcntl.h])
+			if test "$ac_cv_header_linux_fcntl_h" = "yes"
+			then
+				AC_CHECK_DECL(F_SETPIPE_SZ, [HAVE_SETPIPE_SZ=define], [HAVE_SETPIPE_SZ=no], [[#include <linux/fcntl.h>]])
+			fi
+		],
+		[[
+			#define _GNU_SOURCE
+			#include <fcntl.h>
+		]]
+	)
+	AC_MSG_CHECKING([for F_SETPIPE_SZ support])
+	case $HAVE_SETPIPE_SZ in
+		yes)
+			AC_DEFINE(HAVE_SPLICE, 1, [Define to 1 if we have splice support])
+			AC_MSG_RESULT([yes])
+		;;
+		define)
+			AC_DEFINE(HAVE_SPLICE, 1, [Define to 1 if we have splice support])
+			AC_DEFINE(F_SETPIPE_SZ, 1031, [Define to 1031 if we have kernel support but no userspace support])
+			AC_MSG_RESULT([yes])
+		;;
+		no)
+			AC_MSG_RESULT([missing, disabling splice support])
+		;;
+	esac
+fi
+
 dnl AC_MSG_CHECKING([where to puth systemd unit files])
 dnl AC_ARG_WITH(
 dnl   systemd,

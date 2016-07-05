@@ -107,6 +107,8 @@ typedef enum {
                                                old-style export. */
         NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
         NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
+        NBDS_ERR_CFILE_INVALID_SPLICE,    /**< We can't use splice with the other options
+                                               specified for the export. */
         NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
         NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
         NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
@@ -147,6 +149,7 @@ typedef enum {
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
 #define F_TREEFILES 8192  /**< flag to tell us a file is exported using -t */
 #define F_FORCEDTLS 16384 /**< TLS is required, either for the server as a whole or for a given export */
+#define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
 
 /* Functions */
 

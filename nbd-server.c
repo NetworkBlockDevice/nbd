@@ -174,6 +174,14 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
 
+/*
+ * If we want what the system really has set we'd have to read
+ * /proc/sys/fs/pipe-max-size, but for now 1mb should be enough.
+ */
+#define MAX_PIPE_SIZE (1 * 1024 * 1024)
+#define SPLICE_IN	0
+#define SPLICE_OUT	1
+
 #include <nbdsrv.h>
 
 /* Our thread pool */
@@ -183,6 +191,7 @@ GThreadPool *tpool;
 struct work_package {
 	CLIENT* client;
 	struct nbd_request* req;
+	int pipefd[2];
 	void* data; /**< for read requests */
 };
 
@@ -399,6 +408,29 @@ static void socket_write(CLIENT* client, void *buf, size_t len) {
 	g_assert(client->socket_write != NULL);
 	client->socket_write(client, buf, len);
 }
+
+#ifdef HAVE_SPLICE
+/**
+ * Splice data between a pipe and a file descriptor
+ *
+ * @param fd_in The fd to splice from.
+ * @param off_in The fd_in offset to splice from.
+ * @param fd_out The fd to splice to.
+ * @param off_out The fd_out offset to splice to.
+ * @param len The length to splice.
+ */
+static inline void spliceit(int fd_in, loff_t *off_in, int fd_out,
+			    loff_t *off_out, size_t len)
+{
+	ssize_t ret;
+	while (len > 0) {
+		if ((ret = splice(fd_in, off_in, fd_out, off_out, len,
+				  SPLICE_F_MOVE)) <= 0)
+			err("Splice failed: %m");
+		len -= ret;
+	}
+}
+#endif
 
 /**
  * Print out a message about how to use nbd-server. Split out to a separate
@@ -726,6 +758,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 		{ "force_tls",	FALSE,	PARAM_BOOL,	&(s.flags),		F_FORCEDTLS },
+		{ "splice",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPLICE},
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
         struct generic_conf genconftmp;
@@ -882,6 +915,23 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(genconftmp.flags & F_OLDSTYLE) {
 			g_message("Since 3.10, the oldstyle protocol is no longer supported. Please migrate to the newstyle protocol.");
 			g_message("Exiting.");
+			return NULL;
+		}
+#ifndef HAVE_SPLICE
+		if (s.flags & F_SPLICE) {
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without splice support, yet group %s uses it", groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
+			return NULL;
+		}
+#endif
+		/* We can't mix copyonwrite and splice. */
+		if ((s.flags & F_COPYONWRITE) && (s.flags & F_SPLICE)) {
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_INVALID_SPLICE,
+				    "Cannot mix copyonwrite with splice for an export",
+				    groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
 			return NULL;
 		}
 		/* Don't need to free this, it's not our string */
@@ -1180,6 +1230,68 @@ int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
 	}
 	return (ret < 0 || len != 0);
 }
+
+#ifdef HAVE_SPLICE
+int rawexpsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir,
+		 int fua)
+{
+	int fhandle;
+	off_t foffset;
+	size_t maxbytes;
+	ssize_t retval;
+
+	if (get_filepos(client, a, &fhandle, &foffset, &maxbytes))
+		return -1;
+	if (maxbytes && len > maxbytes)
+		len = maxbytes;
+
+	DEBUG("(SPLICE %s fd %d offset %llu len %u), ",
+	      (dir == SPLICE_IN) ? "from" : "to", fhandle,
+	      (unsigned long long)a, (unsigned)len);
+
+	/*
+	 * SPLICE_F_MOVE doesn't actually work at the moment, but in the future
+	 * it might, so go ahead and use it.
+	 */
+	if (dir == SPLICE_IN) {
+		retval = splice(fhandle, &foffset, pipe, NULL, len,
+				SPLICE_F_MOVE);
+	} else {
+		retval = splice(pipe, NULL, fhandle, &foffset, len,
+				SPLICE_F_MOVE);
+		if (client->server->flags & F_SYNC)
+			fsync(fhandle);
+		else if (fua)
+			fdatasync(fhandle);
+	}
+	if (client->server->flags & F_TREEFILES)
+		close(fhandle);
+	return retval;
+}
+
+/**
+ * Splice an amount of bytes from the given offset from/into the right file
+ * from/into the given pipe.
+ * @param pipe The pipe we are using for this splice.
+ * @param a The offset of the file we are operating on.
+ * @param len The length of the splice.
+ * @param client The client we're splicing for.
+ * @param dir The direction we are doing the splice in.
+ * @param fua Set if this is a write and we need to fua.
+ * @return 0 on success, nonzero on failure.
+ */
+int expsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir, int fua)
+{
+	ssize_t ret;
+
+	while (len > 0 &&
+	       (ret = rawexpsplice(pipe, a, len, client, dir, fua)) > 0) {
+		a += ret;
+		len -= ret;
+	}
+	return (ret < 0 || len != 0);
+}
+#endif /* HAVE_SPLICE */
 
 /**
  * Read an amount of bytes at a given offset from the right file. This
@@ -1632,9 +1744,33 @@ static int nbd_errno(int errcode) {
 }
 
 static void package_dispose(struct work_package* package) {
+	if (package->pipefd[0] > 0)
+		close(package->pipefd[0]);
+	if (package->pipefd[1] > 0)
+		close(package->pipefd[1]);
 	g_free(package->data);
 	g_free(package->req);
 	g_free(package);
+}
+
+static int mkpipe(int pipefd[2], size_t len)
+{
+	if (len > MAX_PIPE_SIZE)
+		return -1;
+	if (pipe(pipefd))
+		return -1;
+
+#ifdef HAVE_SPLICE
+	if (fcntl(pipefd[1], F_SETPIPE_SZ, MAX_PIPE_SIZE) < MAX_PIPE_SIZE) {
+		close(pipefd[0]);
+		close(pipefd[1]);
+		pipefd[0] = -1;
+		pipefd[1] = -1;
+		return -1;
+	}
+#endif
+
+	return 0;
 }
 
 struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
@@ -1642,9 +1778,18 @@ struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
 
 	rv->req = req;
 	rv->client = client;
+	rv->data = NULL;
+	rv->pipefd[0] = -1;
+	rv->pipefd[1] = -1;
 
-	if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE)
-		rv->data = malloc(req->len);
+	if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
+		if (client->server->flags & F_SPLICE) {
+			if (mkpipe(rv->pipefd, req->len))
+				rv->data = malloc(req->len);
+		} else {
+			rv->data = malloc(req->len);
+		}
+	}
 
 	return rv;
 }
@@ -1655,7 +1800,41 @@ static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
 	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
 }
 
-static void handle_read(CLIENT* client, struct nbd_request* req) {
+#ifdef HAVE_SPLICE
+static int handle_splice_read(CLIENT *client, struct nbd_request *req)
+{
+	struct nbd_reply rep;
+	int pipefd[2];
+	int max_pipe_size = 1 * 1024 * 1024;
+	int pipe_size;
+
+	// splice doesn't work with TLS
+	if (client->tls_session != NULL)
+		return -1;
+
+	if (mkpipe(pipefd, req->len))
+		return -1;
+
+	if (expsplice(pipefd[1], req->from, req->len, client, SPLICE_IN, 0)) {
+		close(pipefd[1]);
+		close(pipefd[0]);
+		return -1;
+	}
+
+	DEBUG("handling read request (splice)\n");
+	setup_reply(&rep, req);
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof(rep));
+	spliceit(pipefd[0], NULL, client->net, NULL, req->len);
+	pthread_mutex_unlock(&(client->lock));
+	close(pipefd[0]);
+	close(pipefd[1]);
+	return 0;
+}
+#endif
+
+static void handle_normal_read(CLIENT *client, struct nbd_request *req)
+{
 	struct nbd_reply rep;
 	void* buf = malloc(req->len);
 	if(!buf) {
@@ -1676,8 +1855,27 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 	free(buf);
 }
 
-static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
+static void handle_read(CLIENT* client, struct nbd_request* req)
+{
+#ifdef HAVE_SPLICE
+	/*
+	 * If we have splice set we want to try that first, and if that fails
+	 * for whatever reason we fall through to ye olde read.
+	 */
+	if (client->server->flags & F_SPLICE)
+		if (!handle_splice_read(client, req))
+			return;
+#endif
+	handle_normal_read(client, req);
+}
+
+static void handle_write(struct work_package *pkg)
+{
+	CLIENT *client = pkg->client;
+	struct nbd_request *req = pkg->req;
 	struct nbd_reply rep;
+	int fua = req->type & ~NBD_CMD_MASK_COMMAND;
+
 	DEBUG("handling write request\n");
 	setup_reply(&rep, req);
 
@@ -1685,8 +1883,16 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 	    (client->server->flags & F_AUTOREADONLY)) {
 		DEBUG("[WRITE to READONLY!]");
 		rep.error = nbd_errno(EPERM);
+#ifdef HAVE_SPLICE
+	} else if (!pkg->data) {
+		if (expsplice(pkg->pipefd[0], req->from, req->len, client,
+			      SPLICE_OUT, fua)) {
+			DEBUG("Splice failed: %M");
+			rep.error = nbd_errno(errno);
+		}
+#endif
 	} else {
-		if(expwrite(req->from, data, req->len, client, (req->type &~NBD_CMD_MASK_COMMAND))) {
+		if(expwrite(req->from, pkg->data, req->len, client, fua)) {
 			DEBUG("Write failed: %m");
 			rep.error = nbd_errno(errno);
 		}
@@ -1738,7 +1944,7 @@ static void handle_request(gpointer data, gpointer user_data) {
 			handle_read(package->client, package->req);
 			break;
 		case NBD_CMD_WRITE:
-			handle_write(package->client, package->req, package->data);
+			handle_write(package);
 			break;
 		case NBD_CMD_FLUSH:
 			handle_flush(package->client, package->req);
@@ -1785,7 +1991,15 @@ static int mainloop_threaded(CLIENT* client) {
 		pkg = package_create(client, req);
 
 		if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
-			socket_read(client, pkg->data, req->len);
+#ifdef HAVE_SPLICE
+			if ((client->server->flags & F_SPLICE) &&
+			    (req->len <= MAX_PIPE_SIZE && pkg->pipefd[1] > 0) &&
+			    (client->tls_session == NULL))
+				spliceit(client->net, NULL, pkg->pipefd[1],
+					 NULL, req->len);
+			else
+#endif
+				socket_read(client, pkg->data, req->len);
 		}
 		if(req->type == NBD_CMD_DISC) {
 			g_thread_pool_free(tpool, FALSE, TRUE);
