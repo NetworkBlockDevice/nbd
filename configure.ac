@@ -212,6 +212,24 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h])
 AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+
+my_save_cflags="$CFLAGS"
+CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
+AC_MSG_CHECKING([if we are using an old glib 2.0 library])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+	[[#include <glib.h>]],
+	[[g_thread_init(NULL);]])],
+	[
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_OLD_GLIB, 1, [Define to 1 if you have an old glib library])
+	],
+	[
+		AC_MSG_RESULT(no)
+		AC_DEFINE(HAVE_OLD_GLIB, 0, [Define to 1 if you have an old glib library])
+	]
+)
+CFLAGS="$my_save_cflags"
+
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
