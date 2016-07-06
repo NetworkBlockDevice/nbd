@@ -2,10 +2,16 @@ dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],
-  m4_esyscmd_s(support/genver.sh),
+  m4_esyscmd(support/genver.sh | tr -d '\n'),
   [wouter@debian.org],,
   [http://nbd.sourceforge.net/])
-AM_INIT_AUTOMAKE(foreign dist-xz serial-tests)
+m4_define([serial_tests], [
+  m4_esyscmd([automake --version |
+              head -1 |
+              awk '{split ($NF,a,"."); if (a[1] == 1 && a[2] >= 12) { print "serial-tests" }}'
+  ])
+])
+AM_INIT_AUTOMAKE(foreign dist-xz serial_tests)
 AM_MAINTAINER_MODE([enable])
 AC_CONFIG_MACRO_DIR([support])
 LT_INIT
@@ -122,7 +128,7 @@ AC_CHECK_FUNC(fallocate,
     then
       AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
     fi
-  ],[]
+  ]
 )
 
 AC_MSG_CHECKING([for FALLOC_FL_PUNCH_HOLE support])
@@ -211,7 +217,7 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h])
-AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]), gthread)
 
 my_save_cflags="$CFLAGS"
 CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
