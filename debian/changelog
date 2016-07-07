@@ -1,11 +1,11 @@
-nbd (1:3.14-3) UNRELEASED; urgency=medium
+nbd (1:3.14-3) unstable; urgency=medium
 
   * Fix nbd-client postinst file. Closes: #830187
   * Updated translations:
     - Portuguese, by Américo Monteiro <a_monteiro@gmx.com>; Closes:
       #829394.
 
- -- Wouter Verhelst <wouter@debian.org>  Mon, 04 Jul 2016 11:57:20 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Thu, 07 Jul 2016 15:21:54 +0200
 
 nbd (1:3.14-2) unstable; urgency=medium
 
