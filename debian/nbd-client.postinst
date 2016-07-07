@@ -65,7 +65,7 @@ convert_from_sh() {
         fi
         local old_md5sum=$(dpkg-query -W -f='${Conffiles}' nbd-client | awk '/nbdtab/{print $2}')
         local new_md5sum=$(md5sum /etc/nbdtab)
-        if [ $old_md5sum != $new_md5sum ]
+        if [ "$old_md5sum" != "$new_md5sum" ]
         then
                 # nbdtab locally modified
                 return
@@ -75,7 +75,6 @@ convert_from_sh() {
         # check if we may auto-generate
         if [ "$AUTO_GEN" == "n" ]
         then
-                db_start
                 db_get nbd-client/no-auto-config
                 db_go
                 db_stop
@@ -84,7 +83,6 @@ convert_from_sh() {
         # check for KILLALL, which isn't supported anymore
         if [ "$KILLALL" != "false" ]
         then
-                db_start
                 db_get nbd-client/killal_set
                 db_go
                 db_stop
