@@ -1,14 +1,14 @@
 # Danish translation nbd.
-# Copyright (C) 2015 nbd & nedenstående oversættere.
+# Copyright (C) 2016 nbd & nedenstående oversættere.
 # This file is distributed under the same license as the nbd package.
-# Joe Hansen <joedalton2@yahoo.dk>, 2012, 2015.
+# Joe Hansen <joedalton2@yahoo.dk>, 2012, 2015, 2016.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
 "POT-Creation-Date: 2016-06-30 21:30+0200\n"
-"PO-Revision-Date: 2015-10-15 19:21+0100\n"
+"PO-Revision-Date: 2016-07-09 19:21+0100\n"
 "Last-Translator: Joe Hansen <joedalton2@yahoo.dk>\n"
 "Language-Team: Danish <debian-l10n-danish@lists.debian.org>\n"
 "Language: da\n"
@@ -25,17 +25,14 @@ msgstr "AUTO_GEN er angivet til »n« i /etc/nbd-client"
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
-#, fuzzy
-#| msgid ""
-#| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
-#| "to \"n\". The file will therefore not be regenerated automatically."
 msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
 "\"n\". This indicates that you prefer that the nbd configuration is not "
 "automatically generated."
 msgstr ""
-"/etc/nbd-client-filen indeholder en linje som angiver AUTO_GEN-variablen for "
-"»n«. Filen vil derfor ikke blive oprettet automatisk."
+"/etc/nbd-client-filen indeholder en linje, som angiver AUTO_GEN-variablen for "
+"»n«. Dette indikerer, at du fortrækker at nbd-konfiguration ikke bliver "
+"oprettet automatisk."
 
 #. Type: error
 #. Description
@@ -51,6 +48,14 @@ msgid ""
 "to allow the configuration to be migrated, or write the nbdtab file yourself "
 "manually."
 msgstr ""
+"Siden nbd-client 1:3.14-1, er filen /etc/nbd-client ikke længere brugt til "
+"konfiguration på opstartstidspunktet; i stedet bruges en fil, /etc/nbdtab, med "
+"et andet format. Debconf-konfigurationstilvalgene er blevet fjernet, og denne "
+"fil bliver derfor aldrig oprettet automatisk, undtagen at denne opgradering "
+"ville have oprettet en /etc/nbdtab-fil fra din /etc/nbd-client, hvis AUTO_GEN "
+"ikke var blevet sat til »n«. Som sådan skal du enten deaktivere linjen AUTO_GEN "
+"i /etc/nbd-client og kalde »dpkg-reconfigure nbd-client« for at tillade at "
+"konfigurationen bliver migreret, eller skrive nbdtab-filen selv manuelt."
 
 #. Type: error
 #. Description
@@ -59,12 +64,14 @@ msgid ""
 "If you do not take either of those steps, your nbd-client boot-time "
 "configuration will not be functional."
 msgstr ""
+"Hvis du ikke vælger et af disse trin, så vil din nbd-clients "
+"opstartskonfiguration ikke være funktionel."
 
 #. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid "KILLALL is no longer supported"
-msgstr ""
+msgstr "KILLALL er ikke længere understøttet"
 
 #. Type: note
 #. Description
@@ -76,6 +83,11 @@ msgid ""
 "operation no longer supports killing devices that are not specified in "
 "nbdtab."
 msgstr ""
+"Du har en fil /etc/nbd-client, som ikke angiver skalvariablen KILLALL "
+"som falsk. Siden nbd-client 1:3.14-1, er opstartssekvensen blevet ændret "
+"til at bruge /etc/nbdtab i stedet for /etc/nbd-client, og denne "
+"operationstilstand understøtter ikke længere drab af enheder, som ikke er "
+"specificeret i nbdtab."
 
 #. Type: note
 #. Description
@@ -85,6 +97,9 @@ msgid ""
 "file moved to /etc/nbd-client.old, but please note that you must bring down "
 "any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
+"Din konfiguration er blevet migreret til /etc/nbdtab og filen /etc/nbd-client "
+"flyttet til /etc/nbd-client.old, men bemærk at du skal stoppe alle enheder, "
+"der ikke er specificeret i /etc/nbdtab manuelt fra nu af."
 
 #. Type: string
 #. Description
@@ -203,160 +218,3 @@ msgstr ""
 "server/config oprettes i det nye format baseret på den aktuelle "
 "konfiguration. Indtil da vil nbd-server-installationen være ødelagt."
 
-#~ msgid ""
-#~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
-#~ "afterwards."
-#~ msgstr ""
-#~ "Hvis dette er forkert, så fjern linjen og kald »dpkg-reconfigure nbd-"
-#~ "client« efterfølgende."
-
-#~ msgid "A port has been selected for export ${number}"
-#~ msgstr "En port er blevet valg for eksport ${number}"
-
-#~ msgid ""
-#~ "The file /etc/nbd-client configures an NBD export by way of a port "
-#~ "number. This method of connecting to an NBD export is no longer supported "
-#~ "as of NBD 3.10."
-#~ msgstr ""
-#~ "Filen /etc/nbd-client konfigurerer en NBD-eksport via et portnummer. "
-#~ "Denne metode for forbindelse til en NBD-eksport er ikke understøttet fra "
-#~ "og med NBD 3.10."
-
-#~ msgid ""
-#~ "Please migrate the configuration so it uses name-based exports, rather "
-#~ "than port-based ones."
-#~ msgstr ""
-#~ "Migrer venligst konfigurationen så den bruger navnebaseret eksport, frem "
-#~ "for portbaserede."
-
-#~ msgid "Number of nbd-client connections to use:"
-#~ msgstr "Antallet af nbd-client-forbindelser der skal bruges:"
-
-#~ msgid ""
-#~ "nbd-client can handle multiple concurrent connections. Please specify the "
-#~ "number of connections you'd like this configuration script to set up."
-#~ msgstr ""
-#~ "nbd-client kan håntere flere samtidige forbindelser. Angiv venligst "
-#~ "antallet af forbindelser som du ønsker, at dette konfigurationsskript "
-#~ "skal sætte op."
-
-#~ msgid ""
-#~ "Note that if something has already been specified in /etc/nbd-client, the "
-#~ "current configuration will be used as defaults in these dialogs."
-#~ msgstr ""
-#~ "Bemærk at hvis noget allerede er blevet angivet i /etc/nbd-client, så vil "
-#~ "den aktuelle konfiguration blive brugt som standard i disse dialoger."
-
-#~ msgid "swap, filesystem, raw"
-#~ msgstr "swap, filsystem, raw"
-
-#~ msgid "Intended use of the network block device number ${number}:"
-#~ msgstr "Forventet brug af enhedsnummer for netværksblok ${number}:"
-
-#~ msgid ""
-#~ "The network block device can serve multiple purposes. One of the most "
-#~ "interesting is to provide swap space over the network for diskless "
-#~ "clients, but you can store a filesystem on it, or do other things with it "
-#~ "for which a block device is interesting."
-#~ msgstr ""
-#~ "Netværksblokenheden kan betjene flere formål. En af de mest interessante "
-#~ "er at tilbyde swapplads over netværket for diskløse klienter, men du kan "
-#~ "gemme et filsystem på den, eller udføre andre ting hvor en blokenhed er "
-#~ "interessant."
-
-#~ msgid ""
-#~ "If you intend to use the network block device as a swap device, choose "
-#~ "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
-#~ "fstab, give it the option \"_netdev\" (else init will try to mount it "
-#~ "before it's usable), and choose \"filesystem\". For all other purposes, "
-#~ "choose \"raw\". The only thing the nbd-client boot script will do then is "
-#~ "start an nbd-client process; you will have to set it up manually."
-#~ msgstr ""
-#~ "Hvis du forventer at bruge netværksblokenheden som en swapenhed, så vælg "
-#~ "»swap«. Hvis du forventer at bruge den som et filsystem, så tilføj en "
-#~ "linje til /etc/fstab, giv det indstillingen »_netdev« (ellers vil init "
-#~ "forsøge at montere den før den er brugbar), og vælg »filsystem«. For alle "
-#~ "andre formål, så vælg »raw«. Den eneste ting som opstartsskriptet for nbd-"
-#~ "client så vil udføre er at starte en nbd-client-proces; du vil skulle "
-#~ "sætte den op manuelt."
-
-#~ msgid "Hostname of the server (number: ${number})?"
-#~ msgstr "Værtsnavn for serveren (nummer: ${number})?"
-
-#~ msgid ""
-#~ "Please enter the network name or IP address of the machine on which the "
-#~ "nbd-server process is running."
-#~ msgstr ""
-#~ "Indtast venligst netværksnavnet eller IP-adressen for maskine hvorpå nbd-"
-#~ "server-processen kører."
-
-#~ msgid "Name for NBD export (number: ${number})?"
-#~ msgstr "Navn for NBD-eksport (nummer: ${number})?"
-
-#~ msgid ""
-#~ "Please enter the NBD export name needed to access nbd-server. The name "
-#~ "entered here should match an existing export on the server."
-#~ msgstr ""
-#~ "Indtast venligst NBD-eksportnavnet krævet for at tilgå nbd-server. Navnet "
-#~ "indtastet her skal matche en eksisterende eksport på serveren."
-
-#~ msgid ""
-#~ "Note that as of NBD 3.10, connecting to an NBD export using the older "
-#~ "port-based negotiation protocol is no longer supported."
-#~ msgstr ""
-#~ "Bemærk at fra NBD 3.10, er forbindelse til en NBD-eksport via den ældre "
-#~ "port-baserede forhandlingsprotokol ikke længere understøttet."
-
-#~ msgid "/dev entry for this nbd-client (number: ${number})?"
-#~ msgstr "/dev-punkt for denne nbd-client (nummer: ${number})?"
-
-#~ msgid ""
-#~ "Every nbd-client process needs to be associated with a /dev entry with "
-#~ "major number 43. Please enter the name of the /dev entry you want to use "
-#~ "for this nbd-client. Note that this needs to be the full path to that "
-#~ "entry, not just the last part."
-#~ msgstr ""
-#~ "Hver nbd-client-proces skal associeres med et /dev-punkt med hovednummer "
-#~ "43 (major number). Indtast venligst navnet for /dev-punktet du ønsker at "
-#~ "bruge for denne nbd-client. Bemærk at dette skal være den fulde sti til "
-#~ "det punkt, ikke kun den sidste del."
-
-#~ msgid ""
-#~ "If the /dev entry specified does not exist, it will be created with minor "
-#~ "number ${number}."
-#~ msgstr ""
-#~ "Hvis det angivne /dev-punkt ikke findes, så vil det blive oprettet med "
-#~ "undernummeret (minor number) ${number}."
-
-#~ msgid "Disconnect all NBD devices on \"stop\"?"
-#~ msgstr "Frakobl alle NBD-enheder med »stop«?"
-
-#~ msgid ""
-#~ "When the nbd-client init script is called to stop the nbd-client service, "
-#~ "there are two things that can be done: either it can disconnect all nbd-"
-#~ "client devices (which are assumed not to be in use), or it can disconnect "
-#~ "only those nbd-client devices that it knows about in its config file."
-#~ msgstr ""
-#~ "Når init-skriptet for nbd-client kaldes for at stoppe tjenesten for nbd-"
-#~ "client så er der to ting, der kan gøres: enten kan den frakoble alle nbd-"
-#~ "client-enheder (som antages ikke at være i brug), eller den kan kun "
-#~ "frakoble de nbd-client-enheder som den kender til i sin konfigurationsfil."
-
-#~ msgid ""
-#~ "The default (and the traditional behavior) is to disconnect all nbd-"
-#~ "client devices. If the root device or other critical file systems are on "
-#~ "NBD this will cause data loss and should not be accepted."
-#~ msgstr ""
-#~ "Standarden (og den traditionelle opførsel) er at frakoble alle nbd-client-"
-#~ "enheder. Hvis rodenheden eller andre kritiske filsystemer er på NBD, så "
-#~ "vil dette medføre datatab og bør ikke accepteres."
-
-#~ msgid "Extra parameters (number: ${number})"
-#~ msgstr "Ekstra parametre (nummer: ${number})"
-
-#~ msgid ""
-#~ "If you wish to add any extra parameters to nbd-client, then please enter "
-#~ "them here."
-#~ msgstr ""
-#~ "Hvis du ønsker at tilføje ekstra parametre til nbd-client, så tilføj dem "
-#~ "venligst her."
