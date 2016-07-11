@@ -36,19 +36,3 @@ _Description: File to export (server number ${number}):
  .
  Note that it is possible to tune the way in which the IP address will
  be substituted in the file name. See "man 5 nbd-server" for details.
-
-Template: nbd-server/autogen
-Type: error
-_Description: AUTO_GEN is set to "n" in /etc/nbd-server
- The /etc/nbd-server file contains a line that sets the AUTO_GEN variable
- to "n". The file will therefore not be regenerated automatically.
- .
- Note that the current version of the nbd-server package no longer uses
- /etc/nbd-server. Instead it uses a new configuration file, read by
- nbd-server itself (rather than the init script), which supports more
- options. See "man 5 nbd-server" for details.
- .
- If you remove or comment out the AUTO_GEN line, a file
- /etc/nbd-server/config in the new format may be generated based on the
- current configuration. Until then, the nbd-server installation will be
- broken.

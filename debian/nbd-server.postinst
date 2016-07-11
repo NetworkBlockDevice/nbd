@@ -24,15 +24,6 @@ function shell_quote () {
 
 case "$1" in
     configure)
-	if [ -f /etc/nbd-server -o -f /etc/nbd-server.oldconf ]
-	then
-	    db_get nbd-server/convert
-	    if [ "$RET" = "true" ]
-	    then
-	        convert_config;
-		exit 0;
-	    fi
-	fi
 	db_get nbd-server/number
 	NUMBER=${RET:-0}
 	umask 066
