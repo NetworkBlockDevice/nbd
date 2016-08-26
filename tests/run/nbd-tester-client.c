@@ -804,7 +804,7 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 			retval = -1;
 			goto err_open;
 		}
-		if (!(printer++ % 10)) {
+		if (!(printer++ % 100)) {
 			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	}
@@ -823,7 +823,7 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 						 1024, i);
 			--requests;
 		}
-		if (!(printer++ % 10)) {
+		if (!(printer++ % 100)) {
 			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	} while (requests);
