@@ -503,8 +503,12 @@ void set_timeout(int nbd, int timeout) {
 }
 
 void finish_sock(int sock, int nbd, int swap) {
-	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
-		err("Ioctl NBD_SET_SOCK failed: %m\n");
+	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0) {
+		if (errno == EBUSY)
+			err("Kernel doesn't support multiple connections\n");
+		else
+			err("Ioctl NBD_SET_SOCK failed: %m\n");
+	}
 
 #ifndef __ANDROID__
 	if (swap)
@@ -589,9 +593,11 @@ int main(int argc, char *argv[]) {
 	uint32_t opts=0;
 	sigset_t block, old;
 	struct sigaction sa;
+	int num_connections = 1;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
+		{ "connections", required_argument, NULL, 'C'},
 		{ "disconnect", required_argument, NULL, 'd' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "list", no_argument, NULL, 'l' },
@@ -605,10 +611,11 @@ int main(int argc, char *argv[]) {
 		{ "unix", no_argument, NULL, 'u' },
 		{ 0, 0, 0, 0 }, 
 	};
+	int i;
 
 	logging(MY_NAME);
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:u", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:C:d:hlnN:pSst:u", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -657,6 +664,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'c':
 			return check_conn(optarg, 1);
+		case 'C':
+			num_connections = (int)strtol(optarg, NULL, 0);
+			break;
 		case 'd':
 			disconnect(optarg);
 			exit(EXIT_SUCCESS);
@@ -724,27 +734,30 @@ int main(int argc, char *argv[]) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
-	if (b_unix)
-		sock = openunix(hostname);
-	else
-		sock = opennet(hostname, port, sdp);
-	if (sock < 0)
-		exit(EXIT_FAILURE);
-
-	negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
-
 	nbd = open(nbddev, O_RDWR);
 	if (nbd < 0)
 	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 
-	setsizes(nbd, size64, blocksize, flags);
-	set_timeout(nbd, timeout);
-	finish_sock(sock, nbd, swap);
-	if (swap) {
-		/* try linux >= 2.6.36 interface first */
-		if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
-			/* fall back to linux <= 2.6.35 interface */
-			oom_adjust("/proc/self/oom_adj", "-17");
+	for (i = 0; i < num_connections; i++) {
+		if (b_unix)
+			sock = openunix(hostname);
+		else
+			sock = opennet(hostname, port, sdp);
+		if (sock < 0)
+			exit(EXIT_FAILURE);
+
+		negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
+		if (i == 0) {
+			setsizes(nbd, size64, blocksize, flags);
+			set_timeout(nbd, timeout);
+		}
+		finish_sock(sock, nbd, swap);
+		if (swap) {
+			/* try linux >= 2.6.36 interface first */
+			if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
+				/* fall back to linux <= 2.6.35 interface */
+				oom_adjust("/proc/self/oom_adj", "-17");
+			}
 		}
 	}
 
