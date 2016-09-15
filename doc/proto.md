@@ -923,7 +923,7 @@ The following request types exist:
 
 * `NBD_CMD_FLUSH` (3)
 
-    A flush request; a write barrier. The server MUST NOT send a
+    A flush request. The server MUST NOT send a
     successful reply header for this request before all write requests
     for which a reply has already been sent to the client have reached
     permanent storage (using fsync() or similar).
