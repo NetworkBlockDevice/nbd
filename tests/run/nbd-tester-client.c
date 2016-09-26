@@ -384,7 +384,12 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		READ_ALL_ERRCHK(sock, &size, sizeof(size), err,
 				"Could not read size: %s", strerror(errno));
 		size = ntohll(size);
-		READ_ALL_ERRCHK(sock, buf, 128, err, "Could not read data: %s",
+		uint32_t flags;
+		READ_ALL_ERRCHK(sock, &flags, sizeof(uint32_t), err,
+				"Could not read flags: %s", strerror(errno));
+		flags = ntohl(flags);
+		*serverflags = flags;
+		READ_ALL_ERRCHK(sock, buf, 124, err, "Could not read data: %s",
 				strerror(errno));
 		goto end;
 	}
