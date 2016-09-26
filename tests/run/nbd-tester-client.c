@@ -756,10 +756,12 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 				req.type = htonl(NBD_CMD_FLUSH);
 				memcpy(&(req.handle), &j, sizeof(j));
 				req.from = 0;
+				req.len = 0;
 				if (write_all(sock, &req, sizeof(req)) < 0) {
 					retval = -1;
 					goto err_open;
 				}
+				req.len = htonl(1024);
 				++requests;
 			}
 		}
