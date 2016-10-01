@@ -111,9 +111,10 @@ manpage.1: manpage.sgml
     <refsect2>
       <title>Options</title>
       <para>Every command-line <command>nbd-client</command> option
-        has a corresponding option in the <filename>nbdtab</filename> file,
-        and vice versa; where this isn't the case, that is a
-        bug.</para>
+	which allows to configure specific options for a particular
+	device node has a corresponding option in the
+	<filename>nbdtab</filename> file, and vice versa; where this
+	isn't the case, that is a bug.</para>
       <para>Individual options in this field should be separated from
         one another by the comma character.</para>
       <variablelist>
