@@ -294,6 +294,11 @@ order, except that:
   the transmission flags, as otherwise `NBD_CMD_FLUSH` will never
   be sent by the client to the server.
 
+* A client which uses multiple connections to a server to parallelize
+  commands MUST NOT issue an `NBD_CMD_FLUSH` request until it has
+  received the reply for all write commands which it expects to be
+  covered by the flush.
+
 * A server MUST NOT reply to a command that has `NBD_CMD_FLAG_FUA` set
   in its command flags until the data (if any) written by that command
   is persisted to non-volatile storage. This only applies if
