@@ -58,6 +58,7 @@
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
 #include "lfs.h"
+#define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE 500 /* to get pread/pwrite */
 #define _BSD_SOURCE /* to get DT_* macros */
 #define _DARWIN_C_SOURCE /* to get DT_* macros on OS X */
