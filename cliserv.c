@@ -53,11 +53,12 @@ void err_nonfatal(const char *s) {
 	syslog(LOG_ERR, "%s", s1);
 	syslog(LOG_ERR, "Exiting.");
 #endif
-	fprintf(stderr, "Error: %s\nExiting.\n", s1);
+	fprintf(stderr, "Error: %s\n", s1);
 }
 
 void err(const char *s) {
 	err_nonfatal(s);
+	fprintf(stderr, "Exiting.\n");
 	exit(EXIT_FAILURE);
 }
 
