@@ -69,7 +69,9 @@ typedef struct {
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 	int transactionlogfd;/**< fd for transaction log */
 	int clientfeats;     /**< Features supported by this client */
-	pthread_mutex_t lock;
+	pthread_mutex_t lock; /**< socket lock */
+	void *tls_session; /**< TLS session context. Is NULL unless STARTTLS
+				has been negotiated. */
 } CLIENT;
 
 /**

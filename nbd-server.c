@@ -274,23 +274,6 @@ static inline const char * getcommandname(uint64_t command) {
 }
 
 /**
- * Consume data from an FD that we don't want
- *
- * @param f a file descriptor
- * @param buf a buffer
- * @param len the number of bytes to consume
- * @param bufsiz the size of the buffer
- **/
-static inline void consume(int f, void * buf, size_t len, size_t bufsiz) {
-	size_t curlen;
-	while (len>0) {
-		curlen = (len>bufsiz)?bufsiz:len;
-		readit(f, buf, curlen);
-		len -= curlen;
-	}
-}
-
-/**
  * Write data from a buffer into a filedescriptor
  *
  * @param f a file descriptor
@@ -305,6 +288,81 @@ static inline void writeit(int f, void *buf, size_t len) {
 			err("Send failed: %m");
 		len -= res;
 		buf += res;
+	}
+}
+
+static void writeit_tls(gnutls_session_t s, void *buf, size_t len) {
+	ssize_t res;
+	char *m;
+	while(len > 0) {
+		DEBUG("+");
+		if ((res = gnutls_record_send(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
+			m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
+			err_nonfatal(m);
+			g_free(m);
+		} else if(res < 0) {
+			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
+			err(m);
+			g_free(m);
+			return;
+		} else {
+			len -= res;
+			buf += res;
+		}
+	}
+}
+
+static void readit_tls(gnutls_session_t s, void *buf, size_t len) {
+	ssize_t res;
+	char *m;
+	while(len > 0) {
+		DEBUG("*");
+		if((res = gnutls_record_recv(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
+			m = g_strdup_printf("issue while receiving data: %s", gnutls_strerror(res));
+			err_nonfatal(m);
+			g_free(m);
+		} else if(res < 0) {
+			m = g_strdup_printf("could not receive data: %s", gnutls_strerror(res));
+			err(m);
+			g_free(m);
+			return;
+		} else {
+			len -= res;
+			buf += res;
+		}
+	}
+}
+
+static void socket_read(CLIENT* client, void *buf, size_t len) {
+	if(client->tls_session != NULL) {
+		readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+	} else {
+		readit(client->net, buf, len);
+	}
+}
+
+/**
+ * Consume data from a socket that we don't want
+ *
+ * @param f a file descriptor
+ * @param buf a buffer
+ * @param len the number of bytes to consume
+ * @param bufsiz the size of the buffer
+ **/
+static inline void consume(CLIENT* c, void * buf, size_t len, size_t bufsiz) {
+	size_t curlen;
+	while (len>0) {
+		curlen = (len>bufsiz)?bufsiz:len;
+		socket_read(c, buf, curlen);
+		len -= curlen;
+	}
+}
+
+static void socket_write(CLIENT* client, void *buf, size_t len) {
+	if(client->tls_session != NULL) {
+		writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+	} else {
+		writeit(client->net, buf, len);
 	}
 }
 
@@ -1472,9 +1530,9 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	if(!rep.error) {
-		writeit(client->net, buf, req->len);
+		socket_write(client, buf, req->len);
 	}
 	pthread_mutex_unlock(&(client->lock));
 	free(buf);
@@ -1496,7 +1554,7 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 		}
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
@@ -1509,7 +1567,7 @@ static void handle_flush(CLIENT* client, struct nbd_request* req) {
 		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
@@ -1522,7 +1580,7 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
@@ -1559,7 +1617,7 @@ error:
 	setup_reply(&rep, package->req);
 	rep.error = nbd_errno(EINVAL);
 	pthread_mutex_lock(&(package->client->lock));
-	writeit(package->client->net, &rep, sizeof rep);
+	socket_write(package->client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(package->client->lock));
 end:
 	package_dispose(package);
@@ -1574,7 +1632,7 @@ static int mainloop_threaded(CLIENT* client) {
 	while(1) {
 		req = calloc(sizeof (struct nbd_request), 1);
 
-		readit(client->net, req, sizeof(struct nbd_request));
+		socket_read(client, req, sizeof(struct nbd_request));
 		if(client->transactionlogfd != -1) {
 			writeit(client->transactionlogfd, req, sizeof(struct nbd_request));
 		}
@@ -1589,7 +1647,7 @@ static int mainloop_threaded(CLIENT* client) {
 		pkg = package_create(client, req);
 
 		if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
-			readit(client->net, pkg->data, req->len);
+			socket_read(client, pkg->data, req->len);
 		}
 		if(req->type == NBD_CMD_DISC) {
 			g_thread_pool_free(tpool, FALSE, TRUE);
@@ -1600,11 +1658,11 @@ static int mainloop_threaded(CLIENT* client) {
 }
 
 /** sending macro. */
-#define SEND(net,reply) { writeit( net, &reply, sizeof( reply )); \
+#define SEND(cl,reply) { socket_write( cl, &reply, sizeof( reply )); \
 	if (client->transactionlogfd != -1) \
 		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
 /** error macro. */
-#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client->net,reply); reply.error = 0; }
+#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -1636,7 +1694,7 @@ int mainloop(CLIENT *client) {
 		i++;
 		printf("%d: ", i);
 #endif
-		readit(client->net, &request, sizeof(request));
+		socket_read(client, &request, sizeof(request));
 		if (client->transactionlogfd != -1)
 			writeit(client->transactionlogfd, &request, sizeof(request));
 
@@ -1694,27 +1752,27 @@ int mainloop(CLIENT *client) {
 		case NBD_CMD_WRITE:
 			DEBUG("wr: net->buf, ");
 			while(len > 0) {
-				readit(client->net, buf, currlen);
+				socket_read(client, buf, currlen);
 				DEBUG("buf->exp, ");
 				if ((client->server->flags & F_READONLY) ||
 				    (client->server->flags & F_AUTOREADONLY)) {
 					DEBUG("[WRITE to READONLY!]");
 					ERROR(client, reply, EPERM);
-					consume(client->net, buf, len-currlen, BUFSIZE);
+					consume(client, buf, len-currlen, BUFSIZE);
 					continue;
 				}
 				if (expwrite(request.from, buf, currlen, client,
 					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
-					consume(client->net, buf, len-currlen, BUFSIZE);
+					consume(client, buf, len-currlen, BUFSIZE);
 					continue;
 				}
 				len -= currlen;
 				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			DEBUG("OK!\n");
 			continue;
 
@@ -1725,7 +1783,7 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, errno);
 				continue;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			DEBUG("OK!\n");
 			continue;
 
@@ -1733,7 +1791,7 @@ int mainloop(CLIENT *client) {
 			DEBUG("exp->buf, ");
 			if (client->transactionlogfd != -1)
 				writeit(client->transactionlogfd, &reply, sizeof(reply));
-			writeit(client->net, &reply, sizeof(reply));
+			socket_write(client, &reply, sizeof(reply));
 			p = buf;
 			writelen = currlen;
 			while(len > 0) {
@@ -1744,7 +1802,7 @@ int mainloop(CLIENT *client) {
 				}
 				
 				DEBUG("buf->net, ");
-				writeit(client->net, buf, writelen);
+				socket_write(client, buf, writelen);
 				len -= currlen;
 				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
@@ -1768,7 +1826,7 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, errno);
 				continue;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			continue;
 
 		default:
