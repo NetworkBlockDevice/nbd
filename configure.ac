@@ -174,6 +174,8 @@ dnl 		;;
 dnl 	esac
 dnl fi
 
+PKG_CHECK_MODULES(GnuTLS, [gnutls >= 3.3.0])
+
 AC_CHECK_HEADERS([winioctl.h], [], [],
 [#include <io.h>
 #include <windef.h>

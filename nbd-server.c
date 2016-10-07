@@ -140,6 +140,8 @@
 #endif
 #define CFILE SYSCONFDIR "/nbd-server/config"
 
+#include <gnutls/gnutls.h>
+
 /** Where our config file actually is */
 gchar* config_file_pos;
 
