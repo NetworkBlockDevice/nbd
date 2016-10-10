@@ -15,8 +15,6 @@ PID=""
 
 set -e
 
-trap cleanup EXIT
-
 cleanup() {
 	if [ -f ${pidfile} ]
 	then
@@ -25,6 +23,8 @@ cleanup() {
 		if [ ! -z "$PID" ]
 		then
 			kill $PID || true
+		else
+			echo "E: Could not clean up!"
 		fi
 	fi
 	if [ -z "$cleanup" ]
@@ -34,6 +34,15 @@ cleanup() {
 		echo "Setup in $tmpdir"
 	fi
 }
+
+abort() {
+	cleanup
+	trap - INT
+	kill -INT $$
+}
+
+trap -- cleanup EXIT
+trap -- abort INT
 
 # Create a one-meg device
 dd if=/dev/zero of=$tmpnam bs=1024 count=4096 >/dev/null 2>&1
