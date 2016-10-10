@@ -1383,7 +1383,8 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 /**
  * Do the initial negotiation.
  *
- * @param client The client we're negotiating with.
+ * @param net The socket we're doing the negotiation over.
+ * @param servers The array of known servers.
  **/
 CLIENT* negotiate(int net, GArray* servers) {
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
