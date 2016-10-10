@@ -50,7 +50,7 @@ typedef struct {
 /**
   * Variables associated with a client connection
   */
-typedef struct {
+typedef struct _client {
 	uint64_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer, in human-readable format */
 	struct sockaddr_storage clientaddr; /**< peer, in binary format, network byte order */
@@ -72,6 +72,8 @@ typedef struct {
 	pthread_mutex_t lock; /**< socket lock */
 	void *tls_session; /**< TLS session context. Is NULL unless STARTTLS
 				has been negotiated. */
+	void (*socket_read)(struct _client*, void* buf, size_t len);
+	void (*socket_write)(struct _client*, void* buf, size_t len);
 } CLIENT;
 
 /**
