@@ -163,6 +163,7 @@ int dontfork = 0;
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
 #define F_LIST 2	  /**< Allow clients to list the exports on a server */
 #define F_NO_ZEROES 4	  /**< Do not send zeros to client */
+// also accepts F_FORCEDTLS (which is 16384)
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
@@ -246,6 +247,7 @@ struct generic_conf {
         gchar *modernaddr;      /**< address of the modern socket */
         gchar *modernport;      /**< port of the modern socket    */
         gchar *unixsock;	/**< file name of the unix domain socket */
+	gchar *tlsdir;		/**< directory containing TLS credentials */
         gint flags;             /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
@@ -701,6 +703,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "trim",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TRIM },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
+		{ "force_tls",	FALSE,	PARAM_BOOL,	&(s.flags),		F_FORCEDTLS },
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
         struct generic_conf genconftmp;
@@ -714,6 +717,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
 		{ "max_threads", FALSE, PARAM_INT,	&(genconftmp.threads),	  0 },
+		{ "tls_dir",	FALSE, PARAM_STRING,	&(genconftmp.tlsdir),	  0 },
+		{ "force_tls", FALSE, PARAM_BOOL,	&(genconftmp.flags),	  F_FORCEDTLS },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -1338,7 +1343,10 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
-		if(!strcmp(serve->servename, name)) {
+		// Check if this is the export we're looking for, but hide
+		// exports that are TLS-only if we haven't negotiated TLS yet
+		if(!((serve->flags & F_FORCEDTLS) || client->tls_session) &&
+				!strcmp(serve->servename, name)) {
 			client->server = serve;
 			client->exportsize = OFFT_MAX;
 			client->modern = TRUE;
@@ -1349,7 +1357,7 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			return client;
 		}
 	}
-	err("Negotiation failed/8a: Requested export not found");
+	err("Negotiation failed/8a: Requested export not found, or is TLS-only and client did not negotiate TLS");
 	free(name);
 	return NULL;
 }
@@ -1372,6 +1380,10 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		// Hide TLS-only exports if we haven't negotiated TLS yet
+		if(!client->tls_session && (serve->flags & F_FORCEDTLS)) {
+			continue;
+		}
 		len = htonl(strlen(serve->servename));
 		memcpy(buf, &len, sizeof(len));
 		strncpy(ptr, serve->servename, sizeof(buf) - sizeof(len));
@@ -1380,13 +1392,64 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 }
 
+CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, const gchar* tlsdir) {
+#define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
+	gnutls_certificate_credentials_t x509_cred;
+	CLIENT* retval = client;
+	gchar *caname = g_build_filename(tlsdir, "ca.pem", NULL);
+	gchar *certname = g_build_filename(tlsdir, "cert.pem", NULL);
+	gchar *keyname = g_build_filename(tlsdir, "priv.pem", NULL);
+	static gnutls_dh_params_t dh_params;
+	gnutls_priority_t priority_cache;
+	gnutls_session_t *session = g_new0(gnutls_session_t, 1);
+	int ret;
+
+	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
+	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, caname, GNUTLS_X509_FMT_PEM));
+	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, certname, keyname, GNUTLS_X509_FMT_PEM));
+
+	check_rv(gnutls_dh_params_init(&dh_params));
+	check_rv(gnutls_dh_params_generate2(dh_params,
+				gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
+					GNUTLS_SEC_PARAM_MEDIUM)));
+	check_rv(gnutls_priority_init(&priority_cache, "PERFORMANCE:%SERVER_PRECEDENCE", NULL));
+	check_rv(gnutls_init(session, GNUTLS_SERVER));
+	check_rv(gnutls_priority_set(*session, priority_cache));
+	check_rv(gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, x509_cred));
+	gnutls_certificate_server_set_request(*session, GNUTLS_CERT_IGNORE);
+	gnutls_transport_set_int(*session, client->net);
+	do {
+		ret = gnutls_handshake(*session);
+	} while(ret < 0 && gnutls_error_is_fatal(ret) == 0);
+
+	if (ret < 0) {
+		gnutls_deinit(*session);
+		return NULL;
+	}
+	client->tls_session = session;
+#undef check_rv
+exit:
+	g_free(caname);
+	g_free(certname);
+	g_free(keyname);
+	if(retval == NULL && session != NULL) {
+		g_free(session);
+	}
+	/* NBD_OPT_EXPORT_NAME cannot be issued before NBD_OPT_STARTTLS and be retained */
+	if(retval != NULL && retval->server != NULL) {
+		retval->server = NULL;
+	}
+	return retval;
+}
+
 /**
  * Do the initial negotiation.
  *
  * @param net The socket we're doing the negotiation over.
  * @param servers The array of known servers.
+ * @param tlsdir the directory containing global TLS configuration
  **/
-CLIENT* negotiate(int net, GArray* servers) {
+CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
 	uint32_t cflags = 0;
@@ -1417,6 +1480,12 @@ CLIENT* negotiate(int net, GArray* servers) {
 		}
 		socket_read(client, &opt, sizeof(opt));
 		opt = ntohl(opt);
+		if(client->tls_session == NULL
+				&& glob_flags & F_FORCEDTLS
+				&& opt != NBD_OPT_STARTTLS) {
+			send_reply(client, opt, NBD_REP_ERR_TLS_REQD, 0, NULL);
+			continue;
+		}
 		switch(opt) {
 		case NBD_OPT_EXPORT_NAME:
 			// NBD_OPT_EXPORT_NAME must be the last
@@ -1434,6 +1503,18 @@ CLIENT* negotiate(int net, GArray* servers) {
 		case NBD_OPT_ABORT:
 			// handled below
 			break;
+		case NBD_OPT_STARTTLS:
+			if(client->tls_session != NULL) {
+				send_reply(client, opt, NBD_REP_ERR_INVALID, 0, NULL);
+				continue;
+			}
+			if(tlsdir == NULL) {
+				send_reply(client, opt, NBD_REP_ERR_POLICY, 0, NULL);
+			}
+			if(handle_starttls(client, opt, servers, cflags, tlsdir) == NULL) {
+				// can't recover from failed TLS negotiation.
+				goto exit;
+			}
 		default:
 			send_reply(client, opt, NBD_REP_ERR_UNSUP, 0, NULL);
 			break;
@@ -2216,7 +2297,7 @@ socket_accept(const int sock)
 }
 
 static void
-handle_modern_connection(GArray *const servers, const int sock)
+handle_modern_connection(GArray *const servers, const int sock, const gchar* tlsdir)
 {
         int net;
         pid_t pid;
@@ -2381,7 +2462,7 @@ out:
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
-void serveloop(GArray* servers) {
+void serveloop(GArray* servers, gchar* tlsdir) {
 	int i;
 	int max;
 	fd_set mset;
@@ -2490,12 +2571,12 @@ void serveloop(GArray* servers) {
 					continue;
 				}
 
-				handle_modern_connection(servers, sock);
+				handle_modern_connection(servers, sock, tlsdir);
 			}
 		}
 	}
 }
-void serveloop(GArray* servers) G_GNUC_NORETURN;
+void serveloop(GArray* servers, gchar* tlsdir) G_GNUC_NORETURN;
 
 /**
  * Set server socket options.
@@ -2902,5 +2983,5 @@ int main(int argc, char *argv[]) {
 			genconf.unixsock);
 	dousers(genconf.user, genconf.group);
 
-	serveloop(servers);
+	serveloop(servers, genconf.tlsdir);
 }

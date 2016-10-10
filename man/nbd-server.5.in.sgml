@@ -114,13 +114,48 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>
 	    Optional; boolean
-	   </para>
-	   <para>
-	     Whether to allow the client to fetch a list of exports from
-	     this server. If enabled, the client can run
-	     <command>nbd-client -l</command> to get a list of exports
-	     on this server.
-	   </para>
+	  </para>
+	  <para>
+	    Whether to allow the client to fetch a list of exports from
+	    this server. If enabled, the client can run
+	    <command>nbd-client -l</command> to get a list of exports
+	    on this server.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>force_tls</option></term>
+        <listitem>
+          <para>
+            Optional; boolean.
+          </para>
+          <para>
+            Switch the server to FORCEDTLS mode.
+          </para>
+          <para>
+	    Note: this is <emphasis>not</emphasis> the same as enabling
+	    the force_tls option for each and every export individually.
+	    The latter will allow certain options to be issued during
+	    negotiation (e.g., the "list exports" option, even if that
+	    would return an empty result set), whereas enabling this
+	    option will disallow the use of <emphasis>any</emphasis>
+	    option to be issued during negotiation, apart from the
+	    STARTTLS option itself (to switch the transport to TLS).
+          </para>
+          <para>
+            Using FORCEDTLS mode should result in a safer environment,
+            as the server will not allow any communication to take place
+            unless and until TLS has been negotiated. However, it also
+            makes it impossible to set up a nonencrypted export for the
+	    benefit of older clients, or for clients that want to swap
+	    and not deadlock.
+          </para>
+          <para>
+            Using this parameter without also specifying a value for the
+            <option>tls_dir</option> parameter is possible, but silly.
+          </para>
+        </listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>group</option></term>
 	<listitem>
@@ -264,6 +299,43 @@ manpage.1: manpage.sgml
 	  </para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+        <term><option>tls_dir</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>Directory containing TLS credentials, in the filenames given
+	  below. Note: these filenames <emphasis>must</emphasis> be used; they
+	  cannot be deviated from. Future versions of nbd-server may make the
+	  filenames configurable, but for now this is not possible.
+	  </para>
+	  <variablelist>
+	    <varlistentry>
+	      <term><filename>ca.pem</filename></term>
+	      <listitem>
+		<para>The certificate of the CA that signed the TLS
+		  certificate for the NBD server. For a self-signed
+                  certificate, this can be a symlink to the file
+                  <filename>cert.pem</filename></para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><filename>priv.pem</filename></term>
+	      <listitem>
+	        <para>The private key for the server's
+		  certificate</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><filename>cert.pem</filename></term>
+              <listitem>
+                <para>The server's certificate, signed by the CA.</para>
+              </listitem>
+            </varlistentry>
+	  </variablelist>
+	</listitem>
+      </varlistentry>
     </variablelist>
   </refsect1>
   <refsect1>
@@ -397,6 +469,21 @@ manpage.1: manpage.sgml
 	    reliability in the case of an unclean shutdown at
 	    the expense of a degradation of performance. This option
 	    will have no effect unless supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>force_tls</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>Require the use of TLS for this export to be available.</para>
+	  <para>When this option has been enabled for an export, clients
+	    that do not negotiate TLS will not see the export when they
+	    request a list of exports, and will not be able to connect to
+	    it.</para>
+	  <para>
+	    Enabling this option when TLS credentials have not been
+	    configured in the [generic] section is possible, but silly.
 	  </para>
 	</listitem>
       </varlistentry>

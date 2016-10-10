@@ -144,7 +144,8 @@ typedef enum {
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
-#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
+#define F_TREEFILES 8192  /**< flag to tell us a file is exported using -t */
+#define F_FORCEDTLS 16384 /**< TLS is required, either for the server as a whole or for a given export */
 
 /* Functions */
 
