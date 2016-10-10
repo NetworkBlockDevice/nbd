@@ -1294,53 +1294,43 @@ void punch_hole(int fd, off_t off, off_t len) {
 #endif
 }
 
-static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasize, void* data) {
-	uint64_t magic = htonll(0x3e889045565a9LL);
-	reply_type = htonl(reply_type);
-	uint32_t datsize = htonl(datasize);
-	opt = htonl(opt);
-	struct iovec v_data[] = {
-		{ &magic, sizeof(magic) },
-		{ &opt, sizeof(opt) },
-		{ &reply_type, sizeof(reply_type) },
-		{ &datsize, sizeof(datsize) },
-		{ data, datasize },
+static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, size_t datasize, void* data) {
+	struct {
+		uint64_t magic;
+		uint32_t opt;
+		uint32_t reply_type;
+		uint32_t datasize;
+	} __attribute__ ((packed)) header = {
+		htonll(0x3e889045565a9LL),
+		htonl(opt),
+		htonl(reply_type),
+		htonl(datasize),
 	};
-	size_t total = sizeof(magic) + sizeof(opt) + sizeof(reply_type) + sizeof(datsize) + datasize;
-	ssize_t sent = writev(net, v_data, 5);
-	if(sent != total) {
-		perror("E: couldn't write enough data:");
+	socket_write(client, &header, sizeof(header));
+	if(datasize != 0) {
+		socket_write(client, data, datasize);
 	}
 }
 
-static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
 	uint32_t namelen;
 	char* name;
 	int i;
 
-	if (read(net, &namelen, sizeof(namelen)) < 0) {
-		err("Negotiation failed/7: %m");
-		return NULL;
-	}
+	socket_read(client, &namelen, sizeof(namelen));
 	namelen = ntohl(namelen);
 	if(namelen > 0) {
 		name = malloc(namelen+1);
 		name[namelen]=0;
-		if (read(net, name, namelen) < 0) {
-			err("Negotiation failed/8: %m");
-			free(name);
-			return NULL;
-		}
+		socket_read(client, name, namelen);
 	} else {
 		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
 		if(!strcmp(serve->servename, name)) {
-			CLIENT* client = g_new0(CLIENT, 1);
 			client->server = serve;
 			client->exportsize = OFFT_MAX;
-			client->net = net;
 			client->modern = TRUE;
 			client->transactionlogfd = -1;
 			client->clientfeats = cflags;
@@ -1354,20 +1344,19 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 	return NULL;
 }
 
-static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
 	uint32_t len;
 	int i;
 	char buf[1024];
 	char *ptr = buf + sizeof(len);
 
-	if (read(net, &len, sizeof(len)) < 0)
-		err("Negotiation failed/8: %m");
+	socket_read(client, &len, sizeof(len));
 	len = ntohl(len);
 	if(len) {
-		send_reply(opt, net, NBD_REP_ERR_INVALID, 0, NULL);
+		send_reply(client, opt, NBD_REP_ERR_INVALID, 0, NULL);
 	}
 	if(!(glob_flags & F_LIST)) {
-		send_reply(opt, net, NBD_REP_ERR_POLICY, 0, NULL);
+		send_reply(client, opt, NBD_REP_ERR_POLICY, 0, NULL);
 		err_nonfatal("Client tried disallowed list option");
 		return;
 	}
@@ -1376,9 +1365,9 @@ static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags)
 		len = htonl(strlen(serve->servename));
 		memcpy(buf, &len, sizeof(len));
 		strncpy(ptr, serve->servename, sizeof(buf) - sizeof(len));
-		send_reply(opt, net, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
+		send_reply(client, opt, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
 	}
-	send_reply(opt, net, NBD_REP_ACK, 0, NULL);
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 }
 
 /**
@@ -1391,57 +1380,62 @@ CLIENT* negotiate(int net, GArray* servers) {
 	uint64_t magic;
 	uint32_t cflags = 0;
 	uint32_t opt;
+	CLIENT* client = g_new0(CLIENT, 1);
+	client->net = net;
+	client->socket_read = socket_read_notls;
+	client->socket_write = socket_write_notls;
 
 	assert(servers != NULL);
-	if (write(net, INIT_PASSWD, 8) < 0)
-		err_nonfatal("Negotiation failed/1: %m");
+	socket_write(client, INIT_PASSWD, 8);
 	magic = htonll(opts_magic);
-	if (write(net, &magic, sizeof(magic)) < 0)
-		err_nonfatal("Negotiation failed/2: %m");
+	socket_write(client, &magic, sizeof(magic));
 
 	smallflags = htons(smallflags);
-	if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-		err_nonfatal("Negotiation failed/3: %m");
-	if (read(net, &cflags, sizeof(cflags)) < 0)
-		err_nonfatal("Negotiation failed/4: %m");
+	socket_write(client, &smallflags, sizeof(uint16_t));
+	socket_read(client, &cflags, sizeof(cflags));
 	cflags = htonl(cflags);
 	if (cflags & NBD_FLAG_C_NO_ZEROES) {
 		glob_flags |= F_NO_ZEROES;
 	}
 	do {
-		if (read(net, &magic, sizeof(magic)) < 0)
-			err_nonfatal("Negotiation failed/5: %m");
+		socket_read(client, &magic, sizeof(magic));
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			err_nonfatal("Negotiation failed/5a: magic mismatch");
 			return NULL;
 		}
-		if (read(net, &opt, sizeof(opt)) < 0)
-			err_nonfatal("Negotiation failed/6: %m");
+		socket_read(client, &opt, sizeof(opt));
 		opt = ntohl(opt);
 		switch(opt) {
 		case NBD_OPT_EXPORT_NAME:
 			// NBD_OPT_EXPORT_NAME must be the last
 			// selected option, so return from here
 			// if that is chosen.
-			return handle_export_name(opt, net, servers, cflags);
+			if(handle_export_name(client, opt, servers, cflags) != NULL) {
+				return client;
+			} else {
+				goto exit;
+			}
 			break;
 		case NBD_OPT_LIST:
-			handle_list(opt, net, servers, cflags);
+			handle_list(client, opt, servers, cflags);
 			break;
 		case NBD_OPT_ABORT:
 			// handled below
 			break;
 		default:
-			send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
+			send_reply(client, opt, NBD_REP_ERR_UNSUP, 0, NULL);
 			break;
 		}
 	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
 	if(opt == NBD_OPT_ABORT) {
 		err_nonfatal("Session terminated by client");
-		return NULL;
+		goto exit;
 	}
 	err_nonfatal("Weird things happened: reached end of negotiation without success");
+exit:
+	close(net);
+	g_free(client);
 	return NULL;
 }
 
