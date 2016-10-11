@@ -1486,6 +1486,11 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 		if(client->tls_session == NULL
 				&& glob_flags & F_FORCEDTLS
 				&& opt != NBD_OPT_STARTTLS) {
+			if(opt == NBD_OPT_EXPORT_NAME) {
+				// can't send an error message for EXPORT_NAME,
+				// so must do hard close
+				goto hard_close;
+			}
 			send_reply(client, opt, NBD_REP_ERR_TLS_REQD, -1, "TLS is required on this server");
 			continue;
 		}
