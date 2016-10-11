@@ -2325,19 +2325,6 @@ handle_modern_connection(GArray *const servers, const int sock, const gchar* tls
                 /* Child just continues. */
         }
 
-        client = negotiate(net, servers);
-        if (!client) {
-                msg(LOG_ERR, "Modern initial negotiation failed");
-                goto handler_err;
-        }
-
-        if (client->server->max_connections > 0 &&
-           g_hash_table_size(children) >= client->server->max_connections) {
-                msg(LOG_ERR, "Max connections (%d) reached",
-                    client->server->max_connections);
-                goto handler_err;
-        }
-
         sock_flags_old = fcntl(net, F_GETFL, 0);
         if (sock_flags_old == -1) {
                 msg(LOG_ERR, "Failed to get socket flags");
@@ -2348,6 +2335,19 @@ handle_modern_connection(GArray *const servers, const int sock, const gchar* tls
         if (sock_flags_new != sock_flags_old &&
             fcntl(net, F_SETFL, sock_flags_new) == -1) {
                 msg(LOG_ERR, "Failed to set socket to blocking mode");
+                goto handler_err;
+        }
+
+        client = negotiate(net, servers, tlsdir);
+        if (!client) {
+                msg(LOG_ERR, "Modern initial negotiation failed");
+                goto handler_err;
+        }
+
+        if (client->server->max_connections > 0 &&
+           g_hash_table_size(children) >= client->server->max_connections) {
+                msg(LOG_ERR, "Max connections (%d) reached",
+                    client->server->max_connections);
                 goto handler_err;
         }
 
