@@ -2935,7 +2935,7 @@ int main(int argc, char *argv[]) {
 
 	genconf.threads = 4;
         servers = parse_cfile(config_file_pos, &genconf, true, &gerr);
-	
+
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
         glob_flags   |= genconf.flags;
