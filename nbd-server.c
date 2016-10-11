@@ -1374,10 +1374,10 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	socket_read(client, &len, sizeof(len));
 	len = ntohl(len);
 	if(len) {
-		send_reply(client, opt, NBD_REP_ERR_INVALID, 0, NULL);
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "NBD_OPT_LIST with nonzero data length is not a valid request");
 	}
 	if(!(glob_flags & F_LIST)) {
-		send_reply(client, opt, NBD_REP_ERR_POLICY, 0, NULL);
+		send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "Listing of exports denied by server configuration");
 		err_nonfatal("Client tried disallowed list option");
 		return;
 	}
@@ -1486,7 +1486,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 		if(client->tls_session == NULL
 				&& glob_flags & F_FORCEDTLS
 				&& opt != NBD_OPT_STARTTLS) {
-			send_reply(client, opt, NBD_REP_ERR_TLS_REQD, 0, NULL);
+			send_reply(client, opt, NBD_REP_ERR_TLS_REQD, -1, "TLS is required on this server");
 			continue;
 		}
 		switch(opt) {
@@ -1508,18 +1508,18 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 			break;
 		case NBD_OPT_STARTTLS:
 			if(client->tls_session != NULL) {
-				send_reply(client, opt, NBD_REP_ERR_INVALID, 0, NULL);
+				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "TLS has already been negotiated!");
 				continue;
 			}
 			if(tlsdir == NULL) {
-				send_reply(client, opt, NBD_REP_ERR_POLICY, 0, NULL);
+				send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "TLS not allowed on this server");
 			}
 			if(handle_starttls(client, opt, servers, cflags, tlsdir) == NULL) {
 				// can't recover from failed TLS negotiation.
 				goto exit;
 			}
 		default:
-			send_reply(client, opt, NBD_REP_ERR_UNSUP, 0, NULL);
+			send_reply(client, opt, NBD_REP_ERR_UNSUP, -1, "The given option is unknown to this server implementation");
 			break;
 		}
 	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
