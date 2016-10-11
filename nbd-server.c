@@ -1513,7 +1513,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 			break;
 		case NBD_OPT_STARTTLS:
 			if(client->tls_session != NULL) {
-				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "TLS has already been negotiated!");
+				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Invalid STARTTLS request: TLS has already been negotiated!");
 				continue;
 			}
 			if(tlsdir == NULL) {
