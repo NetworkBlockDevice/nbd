@@ -1309,7 +1309,7 @@ void punch_hole(int fd, off_t off, off_t len) {
 #endif
 }
 
-static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, size_t datasize, void* data) {
+static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, void* data) {
 	struct {
 		uint64_t magic;
 		uint32_t opt;
@@ -1323,6 +1323,9 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, size_t
 	};
 	socket_write(client, &header, sizeof(header));
 	if(datasize != 0) {
+		if(datasize < 0) {
+			datasize = strlen((char*)data);
+		}
 		socket_write(client, data, datasize);
 	}
 }
