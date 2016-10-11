@@ -1502,7 +1502,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 			if(handle_export_name(client, opt, servers, cflags) != NULL) {
 				return client;
 			} else {
-				goto exit;
+				goto hard_close;
 			}
 			break;
 		case NBD_OPT_LIST:
@@ -1521,7 +1521,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 			}
 			if(handle_starttls(client, opt, servers, cflags, tlsdir) == NULL) {
 				// can't recover from failed TLS negotiation.
-				goto exit;
+				goto hard_close;
 			}
 		default:
 			send_reply(client, opt, NBD_REP_ERR_UNSUP, -1, "The given option is unknown to this server implementation");
@@ -1530,10 +1530,10 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
 	if(opt == NBD_OPT_ABORT) {
 		err_nonfatal("Session terminated by client");
-		goto exit;
+		goto hard_close;
 	}
 	err_nonfatal("Weird things happened: reached end of negotiation without success");
-exit:
+hard_close:
 	close(net);
 	g_free(client);
 	return NULL;
