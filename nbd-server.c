@@ -1522,6 +1522,11 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 				// so must do hard close
 				goto hard_close;
 			}
+			if(opt == NBD_OPT_ABORT) {
+				// handled below
+				break;
+			}
+			consume_len(client);
 			send_reply(client, opt, NBD_REP_ERR_TLS_REQD, -1, "TLS is required on this server");
 			continue;
 		}
@@ -1544,11 +1549,14 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 			break;
 		case NBD_OPT_STARTTLS:
 			if(client->tls_session != NULL) {
+				consume_len(client);
 				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Invalid STARTTLS request: TLS has already been negotiated!");
 				continue;
 			}
 			if(tlsdir == NULL) {
+				consume_len(client);
 				send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "TLS not allowed on this server");
+				continue;
 			}
 			if(handle_starttls(client, opt, servers, cflags, tlsdir) == NULL) {
 				// can't recover from failed TLS negotiation.
