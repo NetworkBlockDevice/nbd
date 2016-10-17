@@ -365,12 +365,12 @@ static void socket_read(CLIENT* client, void *buf, size_t len) {
 /**
  * Consume data from a socket that we don't want
  *
- * @param f a file descriptor
- * @param buf a buffer
+ * @param c the client to read from
  * @param len the number of bytes to consume
+ * @param buf a buffer
  * @param bufsiz the size of the buffer
  **/
-static inline void consume(CLIENT* c, void * buf, size_t len, size_t bufsiz) {
+static inline void consume(CLIENT* c, size_t len, void * buf, size_t bufsiz) {
 	size_t curlen;
 	while (len>0) {
 		curlen = (len>bufsiz)?bufsiz:len;
@@ -1868,14 +1868,14 @@ int mainloop(CLIENT *client) {
 				    (client->server->flags & F_AUTOREADONLY)) {
 					DEBUG("[WRITE to READONLY!]");
 					ERROR(client, reply, EPERM);
-					consume(client, buf, len-currlen, BUFSIZE);
+					consume(client, len-currlen, buf, BUFSIZE);
 					continue;
 				}
 				if (expwrite(request.from, buf, currlen, client,
 					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
-					consume(client, buf, len-currlen, BUFSIZE);
+					consume(client, len-currlen, buf, BUFSIZE);
 					continue;
 				}
 				len -= currlen;
