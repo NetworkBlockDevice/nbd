@@ -379,6 +379,21 @@ static inline void consume(CLIENT* c, size_t len, void * buf, size_t bufsiz) {
 	}
 }
 
+/**
+ * Consume a length field and corresponding payload that we don't want
+ *
+ * @param c the client to read from
+ **/
+static inline void consume_len(CLIENT* c) {
+	uint32_t len;
+	char buf[1024];
+
+	socket_read(c, &len, sizeof(len));
+	len = ntohl(len);
+	consume(c, len, buf, sizeof(buf));
+}
+
+
 static void socket_write(CLIENT* client, void *buf, size_t len) {
 	g_assert(client->socket_write != NULL);
 	client->socket_write(client, buf, len);
@@ -1540,6 +1555,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 				goto hard_close;
 			}
 		default:
+			consume_len(client);
 			send_reply(client, opt, NBD_REP_ERR_UNSUP, -1, "The given option is unknown to this server implementation");
 			break;
 		}
