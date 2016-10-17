@@ -1327,11 +1327,12 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 		htonl(reply_type),
 		htonl(datasize),
 	};
+	if(datasize < 0) {
+		datasize = strlen((char*)data);
+		header.datasize = htonl(datasize);
+	}
 	socket_write(client, &header, sizeof(header));
 	if(datasize != 0) {
-		if(datasize < 0) {
-			datasize = strlen((char*)data);
-		}
 		socket_write(client, data, datasize);
 	}
 }
