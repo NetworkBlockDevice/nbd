@@ -6,7 +6,8 @@ noinst_LTLIBRARIES = libnbdsrv.la libcliserv.la
 libcliserv_la_SOURCES = cliserv.h cliserv.c
 libcliserv_la_CFLAGS = @CFLAGS@
 nbd_client_SOURCES = nbd-client.c cliserv.h
-nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h nbdsrv.h backend.h
+nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h nbdsrv.h backend.h \
+	netdb-compat.h
 nbd_trdump_SOURCES = nbd-trdump.c cliserv.h nbd.h
 nbd_server_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GnuTLS_CFLAGS@
 nbd_trdump_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
