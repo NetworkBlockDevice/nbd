@@ -1,3 +1,4 @@
+ACLOCAL_AMFLAGS = -I support
 SUBDIRS = . man doc tests systemd gznbd
 bin_PROGRAMS = nbd-server nbd-trdump
 sbin_PROGRAMS = @NBD_CLIENT_NAME@

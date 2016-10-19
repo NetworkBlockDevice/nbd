@@ -11,7 +11,7 @@ m4_define([serial_tests], [
               awk '{split ($NF,a,"."); if (a[1] == 1 && a[2] >= 12) { print "serial-tests" }}'
   ])
 ])
-AM_INIT_AUTOMAKE(foreign dist-xz serial_tests)
+AM_INIT_AUTOMAKE(foreign dist-xz serial_tests subdir-objects)
 AM_MAINTAINER_MODE([enable])
 AC_CONFIG_MACRO_DIR([support])
 LT_INIT
