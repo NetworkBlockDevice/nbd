@@ -49,3 +49,4 @@ ltmain.sh
 .libs/
 *.la
 ar-lib
+tests/run/cliserv.c
