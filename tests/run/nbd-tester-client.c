@@ -272,6 +272,7 @@ int writebuffer(int fd, struct chunklist *l)
 #define TEST_WRITE (1<<0)
 #define TEST_FLUSH (1<<1)
 #define TEST_EXPECT_ERROR (1<<2)
+#define TEST_HANDSHAKE (1<<3)
 
 int timeval_subtract(struct timeval *result, struct timeval *x,
 		     struct timeval *y)
@@ -348,7 +349,7 @@ static inline int write_all(int f, void *buf, size_t len)
 #define WRITE_ALL_ERR_RT(f, buf, len, whereto, rval, errmsg...) if((write_all(f, buf, len))<=0) { snprintf(errstr, errstr_len, ##errmsg); retval = rval; goto whereto; }
 
 int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
-			    int *serverflags)
+			    int *serverflags, int testflags)
 {
 	char buf[256];
 	u64 tmp64;
@@ -403,6 +404,14 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 	negotiationflags = htonl(negotiationflags);
 	WRITE_ALL_ERRCHK(sock, &negotiationflags, sizeof(negotiationflags), err,
 			 "Could not write reserved field: %s", strerror(errno));
+	if (testflags & TEST_HANDSHAKE) {
+		/* Server must support newstyle for this test */
+		if (!(handshakeflags & NBD_FLAG_FIXED_NEWSTYLE)) {
+			strncpy(errstr, "server does not support handshake", errstr_len);
+			goto err;
+		}
+		goto end;
+	}
 	/* magic */
 	tmp64 = htonll(opts_magic);
 	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
@@ -435,7 +444,7 @@ end:
 }
 
 int setup_unix_connection(gchar * unixsock, gchar * name, CONNECTION_TYPE ctype,
-			  int *serverflags)
+			  int *serverflags, int testflags)
 {
 	struct sockaddr_un addr;
 	int sock;
@@ -457,7 +466,7 @@ int setup_unix_connection(gchar * unixsock, gchar * name, CONNECTION_TYPE ctype,
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
 	}
-	sock = setup_connection_common(sock, name, ctype, serverflags);
+	sock = setup_connection_common(sock, name, ctype, serverflags, testflags);
 	goto end;
 err_open:
 	close(sock);
@@ -468,7 +477,7 @@ end:
 }
 
 int setup_inet_connection(gchar * hostname, int port, gchar * name,
-			  CONNECTION_TYPE ctype, int *serverflags)
+			  CONNECTION_TYPE ctype, int *serverflags, int testflags)
 {
 	int sock;
 	struct hostent *host;
@@ -493,7 +502,7 @@ int setup_inet_connection(gchar * hostname, int port, gchar * name,
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
 	}
-	sock = setup_connection_common(sock, name, ctype, serverflags);
+	sock = setup_connection_common(sock, name, ctype, serverflags, testflags);
 	goto end;
 err_open:
 	close(sock);
@@ -504,14 +513,14 @@ end:
 }
 
 int setup_connection(gchar * hostname, gchar * unixsock, int port, gchar * name,
-		     CONNECTION_TYPE ctype, int *serverflags)
+		     CONNECTION_TYPE ctype, int *serverflags, int testflags)
 {
 	if (hostname != NULL) {
 		return setup_inet_connection(hostname, port, name, ctype,
-					     serverflags);
+					     serverflags, testflags);
 	} else if (unixsock != NULL) {
 		return setup_unix_connection(unixsock, name, ctype,
-					     serverflags);
+					     serverflags, testflags);
 	} else {
 		g_error("need a hostname or a unix domain socket!");
 		return -1;
@@ -607,7 +616,7 @@ int oversize_test(gchar * hostname, gchar * unixsock, int port, char *name,
 		if ((sock =
 		     setup_connection(hostname, unixsock, port, name,
 				      CONNECTION_TYPE_FULL,
-				      &serverflags)) < 0) {
+				      &serverflags, testflags)) < 0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval = -1;
 			goto err;
@@ -675,6 +684,91 @@ err:
 	return retval;
 }
 
+int handshake_test(gchar * hostname, gchar * unixsock, int port, char *name,
+		   int sock, char sock_is_open, char close_sock, int testflags)
+{
+	int retval = -1;
+	int i = 0;
+	int serverflags = 0;
+	char buf[256];
+	u64 tmp64;
+	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
+	uint32_t tmp32 = 0;
+
+	/* This should work */
+	if (!sock_is_open) {
+		if ((sock =
+		     setup_connection(hostname, unixsock, port, name,
+				      CONNECTION_TYPE_FULL,
+				      &serverflags, testflags)) < 0) {
+			g_warning("Could not open socket: %s", errstr);
+			goto err;
+		}
+	}
+
+	/* Intentionally throw an unknown option at the server */
+	tmp64 = htonll(opts_magic);
+	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
+			 "Could not write magic: %s", strerror(errno));
+	tmp32 = htonl(0x7654321);
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option: %s", strerror(errno));
+	tmp32 = htonl((uint32_t) sizeof(tmp32));
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option length: %s", strerror(errno));
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option payload: %s", strerror(errno));
+	/* Expect proper error from server */
+	READ_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
+			"Could not read magic: %s", strerror(errno));
+	tmp64 = ntohll(tmp64);
+	if (tmp64 != 0x3e889045565a9LL) {
+		strncpy(errstr, "magic does not match", errstr_len);
+		goto err;
+	}
+	READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			"Could not read option: %s", strerror(errno));
+	tmp32 = ntohl(tmp32);
+	if (tmp32 != 0x7654321) {
+		strncpy(errstr, "option does not match", errstr_len);
+		goto err;
+	}
+	READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			"Could not read status: %s", strerror(errno));
+	tmp32 = ntohl(tmp32);
+	if (tmp32 != NBD_REP_ERR_UNSUP) {
+		strncpy(errstr, "status does not match", errstr_len);
+		goto err;
+	}
+	READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			"Could not read length: %s", strerror(errno));
+	tmp32 = ntohl(tmp32);
+	while (tmp32) {
+		char buf[1024];
+		size_t len = tmp32 < sizeof(buf) ? tmp32 : sizeof(buf);
+		READ_ALL_ERRCHK(sock, buf, len, err,
+				"Could not read payload: %s", strerror(errno));
+		tmp32 -= len;
+	}
+
+
+	/* Send NBD_OPT_ABORT to close the connection */
+	tmp64 = htonll(opts_magic);
+	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
+			 "Could not write magic: %s", strerror(errno));
+	tmp32 = htonl(NBD_OPT_ABORT);
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option: %s", strerror(errno));
+	tmp32 = htonl((uint32_t) 0);
+	WRITE_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
+			 "Could not write option length: %s", strerror(errno));
+
+	retval = 0;
+
+err:
+	return retval;
+}
+
 int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 		    int sock, char sock_is_open, char close_sock, int testflags)
 {
@@ -703,7 +797,7 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 		if ((sock =
 		     setup_connection(hostname, unixsock, port, name,
 				      CONNECTION_TYPE_FULL,
-				      &serverflags)) < 0) {
+				      &serverflags, testflags)) < 0) {
 			g_warning("Could not open socket: %s", errstr);
 			retval = -1;
 			goto err;
@@ -977,7 +1071,7 @@ int integrity_test(gchar * hostname, gchar * unixsock, int port, char *name,
 		if ((sock =
 		     setup_connection(hostname, unixsock, port, name,
 				      CONNECTION_TYPE_FULL,
-				      &serverflags)) < 0) {
+				      &serverflags, testflags)) < 0) {
 			g_warning("Could not open socket: %s", errstr);
 			goto err;
 		}
@@ -1518,7 +1612,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	logging(MY_NAME);
-	while ((c = getopt(argc, argv, "FN:t:owfilu:")) >= 0) {
+	while ((c = getopt(argc, argv, "FN:t:owfilu:h")) >= 0) {
 		switch (c) {
 		case 1:
 			handle_nonopt(optarg, &hostname, &p);
@@ -1552,6 +1646,10 @@ int main(int argc, char **argv)
 			break;
 		case 'u':
 			unixsock = g_strdup(optarg);
+			break;
+		case 'h':
+			test = handshake_test;
+			testflags |= TEST_HANDSHAKE;
 			break;
 		}
 	}
