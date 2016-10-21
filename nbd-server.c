@@ -1562,6 +1562,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 				// can't recover from failed TLS negotiation.
 				goto hard_close;
 			}
+			break;
 		default:
 			consume_len(client);
 			send_reply(client, opt, NBD_REP_ERR_UNSUP, -1, "The given option is unknown to this server implementation");
