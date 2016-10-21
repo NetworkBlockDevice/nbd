@@ -1557,6 +1557,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 				send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "TLS not allowed on this server");
 				continue;
 			}
+			send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 			if(handle_starttls(client, opt, servers, cflags, tlsdir) == NULL) {
 				// can't recover from failed TLS negotiation.
 				goto hard_close;
