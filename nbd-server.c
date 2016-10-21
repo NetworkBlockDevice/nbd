@@ -1431,6 +1431,8 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 		return NULL;
 	}
 	client->tls_session = session;
+	client->socket_read = socket_read_tls;
+	client->socket_write = socket_write_tls;
 #undef check_rv
 exit:
 	g_free(caname);
