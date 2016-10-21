@@ -1427,6 +1427,7 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 
 	if (ret < 0) {
 		gnutls_deinit(*session);
+		g_free(session);
 		return NULL;
 	}
 	client->tls_session = session;
