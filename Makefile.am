@@ -18,4 +18,4 @@ nbd_client_LDADD = libcliserv.la
 nbd_server_LDADD = @GLIB_LIBS@ libnbdsrv.la libcliserv.la @GnuTLS_LIBS@
 nbd_trdump_LDADD = libcliserv.la
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h nbd-debug.h
-EXTRA_DIST = maketr CodingStyle autogen.sh README.md
+EXTRA_DIST = maketr CodingStyle autogen.sh README.md support/genver.sh
