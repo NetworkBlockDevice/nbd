@@ -1448,7 +1448,7 @@ exit:
 	if(retval == NULL && session != NULL) {
 		g_free(session);
 	}
-	/* NBD_OPT_EXPORT_NAME cannot be issued before NBD_OPT_STARTTLS and be retained */
+	/* export names cannot be chosen before NBD_OPT_STARTTLS and be retained */
 	if(retval != NULL && retval->server != NULL) {
 		retval->server = NULL;
 	}
