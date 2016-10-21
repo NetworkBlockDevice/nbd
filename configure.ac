@@ -174,7 +174,8 @@ dnl 		;;
 dnl 	esac
 dnl fi
 
-PKG_CHECK_MODULES(GnuTLS, [gnutls >= 3.3.0])
+PKG_CHECK_MODULES(GnuTLS, [gnutls >= 3.3.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
+AC_DEFINE(HAVE_GNUTLS, $HAVE_GNUTLS, [Define to 1 if you have a GnuTLS version of 3.3 or above])
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
 [#include <io.h>

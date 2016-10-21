@@ -140,7 +140,9 @@
 #endif
 #define CFILE SYSCONFDIR "/nbd-server/config"
 
+#if HAVE_GNUTLS
 #include <gnutls/gnutls.h>
+#endif
 
 /** Where our config file actually is */
 gchar* config_file_pos;
@@ -293,6 +295,7 @@ static inline void writeit(int f, void *buf, size_t len) {
 	}
 }
 
+#if HAVE_GNUTLS
 static void writeit_tls(gnutls_session_t s, void *buf, size_t len) {
 	ssize_t res;
 	char *m;
@@ -334,6 +337,7 @@ static void readit_tls(gnutls_session_t s, void *buf, size_t len) {
 		}
 	}
 }
+#endif // HAVE_GNUTLS
 
 static void socket_read_notls(CLIENT* client, void *buf, size_t len) {
 	readit(client->net, buf, len);
@@ -343,6 +347,7 @@ static void socket_write_notls(CLIENT* client, void *buf, size_t len) {
 	writeit(client->net, buf, len);
 }
 
+#if HAVE_GNUTLS
 static void socket_read_tls(CLIENT* client, void *buf, size_t len) {
 	readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
@@ -350,6 +355,7 @@ static void socket_read_tls(CLIENT* client, void *buf, size_t len) {
 static void socket_write_tls(CLIENT* client, void *buf, size_t len) {
 	writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
+#endif
 
 static void socket_read(CLIENT* client, void *buf, size_t len) {
 	g_assert(client->socket_read != NULL);
@@ -1395,6 +1401,7 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 }
 
+#if HAVE_GNUTLS
 CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, const gchar* tlsdir) {
 #define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
 	gnutls_certificate_credentials_t x509_cred;
@@ -1447,6 +1454,11 @@ exit:
 	}
 	return retval;
 }
+#else
+CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, const gchar* tlsdir) {
+	return NULL;
+}
+#endif // HAVE_GNUTLS
 
 /**
  * Do the initial negotiation.
