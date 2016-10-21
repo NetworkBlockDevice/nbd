@@ -1470,6 +1470,7 @@ exit:
 	}
 	return retval;
 }
+#endif
 
 /**
  * Do the initial negotiation.
