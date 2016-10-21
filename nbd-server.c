@@ -1470,11 +1470,6 @@ exit:
 	}
 	return retval;
 }
-#else
-CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, const gchar* tlsdir) {
-	return NULL;
-}
-#endif // HAVE_GNUTLS
 
 /**
  * Do the initial negotiation.
@@ -1548,6 +1543,10 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 			// handled below
 			break;
 		case NBD_OPT_STARTTLS:
+#if !HAVE_GNUTLS
+			consume_len(client);
+			send_reply(client, opt, NBD_REP_ERR_PLATFORM, -1, "This nbd-server was compiled without TLS support");
+#else
 			if(client->tls_session != NULL) {
 				consume_len(client);
 				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Invalid STARTTLS request: TLS has already been negotiated!");
@@ -1562,6 +1561,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 				// can't recover from failed TLS negotiation.
 				goto hard_close;
 			}
+#endif
 			break;
 		default:
 			consume_len(client);
