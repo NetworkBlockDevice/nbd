@@ -2557,6 +2557,7 @@ out:
         return retval;
 }
 
+void serveloop(GArray* servers, gchar* tlsdir) G_GNUC_NORETURN;
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
@@ -2691,7 +2692,6 @@ void serveloop(GArray* servers, gchar* tlsdir) {
 		}
 	}
 }
-void serveloop(GArray* servers, gchar* tlsdir) G_GNUC_NORETURN;
 
 /**
  * Set server socket options.
