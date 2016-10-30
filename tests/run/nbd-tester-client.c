@@ -765,6 +765,7 @@ int handshake_test(gchar * hostname, gchar * unixsock, int port, char *name,
 
 	retval = 0;
 
+	g_message("Handshake test completed. No errors encountered.");
 err:
 	return retval;
 }
