@@ -210,6 +210,7 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       systems that don't support serving IPv4
 			       and IPv6 from the same socket (like,
 			       e.g., FreeBSD) */
+GArray* childsocks;	/**< parent-side sockets for communication with children */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -2297,16 +2298,18 @@ void destroy_pid_t(gpointer data) {
 }
 
 static pid_t
-spawn_child()
+spawn_child(int* socket)
 {
         pid_t pid;
         sigset_t newset;
         sigset_t oldset;
+	int sockets[2];
 
         sigemptyset(&newset);
         sigaddset(&newset, SIGCHLD);
         sigaddset(&newset, SIGTERM);
         sigprocmask(SIG_BLOCK, &newset, &oldset);
+	socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
         pid = fork();
         if (pid < 0) {
                 msg(LOG_ERR, "Could not fork (%s)", strerror(errno));
@@ -2317,11 +2320,14 @@ spawn_child()
 
                 pidp = g_malloc(sizeof(pid_t));
                 *pidp = pid;
+		*socket = sockets[1];
+		close(sockets[0]);
                 g_hash_table_insert(children, pidp, pidp);
                 goto out;
         }
         /* Child */
-
+	*socket = sockets[0];
+	close(sockets[1]);
         /* Child's signal disposition is reset to default. */
         signal(SIGCHLD, SIG_DFL);
         signal(SIGTERM, SIG_DFL);
@@ -2355,16 +2361,21 @@ handle_modern_connection(GArray *const servers, const int sock, const gchar* tls
         CLIENT *client = NULL;
         int sock_flags_old;
         int sock_flags_new;
+	int commsocket;
+	char acl;
+	uint32_t len;
 
         net = socket_accept(sock);
         if (net < 0)
                 return;
 
         if (!dontfork) {
-                pid = spawn_child();
+                pid = spawn_child(&commsocket);
                 if (pid) {
-                        if (pid > 0)
+                        if (pid > 0) {
                                 msg(LOG_INFO, "Spawned a child process");
+				g_array_append_val(childsocks, commsocket);
+			}
                         if (pid < 0)
                                 msg(LOG_ERR, "Failed to spawn a child process");
                         close(net);
@@ -2387,17 +2398,24 @@ handle_modern_connection(GArray *const servers, const int sock, const gchar* tls
         }
 
         client = negotiate(net, servers, tlsdir);
+	len = strlen(client->server->servename);
+	writeit(commsocket, &len, sizeof len);
+	writeit(commsocket, client->server->servename, len);
+	readit(commsocket, &acl, 1);
+	close(commsocket);
         if (!client) {
                 msg(LOG_ERR, "Modern initial negotiation failed");
                 goto handler_err;
         }
 
-        if (client->server->max_connections > 0 &&
-           g_hash_table_size(children) >= client->server->max_connections) {
-                msg(LOG_ERR, "Max connections (%d) reached",
-                    client->server->max_connections);
-                goto handler_err;
-        }
+	switch(acl) {
+		case 'N':
+			msg(LOG_ERR, "Connection not allowed (too many clients)");
+			goto handler_err;
+		case 'X':
+			msg(LOG_ERR, "Connection not allowed (unknown by parent?!?)");
+			goto handler_err;
+	}
 
         if (set_peername(net, client)) {
                 msg(LOG_ERR, "Failed to set peername");
@@ -2446,6 +2464,35 @@ handler_err:
         if (!dontfork) {
                 exit(EXIT_FAILURE);
         }
+}
+
+static int handle_childname(GArray* servers, int socket)
+{
+	uint32_t len;
+	char *buf;
+	int i;
+
+	if(read(socket, &len, sizeof len) == 0) {
+		return -1;
+	}
+	buf = g_malloc0(len);
+	readit(socket, buf, len);
+	for(i=0; i<servers->len; i++) {
+		SERVER* srv = &g_array_index(servers, SERVER, i);
+		if(strcmp(srv->servename, buf) == 0) {
+			if(srv->max_connections == 0 || srv->max_connections > srv->numclients) {
+				writeit(socket, "Y", 1);
+				srv->numclients++;
+			} else {
+				writeit(socket, "N", 1);
+			}
+			goto exit;
+		}
+	}
+	writeit(socket, "X", 1);
+exit:
+	g_free(buf);
+	return 0;
 }
 
 /**
@@ -2515,7 +2562,7 @@ out:
  **/
 void serveloop(GArray* servers, gchar* tlsdir) {
 	int i;
-	int max;
+	int mmax, max;
 	fd_set mset;
 	fd_set rset;
 	sigset_t blocking_mask;
@@ -2528,12 +2575,12 @@ void serveloop(GArray* servers, gchar* tlsdir) {
 	 * to not fork() for clients anymore, we may have to revisit
 	 * this.
 	 */
-	max=0;
+	mmax=0;
 	FD_ZERO(&mset);
 	for(i=0;i<modernsocks->len;i++) {
 		int sock = g_array_index(modernsocks, int, i);
 		FD_SET(sock, &mset);
-		max=sock>max?sock:max;
+		mmax=sock>max?sock:max;
 	}
 
 	/* Construct a signal mask which is used to make signal testing and
@@ -2614,6 +2661,13 @@ void serveloop(GArray* servers, gchar* tlsdir) {
                 }
 
 		memcpy(&rset, &mset, sizeof(fd_set));
+		max=mmax;
+		for(i=0;i<childsocks->len;i++) {
+			int sock = g_array_index(childsocks, int, i);
+			FD_SET(sock, &rset);
+			max=sock>max?sock:max;
+		}
+
 		if (pselect(max + 1, &rset, NULL, NULL, NULL, &original_mask) > 0) {
 			DEBUG("accept, ");
 			for(i=0; i < modernsocks->len; i++) {
@@ -2623,6 +2677,16 @@ void serveloop(GArray* servers, gchar* tlsdir) {
 				}
 
 				handle_modern_connection(servers, sock, tlsdir);
+			}
+			for(i=0; i < childsocks->len; i++) {
+				int sock = g_array_index(childsocks, int, i);
+
+				if(FD_ISSET(sock, &rset)) {
+					if(handle_childname(servers, sock) < 0) {
+						close(sock);
+						g_array_remove_index(childsocks, i);
+					}
+				}
 			}
 		}
 	}
@@ -2976,6 +3040,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
+	childsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
 	logging(MY_NAME);
 	config_file_pos = g_strdup(CFILE);
