@@ -129,6 +129,15 @@ manpage.1: manpage.sgml
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
+	  <term><option>conns=<replaceable>number</replaceabl></option></term>
+	  <listitem>
+	    <para>The number of connections to use for this device.
+	    Corresponds to the <option>-C</option> option on the command
+	    line; see nbd-client(8) for more details on that
+	    option.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
 	  <term><option>port=<replaceable>port number</replaceable></option></term>
 	  <listitem>
 	    <para>The port on which to communicate with the
