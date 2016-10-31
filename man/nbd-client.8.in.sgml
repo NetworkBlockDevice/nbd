@@ -58,6 +58,7 @@ manpage.1: manpage.sgml
       <arg choice=plain><replaceable>host</replaceable></arg>
       <arg><replaceable>port</replaceable></arg>
       <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-connections <replaceable>num</replaceable></arg>
       <arg>-sdp</arg>
       <arg>-swap</arg>
       <arg>-persist</arg>
@@ -71,6 +72,7 @@ manpage.1: manpage.sgml
       <command>&dhpackage;</command>
       <arg choice=plain><option>-unix <replaceable>path</replaceable></option></arg>
       <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-connections <replaceable>num</replaceable></arg>
       <arg>-sdp</arg>
       <arg>-swap</arg>
       <arg>-persist</arg>
@@ -127,6 +129,16 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Use a blocksize of "block size". Default is 1024;
 	    allowed values are either 512, 1024, 2048 or 4096</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-connections <replaceable>num</replaceable></option></term>
+	<term><option>-C</option></term>
+	<listitem>
+	  <para>Use <replaceable>num</replaceable> connections to the
+	  server, to allow speeding up request handling, at the cost of higher
+	  resource usage on the server. Use of this option requires kernel
+	  support available first with Linux 4.9.
 	</listitem>
       </varlistentry>
       <varlistentry>

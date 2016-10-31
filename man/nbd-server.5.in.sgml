@@ -268,6 +268,24 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>splice</option></term>
+	<listitem>
+	  <para>Optional; boolean</para>
+	  <para>Allow the server to use the splice() system call to
+	  handle read or write calls when possible. Using splice can
+	  speed up handling of such calls significantly. Unfortunately,
+	  splice cannot be used in combination with TLS or the copyonwrite
+	  mode, and will only work for requests smaller than
+	  1MiB.</para>
+	  <para>To handle these situations, the server will exit with an
+	  appropriate error message if splice and copyonwrite are both
+	  enabled for an export; it will silently ignore the splice
+	  option if TLS is enabled, falling back on normal reads and
+	  writes; and it will similarly fall back on normal reads when
+	  the request size exceeds 1MiB.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>user</option></term>
         <listitem>
           <para>
