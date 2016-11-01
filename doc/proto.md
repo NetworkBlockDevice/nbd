@@ -404,9 +404,9 @@ server MUST support one of these modes.
 
 * The server insists upon TLS, and forces the client to
   upgrade by erroring any NBD options other than `NBD_OPT_STARTTLS`
-  with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this in practice means
-  that all option negotiation (apart from the `NBD_OPT_STARTTLS`
-  itself) is carried out with TLS; OR
+  or `NBD_OPT_ABORT` with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this
+  in practice means that all option negotiation (apart from the
+  `NBD_OPT_STARTTLS` itself) is carried out with TLS; OR
 
 * The server provides TLS, and it is mandatory on zero or more
   exports, and is available at the client's option on all
