@@ -401,7 +401,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 #undef MOVE_NEXT
 	// fourth field is the options field, a comma-separated field of options
 	do {
-		if(!strcmp(loc, "conns=", 6)) {
+		if(!strncmp(loc, "conns=", 6)) {
 			*num_conns = (int)strtol(loc+6, &loc, 0);
 			goto next;
 		}
