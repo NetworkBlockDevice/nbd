@@ -259,7 +259,9 @@ struct generic_conf {
         gchar *modernaddr;      /**< address of the modern socket */
         gchar *modernport;      /**< port of the modern socket    */
         gchar *unixsock;	/**< file name of the unix domain socket */
-	gchar *tlsdir;		/**< directory containing TLS credentials */
+	gchar *certfile;        /**< certificate file             */
+	gchar *keyfile;         /**< key file                     */
+	gchar *cacertfile;      /**< CA certificate file          */
         gint flags;             /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
@@ -772,8 +774,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
 		{ "max_threads", FALSE, PARAM_INT,	&(genconftmp.threads),	  0 },
-		{ "tls_dir",	FALSE, PARAM_STRING,	&(genconftmp.tlsdir),	  0 },
 		{ "force_tls", FALSE, PARAM_BOOL,	&(genconftmp.flags),	  F_FORCEDTLS },
+		{ "certfile",   FALSE, PARAM_STRING,    &(genconftmp.certfile),   0 },
+		{ "keyfile",    FALSE, PARAM_STRING,    &(genconftmp.keyfile),    0 },
+		{ "cacertfile", FALSE, PARAM_STRING,    &(genconftmp.cacertfile), 0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -1531,21 +1535,18 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 }
 
 #if HAVE_GNUTLS
-CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, const gchar* tlsdir) {
+CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, struct generic_conf *genconf) {
 #define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
 	gnutls_certificate_credentials_t x509_cred;
 	CLIENT* retval = client;
-	gchar *caname = g_build_filename(tlsdir, "ca.pem", NULL);
-	gchar *certname = g_build_filename(tlsdir, "cert.pem", NULL);
-	gchar *keyname = g_build_filename(tlsdir, "priv.pem", NULL);
 	static gnutls_dh_params_t dh_params;
 	gnutls_priority_t priority_cache;
 	gnutls_session_t *session = g_new0(gnutls_session_t, 1);
 	int ret;
 
 	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
-	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, caname, GNUTLS_X509_FMT_PEM));
-	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, certname, keyname, GNUTLS_X509_FMT_PEM));
+	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
+	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
 
 	check_rv(gnutls_dh_params_init(&dh_params));
 	check_rv(gnutls_dh_params_generate2(dh_params,
@@ -1571,9 +1572,6 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	client->socket_write = socket_write_tls;
 #undef check_rv
 exit:
-	g_free(caname);
-	g_free(certname);
-	g_free(keyname);
 	if(retval == NULL && session != NULL) {
 		g_free(session);
 	}
@@ -1592,7 +1590,7 @@ exit:
  * @param servers The array of known servers.
  * @param tlsdir the directory containing global TLS configuration
  **/
-CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
+CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
 	uint32_t cflags = 0;
@@ -1672,7 +1670,7 @@ CLIENT* negotiate(int net, GArray* servers, const gchar* tlsdir) {
 				continue;
 			}
 			send_reply(client, opt, NBD_REP_ACK, 0, NULL);
-			if(handle_starttls(client, opt, servers, cflags, tlsdir) == NULL) {
+			if(handle_starttls(client, opt, servers, cflags, genconf) == NULL) {
 				// can't recover from failed TLS negotiation.
 				goto hard_close;
 			}
@@ -2568,7 +2566,7 @@ socket_accept(const int sock)
 }
 
 static void
-handle_modern_connection(GArray *const servers, const int sock, const gchar* tlsdir)
+handle_modern_connection(GArray *const servers, const int sock, struct generic_conf *genconf)
 {
         int net;
         pid_t pid;
@@ -2611,7 +2609,7 @@ handle_modern_connection(GArray *const servers, const int sock, const gchar* tls
                 goto handler_err;
         }
 
-        client = negotiate(net, servers, tlsdir);
+        client = negotiate(net, servers, genconf);
 	len = strlen(client->server->servename);
 	writeit(commsocket, &len, sizeof len);
 	writeit(commsocket, client->server->servename, len);
@@ -2771,11 +2769,11 @@ out:
         return retval;
 }
 
-void serveloop(GArray* servers, gchar* tlsdir) G_GNUC_NORETURN;
+void serveloop(GArray* servers, struct generic_conf *genconf) G_GNUC_NORETURN;
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
-void serveloop(GArray* servers, gchar* tlsdir) {
+void serveloop(GArray* servers, struct generic_conf *genconf) {
 	int i;
 	int mmax, max;
 	fd_set mset;
@@ -2891,7 +2889,7 @@ void serveloop(GArray* servers, gchar* tlsdir) {
 					continue;
 				}
 
-				handle_modern_connection(servers, sock, tlsdir);
+				handle_modern_connection(servers, sock, genconf);
 			}
 			for(i=0; i < childsocks->len; i++) {
 				int sock = g_array_index(childsocks, int, i);
@@ -3313,5 +3311,5 @@ int main(int argc, char *argv[]) {
 			genconf.unixsock);
 	dousers(genconf.user, genconf.group);
 
-	serveloop(servers, genconf.tlsdir);
+	serveloop(servers, &genconf);
 }

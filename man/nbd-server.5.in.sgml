@@ -318,40 +318,54 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-        <term><option>tls_dir</option></term>
+	<term><option>keyfile</option></term>
 	<listitem>
 	  <para>
 	    Optional; string
 	  </para>
-	  <para>Directory containing TLS credentials, in the filenames given
-	  below. Note: these filenames <emphasis>must</emphasis> be used; they
-	  cannot be deviated from. Future versions of nbd-server may make the
-	  filenames configurable, but for now this is not possible.
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 private key used for TLS negotiation
+          with the client. This option must be set to enable TLS.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>certfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
 	  </para>
-	  <variablelist>
-	    <varlistentry>
-	      <term><filename>ca.pem</filename></term>
-	      <listitem>
-		<para>The certificate of the CA that signed the TLS
-		  certificate for the NBD server. For a self-signed
-                  certificate, this can be a symlink to the file
-                  <filename>cert.pem</filename></para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename>priv.pem</filename></term>
-	      <listitem>
-	        <para>The private key for the server's
-		  certificate</para>
-              </listitem>
-            </varlistentry>
-            <varlistentry>
-              <term><filename>cert.pem</filename></term>
-              <listitem>
-                <para>The server's certificate, signed by the CA.</para>
-              </listitem>
-            </varlistentry>
-	  </variablelist>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 public certificate used for TLS negotiation
+          with the client. If <option>keyfile</option> is set but
+          <option>certfile</option> is not set, then the server will
+          attempt to read the certificate from the path specified
+          by <option>keyfile</option>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>cacertfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 CA certificate used for validating client
+          certificates supplied by the client. If this option is not
+          set then client certificates will not be checked.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>tlsonly</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will only serve exports
+	    using the TLS extension. If this option is not supplied,
+	    TLS is optional, unless <option>tlsonly</option> is set
+            in the section corresponding to the specific export.
+            In order for TLS to work at all, the <option>keyfile</option>
+            option must be specified in the generic section.</para>
+	  </para>
 	</listitem>
       </varlistentry>
     </variablelist>
@@ -932,6 +946,20 @@ manpage.1: manpage.sgml
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>tlsonly</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will only serve the export
+	    using the TLS extension. If this option is not supplied,
+	    TLS is optional, unless <option>tlsonly</option> is set
+            in the generic section. In order for TLS to work at all,
+            the <option>keyfile</option> option must be specified in
+            the generic section.</para>
+	  </para>
 	</listitem>
       </varlistentry>
     </variablelist>
