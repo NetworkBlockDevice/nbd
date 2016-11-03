@@ -932,7 +932,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		/* We can't mix copyonwrite and splice. */
 		if ((s.flags & F_COPYONWRITE) && (s.flags & F_SPLICE)) {
 			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_INVALID_SPLICE,
-				    "Cannot mix copyonwrite with splice for an export",
+				    "Cannot mix copyonwrite with splice for an export in group %s",
 				    groups[i]);
 			g_array_free(retval, TRUE);
 			g_key_file_free(cfile);
