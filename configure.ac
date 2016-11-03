@@ -211,7 +211,11 @@ dnl 	esac
 dnl fi
 
 PKG_CHECK_MODULES(GnuTLS, [gnutls >= 3.3.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
-AC_DEFINE(HAVE_GNUTLS, $HAVE_GNUTLS, [Define to 1 if you have a GnuTLS version of 3.3 or above])
+if test x$HAVE_GNUTLS=1; then
+	AC_DEFINE(HAVE_GNUTLS, 1, [Define to 1 if you have a GnuTLS version of 3.3 or above])
+else
+	AC_DEFINE(HAVE_GNUTLS, 0)
+fi
 AM_CONDITIONAL([GNUTLS], [test "x$HAVE_GNUTLS" = "x1"])
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
