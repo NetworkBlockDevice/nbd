@@ -19,12 +19,14 @@ crypto-gnutls.c:
 	rm -f crypto-gnutls.c
 	ln -s $(top_srcdir)/crypto-gnutls.c crypto-gnutls.c
 nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.c
-if GNUTLS
-nbd_tester_client_SOURCES += buffer.c crypto-gnutls.c
-endif
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_tester_client_CPPFLAGS = -I$(top_srcdir)
 nbd_tester_client_LDADD = @GLIB_LIBS@
+if GNUTLS
+nbd_tester_client_SOURCES += buffer.c crypto-gnutls.c
+nbd_tester_client_CFLAGS += @GnuTLS_CFLAGS@
+nbd_tester_client_LDADD += @GnuTLS_LIBS@
+endif
 EXTRA_DIST = integrity-test.tr integrityhuge-test.tr simple_test certs/client-key.pem certs/client-cert.pem certs/server-cert.pem certs/ca-cert.pem certs/ca.info certs/client.info certs/server-key.pem certs/ca-key.pem certs/server.info certs/README.md
 cfg1:
 cfgmulti:
