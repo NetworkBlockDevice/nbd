@@ -1588,7 +1588,7 @@ exit:
  *
  * @param net The socket we're doing the negotiation over.
  * @param servers The array of known servers.
- * @param tlsdir the directory containing global TLS configuration
+ * @param genconf the global options (needed for accessing TLS config data)
  **/
 CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
