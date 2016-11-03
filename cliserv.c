@@ -1,4 +1,5 @@
 #include <config.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -11,6 +12,21 @@
 const u64 cliserv_magic = 0x00420281861253LL;
 const u64 opts_magic = 0x49484156454F5054LL;
 const u64 rep_magic = 0x3e889045565a9LL;
+
+/**
+ * Set a socket to blocking or non-blocking
+ *
+ * @param fd The socket's FD
+ * @param nb non-zero to set to non-blocking, else 0 to set to blocking
+ * @return 0 - OK, -1 failed
+ */
+int set_nonblocking(int fd, int nb) {
+	int sf = fcntl (fd, F_GETFL, 0);
+	if (sf == -1)
+		return -1;
+	return fcntl (fd, F_SETFL, nb ? (sf | O_NONBLOCK) : (sf & ~O_NONBLOCK));
+}
+
 
 void setmysockopt(int sock) {
 	int size = 1;

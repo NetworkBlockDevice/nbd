@@ -72,6 +72,7 @@ extern const u64 rep_magic;
 
 #define INFO(a) do { } while(0)
 
+int set_nonblocking(int fd, int nb);
 void setmysockopt(int sock);
 void err_nonfatal(const char *s);
 
