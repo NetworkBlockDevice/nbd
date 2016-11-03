@@ -42,7 +42,7 @@
 #define MY_NAME "nbd-tester-client"
 #include "cliserv.h"
 
-#ifdef WITH_GNUTLS
+#ifdef HAVE_GNUTLS
 #include "crypto-gnutls.h"
 #endif
 
@@ -428,7 +428,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		}
 		goto end;
 	}
-#ifdef WITH_GNUTLS
+#ifdef HAVE_GNUTLS
 	/* TLS */
 	if (keyfile) {
 		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
@@ -1718,7 +1718,7 @@ int main(int argc, char **argv)
 	int testflags = 0;
 	testfunc test = throughput_test;
 
-#ifdef WITH_GNUTLS
+#ifdef HAVE_GNUTLS
 	tlssession_init();
 #endif
 
@@ -1777,7 +1777,7 @@ int main(int argc, char **argv)
 			test = handshake_test;
 			testflags |= TEST_HANDSHAKE;
 			break;
-#ifdef WITH_GNUTLS
+#ifdef HAVE_GNUTLS
 		case 'C':
 			certfile=g_strdup(optarg);
 			break;
