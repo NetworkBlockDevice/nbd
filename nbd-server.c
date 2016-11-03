@@ -1664,7 +1664,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Invalid STARTTLS request: TLS has already been negotiated!");
 				continue;
 			}
-			if(tlsdir == NULL) {
+			if(genconf->keyfile == NULL) {
 				consume_len(client);
 				send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "TLS not allowed on this server");
 				continue;
