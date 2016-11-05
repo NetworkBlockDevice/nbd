@@ -2610,15 +2610,15 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
         }
 
         client = negotiate(net, servers, genconf);
+        if (!client) {
+                msg(LOG_ERR, "Modern initial negotiation failed");
+                goto handler_err;
+        }
 	len = strlen(client->server->servename);
 	writeit(commsocket, &len, sizeof len);
 	writeit(commsocket, client->server->servename, len);
 	readit(commsocket, &acl, 1);
 	close(commsocket);
-        if (!client) {
-                msg(LOG_ERR, "Modern initial negotiation failed");
-                goto handler_err;
-        }
 
 	switch(acl) {
 		case 'N':
