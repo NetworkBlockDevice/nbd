@@ -466,7 +466,11 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 				"Could not read option reply type: %s", strerror(errno));
 		tmp32 = ntohl(tmp32);
 		if (tmp32 != NBD_REP_ACK) {
-			strncpy(errstr, "Option reply type != NBD_REP_ACK", errstr_len);
+			if(tmp32 & NBD_REP_FLAG_ERROR) {
+				snprintf(errstr, errstr_len, "Received error %d", tmp32 & ~NBD_REP_FLAG_ERROR);
+			} else {
+				snprintf(errstr, errstr_len, "Option reply type %d != NBD_REP_ACK", tmp32);
+			}
 			goto err;
 		}
 		READ_ALL_ERRCHK(sock, &tmp32, sizeof(tmp32), err,
