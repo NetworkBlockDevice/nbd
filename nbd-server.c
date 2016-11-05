@@ -1563,6 +1563,7 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	} while(ret < 0 && gnutls_error_is_fatal(ret) == 0);
 
 	if (ret < 0) {
+		err_nonfatal(gnutls_strerror(ret));
 		gnutls_deinit(*session);
 		g_free(session);
 		return NULL;
