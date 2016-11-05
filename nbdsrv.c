@@ -60,6 +60,7 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 		uint8_t mask = 0;
 		int len_left = masklen;
 		if(res->ai_family != addr->sa_family) {
+			msg(LOG_DEBUG, "client address does not match %s: address family mismatch (IPv4 vs IPv6?)", mask);
 			goto next;
 		}
 		switch(addr->sa_family) {
