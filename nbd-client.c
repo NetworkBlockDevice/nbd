@@ -556,7 +556,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 			*cacertfile = strndup(loc+11, strcspn(loc+11, ","));
 			goto next;
 		}
-		if(!strncmp(loc, "hostname=", 9)) {
+		if(!strncmp(loc, "tlshostname=", 9)) {
 			*tlshostname = strndup(loc+9, strcspn(loc+9, ","));
 			goto next;
 		}
@@ -677,7 +677,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
 #ifdef WITH_GNUTLS
-	fprintf(stderr, "All commands that connect to a host also take: [-C|-certfile certfile] [-K|-keyfile keyfile] [-A|-cacertfile cacertfile] [-H|-hostname hostname]\n");
+	fprintf(stderr, "All commands that connect to a host also take: [-F|-certfile certfile] [-K|-keyfile keyfile] [-A|-cacertfile cacertfile] [-H|-tlshostname hostname]\n");
 #endif
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
@@ -746,7 +746,7 @@ int main(int argc, char *argv[]) {
 		{ "certfile", required_argument, NULL, 'F' },
 		{ "keyfile", required_argument, NULL, 'K' },
 		{ "cacertfile", required_argument, NULL, 'A' },
-		{ "hostname", required_argument, NULL, 'H' },
+		{ "tlshostname", required_argument, NULL, 'H' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
