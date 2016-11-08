@@ -270,7 +270,7 @@ void ask_list(int sock) {
 		err("Failed writing length");
 }
 
-void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname) {
+void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls) {
 	u64 magic, size64;
 	uint16_t tmp;
 	uint16_t global_flags;
@@ -311,7 +311,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 
 #ifdef WITH_GNUTLS
         /* TLS */
-        if (keyfile) {
+        if (tls) {
 		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
 		tlssession_t *s = NULL;
 		int ret;
@@ -726,6 +726,7 @@ int main(int argc, char *argv[]) {
 	char *keyfile = NULL;
 	char *cacertfile = NULL;
 	char *tlshostname = NULL;
+	bool tls = false;
 	struct sigaction sa;
 	int num_connections = 1;
 	struct option long_options[] = {
@@ -747,6 +748,7 @@ int main(int argc, char *argv[]) {
 		{ "keyfile", required_argument, NULL, 'K' },
 		{ "cacertfile", required_argument, NULL, 'A' },
 		{ "tlshostname", required_argument, NULL, 'H' },
+		{ "enable-tls", no_argument, NULL, 'x' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
@@ -757,7 +759,7 @@ int main(int argc, char *argv[]) {
         tlssession_init();
 #endif
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:x", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -846,6 +848,9 @@ int main(int argc, char *argv[]) {
 			b_unix = 1;
 			break;
 #ifdef WITH_GNUTLS
+		case 'x':
+			tls = true;
+			break;
                 case 'F':
                         certfile=strdup(optarg);
                         break;
@@ -899,6 +904,10 @@ int main(int argc, char *argv[]) {
         if (!tlshostname && hostname)
                 tlshostname = strdup(hostname);
 
+	if (certfile != NULL || keyfile != NULL || cacertfile != NULL || tlshostname != NULL) {
+		tls = true;
+	}
+
 	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
@@ -917,7 +926,7 @@ int main(int argc, char *argv[]) {
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
-		negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname);
+		negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls);
 		if (i == 0) {
 			setsizes(nbd, size64, blocksize, flags);
 			set_timeout(nbd, timeout);
@@ -1014,7 +1023,7 @@ int main(int argc, char *argv[]) {
 					nbd = open(nbddev, O_RDWR);
 					if (nbd < 0)
 						err("Cannot open NBD: %m");
-					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname);
+					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}
