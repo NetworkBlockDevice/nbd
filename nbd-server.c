@@ -1543,6 +1543,17 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	gnutls_priority_t priority_cache;
 	gnutls_session_t *session = g_new0(gnutls_session_t, 1);
 	int ret;
+	int len;
+
+	socket_read(client, &len, sizeof(len));
+	if(G_UNLIKELY(len != 0)) {
+		char buf[1024*1024];
+		consume(client, len, buf, sizeof(buf));
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Sending a STARTTLS command with data is invalid");
+		return NULL;
+	}
+
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 
 	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
 	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
@@ -1670,7 +1681,6 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 				send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "TLS not allowed on this server");
 				continue;
 			}
-			send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 			if(handle_starttls(client, opt, servers, cflags, genconf) == NULL) {
 				// can't recover from failed TLS negotiation.
 				goto hard_close;
