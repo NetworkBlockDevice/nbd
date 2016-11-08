@@ -1485,10 +1485,12 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
-		// Check if this is the export we're looking for, but hide
-		// exports that are TLS-only if we haven't negotiated TLS yet
-		if(!((serve->flags & F_FORCEDTLS) || client->tls_session) &&
-				!strcmp(serve->servename, name)) {
+		// hide exports that are TLS-only if we haven't negotiated TLS
+		// yet
+		if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
+			continue;
+		}
+		if(!strcmp(serve->servename, name)) {
 			client->server = serve;
 			client->exportsize = OFFT_MAX;
 			client->modern = TRUE;
