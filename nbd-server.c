@@ -349,6 +349,14 @@ static void readit_tls(gnutls_session_t s, void *buf, size_t len) {
 		}
 	}
 }
+
+static void socket_read_tls(CLIENT* client, void *buf, size_t len) {
+	readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+}
+
+static void socket_write_tls(CLIENT* client, void *buf, size_t len) {
+	writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+}
 #endif // HAVE_GNUTLS
 
 static void socket_read_notls(CLIENT* client, void *buf, size_t len) {
@@ -358,16 +366,6 @@ static void socket_read_notls(CLIENT* client, void *buf, size_t len) {
 static void socket_write_notls(CLIENT* client, void *buf, size_t len) {
 	writeit(client->net, buf, len);
 }
-
-#if HAVE_GNUTLS
-static void socket_read_tls(CLIENT* client, void *buf, size_t len) {
-	readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
-}
-
-static void socket_write_tls(CLIENT* client, void *buf, size_t len) {
-	writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
-}
-#endif
 
 static void socket_read(CLIENT* client, void *buf, size_t len) {
 	g_assert(client->socket_read != NULL);
