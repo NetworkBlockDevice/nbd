@@ -1710,8 +1710,7 @@ void send_export_info(CLIENT* client) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS;
 
-	if (write(client->net, &size_host, 8) < 0)
-		err("Negotiation failed/9: %m");
+	socket_write(client, &size_host, 8);
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
 	if (client->server->flags & F_FLUSH)
@@ -1723,13 +1722,11 @@ void send_export_info(CLIENT* client) {
 	if (client->server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
 	flags = htons(flags);
-	if (write(client->net, &flags, sizeof(flags)) < 0)
-		err("Negotiation failed/11: %m");
+	socket_write(client, &flags, sizeof(flags));
 	if (!(glob_flags & F_NO_ZEROES)) {
 		char zeros[128];
 		memset(zeros, '\0', sizeof(zeros));
-		if (write(client->net, zeros, 124) < 0)
-			err("Negotiation failed/12: %m");
+		socket_write(client, zeros, 124);
 	}
 }
 
