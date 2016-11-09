@@ -1562,7 +1562,13 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	check_rv(gnutls_dh_params_init(&dh_params));
 	check_rv(gnutls_dh_params_generate2(dh_params,
 				gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
-					GNUTLS_SEC_PARAM_MEDIUM)));
+// Renamed in GnuTLS 3.3
+#if GNUTLS_VERSION_NUMBER >= 0x030300
+					GNUTLS_SEC_PARAM_MEDIUM
+#else
+					GNUTLS_SEC_PARAM_NORMAL
+#endif
+					)));
 	check_rv(gnutls_priority_init(&priority_cache, "PERFORMANCE:%SERVER_PRECEDENCE", NULL));
 	check_rv(gnutls_init(session, GNUTLS_SERVER));
 	check_rv(gnutls_priority_set(*session, priority_cache));
