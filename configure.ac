@@ -210,9 +210,9 @@ dnl 		;;
 dnl 	esac
 dnl fi
 
-PKG_CHECK_MODULES(GnuTLS, [gnutls >= 3.3.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
+PKG_CHECK_MODULES(GnuTLS, [gnutls >= 2.12.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
 if test x$HAVE_GNUTLS=1; then
-	AC_DEFINE(HAVE_GNUTLS, 1, [Define to 1 if you have a GnuTLS version of 3.3 or above])
+	AC_DEFINE(HAVE_GNUTLS, 1, [Define to 1 if you have a GnuTLS version of 2.12 or above])
 else
 	AC_DEFINE(HAVE_GNUTLS, 0)
 fi
