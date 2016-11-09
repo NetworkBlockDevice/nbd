@@ -152,7 +152,7 @@ manpage.1: manpage.sgml
           </para>
           <para>
             Using this parameter without also specifying a value for the
-            <option>tls_dir</option> parameter is possible, but silly.
+            other TLS-related parameters is possible, but silly.
           </para>
         </listitem>
       </varlistentry>
