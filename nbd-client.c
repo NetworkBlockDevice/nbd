@@ -677,7 +677,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
 #if HAVE_GNUTLS
-	fprintf(stderr, "All commands that connect to a host also take: [-F|-certfile certfile] [-K|-keyfile keyfile] [-A|-cacertfile cacertfile] [-H|-tlshostname hostname]\n");
+	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n");
 #endif
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
