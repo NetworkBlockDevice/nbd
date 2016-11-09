@@ -303,7 +303,7 @@ tlssession_new (int isserver,
     }
 
   const char *errpos = NULL;
-  ret = gnutls_priority_set_direct(s->session, PRIORITY, &errpos);
+  ret = gnutls_priority_set_direct (s->session, PRIORITY, &errpos);
   if (ret < 0)
     {
       errout (s, "Cannot set GNUTLS session priority: %s\n",
@@ -604,7 +604,10 @@ tlssession_mainloop (int cryptfd, int plainfd, tlssession_t * s)
 			  gnutls_strerror (ret));
 		  goto error;
 		}
-	      bufDoneRead (plainToCrypt, ret);	/* mark ret bytes as read from the buffer */
+	      else
+		{
+		  bufDoneRead (plainToCrypt, ret);	/* mark ret bytes as read from the buffer */
+		}
 	    }
 	}
     }
