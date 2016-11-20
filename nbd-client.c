@@ -901,12 +901,12 @@ int main(int argc, char *argv[]) {
         if (keyfile && !certfile)
 		certfile = strdup(keyfile);
 
-        if (!tlshostname && hostname)
-                tlshostname = strdup(hostname);
-
 	if (certfile != NULL || keyfile != NULL || cacertfile != NULL || tlshostname != NULL) {
 		tls = true;
 	}
+
+        if (!tlshostname && hostname)
+                tlshostname = strdup(hostname);
 
 	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
