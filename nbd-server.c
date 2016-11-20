@@ -1539,7 +1539,6 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 #define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
 	gnutls_certificate_credentials_t x509_cred;
 	CLIENT* retval = client;
-	static gnutls_dh_params_t dh_params;
 	gnutls_priority_t priority_cache;
 	gnutls_session_t *session = g_new0(gnutls_session_t, 1);
 	int ret;
@@ -1558,17 +1557,6 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
 	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
 	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
-
-	check_rv(gnutls_dh_params_init(&dh_params));
-	check_rv(gnutls_dh_params_generate2(dh_params,
-				gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
-// Renamed in GnuTLS 3.3
-#if GNUTLS_VERSION_NUMBER >= 0x030300
-					GNUTLS_SEC_PARAM_MEDIUM
-#else
-					GNUTLS_SEC_PARAM_NORMAL
-#endif
-					)));
 	check_rv(gnutls_priority_init(&priority_cache, "PERFORMANCE:%SERVER_PRECEDENCE", NULL));
 	check_rv(gnutls_init(session, GNUTLS_SERVER));
 	check_rv(gnutls_priority_set(*session, priority_cache));
@@ -3329,5 +3317,18 @@ int main(int argc, char *argv[]) {
 			genconf.unixsock);
 	dousers(genconf.user, genconf.group);
 
+#if HAVE_GNUTLS
+	static gnutls_dh_params_t dh_params;
+	gnutls_dh_params_init(&dh_params);
+	gnutls_dh_params_generate2(dh_params,
+				gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
+// Renamed in GnuTLS 3.3
+#if GNUTLS_VERSION_NUMBER >= 0x030300
+					GNUTLS_SEC_PARAM_MEDIUM
+#else
+					GNUTLS_SEC_PARAM_NORMAL
+#endif
+					));
+#endif
 	serveloop(servers, &genconf);
 }
