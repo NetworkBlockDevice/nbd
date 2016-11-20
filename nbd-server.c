@@ -1557,7 +1557,7 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
 	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
 	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
-	check_rv(gnutls_priority_init(&priority_cache, "PERFORMANCE:%SERVER_PRECEDENCE", NULL));
+	check_rv(gnutls_priority_init(&priority_cache, "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2", NULL));
 	check_rv(gnutls_init(session, GNUTLS_SERVER));
 	check_rv(gnutls_priority_set(*session, priority_cache));
 	check_rv(gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, x509_cred));
