@@ -348,7 +348,7 @@ EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client -N export1 -i -t "${mydir}/integrityhuge-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" -H 127.0.0.1 localhost
+		./nbd-tester-client -N export1 -i -t "${mydir}/integrityhuge-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" -H localhost 127.0.0.1
 		retval=$?
 	;;
 	*)
