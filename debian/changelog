@@ -1,4 +1,4 @@
-nbd (1:3.14-4) UNRELEASED; urgency=medium
+nbd (1:3.14-4) unstable; urgency=medium
 
   * debian/nbd-server.postinst, debian/nbd-server.templates: remove
     leftover bits of pre-lenny upgrade support of nbd-server
@@ -11,7 +11,7 @@ nbd (1:3.14-4) UNRELEASED; urgency=medium
     - Brazilian Portuguese, by Adriano Rafael Gomes
       <adrianorg@arg.eti.br>; Closes: #824335.
 
- -- Wouter Verhelst <wouter@debian.org>  Sun, 10 Jul 2016 17:27:41 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 21 Nov 2016 22:53:37 +0100
 
 nbd (1:3.14-3) unstable; urgency=medium
 
