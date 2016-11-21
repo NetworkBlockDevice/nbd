@@ -6,7 +6,10 @@ nbd (1:3.14-4) unstable; urgency=medium
   * Cherry-pick one commit from upstream git to fix systemd unit
   * Updated translations:
     - Danish, by Joe Dalton <joedalton2@yahoo.dk>; Closes: #830600.
-    - Dutch, by yours truly.
+    - Dutch, by yours truly. Unfortunately, while this translation was
+      sitting in git, Frans Spiesschaert <Frans.Spiesschaert@yucom.be>
+      also submitted a Dutch translation. Keeping my original, but
+      thanks anyway, Frans; Closes: #834620.
     - German, by Chris Leick <c.leick@vollbio.de>; Closes: #842495.
     - Brazilian Portuguese, by Adriano Rafael Gomes
       <adrianorg@arg.eti.br>; Closes: #824335.
