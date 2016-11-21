@@ -1561,7 +1561,8 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	check_rv(gnutls_init(session, GNUTLS_SERVER));
 	check_rv(gnutls_priority_set(*session, priority_cache));
 	check_rv(gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, x509_cred));
-	gnutls_certificate_server_set_request(*session, GNUTLS_CERT_IGNORE);
+
+	gnutls_certificate_server_set_request(*session, GNUTLS_CERT_REQUEST);
 #if GNUTLS_VERSION_NUMBER >= 0x030109
 	gnutls_transport_set_int(*session, client->net);
 #else
