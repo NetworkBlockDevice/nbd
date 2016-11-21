@@ -7,6 +7,9 @@ nbd (1:3.14-4) UNRELEASED; urgency=medium
   * Updated translations:
     - Danish, by Joe Dalton <joedalton2@yahoo.dk>; Closes: #830600.
     - Dutch, by yours truly.
+    - German, by Chris Leick <c.leick@vollbio.de>; Closes: #842495.
+    - Brazilian Portuguese, by Adriano Rafael Gomes
+      <adrianorg@arg.eti.br>; Closes: #824335.
 
  -- Wouter Verhelst <wouter@debian.org>  Sun, 10 Jul 2016 17:27:41 +0200
 
