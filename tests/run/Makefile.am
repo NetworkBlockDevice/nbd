@@ -5,7 +5,8 @@ TLSSRC =
 endif
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
 TESTS = cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig list \
-	rowrite tree rotree unix integrityhuge handshake tls tlshuge
+	rowrite tree rotree unix integrityhuge handshake tls tlshuge tlswrongcert
+XFAIL_TESTS = tlswrongcert
 check_PROGRAMS = nbd-tester-client
 ## Various Automake versions don't play nice with files in parent
 ## directories, so instead work with a local copy
@@ -45,3 +46,4 @@ unix:
 handshake:
 tls:
 tlshuge:
+tlswrongcert:
