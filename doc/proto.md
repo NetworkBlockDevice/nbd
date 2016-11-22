@@ -687,6 +687,14 @@ The field has the following format:
   experimental `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
 - bit 7, `NBD_FLAG_SEND_DF`: defined by the experimental `STRUCTURED_REPLY`
   [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+- bit 8, `NBD_FLAG_CAN_MULTI_CONN`: Indicates that the server operates
+  entirely without cache, or that the cache it uses is shared among all
+  connections to the given device. In particular, if this flag is
+  present, then the effects of `NBD_CMD_FLUSH` and `NBD_CMD_FLAG_FUA`
+  MUST be visible across all connections when the server sends its reply
+  to that command to the client. In the absense of this flag, clients
+  SHOULD NOT multiplex their commands over more than one connection to
+  the export.
 
 Clients SHOULD ignore unknown flags.
 
