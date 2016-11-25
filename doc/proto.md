@@ -768,8 +768,8 @@ The field has the following format:
   to that command to the client. In the absense of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
-- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
-  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`; defined by the experimental
+  `BLOCK_STATUS` extension; see below.
 
 Clients SHOULD ignore unknown flags.
 
@@ -1051,6 +1051,10 @@ interpret the "length" bytes of payload.
   64 bits: offset (unsigned)  
   32 bits: hole size (unsigned, MUST be nonzero)  
 
+- `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
+
+  Defined by the experimental extension `BLOCK_STATUS`; see below.
+
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
 `NBD_REPLY_TYPE_ERROR`.  If non-zero, *message length* indicates
@@ -1085,7 +1089,7 @@ remaining structured fields at the end.
   were sent earlier in the structured reply, the server SHOULD NOT
   send multiple distinct offsets that lie within the bounds of a
   single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-  `NBD_CMD_WRITE`, and `NBD_CMD_TRIM`.
+  `NBD_CMD_WRITE`, `NBD_CMD_TRIM`, and `NBD_CMD_BLOCK_STATUS`.
 
   The payload is structured as:
 
@@ -1259,6 +1263,11 @@ The following request types exist:
 
     Defined by the experimental `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 
+* `NBD_CMD_BLOCK_STATUS` (7)
+
+    Defined by the experimental `BLOCK_STATUS` extension; see below.
+
+
 * Other requests
 
     Some third-party implementations may require additional protocol
@@ -1344,6 +1353,148 @@ for such proposed extensions. Aside from that, extensions are
 written as branches which can be merged into master if and
 when those extensions are promoted to the normative version
 of the document in the master branch.
+
+### `BLOCK_STATUS` extension
+
+With the availability of sparse storage formats, it is often needed to
+query the status of a particular range and read only those blocks of
+data that are actually present on the block device.
+
+Some storage formats and operations over such formats express a
+concept of data dirtiness. Whether the operation is block device
+mirroring, incremental block device backup or any other operation with
+a concept of data dirtiness, they all share a need to provide a list
+of ranges that this particular operation treats as dirty.
+
+To provide such class of information, the `BLOCK_STATUS` extension
+adds a new `NBD_CMD_BLOCK_STATUS` command which returns a list of
+ranges with their respective states.  This extension is not available
+unless the client also negotiates the `STRUCTURED_REPLY` extension.
+
+* `NBD_FLAG_SEND_BLOCK_STATUS`
+
+    The server SHOULD set this transmission flag to 1 if structured
+    replies have been negotiated, and the `NBD_CMD_BLOCK_STATUS`
+    request is supported.
+
+* `NBD_REPLY_TYPE_BLOCK_STATUS`
+
+    *length* MUST be a positive integer multiple of 8.  This reply
+    represents a series of consecutive block descriptors where the sum
+    of the lengths of the descriptors MUST not be greater than the
+    length of the original request.  This chunk type MUST appear at most
+    once in a structured reply. Valid as a reply to
+    `NBD_CMD_BLOCK_STATUS`.
+
+    The payload is structured as a list of one or more descriptors,
+    each with this layout:
+
+        * 32 bits, length (unsigned, MUST NOT be zero)
+        * 32 bits, status flags
+
+    The definition of the status flags is determined based on the
+    flags present in the original request.
+
+* `NBD_CMD_BLOCK_STATUS`
+
+    A block status query request. Length and offset define the range
+    of interest. Clients SHOULD NOT use this request unless the server
+    set `NBD_CMD_SEND_BLOCK_STATUS` in the transmission flags, which
+    in turn requires the client to first negotiate structured replies.
+    For a successful return, the server MUST use a structured reply,
+    containing at most one chunk of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
+
+    The list of block status descriptors within the
+    `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
+    of the file starting from specified *offset*, and the sum of the
+    *length* fields of each descriptor MUST not be greater than the
+    overall *length* of the request. This means that the server MAY
+    return less data than required. However the server MUST return at
+    least one status descriptor.  The server SHOULD use different
+    *status* values between consecutive descriptors, and SHOULD use
+    descriptor lengths that are an integer multiple of 512 bytes where
+    possible (the first and last descriptor of an unaligned query being
+    the most obvious places for an exception). The status flags are
+    intentionally defined so that a server MAY always safely report a
+    status of 0 for any block, although the server SHOULD return
+    additional status values when they can be easily detected.
+
+    If an error occurs, the server SHOULD set the appropriate error
+    code in the error field of either a simple reply or an error
+    chunk.  However, if the error does not involve invalid usage (such
+    as a request beyond the bounds of the file), a server MAY reply
+    with a single block status descriptor with *length* matching the
+    requested length, and *status* of 0 rather than reporting the
+    error.
+
+    The type of information requested by the client is determined by
+    the request flags, as follows:
+
+    1. Block provisioning status
+
+    Upon receiving an `NBD_CMD_BLOCK_STATUS` command with the flag
+    `NBD_FLAG_STATUS_DIRTY` clear, the server MUST return the
+    provisioning status of the device, where the status field of each
+    descriptor is determined by the following bits (all four
+    combinations of these two bits are possible):
+
+      - `NBD_STATE_HOLE` (bit 0); if set, the block represents a hole
+        (and future writes to that area may cause fragmentation or
+        encounter an `ENOSPC` error); if clear, the block is allocated
+        or the server could not otherwise determine its status.  Note
+        that the use of `NBD_CMD_TRIM` is related to this status, but
+        that the server MAY report a hole even where trim has not been
+        requested, and also that a server MAY report allocation even
+        where a trim has been requested.
+      - `NBD_STATE_ZERO` (bit 1), if set, the block contents read as
+        all zeroes; if clear, the block contents are not known.  Note
+        that the use of `NBD_CMD_WRITE_ZEROES` is related to this
+        status, but that the server MAY report zeroes even where write
+        zeroes has not been requested, and also that a server MAY
+        report unknown content even where write zeroes has been
+        requested.
+
+    The client SHOULD NOT read from an area that has both
+    `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear.
+
+    2. Block dirtiness status
+
+    This command is meant to operate in tandem with other (non-NBD)
+    channels to the server.  Generally, a "dirty" block is a block
+    that has been written to by someone, but the exact meaning of "has
+    been written" is left to the implementation.  For example, a
+    virtual machine monitor could provide a (non-NBD) command to start
+    tracking blocks written by the virtual machine.  A backup client
+    can then connect to an NBD server provided by the virtual machine
+    monitor and use `NBD_CMD_BLOCK_STATUS` with the
+    `NBD_FLAG_STATUS_DIRTY` bit set in order to read only the dirty
+    blocks that the virtual machine has changed.
+
+    An implementation that doesn't track the "dirtiness" state of
+    blocks MUST either fail this command with `EINVAL`, or mark all
+    blocks as dirty in the descriptor that it returns.  Upon receiving
+    an `NBD_CMD_BLOCK_STATUS` command with the flag
+    `NBD_FLAG_STATUS_DIRTY` set, the server MUST return the dirtiness
+    status of the device, where the status field of each descriptor is
+    determined by the following bit:
+
+      - `NBD_STATE_CLEAN` (bit 2); if set, the block represents a
+        portion of the file that is still clean because it has not
+        been written; if clear, the block represents a portion of the
+        file that is dirty, or where the server could not otherwise
+        determine its status.
+
+A client MAY close the connection if it detects that the server has
+sent an invalid chunks (such as lengths in the
+`NBD_REPLY_TYPE_BLOCK_STATUS` not summing up to the requested length).
+The server SHOULD return `EINVAL` if it receives a `BLOCK_STATUS`
+request including one or more sectors beyond the size of the device.
+
+The extension adds the following new command flag:
+
+- `NBD_CMD_FLAG_STATUS_DIRTY`; valid during `NBD_CMD_BLOCK_STATUS`.
+  SHOULD be set to 1 if the client wants to request dirtiness status
+  rather than provisioning status.
 
 ## About this file
 
