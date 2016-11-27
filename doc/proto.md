@@ -695,6 +695,8 @@ The field has the following format:
   to that command to the client. In the absense of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
+- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
+  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
