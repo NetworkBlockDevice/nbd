@@ -684,9 +684,9 @@ The field has the following format:
   to the setting of this flag.
 - bit 5, `NBD_FLAG_SEND_TRIM`: exposes support for `NBD_CMD_TRIM`.
 - bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: defined by the
-  experimental `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+  experimental `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 - bit 7, `NBD_FLAG_SEND_DF`: defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 - bit 8, `NBD_FLAG_CAN_MULTI_CONN`: Indicates that the server operates
   entirely without cache, or that the cache it uses is shared among all
   connections to the given device. In particular, if this flag is
@@ -764,19 +764,19 @@ of the newstyle negotiation.
 
 - `NBD_OPT_INFO` (6)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 - `NBD_OPT_GO` (7)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
-    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
 - `NBD_OPT_BLOCK_SIZE` (9)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 #### Option reply types
 
@@ -806,7 +806,7 @@ during option haggling in the fixed newstyle negotiation.
 
 * `NBD_REP_INFO` (3)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -843,7 +843,7 @@ case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 * `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
 
@@ -852,7 +852,7 @@ case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 ### Transmission phase
 
@@ -882,9 +882,9 @@ valid may depend on negotiation during the handshake phase.
   where the command as a whole is ignored), the server MAY ignore this bit
   being set on such a command.
 - bit 1, `NBD_CMD_FLAG_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
-  [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
 
 #### Request types
@@ -962,7 +962,7 @@ The following request types exist:
 
 * `NBD_CMD_WRITE_ZEROES` (6)
 
-    Defined by the experimental `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+    Defined by the experimental `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 
 * Other requests
 
@@ -996,7 +996,7 @@ The following error values are defined:
 * `EINVAL` (22), Invalid argument.
 * `ENOSPC` (28), No space left on device.
 * `EOVERFLOW` (75), defined in the  experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 * `ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `ENOSPC` if it receives a write request
@@ -1030,11 +1030,13 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+* The `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md)
+* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md)
 
-* The `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+* The `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+
+* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
