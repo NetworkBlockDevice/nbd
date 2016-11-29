@@ -768,8 +768,6 @@ The field has the following format:
   to that command to the client. In the absense of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
-- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`; defined by the experimental
-  `BLOCK_STATUS` extension; see below.
 
 Clients SHOULD ignore unknown flags.
 
@@ -871,6 +869,46 @@ of the newstyle negotiation.
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
+- `NBD_OPT_ALLOC_CONTEXT` (10)
+
+    Return a list of `NBD_REP_ALLOC_CONTEXT` replies, one per context,
+    followed by an `NBD_REP_ACK`. If a server replies to such a request
+    with no error message, clients MAY send NBD_CMD_BLOCK_STATUS
+    commands during the transmission phase.
+
+    If the query string is syntactically invalid, the server SHOULD send
+    `NBD_REP_ERR_INVALID`. If the query string is syntactically valid
+    but finds no allocation contexts, the server MUST send a single
+    reply of type `NBD_REP_ACK`.
+
+    This option MUST NOT be requested unless structured replies have
+    been negotiated first. If a client attempts to do so, a server
+    SHOULD send `NBD_REP_ERR_INVALID`.
+
+    Data:
+    - 32 bits, type
+    - String, query to select a subset of the available allocation
+      contexts. If this is not specified (i.e., length is 4 and no
+      command is sent), then the server MUST send all the allocation
+      contexts it knows about. If specified, this query string MUST
+      start with a name that uniquely identifies a server
+      implementation; e.g., the reference implementation that
+      accompanies this document would support query strings starting
+      with 'nbd-server:'
+
+    The type may be one of:
+    - `NBD_ALLOC_LIST_CONTEXT` (1): the list of allocation contexts
+      selected by the query string is returned to the client without
+      changing any state (i.e., this does not add allocation contexts
+      for further usage).
+    - `NBD_ALLOC_ADD_CONTEXT` (2): the list of allocation contexts
+      selected by the query string is added to the list of existing
+      allocation contexts.
+    - `NBD_ALLOC_DEL_CONTEXT` (3): the list of allocation contexts
+      selected by the query string is removed from the list of used
+      allocation contexts. Servers SHOULD NOT reuse existing allocation
+      context IDs.
+
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
@@ -900,6 +938,18 @@ during option haggling in the fixed newstyle negotiation.
 * `NBD_REP_INFO` (3)
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+
+- `NBD_REP_ALLOC_CONTEXT` (4)
+
+    A description of an allocation context. Data:
+
+    - 32 bits, NBD allocation context ID. If the request was NOT of type
+      `NBD_ALLOC_LIST_CONTEXT`, this field MUST NOT be zero.
+    - String, name of the allocation context. This is not required to be
+      a human-readable string, but it MUST be valid UTF-8 data.
+
+    Allocation context ID 0 is implied, and always exists. It cannot be
+    removed.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -938,14 +988,46 @@ case that data is an error message string suitable for display to the user.
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
-* `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
+* `NBD_REP_ERR_SHUTDOWN` (2^31 + 7)
 
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
 
-* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^31 + 8)
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+
+##### Allocation contexts
+
+Allocation context 0 is the basic "exists at all" allocation context. If
+an extent is not allocated at allocation context 0, it MUST NOT be
+listed as allocated at another allocation context. This supports sparse
+file semantics on the server side. If a server has only one allocation
+context (the default), then writing to an extent which is allocated in
+that allocation context 0 MUST NOT fail with ENOSPC.
+
+For all other cases, this specification requires no specific semantics
+of allocation contexts. Implementations could support allocation
+contexts with semantics like the following:
+
+- Incremental snapshots; if a block is allocated in one allocation
+  context, that implies that it is also allocated in the next level up.
+- Various bits of data about the backend of the storage; e.g., if the
+  storage is written on a RAID array, an allocation context could
+  return information about the redundancy level of a given extent
+- If the backend implements a write-through cache of some sort, or
+  synchronises with other servers, an allocation context could state
+  that an extent is "allocated" once it has reached permanent storage
+  and/or is synchronized with other servers.
+
+The only requirement of an allocation context is that it MUST be
+representable with the flags as defined for `NBD_CMD_BLOCK_STATUS`.
+
+Likewise, the syntax of query strings is not specified by this document.
+
+Server implementations SHOULD document their syntax for query strings
+and semantics for resulting allocation contexts in a document like this
+one.
 
 ### Transmission phase
 
@@ -983,6 +1065,9 @@ valid may depend on negotiation during the handshake phase.
    content chunk in reply.  MUST NOT be set unless the transmission
    flags include `NBD_FLAG_SEND_DF`.  Use of this flag MAY trigger an
    `EOVERFLOW` error chunk, if the request length is too large.
+- bit 3, `NBD_CMD_FLAG_REQ_ONE`; valid during `NBD_CMD_BLOCK_STATUS`. If
+  set, the client is interested in only one extent per allocation
+  context.
 
 ##### Structured reply flags
 
@@ -1371,38 +1456,48 @@ adds a new `NBD_CMD_BLOCK_STATUS` command which returns a list of
 ranges with their respective states.  This extension is not available
 unless the client also negotiates the `STRUCTURED_REPLY` extension.
 
-* `NBD_FLAG_SEND_BLOCK_STATUS`
-
-    The server SHOULD set this transmission flag to 1 if structured
-    replies have been negotiated, and the `NBD_CMD_BLOCK_STATUS`
-    request is supported.
-
 * `NBD_REPLY_TYPE_BLOCK_STATUS`
 
-    *length* MUST be a positive integer multiple of 8.  This reply
+    *length* MUST be 4 + (a positive integer multiple of 8).  This reply
     represents a series of consecutive block descriptors where the sum
     of the lengths of the descriptors MUST not be greater than the
-    length of the original request.  This chunk type MUST appear at most
-    once in a structured reply. Valid as a reply to
+    length of the original request. This chunk type MUST appear at most
+    once per allocation ID in a structured reply. Valid as a reply to
     `NBD_CMD_BLOCK_STATUS`.
 
-    The payload is structured as a list of one or more descriptors,
-    each with this layout:
+    Servers MUST return an `NBD_REPLY_TYPE_BLOCK_STATUS` chunk for every
+    allocation context ID, except if the semantics of particular
+    allocation contexts mean that the information for one allocation
+    context is implied by the information for another.
+
+    The payload starts with:
+
+        * 32 bits, allocation context ID
+
+    and is followed by a list of one or more descriptors, each with this
+    layout:
 
         * 32 bits, length (unsigned, MUST NOT be zero)
         * 32 bits, status flags
 
-    The definition of the status flags is determined based on the
-    flags present in the original request.
+    If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
+    then every reply chunk MUST NOT contain more than one descriptor.
+
+    Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
+    its request, the server MAY return less descriptors in the reply
+    than would be required to fully specify the whole range of requested
+    information to the client, if the number of descriptors would be
+    over 16 otherwise and looking up the information would be too
+    resource-intensive for the server.
 
 * `NBD_CMD_BLOCK_STATUS`
 
-    A block status query request. Length and offset define the range
-    of interest. Clients SHOULD NOT use this request unless the server
-    set `NBD_CMD_SEND_BLOCK_STATUS` in the transmission flags, which
-    in turn requires the client to first negotiate structured replies.
-    For a successful return, the server MUST use a structured reply,
-    containing at most one chunk of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
+    A block status query request. Length and offset define the range of
+    interest. Clients SHOULD NOT use this request unless allocation
+    contexts have been negotiated, which in turn requires the client to
+    first negotiate structured replies. For a successful return, the
+    server MUST use a structured reply, containing at least one chunk of
+    type `NBD_REPLY_TYPE_BLOCK_STATUS`.
 
     The list of block status descriptors within the
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
@@ -1427,18 +1522,12 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
     requested length, and *status* of 0 rather than reporting the
     error.
 
-    The type of information requested by the client is determined by
-    the request flags, as follows:
+    Upon receiving an `NBD_CMD_BLOCK_STATUS` command, the server MUST
+    return the status of the device, where the status field of each
+    descriptor is determined by the following bits (all combinations of
+    these bits are possible):
 
-    1. Block provisioning status
-
-    Upon receiving an `NBD_CMD_BLOCK_STATUS` command with the flag
-    `NBD_FLAG_STATUS_DIRTY` clear, the server MUST return the
-    provisioning status of the device, where the status field of each
-    descriptor is determined by the following bits (all four
-    combinations of these two bits are possible):
-
-      - `NBD_STATE_HOLE` (bit 0); if set, the block represents a hole
+      - `NBD_STATE_HOLE` (bit 0): if set, the block represents a hole
         (and future writes to that area may cause fragmentation or
         encounter an `ENOSPC` error); if clear, the block is allocated
         or the server could not otherwise determine its status.  Note
@@ -1446,43 +1535,34 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
         that the server MAY report a hole even where trim has not been
         requested, and also that a server MAY report allocation even
         where a trim has been requested.
-      - `NBD_STATE_ZERO` (bit 1), if set, the block contents read as
+      - `NBD_STATE_ZERO` (bit 1): if set, the block contents read as
         all zeroes; if clear, the block contents are not known.  Note
         that the use of `NBD_CMD_WRITE_ZEROES` is related to this
         status, but that the server MAY report zeroes even where write
         zeroes has not been requested, and also that a server MAY
         report unknown content even where write zeroes has been
         requested.
-
-    The client SHOULD NOT read from an area that has both
-    `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear.
-
-    2. Block dirtiness status
-
-    This command is meant to operate in tandem with other (non-NBD)
-    channels to the server.  Generally, a "dirty" block is a block
-    that has been written to by someone, but the exact meaning of "has
-    been written" is left to the implementation.  For example, a
-    virtual machine monitor could provide a (non-NBD) command to start
-    tracking blocks written by the virtual machine.  A backup client
-    can then connect to an NBD server provided by the virtual machine
-    monitor and use `NBD_CMD_BLOCK_STATUS` with the
-    `NBD_FLAG_STATUS_DIRTY` bit set in order to read only the dirty
-    blocks that the virtual machine has changed.
-
-    An implementation that doesn't track the "dirtiness" state of
-    blocks MUST either fail this command with `EINVAL`, or mark all
-    blocks as dirty in the descriptor that it returns.  Upon receiving
-    an `NBD_CMD_BLOCK_STATUS` command with the flag
-    `NBD_FLAG_STATUS_DIRTY` set, the server MUST return the dirtiness
-    status of the device, where the status field of each descriptor is
-    determined by the following bit:
-
-      - `NBD_STATE_CLEAN` (bit 2); if set, the block represents a
+      - `NBD_STATE_CLEAN` (bit 2): if set, the block represents a
         portion of the file that is still clean because it has not
         been written; if clear, the block represents a portion of the
         file that is dirty, or where the server could not otherwise
-        determine its status.
+        determine its status. The server MUST NOT set this bit for
+        allocation context 0, where it has no meaning.
+      - `NBD_STATE_ACTIVE` (bit 3): if set, the block represents a
+	portion of the file that is "active" in the given allocation
+	context. The server MUST NOT set this bit for allocation context
+	0, where it has no meaning.
+
+    The exact semantics of what it means for a block to be "clean" or
+    "active" at a given allocation context is not defined by this
+    specification, except that the default in both cases should be to
+    clear the bit. That is, when the allocation context does not have
+    knowledge of the relevant status for the given extent, or when the
+    allocation context does not assign any meaning to it, the bits
+    should be cleared.
+
+    A client SHOULD NOT read from an area that has both `NBD_STATE_HOLE`
+    set and `NBD_STATE_ZERO` clear.
 
 A client MAY close the connection if it detects that the server has
 sent an invalid chunks (such as lengths in the
@@ -1492,9 +1572,9 @@ request including one or more sectors beyond the size of the device.
 
 The extension adds the following new command flag:
 
-- `NBD_CMD_FLAG_STATUS_DIRTY`; valid during `NBD_CMD_BLOCK_STATUS`.
-  SHOULD be set to 1 if the client wants to request dirtiness status
-  rather than provisioning status.
+- `NBD_CMD_FLAG_REQ_ONE`; valid during `NBD_CMD_BLOCK_STATUS`.
+  SHOULD be set to 1 if the client wants to request information for only
+  one extent per allocation context.
 
 ## About this file
 
