@@ -1574,7 +1574,7 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
     set and `NBD_STATE_ZERO` clear.
 
 A client MAY close the connection if it detects that the server has
-sent an invalid chunks (such as lengths in the
+sent an invalid chunk (such as lengths in the
 `NBD_REPLY_TYPE_BLOCK_STATUS` not summing up to the requested length).
 The server SHOULD return `EINVAL` if it receives a `BLOCK_STATUS`
 request including one or more sectors beyond the size of the device.
