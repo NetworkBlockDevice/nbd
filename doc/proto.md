@@ -869,16 +869,16 @@ of the newstyle negotiation.
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
-- `NBD_OPT_ALLOC_CONTEXT` (10)
+- `NBD_OPT_META_CONTEXT` (10)
 
-    Return a list of `NBD_REP_ALLOC_CONTEXT` replies, one per context,
+    Return a list of `NBD_REP_META_CONTEXT` replies, one per context,
     followed by an `NBD_REP_ACK`. If a server replies to such a request
     with no error message, clients MAY send NBD_CMD_BLOCK_STATUS
     commands during the transmission phase.
 
     If the query string is syntactically invalid, the server SHOULD send
     `NBD_REP_ERR_INVALID`. If the query string is syntactically valid
-    but finds no allocation contexts, the server MUST send a single
+    but finds no metadata contexts, the server MUST send a single
     reply of type `NBD_REP_ACK`.
 
     This option MUST NOT be requested unless structured replies have
@@ -887,9 +887,9 @@ of the newstyle negotiation.
 
     Data:
     - 32 bits, type
-    - String, query to select a subset of the available allocation
+    - String, query to select a subset of the available metadata
       contexts. If this is not specified (i.e., length is 4 and no
-      command is sent), then the server MUST send all the allocation
+      command is sent), then the server MUST send all the metadata
       contexts it knows about. If specified, this query string MUST
       start with a name that uniquely identifies a server
       implementation; e.g., the reference implementation that
@@ -897,16 +897,16 @@ of the newstyle negotiation.
       with 'nbd-server:'
 
     The type may be one of:
-    - `NBD_ALLOC_LIST_CONTEXT` (1): the list of allocation contexts
+    - `NBD_META_LIST_CONTEXT` (1): the list of metadata contexts
       selected by the query string is returned to the client without
-      changing any state (i.e., this does not add allocation contexts
+      changing any state (i.e., this does not add metadata contexts
       for further usage).
-    - `NBD_ALLOC_ADD_CONTEXT` (2): the list of allocation contexts
+    - `NBD_META_ADD_CONTEXT` (2): the list of metadata contexts
       selected by the query string is added to the list of existing
-      allocation contexts.
-    - `NBD_ALLOC_DEL_CONTEXT` (3): the list of allocation contexts
+      metadata contexts.
+    - `NBD_META_DEL_CONTEXT` (3): the list of metadata contexts
       selected by the query string is removed from the list of used
-      allocation contexts. Servers SHOULD NOT reuse existing allocation
+      metadata contexts. Servers SHOULD NOT reuse existing metadata
       context IDs.
 
 #### Option reply types
@@ -939,16 +939,16 @@ during option haggling in the fixed newstyle negotiation.
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
-- `NBD_REP_ALLOC_CONTEXT` (4)
+- `NBD_REP_META_CONTEXT` (4)
 
-    A description of an allocation context. Data:
+    A description of a metadata context. Data:
 
-    - 32 bits, NBD allocation context ID. If the request was NOT of type
+    - 32 bits, NBD metadata context ID. If the request was NOT of type
       `NBD_ALLOC_LIST_CONTEXT`, this field MUST NOT be zero.
-    - String, name of the allocation context. This is not required to be
+    - String, name of the metadata context. This is not required to be
       a human-readable string, but it MUST be valid UTF-8 data.
 
-    Allocation context ID 0 is implied, and always exists. It cannot be
+    Metadata context ID 0 is implied, and always exists. It cannot be
     removed.
 
 There are a number of error reply types, all of which are denoted by
@@ -997,36 +997,36 @@ case that data is an error message string suitable for display to the user.
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
-##### Allocation contexts
+##### Metadata contexts
 
-Allocation context 0 is the basic "exists at all" allocation context. If
-an extent is not allocated at allocation context 0, it MUST NOT be
-listed as allocated at another allocation context. This supports sparse
-file semantics on the server side. If a server has only one allocation
+Metadata context 0 is the basic "exists at all" metadata context. If
+an extent is not allocated at metadata context 0, it MUST NOT be
+listed as allocated at another metadata context. This supports sparse
+file semantics on the server side. If a server has only one metadata
 context (the default), then writing to an extent which is allocated in
-that allocation context 0 MUST NOT fail with ENOSPC.
+that metadata context 0 MUST NOT fail with ENOSPC.
 
 For all other cases, this specification requires no specific semantics
-of allocation contexts. Implementations could support allocation
+of metadata contexts. Implementations could support metadata
 contexts with semantics like the following:
 
-- Incremental snapshots; if a block is allocated in one allocation
+- Incremental snapshots; if a block is allocated in one metadata
   context, that implies that it is also allocated in the next level up.
 - Various bits of data about the backend of the storage; e.g., if the
-  storage is written on a RAID array, an allocation context could
+  storage is written on a RAID array, a metadata context could
   return information about the redundancy level of a given extent
 - If the backend implements a write-through cache of some sort, or
-  synchronises with other servers, an allocation context could state
+  synchronises with other servers, a metadata context could state
   that an extent is "allocated" once it has reached permanent storage
   and/or is synchronized with other servers.
 
-The only requirement of an allocation context is that it MUST be
+The only requirement of a metadata context is that it MUST be
 representable with the flags as defined for `NBD_CMD_BLOCK_STATUS`.
 
 Likewise, the syntax of query strings is not specified by this document.
 
 Server implementations SHOULD document their syntax for query strings
-and semantics for resulting allocation contexts in a document like this
+and semantics for resulting metadata contexts in a document like this
 one.
 
 ### Transmission phase
@@ -1066,7 +1066,7 @@ valid may depend on negotiation during the handshake phase.
    flags include `NBD_FLAG_SEND_DF`.  Use of this flag MAY trigger an
    `EOVERFLOW` error chunk, if the request length is too large.
 - bit 3, `NBD_CMD_FLAG_REQ_ONE`; valid during `NBD_CMD_BLOCK_STATUS`. If
-  set, the client is interested in only one extent per allocation
+  set, the client is interested in only one extent per metadata
   context.
 
 ##### Structured reply flags
@@ -1462,17 +1462,17 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
     represents a series of consecutive block descriptors where the sum
     of the lengths of the descriptors MUST not be greater than the
     length of the original request. This chunk type MUST appear at most
-    once per allocation ID in a structured reply. Valid as a reply to
+    once per metadata ID in a structured reply. Valid as a reply to
     `NBD_CMD_BLOCK_STATUS`.
 
     Servers MUST return an `NBD_REPLY_TYPE_BLOCK_STATUS` chunk for every
-    allocation context ID, except if the semantics of particular
-    allocation contexts mean that the information for one allocation
+    metadata context ID, except if the semantics of particular
+    metadata contexts mean that the information for one metadata
     context is implied by the information for another.
 
     The payload starts with:
 
-        * 32 bits, allocation context ID
+        * 32 bits, metadata context ID
 
     and is followed by a list of one or more descriptors, each with this
     layout:
@@ -1493,7 +1493,7 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
 * `NBD_CMD_BLOCK_STATUS`
 
     A block status query request. Length and offset define the range of
-    interest. Clients SHOULD NOT use this request unless allocation
+    interest. Clients MUST NOT use this request unless metadata
     contexts have been negotiated, which in turn requires the client to
     first negotiate structured replies. For a successful return, the
     server MUST use a structured reply, containing at least one chunk of
@@ -1533,7 +1533,7 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
         or the server could not otherwise determine its status.  Note
         that the use of `NBD_CMD_TRIM` is related to this status, but
         that the server MAY report a hole even where trim has not been
-        requested, and also that a server MAY report allocation even
+        requested, and also that a server MAY report metadata even
         where a trim has been requested.
       - `NBD_STATE_ZERO` (bit 1): if set, the block contents read as
         all zeroes; if clear, the block contents are not known.  Note
@@ -1547,18 +1547,18 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
         been written; if clear, the block represents a portion of the
         file that is dirty, or where the server could not otherwise
         determine its status. The server MUST NOT set this bit for
-        allocation context 0, where it has no meaning.
+        metadata context 0, where it has no meaning.
       - `NBD_STATE_ACTIVE` (bit 3): if set, the block represents a
-	portion of the file that is "active" in the given allocation
-	context. The server MUST NOT set this bit for allocation context
+	portion of the file that is "active" in the given metadata
+	context. The server MUST NOT set this bit for metadata context
 	0, where it has no meaning.
 
     The exact semantics of what it means for a block to be "clean" or
-    "active" at a given allocation context is not defined by this
+    "active" at a given metadata context is not defined by this
     specification, except that the default in both cases should be to
-    clear the bit. That is, when the allocation context does not have
+    clear the bit. That is, when the metadata context does not have
     knowledge of the relevant status for the given extent, or when the
-    allocation context does not assign any meaning to it, the bits
+    metadata context does not assign any meaning to it, the bits
     should be cleared.
 
     A client SHOULD NOT read from an area that has both `NBD_STATE_HOLE`
@@ -1574,7 +1574,7 @@ The extension adds the following new command flag:
 
 - `NBD_CMD_FLAG_REQ_ONE`; valid during `NBD_CMD_BLOCK_STATUS`.
   SHOULD be set to 1 if the client wants to request information for only
-  one extent per allocation context.
+  one extent per metadata context.
 
 ## About this file
 
