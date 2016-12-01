@@ -1021,7 +1021,7 @@ contexts with semantics like the following:
   return information about the redundancy level of a given extent
 - If the backend implements a write-through cache of some sort, or
   synchronises with other servers, a metadata context could state
-  that an extent is "allocated" once it has reached permanent storage
+  that an extent is "active" once it has reached permanent storage
   and/or is synchronized with other servers.
 
 The only requirement of a metadata context is that it MUST be
