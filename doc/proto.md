@@ -924,7 +924,7 @@ during option haggling in the fixed newstyle negotiation.
     information is available, or when sending data related to the option
     (in the case of `NBD_OPT_LIST`) has finished. No data.
 
-* `NBD_REP_SERVER` (2)
+- `NBD_REP_SERVER` (2)
 
     A description of an export. Data:
 
@@ -939,7 +939,7 @@ during option haggling in the fixed newstyle negotiation.
       particular client request, this field is defined to be a string
       suitable for direct display to a human being.
 
-* `NBD_REP_INFO` (3)
+- `NBD_REP_INFO` (3)
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
@@ -1558,9 +1558,9 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
         determine its status. The server MUST NOT set this bit for
         the "BASE:allocation" context, where it has no meaning.
       - `NBD_STATE_ACTIVE` (bit 3): if set, the block represents a
-	portion of the file that is "active" in the given metadata
-	context. The server MUST NOT set this bit for the
-	"BASE:allocation" context, where it has no meaning.
+        portion of the file that is "active" in the given metadata
+        context. The server MUST NOT set this bit for the
+        "BASE:allocation" context, where it has no meaning.
 
     The exact semantics of what it means for a block to be "clean" or
     "active" at a given metadata context is not defined by this
