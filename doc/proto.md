@@ -909,6 +909,10 @@ of the newstyle negotiation.
       metadata contexts. Servers SHOULD NOT reuse existing metadata
       context IDs.
 
+    The syntax of the query string is not specified, except that
+    implementations MUST support adding and removing individual metadata
+    contexts by simply listing their names.
+
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
