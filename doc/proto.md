@@ -947,13 +947,12 @@ during option haggling in the fixed newstyle negotiation.
 
     A description of a metadata context. Data:
 
-    - 32 bits, NBD metadata context ID. If the request was NOT of type
-      `NBD_ALLOC_LIST_CONTEXT`, this field MUST NOT be zero.
+    - 32 bits, NBD metadata context ID.
     - String, name of the metadata context. This is not required to be
       a human-readable string, but it MUST be valid UTF-8 data.
 
-    Metadata context ID 0 is implied, and always exists. It cannot be
-    removed.
+    This specification declares one metadata context. It is called
+    "BASE:allocation" and contains the basic "exists at all" context.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -1003,12 +1002,13 @@ case that data is an error message string suitable for display to the user.
 
 ##### Metadata contexts
 
-Metadata context 0 is the basic "exists at all" metadata context. If
-an extent is not allocated at metadata context 0, it MUST NOT be
-listed as allocated at another metadata context. This supports sparse
-file semantics on the server side. If a server has only one metadata
-context (the default), then writing to an extent which is allocated in
-that metadata context 0 MUST NOT fail with ENOSPC.
+The "BASE:allocation" metadata context is the basic "exists at all"
+metadata context. If an extent is marked with `NBD_STATE_HOLE` at that
+context, this means that the given extent is not allocated in the
+backend storage, and that writing to the extent MAY result in the ENOSPC
+error. This supports sparse file semantics on the server side. If a
+server has only one metadata context (the default), then writing to an
+extent which has `NBD_STATE_HOLE` clear MUST NOT fail with ENOSPC.
 
 For all other cases, this specification requires no specific semantics
 of metadata contexts. Implementations could support metadata
@@ -1551,11 +1551,11 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
         been written; if clear, the block represents a portion of the
         file that is dirty, or where the server could not otherwise
         determine its status. The server MUST NOT set this bit for
-        metadata context 0, where it has no meaning.
+        the "BASE:allocation" context, where it has no meaning.
       - `NBD_STATE_ACTIVE` (bit 3): if set, the block represents a
 	portion of the file that is "active" in the given metadata
-	context. The server MUST NOT set this bit for metadata context
-	0, where it has no meaning.
+	context. The server MUST NOT set this bit for the
+	"BASE:allocation" context, where it has no meaning.
 
     The exact semantics of what it means for a block to be "clean" or
     "active" at a given metadata context is not defined by this
