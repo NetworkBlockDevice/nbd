@@ -1471,8 +1471,13 @@ unless the client also negotiates the `STRUCTURED_REPLY` extension.
 
     Servers MUST return an `NBD_REPLY_TYPE_BLOCK_STATUS` chunk for every
     metadata context ID, except if the semantics of particular
-    metadata contexts mean that the information for one metadata
-    context is implied by the information for another.
+    metadata contexts mean that the information for one active metadata
+    context is implied by the information for another; e.g., if a
+    particular metadata context can only have meaning for extents where
+    the `NBD_STATE_HOLE` flag is cleared on the "BASE:allocation"
+    context, servers MAY omit the relevant chunks for that context if
+    they already sent an extent with the `NBD_STATE_HOLE` flag set in
+    reply to the same `NBD_CMD_BLOCK_STATUS` command.
 
     The payload starts with:
 
