@@ -720,10 +720,10 @@ reply to clients doing so anyway with `EINVAL`.
 
 The reply to the `NBD_CMD_BLOCK_STATUS` request MUST be sent by a
 structured reply; this implies that in order to use metadata querying,
-structured replies MUST first be negotiated.
+structured replies MUST be negotiated first.
 
 This standard defines exactly one metadata context; it is called
-`base:allocation`, and it provided information on the basic allocation
+`base:allocation`, and it provides information on the basic allocation
 status of extents (that is, whether they are allocated at all in a
 sparse file context).
 
@@ -933,14 +933,14 @@ of the newstyle negotiation.
 
     Data:
     - 32 bits, length of export name
-    - String, name of export for which we wish to list, select, or
-      deselect, metadata contexts.
+    - String, name of export for which we wish to list or select metadata
+      contexts.
     - 32 bits, length of query
     - String, query to select a subset of the available metadata
-      contexts. If this is not specified (i.e., length is 4 and no
-      command is sent), then the server MUST send all the metadata
-      contexts it knows about. If specified, this query string MUST
-      start with a name that uniquely identifies a server
+      contexts. If this is not specified (i.e., the "length of query"
+      field is 0 and no query is sent), then the server MUST send all
+      the metadata contexts it knows about. If specified, this query
+      string MUST start with a name that uniquely identifies a server
       implementation; e.g., the reference implementation that
       accompanies this document would support query strings starting
       with 'nbd-server:'
@@ -954,7 +954,7 @@ of the newstyle negotiation.
     Change the set of active metadata contexts. Issuing this command
     replaces all previously-set metadata contexts; clients must ensure
     that all metadata contexts they're interested in are selected with
-    the queries they sent.
+    the final query that they sent.
 
     Data:
     - 32 bits, length of query
@@ -1088,14 +1088,20 @@ It defines the following flags for the flags field:
   requested, and also that a server MAY report unknown content even
   where write zeroes has been requested.
 
+It is not an error for a server to report that a region of the
+export has both `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear. The
+contents of such an area is undefined, and may not be stable;
+clients who are aware of the existence of such a region SHOULD NOT
+read it.
+
 For the `base:allocation` context, the remainder of the flags field is
 reserved. Servers SHOULD set it to all-zero; clients MUST ignore unknown
 flags.
 
 For all other cases, this specification requires no specific semantics of
-metadata contexts, except that all the information they provide The only
-requirement of a metadata context is that it MUST be representable within the
-flags field as defined for `NBD_CMD_BLOCK_STATUS`.
+metadata contexts, except that all the information they provide MUST be
+representable within the flags field as defined for
+`NBD_REPLY_TYPE_BLOCK_STATUS`.
 
 Likewise, the syntax of query strings is not specified by this document.
 
@@ -1455,7 +1461,9 @@ The following request types exist:
     contexts have been negotiated, which in turn requires the client to
     first negotiate structured replies. For a successful return, the
     server MUST use a structured reply, containing at least one chunk of
-    type `NBD_REPLY_TYPE_BLOCK_STATUS`.
+    type `NBD_REPLY_TYPE_BLOCK_STATUS`, where the status field of each
+    descriptor is determined by the flags field as defined by the
+    metadata context.
 
     The list of block status descriptors within the
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
@@ -1473,53 +1481,16 @@ The following request types exist:
     additional status values when they can be easily detected.
 
     If an error occurs, the server SHOULD set the appropriate error
-    code in the error field of either a simple reply or an error
-    chunk.  However, if the error does not involve invalid usage (such
-    as a request beyond the bounds of the file), a server MAY reply
-    with a single block status descriptor with *length* matching the
-    requested length, and *status* of 0 rather than reporting the
-    error.
+    code in the error field of an error chunk. However, if the error
+    does not involve invalid usage (such as a request beyond the bounds
+    of the file), a server MAY reply with a single block status
+    descriptor with *length* matching the requested length, and *status*
+    of 0 rather than reporting the error.
 
-    Upon receiving an `NBD_CMD_BLOCK_STATUS` command, the server MUST
-    return the status of the device, where the status field of each
-    descriptor is determined by the following bits (all combinations of
-    these bits are possible):
-
-      - `NBD_STATE_HOLE` (bit 0): if set, the block represents a hole
-        (and future writes to that area may cause fragmentation or
-        encounter an `ENOSPC` error); if clear, the block is allocated
-        or the server could not otherwise determine its status.  Note
-        that the use of `NBD_CMD_TRIM` is related to this status, but
-        that the server MAY report a hole even where trim has not been
-        requested, and also that a server MAY report metadata even
-        where a trim has been requested. Additionally, clients should be
-        aware that servers may have no information on the storage
-        availability of an export; e.g., an export may be stored on a
-        sparsely-populated storage device itself, even if it doesn't
-        appear to be the case using regular system calls. As such, it is
-        not an error for a server to report an `ENOSPC` error on a
-        region of the file where the `base:allocation` context has
-        `NBD_STATE_HOLE` clear (although servers SHOULD attempt to avoid
-        this situation).
-      - `NBD_STATE_ZERO` (bit 1): if set, the block contents read as
-        all zeroes; if clear, the block contents are not known.  Note
-        that the use of `NBD_CMD_WRITE_ZEROES` is related to this
-        status, but that the server MAY report zeroes even where write
-        zeroes has not been requested, and also that a server MAY
-        report unknown content even where write zeroes has been
-        requested.
-
-    It is not an error for a server to report that a region of the
-    export has both `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear. The
-    contents of such an area is undefined, and may not be stable;
-    clients who are aware of the existence of such a region SHOULD NOT
-    read it.
-
-A client MAY terminate the connection if it detects that the server has
-sent an invalid chunk (such as lengths in the
-`NBD_REPLY_TYPE_BLOCK_STATUS` not summing up to the requested length).
-The server SHOULD return `EINVAL` if it receives a `BLOCK_STATUS`
-request including one or more sectors beyond the size of the device.
+    A client MAY initiate a hard disconnect if it detects that the
+    server has sent an invalid chunk. The server SHOULD return `EINVAL`
+    if it receives a `NBD_CMD_BLOCK_STATUS` request including one or
+    more sectors beyond the size of the device.
 
 * Other requests
 
