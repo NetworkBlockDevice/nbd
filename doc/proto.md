@@ -1242,9 +1242,11 @@ interpret the "length" bytes of payload.
     Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
     its request, the server MAY return less descriptors in the reply
     than would be required to fully specify the whole range of requested
-    information to the client, if the number of descriptors would be
-    over 16 otherwise and looking up the information would be too
-    resource-intensive for the server.
+    information to the client, if looking up the information would be
+    too resource-intensive for the server, so long as at least one
+    extent is returned. Servers should however be aware that most
+    clients implementations will then simply ask for the next extent
+    instead.
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
