@@ -967,7 +967,7 @@ of the newstyle negotiation.
           currently);
         - `x-*:`, where `*` can be replaced by any random string not
           containing colons, for local experiments. This SHOULD NOT be
-          used by metadata contexts that are expected to e widely used.
+          used by metadata contexts that are expected to be widely used.
         - third-party implementations can register additional
           namespaces by simple request to the mailinglist.
 
