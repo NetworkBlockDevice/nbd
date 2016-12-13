@@ -971,6 +971,9 @@ of the newstyle negotiation.
         - third-party implementations can register additional
           namespaces by simple request to the mailinglist.
 
+    These two fields MAY be repeated as much as is necessary to select all
+    metadata contexts the client is interested in.
+
     The server MUST reply with a number of `NBD_REP_META_CONTEXT`
     replies, one for each selected metadata context, each with a unique
     metadata context ID. It is not an error if a
