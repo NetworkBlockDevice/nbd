@@ -723,7 +723,7 @@ The procedure works as follows:
 
 A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
 non-zero number of metadata contexts during negotiation. Servers SHOULD
-reply to clients sending `NBD_CMD_BLOCK_STATUS without
+reply to clients sending `NBD_CMD_BLOCK_STATUS` without
 selecting metadata contexts with `EINVAL`.
 
 The reply to the `NBD_CMD_BLOCK_STATUS` request MUST be sent as a
@@ -971,7 +971,8 @@ of the newstyle negotiation.
          contexts.
 
     If zero queries are sent, then the server MUST return all
-    the metadata contexts it knows about.
+    the metadata contexts that are available to the client to select
+    on the given export with `NBD_OPT_SET_META_CONTEXT`.
 
     For details on the query string, see under `NBD_OPT_SET_META_CONTEXT`.
 
@@ -990,7 +991,8 @@ of the newstyle negotiation.
 
     A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless
     within the negotiation phase it sent `NBD_OPT_SET_META_CONTEXT`
-    at least once, and the final time it was sent, the server
+    at least once, and the final time it was sent, it referred
+    to the export name that was ultimately selected, the server
     responded without an error, and returned at least one metadata
     context.
 
@@ -1506,7 +1508,8 @@ The following request types exist:
 
     A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless
     within the negotiation phase it sent `NBD_OPT_SET_META_CONTEXT`
-    at least once, and the final time it was sent, the server
+    at least once, and the final time it was sent, it referred
+    to the export name that was finally selected, the server
     responded without an error, and returned at least one metadata
     context. This in turn requires the client to
     first negotiate structured replies. For a successful return, the
