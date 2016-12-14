@@ -743,7 +743,7 @@ Namespaces MUST be consist of one of the following:
 - `nbd-server`, for metadata contexts defined by the
    implementation that accompanies this document (none
    currently);
-- `x-*`, where `*` can be replaced by any random string not
+- `x-*`, where `*` can be replaced by an arbitrary string not
    containing colons, for local experiments. This SHOULD NOT be
    used by metadata contexts that are expected to be widely used.
 - A third-party namespace from the list below.
