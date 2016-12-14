@@ -735,7 +735,7 @@ consist of a namespace, followed by a colon, followed by a leaf-name.
 The namespace and the leaf-name must each consist entirely of
 printable non-whitespace UTF-8 characters other than colons,
 and be non-empty. The entire name (namespace, colon and leaf-name)
-MUST NOT exceed 255 bytes (and therefore botht he namespace and
+MUST NOT exceed 255 bytes (and therefore both the namespace and
 leaf-name are guaranteed to be smaller than 255 bytes).
 
 Namespaces MUST be consist of one of the following:
