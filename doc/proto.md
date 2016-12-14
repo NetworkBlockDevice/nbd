@@ -753,10 +753,69 @@ request to the mailing-list. The following additional third-party namespaces
 are currently registered:
 * (none)
 
+Save in respect of the `base:` namespace described below, this specification
+requires no specific semantics of metadata contexts, except that all the
+information they provide MUST be representable within the flags field as
+defined for `NBD_REPLY_TYPE_BLOCK_STATUS`. Likewise, save in respect of
+the `base:` namespace, the syntax of query strings is not specified by this
+document.
+
+Server implementations SHOULD ensure the syntax for query strings they
+support and semantics for resulting metadata context is documented similarly
+to this document.
+
+### The `base:` metadata namespace
+
 This standard defines exactly one metadata context; it is called
 `base:allocation`, and it provides information on the basic allocation
 status of extents (that is, whether they are allocated at all in a
 sparse file context).
+
+The query string within the `base:` metadata context can take
+one of two forms:
+* `base:` - in which case all metadata contexts within `base:` are
+  listed; or
+* `base:[leaf-name]` where `[leaf-name]` is a context leaf-name
+  that exists within the `base` namespace (currently just
+  `base:allocation`.
+
+#### `base:allocation` metadata context
+
+The `base:allocation` metadata context is the basic "allocated at all"
+metadata context. If an extent is marked with `NBD_STATE_HOLE` at that
+context, this means that the given extent is not allocated in the
+backend storage, and that writing to the extent MAY result in the ENOSPC
+error. This supports sparse file semantics on the server side.
+If a server supports the `base:allocation` metadata context, then writing
+to an extent which has `NBD_STATE_HOLE` clear MUST NOT fail with ENOSPC
+unless for reasons specified in the definition of another context.
+
+It defines the following flags for the flags field:
+
+- `NBD_STATE_HOLE` (bit 0): if set, the block represents a hole (and
+  future writes to that area may cause fragmentation or encounter an
+  `ENOSPC` error); if clear, the block is allocated or the server could
+  not otherwise determine its status. Note that the use of
+  `NBD_CMD_TRIM` is related to this status, but that the server MAY
+  report a hole even where `NBD_CMD_TRIM` has not been requested, and
+  also that a server MAY report that the block is allocated even where
+  `NBD_CMD_TRIM` has been requested.
+- `NBD_STATE_ZERO` (bit 1): if set, the block contents read as all
+  zeroes; if clear, the block contents are not known. Note that the use
+  of `NBD_CMD_WRITE_ZEROES` is related to this status, but that the
+  server MAY report zeroes even where `NBD_CMD_WRITE_ZEROES` has not been
+  requested, and also that a server MAY report unknown content even
+  where `NBD_CMD_WRITE_ZEROES` has been requested.
+
+It is not an error for a server to report that a region of the
+export has both `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear. The
+contents of such an area are undefined, and a client
+reading such an area should make no assumption as to its contents
+or stability.
+
+For the `base:allocation` context, the remainder of the flags field is
+reserved. Servers SHOULD set it to all-zero; clients MUST ignore unknown
+flags.
 
 ## Values
 
@@ -970,15 +1029,38 @@ of the newstyle negotiation.
        - String, query to list a subset of the available metadata
          contexts.
 
-    If zero queries are sent, then the server MUST return all
-    the metadata contexts that are available to the client to select
-    on the given export with `NBD_OPT_SET_META_CONTEXT`.
-
     For details on the query string, see under `NBD_OPT_SET_META_CONTEXT`.
 
     The server MUST either reply with an error (for instance `EINVAL`
     if the option is not supported), or reply with a list of
     `NBD_REP_META_CONTEXT` replies followed by `NBD_REP_ACK`.
+
+    If zero queries are sent, then the server MUST return all
+    the metadata contexts that are available to the client to select
+    on the given export with `NBD_OPT_SET_META_CONTEXT`, save that:
+
+    If one or more queries are sent, then the server MUST return
+    those metadata contexts that are available to the client to
+    select on the given export with `NBD_OPT_SET_META_CONTEXT`,
+    and which match one or more of the queries given. The
+    support of wildcarding within the leaf-name portion of
+    the query string is dependent upon the namespace.
+
+    In either case, however:
+
+    * the server MAY return an incomplete list if returning a
+      complete list would require undue resources.
+
+    * the server MAY return a context consisting of a namespace and
+      a colon only (i.e. omitting the leaf-name) to indicate that
+      the namespace contains a large number of possible contexts
+      within that namespace (for instance a namespace `X-backup` with
+      contexts that indicate whether blocks were written after
+      a given date might accept queries of the form
+      `'X-backup:modifiedtime>[unixdate]'` where `[unixdate]` is an
+      arbitrary integer, and in this case it might simply
+      return `X-backup:`)
+
     The metadata context ID in these replies is reserved and SHOULD be
     set to zero; clients MUST disregard it.
 
@@ -1009,7 +1091,9 @@ of the newstyle negotiation.
 
     If zero queries are sent, the server MUST select no metadata contexts.
 
-    The server MUST reply with a number of `NBD_REP_META_CONTEXT`
+    The server MAY return `NBD_REP_ERR_TOO_BIG` if a request
+    seeks to select too many contexts. Otherwise
+    the server MUST reply with a number of `NBD_REP_META_CONTEXT`
     replies, one for each selected metadata context, each with a unique
     metadata context ID, followed by `NBD_REP_ACK`. The metadata context
     ID is transient and may vary across calls to `NBD_OPT_SET_META_CONTEXT`;
@@ -1103,54 +1187,9 @@ case that data is an error message string suitable for display to the user.
 
     Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
-##### Metadata contexts
+* `NBD_REP_ERR_TOO_BIG` (2^31 + 9)
 
-The `base:allocation` metadata context is the basic "allocated at all"
-metadata context. If an extent is marked with `NBD_STATE_HOLE` at that
-context, this means that the given extent is not allocated in the
-backend storage, and that writing to the extent MAY result in the ENOSPC
-error. This supports sparse file semantics on the server side.
-If a server supports the `base:allocation` metadata context, then writing
-to an extent which has `NBD_STATE_HOLE` clear MUST NOT fail with ENOSPC
-unless for reasons specified in the definition of another context.
-
-It defines the following flags for the flags field:
-
-- `NBD_STATE_HOLE` (bit 0): if set, the block represents a hole (and
-  future writes to that area may cause fragmentation or encounter an
-  `ENOSPC` error); if clear, the block is allocated or the server could
-  not otherwise determine its status. Note that the use of
-  `NBD_CMD_TRIM` is related to this status, but that the server MAY
-  report a hole even where `NBD_CMD_TRIM` has not been requested, and
-  also that a server MAY report that the block is allocated even where
-  `NBD_CMD_TRIM` has been requested.
-- `NBD_STATE_ZERO` (bit 1): if set, the block contents read as all
-  zeroes; if clear, the block contents are not known. Note that the use
-  of `NBD_CMD_WRITE_ZEROES` is related to this status, but that the
-  server MAY report zeroes even where `NBD_CMD_WRITE_ZEROES` has not been
-  requested, and also that a server MAY report unknown content even
-  where `NBD_CMD_WRITE_ZEROES` has been requested.
-
-It is not an error for a server to report that a region of the
-export has both `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear. The
-contents of such an area are undefined, and a client
-reading such an area should make no assumption as to its contents
-or stability.
-
-For the `base:allocation` context, the remainder of the flags field is
-reserved. Servers SHOULD set it to all-zero; clients MUST ignore unknown
-flags.
-
-For all other cases, this specification requires no specific semantics of
-metadata contexts, except that all the information they provide MUST be
-representable within the flags field as defined for
-`NBD_REPLY_TYPE_BLOCK_STATUS`.
-
-Likewise, the syntax of query strings is not specified by this document.
-
-Server implementations SHOULD document their syntax for query strings
-and semantics for resulting metadata contexts in a document like this
-one.
+    The request or the reply is too large to process.
 
 ### Transmission phase
 
