@@ -286,7 +286,7 @@ The server MAY process commands out of order, and MAY reply out of
 order, except that:
 
 * All write commands (that includes `NBD_CMD_WRITE`,
-  `NBD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
+  `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
   completes (i.e. replies to) prior to processing to a
   `NBD_CMD_FLUSH` MUST be written to non-volatile
   storage prior to replying to that `NBD_CMD_FLUSH`. This
