@@ -1046,20 +1046,23 @@ of the newstyle negotiation.
     support of wildcarding within the leaf-name portion of
     the query string is dependent upon the namespace.
 
-    In either case, however:
-
-    * the server MAY return an incomplete list if returning a
-      complete list would require undue resources.
-
-    * the server MAY return a context consisting of a namespace and
-      a colon only (i.e. omitting the leaf-name) to indicate that
-      the namespace contains a large number of possible contexts
-      within that namespace (for instance a namespace `X-backup` with
-      contexts that indicate whether blocks were written after
-      a given date might accept queries of the form
-      `'X-backup:modifiedtime>[unixdate]'` where `[unixdate]` is an
-      arbitrary integer, and in this case it might simply
-      return `X-backup:`)
+    In either case, however, for any given namespace the
+    server MAY, instead of exhaustively listing every
+    matching context available to select (or every context
+    available to select where no query is given), send
+    sufficient context records back to allow a client with
+    knowledge of the namespace to select any context. Each
+    namespace returned MUST still satisfy the rules for
+    namespaces (i.e. they must begin with the relevant
+    namespace, followed by a colon, then printable non-whitespace
+    UTF-8 characters, with the entire string not exceeding
+    255 bytes). This may be helpful where a client can
+    construct algorithmic queries. For instance, a client might
+    reply simply with the namespace with no leaf-name (e.g.
+    'X-FooBar:') or with a range of values (e.g.
+    'X-ModifiedDate:20160310-20161214'). The semantics of
+    such a reply are a matter for the definition of the
+    namespace.
 
     The metadata context ID in these replies is reserved and SHOULD be
     set to zero; clients MUST disregard it.
