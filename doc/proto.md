@@ -1037,7 +1037,8 @@ of the newstyle negotiation.
 
     If zero queries are sent, then the server MUST return all
     the metadata contexts that are available to the client to select
-    on the given export with `NBD_OPT_SET_META_CONTEXT`, save that:
+    on the given export with `NBD_OPT_SET_META_CONTEXT`, except
+    as set out below.
 
     If one or more queries are sent, then the server MUST return
     those metadata contexts that are available to the client to
