@@ -99,7 +99,6 @@
 #ifdef HAVE_SYS_DIRENT_H
 #include <sys/dirent.h>
 #endif
-#include <unistd.h>
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
