@@ -15,8 +15,6 @@ PID=""
 
 set -e
 
-trap cleanup EXIT
-
 cleanup() {
 	if [ -f ${pidfile} ]
 	then
@@ -25,6 +23,8 @@ cleanup() {
 		if [ ! -z "$PID" ]
 		then
 			kill $PID || true
+		else
+			echo "E: Could not clean up!"
 		fi
 	fi
 	if [ -z "$cleanup" ]
@@ -34,6 +34,15 @@ cleanup() {
 		echo "Setup in $tmpdir"
 	fi
 }
+
+abort() {
+	cleanup
+	trap - INT
+	kill -INT $$
+}
+
+trap -- cleanup EXIT
+trap -- abort INT
 
 # Create a one-meg device
 dd if=/dev/zero of=$tmpnam bs=1024 count=4096 >/dev/null 2>&1
@@ -284,6 +293,85 @@ EOF
 		./nbd-tester-client -N export1 -u ${tmpdir}/unix.sock
 		retval=$?
 		;;
+	*/handshake)
+		# Test negotiation handshake
+		cat >${conffile} <<EOF
+[generic]
+[export1]
+	exportname = $tmpnam
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -h -N export1 localhost
+		retval=$?
+	;;
+	*/tls)
+		# TLS test
+		certdir=$(pwd)/certs
+		cat >${conffile} <<EOF
+[generic]
+	certfile = $certdir/server-cert.pem
+	keyfile = $certdir/server-key.pem
+	cacertfile = $certdir/ca-cert.pem
+[export1]
+	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
+	filesize = 52428800
+	temporary = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -i -t "${mydir}/integrity-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" localhost
+		retval=$?
+	;;
+	*/tlshuge)
+		# TLS test with big operations
+		# takes a while
+		certdir=$(pwd)/certs
+		cat >${conffile} <<EOF
+[generic]
+	certfile = $certdir/server-cert.pem
+	keyfile = $certdir/server-key.pem
+	cacertfile = $certdir/ca-cert.pem
+[export1]
+	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
+	filesize = 52428800
+	temporary = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 -i -t "${mydir}/integrityhuge-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" -H localhost 127.0.0.1
+		retval=$?
+	;;
+	*/tlswrongcert)
+		certdir=$(pwd)/certs
+		cat >${conffile} <<EOF
+[generic]
+	certfile = $certdir/server-cert.pem
+	keyfile = $certdir/server-key.pem
+	cacertfile = $certdir/ca-cert.pem
+[export1]
+	exportname = $tmpnam
+	flush = true
+	fua = true
+	rotational = true
+	filesize = 52428800
+	temporary = true
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep 1
+		./nbd-tester-client -N export1 "${mydir}/integrity-test.tr" -C "${certdir}/selfsigned-cert.pem" -K "${certdir}/selfsigned-key.pem" localhost
+		retval=$?
+	;;
 	*)
 		echo "E: unknown test $1"
 		exit 1

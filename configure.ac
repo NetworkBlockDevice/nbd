@@ -2,10 +2,16 @@ dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],
-  m4_esyscmd_s(support/genver.sh),
+  m4_esyscmd(support/genver.sh | tr -d '\n'),
   [wouter@debian.org],,
   [http://nbd.sourceforge.net/])
-AM_INIT_AUTOMAKE(foreign dist-xz serial-tests)
+m4_define([serial_tests], [
+  m4_esyscmd([automake --version |
+              head -1 |
+              awk '{split ($NF,a,"."); if (a[1] == 1 && a[2] >= 12) { print "serial-tests" }}'
+  ])
+])
+AM_INIT_AUTOMAKE(foreign dist-xz serial_tests subdir-objects)
 AM_MAINTAINER_MODE([enable])
 AC_CONFIG_MACRO_DIR([support])
 LT_INIT
@@ -103,6 +109,7 @@ AC_ARG_ENABLE(
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
+PKG_PROG_PKG_CONFIG
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
 AC_C_INLINE
@@ -114,6 +121,7 @@ AC_CHECK_SIZEOF(unsigned long long int)
 AC_STRUCT_DIRENT_D_TYPE
 AC_CHECK_FUNCS([llseek alarm gethostbyname inet_ntoa memset socket strerror strstr mkstemp fdatasync])
 HAVE_FL_PH=no
+
 AC_CHECK_FUNC(fallocate,
   [
     AC_CHECK_HEADERS([linux/falloc.h])
@@ -121,7 +129,7 @@ AC_CHECK_FUNC(fallocate,
     then
       AC_CHECK_DECL(FALLOC_FL_PUNCH_HOLE, [HAVE_FL_PH=yes], [HAVE_FL_PH=no], [[#include <linux/falloc.h>]])
     fi
-  ],[]
+  ]
 )
 
 AC_MSG_CHECKING([for FALLOC_FL_PUNCH_HOLE support])
@@ -133,6 +141,82 @@ else
 	AC_DEFINE(HAVE_FALLOC_PH, 0, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([no])
 fi
+
+AC_CHECK_FUNC(splice, [HAVE_SPLICE=yes], [HAVE_SPLICE=no])
+if test "$HAVE_SPLICE" = "yes"
+then
+	HAVE_SETPIPE_SZ=no
+	AC_CHECK_DECL(F_SETPIPE_SZ, [HAVE_SETPIPE_SZ=yes],
+		[
+			unset ac_cv_have_decl_F_SETPIPE_SZ
+			AC_CHECK_HEADERS([linux/fcntl.h])
+			if test "$ac_cv_header_linux_fcntl_h" = "yes"
+			then
+				AC_CHECK_DECL(F_SETPIPE_SZ, [HAVE_SETPIPE_SZ=define], [HAVE_SETPIPE_SZ=no], [[#include <linux/fcntl.h>]])
+			fi
+		],
+		[[
+			#define _GNU_SOURCE
+			#include <fcntl.h>
+		]]
+	)
+	AC_MSG_CHECKING([for F_SETPIPE_SZ support])
+	case $HAVE_SETPIPE_SZ in
+		yes)
+			AC_DEFINE(HAVE_SPLICE, 1, [Define to 1 if we have splice support])
+			AC_MSG_RESULT([yes])
+		;;
+		define)
+			AC_DEFINE(HAVE_SPLICE, 1, [Define to 1 if we have splice support])
+			AC_DEFINE(F_SETPIPE_SZ, 1031, [Define to 1031 if we have kernel support but no userspace support])
+			AC_MSG_RESULT([yes])
+		;;
+		no)
+			AC_MSG_RESULT([missing, disabling splice support])
+		;;
+	esac
+fi
+
+dnl AC_MSG_CHECKING([where to puth systemd unit files])
+dnl AC_ARG_WITH(
+dnl   systemd,
+dnl   AS_HELP_STRING([--with-systemd=loc|pkgconfig],[Install systemd files in loc; if passing pkgconfig, use pkg-config to detect the correct location and install there.])
+dnl   [
+dnl     if test "x$enableval" = "xyes"; then
+dnl       ENABLE_SYSTEMD=yes
+dnl     else
+dnl       ENABLE_SYSTEMD=no
+dnl     fi
+dnl   ],[]
+dnl )
+dnl 
+dnl if test "x$ENABLE_SYSTEMD" != "xno"; then
+dnl 	PKG_CHECK_VAR([SYSTEMDUNIT],[systemd],systemdsystemunitdir],[AC_SUBST([SYSTEMDLOC], [$SYSTEMDUNIT])])
+dnl fi
+dnl AM_CONDITIONAL(SYSTEMD, [test ! -z "$SYSTEMDUNIT"])
+dnl if test ! -z $SYSTEMDUNIT; then
+dnl 	AC_MSG_RESULT([$SYSTEMDUNIT])
+dnl else
+dnl 	case $ENABLE_SYSTEMD in
+dnl 		no)
+dnl 			AC_MSG_RESULT([disabled])
+dnl 		;;
+dnl 		yes)
+dnl 			AC_MSG_ERROR([systemd not found])
+dnl 		;;
+dnl 		*)
+dnl 			AC_MSG_RESULT([not found])
+dnl 		;;
+dnl 	esac
+dnl fi
+
+PKG_CHECK_MODULES(GnuTLS, [gnutls >= 2.12.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
+if test x$HAVE_GNUTLS = x1; then
+	AC_DEFINE(HAVE_GNUTLS, 1, [Define to 1 if you have a GnuTLS version of 2.12 or above])
+else
+	AC_DEFINE(HAVE_GNUTLS, 0)
+fi
+AM_CONDITIONAL([GNUTLS], [test "x$HAVE_GNUTLS" = "x1"])
 
 AC_CHECK_HEADERS([winioctl.h], [], [],
 [#include <io.h>
@@ -177,7 +261,25 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h])
-AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]), gthread)
+
+my_save_cflags="$CFLAGS"
+CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
+AC_MSG_CHECKING([if we are using an old glib 2.0 library])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+	[[#include <glib.h>]],
+	[[g_thread_init(NULL);]])],
+	[
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_OLD_GLIB, 1, [Define to 1 if you have an old glib library])
+	],
+	[
+		AC_MSG_RESULT(no)
+		AC_DEFINE(HAVE_OLD_GLIB, 0, [Define to 1 if you have an old glib library])
+	]
+)
+CFLAGS="$my_save_cflags"
+
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
@@ -197,6 +299,9 @@ AC_CONFIG_FILES([Makefile
 		 man/nbd-server.5.sh
 		 man/nbd-server.1.sh
 		 man/nbd-trdump.1.sh
-		 man/nbdtab.5.sh])
+		 man/nbdtab.5.sh
+		 systemd/Makefile
+		 systemd/nbd@.service.sh
+		])
 AC_OUTPUT
 

@@ -62,6 +62,8 @@ enum {
 #define NBD_REPLY_MAGIC 0x67446698
 /* Do *not* use magics: 0x12560953 0x96744668. */
 
+#define NBD_OPT_REPLY_MAGIC 0x3e889045565a9LL
+
 /*
  * This is the packet used for communication between client and
  * server. All data are in network byte order.

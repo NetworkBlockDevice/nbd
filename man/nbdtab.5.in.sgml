@@ -111,9 +111,10 @@ manpage.1: manpage.sgml
     <refsect2>
       <title>Options</title>
       <para>Every command-line <command>nbd-client</command> option
-        has a corresponding option in the <filename>nbdtab</filename> file,
-        and vice versa; where this isn't the case, that is a
-        bug.</para>
+	which allows to configure specific options for a particular
+	device node has a corresponding option in the
+	<filename>nbdtab</filename> file, and vice versa; where this
+	isn't the case, that is a bug.</para>
       <para>Individual options in this field should be separated from
         one another by the comma character.</para>
       <variablelist>
@@ -125,6 +126,15 @@ manpage.1: manpage.sgml
 	    instead.</para>
 	    <para>Corresponds to the <option>-b</option> option on the
 	    command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>conns=<replaceable>number</replaceabl></option></term>
+	  <listitem>
+	    <para>The number of connections to use for this device.
+	    Corresponds to the <option>-C</option> option on the command
+	    line; see nbd-client(8) for more details on that
+	    option.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>

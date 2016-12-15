@@ -294,6 +294,11 @@ order, except that:
   the transmission flags, as otherwise `NBD_CMD_FLUSH` will never
   be sent by the client to the server.
 
+* A client which uses multiple connections to a server to parallelize
+  commands MUST NOT issue an `NBD_CMD_FLUSH` request until it has
+  received the reply for all write commands which it expects to be
+  covered by the flush.
+
 * A server MUST NOT reply to a command that has `NBD_CMD_FLAG_FUA` set
   in its command flags until the data (if any) written by that command
   is persisted to non-volatile storage. This only applies if
@@ -399,9 +404,9 @@ server MUST support one of these modes.
 
 * The server insists upon TLS, and forces the client to
   upgrade by erroring any NBD options other than `NBD_OPT_STARTTLS`
-  with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this in practice means
-  that all option negotiation (apart from the `NBD_OPT_STARTTLS`
-  itself) is carried out with TLS; OR
+  or `NBD_OPT_ABORT` with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this
+  in practice means that all option negotiation (apart from the
+  `NBD_OPT_STARTTLS` itself) is carried out with TLS; OR
 
 * The server provides TLS, and it is mandatory on zero or more
   exports, and is available at the client's option on all
@@ -681,7 +686,17 @@ The field has the following format:
 - bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: exposes support for
   `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_FLAG_NO_HOLE`.
 - bit 7, `NBD_FLAG_SEND_DF`: defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
+- bit 8, `NBD_FLAG_CAN_MULTI_CONN`: Indicates that the server operates
+  entirely without cache, or that the cache it uses is shared among all
+  connections to the given device. In particular, if this flag is
+  present, then the effects of `NBD_CMD_FLUSH` and `NBD_CMD_FLAG_FUA`
+  MUST be visible across all connections when the server sends its reply
+  to that command to the client. In the absense of this flag, clients
+  SHOULD NOT multiplex their commands over more than one connection to
+  the export.
+- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
+  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
@@ -751,19 +766,19 @@ of the newstyle negotiation.
 
 - `NBD_OPT_INFO` (6)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 - `NBD_OPT_GO` (7)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
-    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
 - `NBD_OPT_BLOCK_SIZE` (9)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 #### Option reply types
 
@@ -793,7 +808,7 @@ during option haggling in the fixed newstyle negotiation.
 
 * `NBD_REP_INFO` (3)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -830,7 +845,7 @@ case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_UNKNOWN` (2^31 + 6)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 * `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
 
@@ -839,7 +854,7 @@ case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
 
-    Defined by the experimental `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
 
 ### Transmission phase
 
@@ -875,7 +890,7 @@ valid may depend on negotiation during the handshake phase.
   The server MUST support the use of this flag if it advertises
   `NBD_FLAG_SEND_WRITE_ZEROES`.
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
 
 #### Request types
@@ -891,12 +906,9 @@ The following request types exist:
     of data, read from *offset* bytes into the file, unless an error
     condition has occurred.
 
-    If an error occurs, the server SHOULD set the appropriate error
-    code in the error field. The server MUST then either initiate
-    a hard disconnect, or send *length* bytes of data (these bytes MAY be
-    invalid, in which case they SHOULD be zero); this is true even if
-    the error is `EINVAL` for bad flags detected before even
-    attempting to read.
+    If an error occurs, the server SHOULD set the appropriate error code
+    in the error field. The server MAY then initiate a hard disconnect.
+    If it chooses not to, it MUST NOT send any payload for this request.
 
     If an error occurs while reading after the server has already sent
     out the reply header with an error field set to zero (i.e.,
@@ -930,7 +942,7 @@ The following request types exist:
 
 * `NBD_CMD_FLUSH` (3)
 
-    A flush request; a write barrier. The server MUST NOT send a
+    A flush request. The server MUST NOT send a
     successful reply header for this request before all write requests
     for which a reply has already been sent to the client have reached
     permanent storage (using fsync() or similar).
@@ -1013,7 +1025,7 @@ The following error values are defined:
 * `EINVAL` (22), Invalid argument.
 * `ENOSPC` (28), No space left on device.
 * `EOVERFLOW` (75), defined in the  experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 * `ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `ENOSPC` if it receives a write request
@@ -1047,11 +1059,13 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+* The `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md)
+* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md)
 
-* The `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+* The `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+
+* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help

@@ -47,6 +47,10 @@
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
 
+#if HAVE_GNUTLS
+#include "crypto-gnutls.h"
+#endif
+
 #ifdef WITH_SDP
 #include <sdp_inet.h>
 #endif
@@ -266,13 +270,14 @@ void ask_list(int sock) {
 		err("Failed writing length");
 }
 
-void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
+void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls) {
 	u64 magic, size64;
 	uint16_t tmp;
 	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
 	uint32_t opt;
 	uint32_t namesize;
+	int sock = *sockp;
 
 	printf("Negotiation: ");
 	readit(sock, buf, 8);
@@ -303,6 +308,108 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	client_flags = htonl(client_flags);
 	if (write(sock, &client_flags, sizeof(client_flags)) < 0)
 		err("Failed/2.1: %m");
+
+#if HAVE_GNUTLS
+        /* TLS */
+        if (tls) {
+		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
+		tlssession_t *s = NULL;
+		int ret;
+		uint32_t tmp32;
+		uint64_t tmp64;
+
+		/* magic */
+		tmp64 = htonll(opts_magic);
+		if (write(sock, &tmp64, sizeof(tmp64)) < 0)
+			err( "Could not write magic: %m");
+		/* starttls */
+		tmp32 = htonl(NBD_OPT_STARTTLS);
+		if (write(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not write option: %m");
+		/* length of data */
+		tmp32 = htonl(0);
+		if (write(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not write option length: %m");
+
+		if (read(sock, &tmp64, sizeof(tmp64)) < 0)
+			err("Could not read cliserv_magic: %m");
+		tmp64 = ntohll(tmp64);
+		if (tmp64 != NBD_OPT_REPLY_MAGIC) {
+			err("reply magic does not match");
+		}
+		if (read(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not read option type: %m");
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != NBD_OPT_STARTTLS)
+			err("Reply to wrong option");
+		if (read(sock, &tmp32, sizeof(tmp32)) < 0)
+			err("Could not read option reply type: %m");
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != NBD_REP_ACK) {
+			err("Option reply type != NBD_REP_ACK");
+		}
+		if (read(sock, &tmp32, sizeof(tmp32)) < 0) err(
+			"Could not read option data length: %m");
+		tmp32 = ntohl(tmp32);
+		if (tmp32 != 0) {
+			err("Option reply data length != 0");
+		}
+		s = tlssession_new(0,
+				   keyfile,
+				   certfile,
+				   cacertfile,
+				   tlshostname,
+				   !cacertfile || !tlshostname, // insecure flag
+#ifdef DODBG
+				   1, // debug
+#else
+				   0, // debug
+#endif
+				   NULL, // quitfn
+				   NULL, // erroutfn
+				   NULL // opaque
+			);
+		if (!s)
+			err("Cannot establish TLS session");
+
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, plainfd) < 0)
+			err("Cannot get socket pair");
+
+		if (set_nonblocking(plainfd[0], 0) <0 ||
+		    set_nonblocking(plainfd[1], 0) <0 ||
+		    set_nonblocking(sock, 0) <0) {
+			close(plainfd[0]);
+			close(plainfd[1]);
+			err("Cannot set socket options");
+		}
+
+		ret = fork();
+		if (ret < 0)
+			err("Could not fork");
+		else if (ret == 0) {
+			// we are the child
+			if (daemon(0, 0) < 0) {
+				/* no one will see this */
+				fprintf(stderr, "Can't detach from the terminal");
+				exit(1);
+			}
+			signal (SIGPIPE, SIG_IGN);
+			close(plainfd[1]);
+			tlssession_mainloop(sock, plainfd[0], s);
+			close(sock);
+			close(plainfd[0]);
+			exit(0);
+		}
+		close(plainfd[0]);
+		close(sock);
+		sock = plainfd[1]; /* use the decrypted FD from now on */
+		*sockp = sock;
+	}
+#else
+	if (keyfile) {
+		err("TLS requested but support not compiled in");
+	}
+#endif
 
 	if(do_opts & NBDC_DO_LIST) {
 		ask_list(sock);
@@ -344,7 +451,7 @@ void negotiate(int sock, u64 *rsize64, uint16_t *flags, char* name, uint32_t nee
 	*rsize64 = size64;
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port) {
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname) {
 	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
 	bool retval = false;
 	if(fd < 0) {
@@ -401,6 +508,10 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 #undef MOVE_NEXT
 	// fourth field is the options field, a comma-separated field of options
 	do {
+		if(!strncmp(loc, "conns=", 6)) {
+			*num_conns = (int)strtol(loc+6, &loc, 0);
+			goto next;
+		}
 		if(!strncmp(loc, "bs=", 3)) {
 			*bs = (int)strtol(loc+3, &loc, 0);
 			goto next;
@@ -431,6 +542,22 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 		if(!strncmp(loc, "unix", 4)) {
 			*b_unix = 1;
 			loc += 4;
+			goto next;
+		}
+		if(!strncmp(loc, "certfile=", 9)) {
+			*certfile = strndup(loc+9, strcspn(loc+9, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "keyfile=", 8)) {
+			*keyfile = strndup(loc+8, strcspn(loc+8, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "cacertfile=", 11)) {
+			*cacertfile = strndup(loc+11, strcspn(loc+11, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "tlshostname=", 9)) {
+			*tlshostname = strndup(loc+9, strcspn(loc+9, ","));
 			goto next;
 		}
 		// skip unknown options, with a warning unless they start with a '_'
@@ -503,8 +630,12 @@ void set_timeout(int nbd, int timeout) {
 }
 
 void finish_sock(int sock, int nbd, int swap) {
-	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0)
-		err("Ioctl NBD_SET_SOCK failed: %m\n");
+	if (ioctl(nbd, NBD_SET_SOCK, sock) < 0) {
+		if (errno == EBUSY)
+			err("Kernel doesn't support multiple connections\n");
+		else
+			err("Ioctl NBD_SET_SOCK failed: %m\n");
+	}
 
 #ifndef __ANDROID__
 	if (swap)
@@ -545,6 +676,9 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
+#if HAVE_GNUTLS
+	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n");
+#endif
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
@@ -588,10 +722,17 @@ int main(int argc, char *argv[]) {
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
 	sigset_t block, old;
+	char *certfile = NULL;
+	char *keyfile = NULL;
+	char *cacertfile = NULL;
+	char *tlshostname = NULL;
+	bool tls = false;
 	struct sigaction sa;
+	int num_connections = 1;
 	struct option long_options[] = {
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
+		{ "connections", required_argument, NULL, 'C'},
 		{ "disconnect", required_argument, NULL, 'd' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "list", no_argument, NULL, 'l' },
@@ -603,12 +744,22 @@ int main(int argc, char *argv[]) {
 		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ "unix", no_argument, NULL, 'u' },
+		{ "certfile", required_argument, NULL, 'F' },
+		{ "keyfile", required_argument, NULL, 'K' },
+		{ "cacertfile", required_argument, NULL, 'A' },
+		{ "tlshostname", required_argument, NULL, 'H' },
+		{ "enable-tls", no_argument, NULL, 'x' },
 		{ 0, 0, 0, 0 }, 
 	};
+	int i;
 
 	logging(MY_NAME);
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:u", long_options, NULL))>=0) {
+#if HAVE_GNUTLS
+        tlssession_init();
+#endif
+
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:x", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -657,6 +808,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'c':
 			return check_conn(optarg, 1);
+		case 'C':
+			num_connections = (int)strtol(optarg, NULL, 0);
+			break;
 		case 'd':
 			disconnect(optarg);
 			exit(EXIT_SUCCESS);
@@ -693,6 +847,30 @@ int main(int argc, char *argv[]) {
 		case 'u':
 			b_unix = 1;
 			break;
+#if HAVE_GNUTLS
+		case 'x':
+			tls = true;
+			break;
+                case 'F':
+                        certfile=strdup(optarg);
+                        break;
+                case 'K':
+                        keyfile=strdup(optarg);
+                        break;
+                case 'A':
+                        cacertfile=strdup(optarg);
+                        break;
+                case 'H':
+                        tlshostname=strdup(optarg);
+                        break;
+#else
+                case 'F':
+                case 'K':
+                case 'H':
+                case 'A':
+			fprintf(stderr, "E: TLS support not compiled in\n");
+                        exit(EXIT_FAILURE);
+#endif
 		default:
 			fprintf(stderr, "E: option eaten by 42 mice\n");
 			exit(EXIT_FAILURE);
@@ -706,7 +884,7 @@ int main(int argc, char *argv[]) {
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &hostname)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
 				}
@@ -720,31 +898,48 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
+        if (keyfile && !certfile)
+		certfile = strdup(keyfile);
+
+	if (certfile != NULL || keyfile != NULL || cacertfile != NULL || tlshostname != NULL) {
+		tls = true;
+	}
+
+        if (!tlshostname && hostname)
+                tlshostname = strdup(hostname);
+
 	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
-	if (b_unix)
-		sock = openunix(hostname);
-	else
-		sock = opennet(hostname, port, sdp);
-	if (sock < 0)
-		exit(EXIT_FAILURE);
+	if(!opts & NBDC_DO_LIST) {
+		nbd = open(nbddev, O_RDWR);
+		if (nbd < 0)
+			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
+	}
 
-	negotiate(sock, &size64, &flags, name, needed_flags, cflags, opts);
+	for (i = 0; i < num_connections; i++) {
+		if (b_unix)
+			sock = openunix(hostname);
+		else
+			sock = opennet(hostname, port, sdp);
+		if (sock < 0)
+			exit(EXIT_FAILURE);
 
-	nbd = open(nbddev, O_RDWR);
-	if (nbd < 0)
-	  err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
-
-	setsizes(nbd, size64, blocksize, flags);
-	set_timeout(nbd, timeout);
-	finish_sock(sock, nbd, swap);
-	if (swap) {
-		/* try linux >= 2.6.36 interface first */
-		if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
-			/* fall back to linux <= 2.6.35 interface */
-			oom_adjust("/proc/self/oom_adj", "-17");
+		negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls);
+		if (i == 0) {
+			setsizes(nbd, size64, blocksize, flags);
+			set_timeout(nbd, timeout);
+		}
+		finish_sock(sock, nbd, swap);
+		if (swap) {
+			if (keyfile)
+				fprintf(stderr, "Warning: using swap and TLS is prone to deadlock\n");
+			/* try linux >= 2.6.36 interface first */
+			if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
+				/* fall back to linux <= 2.6.35 interface */
+				oom_adjust("/proc/self/oom_adj", "-17");
+			}
 		}
 	}
 
@@ -828,7 +1023,7 @@ int main(int argc, char *argv[]) {
 					nbd = open(nbddev, O_RDWR);
 					if (nbd < 0)
 						err("Cannot open NBD: %m");
-					negotiate(sock, &new_size, &new_flags, name, needed_flags, cflags, opts);
+					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}

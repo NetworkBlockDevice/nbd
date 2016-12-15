@@ -58,6 +58,7 @@
 /* Includes LFS defines, which defines behaviours of some of the following
  * headers, so must come before those */
 #include "lfs.h"
+#define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE 500 /* to get pread/pwrite */
 #define _BSD_SOURCE /* to get DT_* macros */
 #define _DARWIN_C_SOURCE /* to get DT_* macros on OS X */
@@ -98,7 +99,6 @@
 #ifdef HAVE_SYS_DIRENT_H
 #include <sys/dirent.h>
 #endif
-#include <unistd.h>
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
@@ -107,6 +107,10 @@
 #include <inttypes.h>
 
 #include <glib.h>
+
+#if HAVE_OLD_GLIB
+#include <pthread.h>
+#endif
 
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
@@ -135,6 +139,10 @@
 #endif
 #define CFILE SYSCONFDIR "/nbd-server/config"
 
+#if HAVE_GNUTLS
+#include <gnutls/gnutls.h>
+#endif
+
 /** Where our config file actually is */
 gchar* config_file_pos;
 
@@ -156,6 +164,7 @@ int dontfork = 0;
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
 #define F_LIST 2	  /**< Allow clients to list the exports on a server */
 #define F_NO_ZEROES 4	  /**< Do not send zeros to client */
+// also accepts F_FORCEDTLS (which is 16384)
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
 char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of allow file */
@@ -163,6 +172,14 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #define NEG_INIT	(1 << 0)
 #define NEG_OLD		(1 << 1)
 #define NEG_MODERN	(1 << 2)
+
+/*
+ * If we want what the system really has set we'd have to read
+ * /proc/sys/fs/pipe-max-size, but for now 1mb should be enough.
+ */
+#define MAX_PIPE_SIZE (1 * 1024 * 1024)
+#define SPLICE_IN	0
+#define SPLICE_OUT	1
 
 #include <nbdsrv.h>
 
@@ -173,6 +190,7 @@ GThreadPool *tpool;
 struct work_package {
 	CLIENT* client;
 	struct nbd_request* req;
+	int pipefd[2];
 	void* data; /**< for read requests */
 };
 
@@ -200,6 +218,7 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       systems that don't support serving IPv4
 			       and IPv6 from the same socket (like,
 			       e.g., FreeBSD) */
+GArray* childsocks;	/**< parent-side sockets for communication with children */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -239,6 +258,9 @@ struct generic_conf {
         gchar *modernaddr;      /**< address of the modern socket */
         gchar *modernport;      /**< port of the modern socket    */
         gchar *unixsock;	/**< file name of the unix domain socket */
+	gchar *certfile;        /**< certificate file             */
+	gchar *keyfile;         /**< key file                     */
+	gchar *cacertfile;      /**< CA certificate file          */
         gint flags;             /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
@@ -269,23 +291,6 @@ static inline const char * getcommandname(uint64_t command) {
 }
 
 /**
- * Consume data from an FD that we don't want
- *
- * @param f a file descriptor
- * @param buf a buffer
- * @param len the number of bytes to consume
- * @param bufsiz the size of the buffer
- **/
-static inline void consume(int f, void * buf, size_t len, size_t bufsiz) {
-	size_t curlen;
-	while (len>0) {
-		curlen = (len>bufsiz)?bufsiz:len;
-		readit(f, buf, curlen);
-		len -= curlen;
-	}
-}
-
-/**
  * Write data from a buffer into a filedescriptor
  *
  * @param f a file descriptor
@@ -302,6 +307,131 @@ static inline void writeit(int f, void *buf, size_t len) {
 		buf += res;
 	}
 }
+
+#if HAVE_GNUTLS
+static void writeit_tls(gnutls_session_t s, void *buf, size_t len) {
+	ssize_t res;
+	char *m;
+	while(len > 0) {
+		DEBUG("+");
+		if ((res = gnutls_record_send(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
+			m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
+			err_nonfatal(m);
+			g_free(m);
+		} else if(res < 0) {
+			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
+			err(m);
+			g_free(m);
+			return;
+		} else {
+			len -= res;
+			buf += res;
+		}
+	}
+}
+
+static void readit_tls(gnutls_session_t s, void *buf, size_t len) {
+	ssize_t res;
+	char *m;
+	while(len > 0) {
+		DEBUG("*");
+		if((res = gnutls_record_recv(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
+			m = g_strdup_printf("issue while receiving data: %s", gnutls_strerror(res));
+			err_nonfatal(m);
+			g_free(m);
+		} else if(res < 0) {
+			m = g_strdup_printf("could not receive data: %s", gnutls_strerror(res));
+			err(m);
+			g_free(m);
+			return;
+		} else {
+			len -= res;
+			buf += res;
+		}
+	}
+}
+
+static void socket_read_tls(CLIENT* client, void *buf, size_t len) {
+	readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+}
+
+static void socket_write_tls(CLIENT* client, void *buf, size_t len) {
+	writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+}
+#endif // HAVE_GNUTLS
+
+static void socket_read_notls(CLIENT* client, void *buf, size_t len) {
+	readit(client->net, buf, len);
+}
+
+static void socket_write_notls(CLIENT* client, void *buf, size_t len) {
+	writeit(client->net, buf, len);
+}
+
+static void socket_read(CLIENT* client, void *buf, size_t len) {
+	g_assert(client->socket_read != NULL);
+	client->socket_read(client, buf, len);
+}
+
+/**
+ * Consume data from a socket that we don't want
+ *
+ * @param c the client to read from
+ * @param len the number of bytes to consume
+ * @param buf a buffer
+ * @param bufsiz the size of the buffer
+ **/
+static inline void consume(CLIENT* c, size_t len, void * buf, size_t bufsiz) {
+	size_t curlen;
+	while (len>0) {
+		curlen = (len>bufsiz)?bufsiz:len;
+		socket_read(c, buf, curlen);
+		len -= curlen;
+	}
+}
+
+/**
+ * Consume a length field and corresponding payload that we don't want
+ *
+ * @param c the client to read from
+ **/
+static inline void consume_len(CLIENT* c) {
+	uint32_t len;
+	char buf[1024];
+
+	socket_read(c, &len, sizeof(len));
+	len = ntohl(len);
+	consume(c, len, buf, sizeof(buf));
+}
+
+
+static void socket_write(CLIENT* client, void *buf, size_t len) {
+	g_assert(client->socket_write != NULL);
+	client->socket_write(client, buf, len);
+}
+
+#ifdef HAVE_SPLICE
+/**
+ * Splice data between a pipe and a file descriptor
+ *
+ * @param fd_in The fd to splice from.
+ * @param off_in The fd_in offset to splice from.
+ * @param fd_out The fd to splice to.
+ * @param off_out The fd_out offset to splice to.
+ * @param len The length to splice.
+ */
+static inline void spliceit(int fd_in, loff_t *off_in, int fd_out,
+			    loff_t *off_out, size_t len)
+{
+	ssize_t ret;
+	while (len > 0) {
+		if ((ret = splice(fd_in, off_in, fd_out, off_out, len,
+				  SPLICE_F_MOVE)) <= 0)
+			err("Splice failed: %m");
+		len -= ret;
+	}
+}
+#endif
 
 /**
  * Print out a message about how to use nbd-server. Split out to a separate
@@ -628,6 +758,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "trim",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TRIM },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
+		{ "force_tls",	FALSE,	PARAM_BOOL,	&(s.flags),		F_FORCEDTLS },
+		{ "splice",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPLICE},
 	};
 	const int lp_size=sizeof(lp)/sizeof(PARAM);
         struct generic_conf genconftmp;
@@ -641,6 +773,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
 		{ "max_threads", FALSE, PARAM_INT,	&(genconftmp.threads),	  0 },
+		{ "force_tls", FALSE, PARAM_BOOL,	&(genconftmp.flags),	  F_FORCEDTLS },
+		{ "certfile",   FALSE, PARAM_STRING,    &(genconftmp.certfile),   0 },
+		{ "keyfile",    FALSE, PARAM_STRING,    &(genconftmp.keyfile),    0 },
+		{ "cacertfile", FALSE, PARAM_STRING,    &(genconftmp.cacertfile), 0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -782,6 +918,23 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(genconftmp.flags & F_OLDSTYLE) {
 			g_message("Since 3.10, the oldstyle protocol is no longer supported. Please migrate to the newstyle protocol.");
 			g_message("Exiting.");
+			return NULL;
+		}
+#ifndef HAVE_SPLICE
+		if (s.flags & F_SPLICE) {
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without splice support, yet group %s uses it", groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
+			return NULL;
+		}
+#endif
+		/* We can't mix copyonwrite and splice. */
+		if ((s.flags & F_COPYONWRITE) && (s.flags & F_SPLICE)) {
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_INVALID_SPLICE,
+				    "Cannot mix copyonwrite with splice for an export in group %s",
+				    groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
 			return NULL;
 		}
 		/* Don't need to free this, it's not our string */
@@ -1081,6 +1234,68 @@ int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
 	return (ret < 0 || len != 0);
 }
 
+#ifdef HAVE_SPLICE
+int rawexpsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir,
+		 int fua)
+{
+	int fhandle;
+	off_t foffset;
+	size_t maxbytes;
+	ssize_t retval;
+
+	if (get_filepos(client, a, &fhandle, &foffset, &maxbytes))
+		return -1;
+	if (maxbytes && len > maxbytes)
+		len = maxbytes;
+
+	DEBUG("(SPLICE %s fd %d offset %llu len %u), ",
+	      (dir == SPLICE_IN) ? "from" : "to", fhandle,
+	      (unsigned long long)a, (unsigned)len);
+
+	/*
+	 * SPLICE_F_MOVE doesn't actually work at the moment, but in the future
+	 * it might, so go ahead and use it.
+	 */
+	if (dir == SPLICE_IN) {
+		retval = splice(fhandle, &foffset, pipe, NULL, len,
+				SPLICE_F_MOVE);
+	} else {
+		retval = splice(pipe, NULL, fhandle, &foffset, len,
+				SPLICE_F_MOVE);
+		if (client->server->flags & F_SYNC)
+			fsync(fhandle);
+		else if (fua)
+			fdatasync(fhandle);
+	}
+	if (client->server->flags & F_TREEFILES)
+		close(fhandle);
+	return retval;
+}
+
+/**
+ * Splice an amount of bytes from the given offset from/into the right file
+ * from/into the given pipe.
+ * @param pipe The pipe we are using for this splice.
+ * @param a The offset of the file we are operating on.
+ * @param len The length of the splice.
+ * @param client The client we're splicing for.
+ * @param dir The direction we are doing the splice in.
+ * @param fua Set if this is a write and we need to fua.
+ * @return 0 on success, nonzero on failure.
+ */
+int expsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir, int fua)
+{
+	ssize_t ret;
+
+	while (len > 0 &&
+	       (ret = rawexpsplice(pipe, a, len, client, dir, fua)) > 0) {
+		a += ret;
+		len -= ret;
+	}
+	return (ret < 0 || len != 0);
+}
+#endif /* HAVE_SPLICE */
+
 /**
  * Read an amount of bytes at a given offset from the right file. This
  * abstracts the read-side of the copyonwrite stuff, and calls
@@ -1195,10 +1410,9 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
  * @param client The client we're going to write for.
  * @return 0 on success, nonzero on failure
  **/
-int expwrite_zeroes(struct nbd_request* req, CLIENT* client) {
+int expwrite_zeroes(struct nbd_request* req, CLIENT* client, int fua) {
 	off_t a = req->from;
 	size_t len = req->len;
-	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
 	size_t maxsize = 64LL*1024LL*1024LL;
 	/* use calloc() as sadly MAP_ANON is apparently not POSIX standard */
 	char *buf = calloc (1, maxsize);
@@ -1264,53 +1478,52 @@ void punch_hole(int fd, off_t off, off_t len) {
 #endif
 }
 
-static void send_reply(uint32_t opt, int net, uint32_t reply_type, size_t datasize, void* data) {
-	uint64_t magic = htonll(0x3e889045565a9LL);
-	reply_type = htonl(reply_type);
-	uint32_t datsize = htonl(datasize);
-	opt = htonl(opt);
-	struct iovec v_data[] = {
-		{ &magic, sizeof(magic) },
-		{ &opt, sizeof(opt) },
-		{ &reply_type, sizeof(reply_type) },
-		{ &datsize, sizeof(datsize) },
-		{ data, datasize },
+static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, void* data) {
+	struct {
+		uint64_t magic;
+		uint32_t opt;
+		uint32_t reply_type;
+		uint32_t datasize;
+	} __attribute__ ((packed)) header = {
+		htonll(0x3e889045565a9LL),
+		htonl(opt),
+		htonl(reply_type),
+		htonl(datasize),
 	};
-	size_t total = sizeof(magic) + sizeof(opt) + sizeof(reply_type) + sizeof(datsize) + datasize;
-	ssize_t sent = writev(net, v_data, 5);
-	if(sent != total) {
-		perror("E: couldn't write enough data:");
+	if(datasize < 0) {
+		datasize = strlen((char*)data);
+		header.datasize = htonl(datasize);
+	}
+	socket_write(client, &header, sizeof(header));
+	if(datasize != 0) {
+		socket_write(client, data, datasize);
 	}
 }
 
-static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
 	uint32_t namelen;
 	char* name;
 	int i;
 
-	if (read(net, &namelen, sizeof(namelen)) < 0) {
-		err("Negotiation failed/7: %m");
-		return NULL;
-	}
+	socket_read(client, &namelen, sizeof(namelen));
 	namelen = ntohl(namelen);
 	if(namelen > 0) {
 		name = malloc(namelen+1);
 		name[namelen]=0;
-		if (read(net, name, namelen) < 0) {
-			err("Negotiation failed/8: %m");
-			free(name);
-			return NULL;
-		}
+		socket_read(client, name, namelen);
 	} else {
 		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		// hide exports that are TLS-only if we haven't negotiated TLS
+		// yet
+		if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
+			continue;
+		}
 		if(!strcmp(serve->servename, name)) {
-			CLIENT* client = g_new0(CLIENT, 1);
 			client->server = serve;
 			client->exportsize = OFFT_MAX;
-			client->net = net;
 			client->modern = TRUE;
 			client->transactionlogfd = -1;
 			client->clientfeats = cflags;
@@ -1319,99 +1532,207 @@ static CLIENT* handle_export_name(uint32_t opt, int net, GArray* servers, uint32
 			return client;
 		}
 	}
-	err("Negotiation failed/8a: Requested export not found");
+	err("Negotiation failed/8a: Requested export not found, or is TLS-only and client did not negotiate TLS");
 	free(name);
 	return NULL;
 }
 
-static void handle_list(uint32_t opt, int net, GArray* servers, uint32_t cflags) {
+static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
 	uint32_t len;
 	int i;
 	char buf[1024];
 	char *ptr = buf + sizeof(len);
 
-	if (read(net, &len, sizeof(len)) < 0)
-		err("Negotiation failed/8: %m");
+	socket_read(client, &len, sizeof(len));
 	len = ntohl(len);
 	if(len) {
-		send_reply(opt, net, NBD_REP_ERR_INVALID, 0, NULL);
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "NBD_OPT_LIST with nonzero data length is not a valid request");
 	}
 	if(!(glob_flags & F_LIST)) {
-		send_reply(opt, net, NBD_REP_ERR_POLICY, 0, NULL);
+		send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "Listing of exports denied by server configuration");
 		err_nonfatal("Client tried disallowed list option");
 		return;
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		// Hide TLS-only exports if we haven't negotiated TLS yet
+		if(!client->tls_session && (serve->flags & F_FORCEDTLS)) {
+			continue;
+		}
 		len = htonl(strlen(serve->servename));
 		memcpy(buf, &len, sizeof(len));
 		strncpy(ptr, serve->servename, sizeof(buf) - sizeof(len));
-		send_reply(opt, net, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
+		send_reply(client, opt, NBD_REP_SERVER, strlen(serve->servename)+sizeof(len), buf);
 	}
-	send_reply(opt, net, NBD_REP_ACK, 0, NULL);
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 }
+
+#if HAVE_GNUTLS
+CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, struct generic_conf *genconf) {
+#define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
+	gnutls_certificate_credentials_t x509_cred;
+	CLIENT* retval = client;
+	gnutls_priority_t priority_cache;
+	gnutls_session_t *session = g_new0(gnutls_session_t, 1);
+	int ret;
+	int len;
+
+	socket_read(client, &len, sizeof(len));
+	if(G_UNLIKELY(len != 0)) {
+		char buf[1024*1024];
+		consume(client, len, buf, sizeof(buf));
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Sending a STARTTLS command with data is invalid");
+		return NULL;
+	}
+
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
+
+	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
+	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
+	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
+	check_rv(gnutls_priority_init(&priority_cache, "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE", NULL));
+	check_rv(gnutls_init(session, GNUTLS_SERVER));
+	check_rv(gnutls_priority_set(*session, priority_cache));
+	check_rv(gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, x509_cred));
+
+	gnutls_certificate_server_set_request(*session, GNUTLS_CERT_REQUEST);
+#if GNUTLS_VERSION_NUMBER >= 0x030109
+	gnutls_transport_set_int(*session, client->net);
+#else
+	gnutls_transport_set_ptr(*session, (gnutls_transport_ptr_t) (intptr_t) client->net);
+#endif
+	do {
+		ret = gnutls_handshake(*session);
+	} while(ret < 0 && gnutls_error_is_fatal(ret) == 0);
+
+	if (ret < 0) {
+		err_nonfatal(gnutls_strerror(ret));
+		gnutls_deinit(*session);
+		g_free(session);
+		return NULL;
+	}
+	client->tls_session = session;
+	client->socket_read = socket_read_tls;
+	client->socket_write = socket_write_tls;
+#undef check_rv
+exit:
+	if(retval == NULL && session != NULL) {
+		g_free(session);
+	}
+	/* export names cannot be chosen before NBD_OPT_STARTTLS and be retained */
+	if(retval != NULL && retval->server != NULL) {
+		retval->server = NULL;
+	}
+	return retval;
+}
+#endif
 
 /**
  * Do the initial negotiation.
  *
- * @param client The client we're negotiating with.
+ * @param net The socket we're doing the negotiation over.
+ * @param servers The array of known servers.
+ * @param genconf the global options (needed for accessing TLS config data)
  **/
-CLIENT* negotiate(int net, GArray* servers) {
+CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 	uint16_t smallflags = NBD_FLAG_FIXED_NEWSTYLE | NBD_FLAG_NO_ZEROES;
 	uint64_t magic;
 	uint32_t cflags = 0;
 	uint32_t opt;
+	CLIENT* client = g_new0(CLIENT, 1);
+	client->net = net;
+	client->socket_read = socket_read_notls;
+	client->socket_write = socket_write_notls;
 
 	assert(servers != NULL);
-	if (write(net, INIT_PASSWD, 8) < 0)
-		err_nonfatal("Negotiation failed/1: %m");
+	socket_write(client, INIT_PASSWD, 8);
 	magic = htonll(opts_magic);
-	if (write(net, &magic, sizeof(magic)) < 0)
-		err_nonfatal("Negotiation failed/2: %m");
+	socket_write(client, &magic, sizeof(magic));
 
 	smallflags = htons(smallflags);
-	if (write(net, &smallflags, sizeof(uint16_t)) < 0)
-		err_nonfatal("Negotiation failed/3: %m");
-	if (read(net, &cflags, sizeof(cflags)) < 0)
-		err_nonfatal("Negotiation failed/4: %m");
+	socket_write(client, &smallflags, sizeof(uint16_t));
+	socket_read(client, &cflags, sizeof(cflags));
 	cflags = htonl(cflags);
 	if (cflags & NBD_FLAG_C_NO_ZEROES) {
 		glob_flags |= F_NO_ZEROES;
 	}
 	do {
-		if (read(net, &magic, sizeof(magic)) < 0)
-			err_nonfatal("Negotiation failed/5: %m");
+		socket_read(client, &magic, sizeof(magic));
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			err_nonfatal("Negotiation failed/5a: magic mismatch");
 			return NULL;
 		}
-		if (read(net, &opt, sizeof(opt)) < 0)
-			err_nonfatal("Negotiation failed/6: %m");
+		socket_read(client, &opt, sizeof(opt));
 		opt = ntohl(opt);
+		if(client->tls_session == NULL
+				&& glob_flags & F_FORCEDTLS
+				&& opt != NBD_OPT_STARTTLS) {
+			if(opt == NBD_OPT_EXPORT_NAME) {
+				// can't send an error message for EXPORT_NAME,
+				// so must do hard close
+				goto hard_close;
+			}
+			if(opt == NBD_OPT_ABORT) {
+				// handled below
+				break;
+			}
+			consume_len(client);
+			send_reply(client, opt, NBD_REP_ERR_TLS_REQD, -1, "TLS is required on this server");
+			continue;
+		}
 		switch(opt) {
 		case NBD_OPT_EXPORT_NAME:
 			// NBD_OPT_EXPORT_NAME must be the last
 			// selected option, so return from here
 			// if that is chosen.
-			return handle_export_name(opt, net, servers, cflags);
+			if(handle_export_name(client, opt, servers, cflags) != NULL) {
+				return client;
+			} else {
+				goto hard_close;
+			}
 			break;
 		case NBD_OPT_LIST:
-			handle_list(opt, net, servers, cflags);
+			handle_list(client, opt, servers, cflags);
 			break;
 		case NBD_OPT_ABORT:
 			// handled below
 			break;
+		case NBD_OPT_STARTTLS:
+#if !HAVE_GNUTLS
+			consume_len(client);
+			send_reply(client, opt, NBD_REP_ERR_PLATFORM, -1, "This nbd-server was compiled without TLS support");
+#else
+			if(client->tls_session != NULL) {
+				consume_len(client);
+				send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "Invalid STARTTLS request: TLS has already been negotiated!");
+				continue;
+			}
+			if(genconf->keyfile == NULL) {
+				consume_len(client);
+				send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "TLS not allowed on this server");
+				continue;
+			}
+			if(handle_starttls(client, opt, servers, cflags, genconf) == NULL) {
+				// can't recover from failed TLS negotiation.
+				goto hard_close;
+			}
+#endif
+			break;
 		default:
-			send_reply(opt, net, NBD_REP_ERR_UNSUP, 0, NULL);
+			consume_len(client);
+			send_reply(client, opt, NBD_REP_ERR_UNSUP, -1, "The given option is unknown to this server implementation");
 			break;
 		}
 	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
 	if(opt == NBD_OPT_ABORT) {
 		err_nonfatal("Session terminated by client");
-		return NULL;
+		goto hard_close;
 	}
 	err_nonfatal("Weird things happened: reached end of negotiation without success");
+hard_close:
+	close(net);
+	g_free(client);
 	return NULL;
 }
 
@@ -1419,8 +1740,7 @@ void send_export_info(CLIENT* client) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
-	if (write(client->net, &size_host, 8) < 0)
-		err("Negotiation failed/9: %m");
+	socket_write(client, &size_host, 8);
 	if (client->server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
 	if (client->server->flags & F_FLUSH)
@@ -1432,13 +1752,11 @@ void send_export_info(CLIENT* client) {
 	if (client->server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
 	flags = htons(flags);
-	if (write(client->net, &flags, sizeof(flags)) < 0)
-		err("Negotiation failed/11: %m");
+	socket_write(client, &flags, sizeof(flags));
 	if (!(glob_flags & F_NO_ZEROES)) {
 		char zeros[128];
 		memset(zeros, '\0', sizeof(zeros));
-		if (write(client->net, zeros, 124) < 0)
-			err("Negotiation failed/12: %m");
+		socket_write(client, zeros, 124);
 	}
 }
 
@@ -1464,9 +1782,33 @@ static int nbd_errno(int errcode) {
 }
 
 static void package_dispose(struct work_package* package) {
+	if (package->pipefd[0] > 0)
+		close(package->pipefd[0]);
+	if (package->pipefd[1] > 0)
+		close(package->pipefd[1]);
 	g_free(package->data);
 	g_free(package->req);
 	g_free(package);
+}
+
+static int mkpipe(int pipefd[2], size_t len)
+{
+	if (len > MAX_PIPE_SIZE)
+		return -1;
+	if (pipe(pipefd))
+		return -1;
+
+#ifdef HAVE_SPLICE
+	if (fcntl(pipefd[1], F_SETPIPE_SZ, MAX_PIPE_SIZE) < MAX_PIPE_SIZE) {
+		close(pipefd[0]);
+		close(pipefd[1]);
+		pipefd[0] = -1;
+		pipefd[1] = -1;
+		return -1;
+	}
+#endif
+
+	return 0;
 }
 
 struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
@@ -1474,9 +1816,18 @@ struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
 
 	rv->req = req;
 	rv->client = client;
+	rv->data = NULL;
+	rv->pipefd[0] = -1;
+	rv->pipefd[1] = -1;
 
-	if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE)
-		rv->data = malloc(req->len);
+	if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
+		if (client->server->flags & F_SPLICE) {
+			if (mkpipe(rv->pipefd, req->len))
+				rv->data = malloc(req->len);
+		} else {
+			rv->data = malloc(req->len);
+		}
+	}
 
 	return rv;
 }
@@ -1487,7 +1838,41 @@ static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
 	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
 }
 
-static void handle_read(CLIENT* client, struct nbd_request* req) {
+#ifdef HAVE_SPLICE
+static int handle_splice_read(CLIENT *client, struct nbd_request *req)
+{
+	struct nbd_reply rep;
+	int pipefd[2];
+	int max_pipe_size = 1 * 1024 * 1024;
+	int pipe_size;
+
+	// splice doesn't work with TLS
+	if (client->tls_session != NULL)
+		return -1;
+
+	if (mkpipe(pipefd, req->len))
+		return -1;
+
+	if (expsplice(pipefd[1], req->from, req->len, client, SPLICE_IN, 0)) {
+		close(pipefd[1]);
+		close(pipefd[0]);
+		return -1;
+	}
+
+	DEBUG("handling read request (splice)\n");
+	setup_reply(&rep, req);
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof(rep));
+	spliceit(pipefd[0], NULL, client->net, NULL, req->len);
+	pthread_mutex_unlock(&(client->lock));
+	close(pipefd[0]);
+	close(pipefd[1]);
+	return 0;
+}
+#endif
+
+static void handle_normal_read(CLIENT *client, struct nbd_request *req)
+{
 	struct nbd_reply rep;
 	void* buf = malloc(req->len);
 	if(!buf) {
@@ -1500,14 +1885,35 @@ static void handle_read(CLIENT* client, struct nbd_request* req) {
 		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
-	writeit(client->net, buf, req->len);
+	socket_write(client, &rep, sizeof rep);
+	if(!rep.error) {
+		socket_write(client, buf, req->len);
+	}
 	pthread_mutex_unlock(&(client->lock));
 	free(buf);
 }
 
-static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
+static void handle_read(CLIENT* client, struct nbd_request* req)
+{
+#ifdef HAVE_SPLICE
+	/*
+	 * If we have splice set we want to try that first, and if that fails
+	 * for whatever reason we fall through to ye olde read.
+	 */
+	if (client->server->flags & F_SPLICE)
+		if (!handle_splice_read(client, req))
+			return;
+#endif
+	handle_normal_read(client, req);
+}
+
+static void handle_write(struct work_package *pkg)
+{
+	CLIENT *client = pkg->client;
+	struct nbd_request *req = pkg->req;
 	struct nbd_reply rep;
+	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
+
 	DEBUG("handling write request\n");
 	setup_reply(&rep, req);
 
@@ -1515,14 +1921,22 @@ static void handle_write(CLIENT* client, struct nbd_request* req, void* data) {
 	    (client->server->flags & F_AUTOREADONLY)) {
 		DEBUG("[WRITE to READONLY!]");
 		rep.error = nbd_errno(EPERM);
+#ifdef HAVE_SPLICE
+	} else if (!pkg->data) {
+		if (expsplice(pkg->pipefd[0], req->from, req->len, client,
+			      SPLICE_OUT, fua)) {
+			DEBUG("Splice failed: %M");
+			rep.error = nbd_errno(errno);
+		}
+#endif
 	} else {
-		if(expwrite(req->from, data, req->len, client, !!(req->type & NBD_CMD_FLAG_FUA))) {
+		if(expwrite(req->from, pkg->data, req->len, client, fua)) {
 			DEBUG("Write failed: %m");
 			rep.error = nbd_errno(errno);
 		}
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
@@ -1535,7 +1949,7 @@ static void handle_flush(CLIENT* client, struct nbd_request* req) {
 		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
@@ -1548,15 +1962,20 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 		rep.error = nbd_errno(errno);
 	}
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
 static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
 	struct nbd_reply rep;
 	DEBUG("handling write_zeroes request\n");
+	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
 	setup_reply(&rep, req);
-	if(expwrite_zeroes(req, client)) {
+	if ((client->server->flags & F_READONLY) ||
+	    (client->server->flags & F_AUTOREADONLY)) {
+		DEBUG("[WRITE to READONLY!]");
+		rep.error = nbd_errno(EPERM);
+	} else if(expwrite_zeroes(req, client, fua)) {
 		DEBUG("Write_zeroes failed: %m");
 		rep.error = nbd_errno(errno);
 	}
@@ -1584,7 +2003,7 @@ static void handle_request(gpointer data, gpointer user_data) {
 			handle_read(package->client, package->req);
 			break;
 		case NBD_CMD_WRITE:
-			handle_write(package->client, package->req, package->data);
+			handle_write(package);
 			break;
 		case NBD_CMD_FLUSH:
 			handle_flush(package->client, package->req);
@@ -1604,7 +2023,7 @@ error:
 	setup_reply(&rep, package->req);
 	rep.error = nbd_errno(EINVAL);
 	pthread_mutex_lock(&(package->client->lock));
-	writeit(package->client->net, &rep, sizeof rep);
+	socket_write(package->client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(package->client->lock));
 end:
 	package_dispose(package);
@@ -1619,7 +2038,7 @@ static int mainloop_threaded(CLIENT* client) {
 	while(1) {
 		req = calloc(sizeof (struct nbd_request), 1);
 
-		readit(client->net, req, sizeof(struct nbd_request));
+		socket_read(client, req, sizeof(struct nbd_request));
 		if(client->transactionlogfd != -1) {
 			writeit(client->transactionlogfd, req, sizeof(struct nbd_request));
 		}
@@ -1634,7 +2053,15 @@ static int mainloop_threaded(CLIENT* client) {
 		pkg = package_create(client, req);
 
 		if((req->type & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) {
-			readit(client->net, pkg->data, req->len);
+#ifdef HAVE_SPLICE
+			if ((client->server->flags & F_SPLICE) &&
+			    (req->len <= MAX_PIPE_SIZE && pkg->pipefd[1] > 0) &&
+			    (client->tls_session == NULL))
+				spliceit(client->net, NULL, pkg->pipefd[1],
+					 NULL, req->len);
+			else
+#endif
+				socket_read(client, pkg->data, req->len);
 		}
 		if(req->type == NBD_CMD_DISC) {
 			g_thread_pool_free(tpool, FALSE, TRUE);
@@ -1645,11 +2072,11 @@ static int mainloop_threaded(CLIENT* client) {
 }
 
 /** sending macro. */
-#define SEND(net,reply) { writeit( net, &reply, sizeof( reply )); \
+#define SEND(cl,reply) { socket_write( cl, &reply, sizeof( reply )); \
 	if (client->transactionlogfd != -1) \
 		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
 /** error macro. */
-#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client->net,reply); reply.error = 0; }
+#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client,reply); reply.error = 0; }
 /**
  * Serve a file to a single client.
  *
@@ -1681,7 +2108,7 @@ int mainloop(CLIENT *client) {
 		i++;
 		printf("%d: ", i);
 #endif
-		readit(client->net, &request, sizeof(request));
+		socket_read(client, &request, sizeof(request));
 		if (client->transactionlogfd != -1)
 			writeit(client->transactionlogfd, &request, sizeof(request));
 
@@ -1739,27 +2166,27 @@ int mainloop(CLIENT *client) {
 		case NBD_CMD_WRITE:
 			DEBUG("wr: net->buf, ");
 			while(len > 0) {
-				readit(client->net, buf, currlen);
+				socket_read(client, buf, currlen);
 				DEBUG("buf->exp, ");
 				if ((client->server->flags & F_READONLY) ||
 				    (client->server->flags & F_AUTOREADONLY)) {
 					DEBUG("[WRITE to READONLY!]");
 					ERROR(client, reply, EPERM);
-					consume(client->net, buf, len-currlen, BUFSIZE);
+					consume(client, len-currlen, buf, BUFSIZE);
 					continue;
 				}
 				if (expwrite(request.from, buf, currlen, client,
 					     request.type & NBD_CMD_FLAG_FUA)) {
 					DEBUG("Write failed: %m" );
 					ERROR(client, reply, errno);
-					consume(client->net, buf, len-currlen, BUFSIZE);
+					consume(client, len-currlen, buf, BUFSIZE);
 					continue;
 				}
 				len -= currlen;
 				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			DEBUG("OK!\n");
 			continue;
 
@@ -1770,7 +2197,7 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, errno);
 				continue;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			DEBUG("OK!\n");
 			continue;
 
@@ -1778,7 +2205,7 @@ int mainloop(CLIENT *client) {
 			DEBUG("exp->buf, ");
 			if (client->transactionlogfd != -1)
 				writeit(client->transactionlogfd, &reply, sizeof(reply));
-			writeit(client->net, &reply, sizeof(reply));
+			socket_write(client, &reply, sizeof(reply));
 			p = buf;
 			writelen = currlen;
 			while(len > 0) {
@@ -1789,7 +2216,7 @@ int mainloop(CLIENT *client) {
 				}
 				
 				DEBUG("buf->net, ");
-				writeit(client->net, buf, writelen);
+				socket_write(client, buf, writelen);
 				len -= currlen;
 				request.from += currlen;
 				currlen = (len < BUFSIZE) ? len : BUFSIZE;
@@ -1813,7 +2240,7 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, errno);
 				continue;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			continue;
 
 		case NBD_CMD_WRITE_ZEROES:
@@ -1823,12 +2250,13 @@ int mainloop(CLIENT *client) {
 				ERROR(client, reply, EPERM);
 				continue;
 			}
-			if (expwrite_zeroes(&request, client)) {
+			if (expwrite_zeroes(&request, client,
+					    request.type & NBD_CMD_FLAG_FUA)) {
 				DEBUG("Write zeroes failed: %m");
 				ERROR(client, reply, errno);
 				continue;
 			}
-			SEND(client->net, reply);
+			SEND(client, reply);
 			continue;
 
 		default:
@@ -2162,16 +2590,18 @@ void destroy_pid_t(gpointer data) {
 }
 
 static pid_t
-spawn_child()
+spawn_child(int* socket)
 {
         pid_t pid;
         sigset_t newset;
         sigset_t oldset;
+	int sockets[2];
 
         sigemptyset(&newset);
         sigaddset(&newset, SIGCHLD);
         sigaddset(&newset, SIGTERM);
         sigprocmask(SIG_BLOCK, &newset, &oldset);
+	socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
         pid = fork();
         if (pid < 0) {
                 msg(LOG_ERR, "Could not fork (%s)", strerror(errno));
@@ -2182,11 +2612,14 @@ spawn_child()
 
                 pidp = g_malloc(sizeof(pid_t));
                 *pidp = pid;
+		*socket = sockets[1];
+		close(sockets[0]);
                 g_hash_table_insert(children, pidp, pidp);
                 goto out;
         }
         /* Child */
-
+	*socket = sockets[0];
+	close(sockets[1]);
         /* Child's signal disposition is reset to default. */
         signal(SIGCHLD, SIG_DFL);
         signal(SIGTERM, SIG_DFL);
@@ -2213,42 +2646,34 @@ socket_accept(const int sock)
 }
 
 static void
-handle_modern_connection(GArray *const servers, const int sock)
+handle_modern_connection(GArray *const servers, const int sock, struct generic_conf *genconf)
 {
         int net;
         pid_t pid;
         CLIENT *client = NULL;
         int sock_flags_old;
         int sock_flags_new;
+	int commsocket;
+	char acl;
+	uint32_t len;
 
         net = socket_accept(sock);
         if (net < 0)
                 return;
 
         if (!dontfork) {
-                pid = spawn_child();
+                pid = spawn_child(&commsocket);
                 if (pid) {
-                        if (pid > 0)
+                        if (pid > 0) {
                                 msg(LOG_INFO, "Spawned a child process");
+				g_array_append_val(childsocks, commsocket);
+			}
                         if (pid < 0)
                                 msg(LOG_ERR, "Failed to spawn a child process");
                         close(net);
                         return;
                 }
                 /* Child just continues. */
-        }
-
-        client = negotiate(net, servers);
-        if (!client) {
-                msg(LOG_ERR, "Modern initial negotiation failed");
-                goto handler_err;
-        }
-
-        if (client->server->max_connections > 0 &&
-           g_hash_table_size(children) >= client->server->max_connections) {
-                msg(LOG_ERR, "Max connections (%d) reached",
-                    client->server->max_connections);
-                goto handler_err;
         }
 
         sock_flags_old = fcntl(net, F_GETFL, 0);
@@ -2263,6 +2688,26 @@ handle_modern_connection(GArray *const servers, const int sock)
                 msg(LOG_ERR, "Failed to set socket to blocking mode");
                 goto handler_err;
         }
+
+        client = negotiate(net, servers, genconf);
+        if (!client) {
+                msg(LOG_ERR, "Modern initial negotiation failed");
+                goto handler_err;
+        }
+	len = strlen(client->server->servename);
+	writeit(commsocket, &len, sizeof len);
+	writeit(commsocket, client->server->servename, len);
+	readit(commsocket, &acl, 1);
+	close(commsocket);
+
+	switch(acl) {
+		case 'N':
+			msg(LOG_ERR, "Connection not allowed (too many clients)");
+			goto handler_err;
+		case 'X':
+			msg(LOG_ERR, "Connection not allowed (unknown by parent?!?)");
+			goto handler_err;
+	}
 
         if (set_peername(net, client)) {
                 msg(LOG_ERR, "Failed to set peername");
@@ -2311,6 +2756,35 @@ handler_err:
         if (!dontfork) {
                 exit(EXIT_FAILURE);
         }
+}
+
+static int handle_childname(GArray* servers, int socket)
+{
+	uint32_t len;
+	char *buf;
+	int i;
+
+	if(read(socket, &len, sizeof len) == 0) {
+		return -1;
+	}
+	buf = g_malloc0(len);
+	readit(socket, buf, len);
+	for(i=0; i<servers->len; i++) {
+		SERVER* srv = &g_array_index(servers, SERVER, i);
+		if(strcmp(srv->servename, buf) == 0) {
+			if(srv->max_connections == 0 || srv->max_connections > srv->numclients) {
+				writeit(socket, "Y", 1);
+				srv->numclients++;
+			} else {
+				writeit(socket, "N", 1);
+			}
+			goto exit;
+		}
+	}
+	writeit(socket, "X", 1);
+exit:
+	g_free(buf);
+	return 0;
 }
 
 /**
@@ -2375,12 +2849,13 @@ out:
         return retval;
 }
 
+void serveloop(GArray* servers, struct generic_conf *genconf) G_GNUC_NORETURN;
 /**
  * Loop through the available servers, and serve them. Never returns.
  **/
-void serveloop(GArray* servers) {
+void serveloop(GArray* servers, struct generic_conf *genconf) {
 	int i;
-	int max;
+	int mmax, max;
 	fd_set mset;
 	fd_set rset;
 	sigset_t blocking_mask;
@@ -2393,12 +2868,12 @@ void serveloop(GArray* servers) {
 	 * to not fork() for clients anymore, we may have to revisit
 	 * this.
 	 */
-	max=0;
+	mmax=0;
 	FD_ZERO(&mset);
 	for(i=0;i<modernsocks->len;i++) {
 		int sock = g_array_index(modernsocks, int, i);
 		FD_SET(sock, &mset);
-		max=sock>max?sock:max;
+		mmax=sock>max?sock:max;
 	}
 
 	/* Construct a signal mask which is used to make signal testing and
@@ -2479,6 +2954,13 @@ void serveloop(GArray* servers) {
                 }
 
 		memcpy(&rset, &mset, sizeof(fd_set));
+		max=mmax;
+		for(i=0;i<childsocks->len;i++) {
+			int sock = g_array_index(childsocks, int, i);
+			FD_SET(sock, &rset);
+			max=sock>max?sock:max;
+		}
+
 		if (pselect(max + 1, &rset, NULL, NULL, NULL, &original_mask) > 0) {
 			DEBUG("accept, ");
 			for(i=0; i < modernsocks->len; i++) {
@@ -2487,12 +2969,21 @@ void serveloop(GArray* servers) {
 					continue;
 				}
 
-				handle_modern_connection(servers, sock);
+				handle_modern_connection(servers, sock, genconf);
+			}
+			for(i=0; i < childsocks->len; i++) {
+				int sock = g_array_index(childsocks, int, i);
+
+				if(FD_ISSET(sock, &rset)) {
+					if(handle_childname(servers, sock) < 0) {
+						close(sock);
+						g_array_remove_index(childsocks, i);
+					}
+				}
 			}
 		}
 	}
 }
-void serveloop(GArray* servers) G_GNUC_NORETURN;
 
 /**
  * Set server socket options.
@@ -2841,6 +3332,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	modernsocks = g_array_new(FALSE, FALSE, sizeof(int));
+	childsocks = g_array_new(FALSE, FALSE, sizeof(int));
 
 	logging(MY_NAME);
 	config_file_pos = g_strdup(CFILE);
@@ -2848,7 +3340,7 @@ int main(int argc, char *argv[]) {
 
 	genconf.threads = 4;
         servers = parse_cfile(config_file_pos, &genconf, true, &gerr);
-	
+
         /* Update global variables with parsed values. This will be
          * removed once we get rid of global configuration variables. */
         glob_flags   |= genconf.flags;
@@ -2890,12 +3382,27 @@ int main(int argc, char *argv[]) {
 	}
 	if (!dontfork)
 		daemonize();
-
+#if HAVE_OLD_GLIB
+	g_thread_init(NULL);
+#endif
 	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
 
 	setup_servers(servers, genconf.modernaddr, genconf.modernport,
 			genconf.unixsock);
 	dousers(genconf.user, genconf.group);
 
-	serveloop(servers);
+#if HAVE_GNUTLS
+	static gnutls_dh_params_t dh_params;
+	gnutls_dh_params_init(&dh_params);
+	gnutls_dh_params_generate2(dh_params,
+				gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
+// Renamed in GnuTLS 3.3
+#if GNUTLS_VERSION_NUMBER >= 0x030300
+					GNUTLS_SEC_PARAM_MEDIUM
+#else
+					GNUTLS_SEC_PARAM_NORMAL
+#endif
+					));
+#endif
+	serveloop(servers, &genconf);
 }
