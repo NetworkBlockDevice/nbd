@@ -1053,11 +1053,10 @@ of the newstyle negotiation.
     available to select where no query is given), send
     sufficient context records back to allow a client with
     knowledge of the namespace to select any context. Each
-    namespace returned MUST still satisfy the rules for
-    namespaces (i.e. they must begin with the relevant
+    namespace returned MUST  begin with the relevant
     namespace, followed by a colon, then printable non-whitespace
-    UTF-8 characters, with the entire string not exceeding
-    255 bytes). This may be helpful where a client can
+    UTF-8 characters or spaces, with the entire string not exceeding
+    255 bytes. This may be helpful where a client can
     construct algorithmic queries. For instance, a client might
     reply simply with the namespace with no leaf-name (e.g.
     'X-FooBar:') or with a range of values (e.g.
