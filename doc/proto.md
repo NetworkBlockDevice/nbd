@@ -783,10 +783,10 @@ one of two forms:
 The `base:allocation` metadata context is the basic "allocated at all"
 metadata context. If an extent is marked with `NBD_STATE_HOLE` at that
 context, this means that the given extent is not allocated in the
-backend storage, and that writing to the extent MAY result in the ENOSPC
+backend storage, and that writing to the extent MAY result in the `ENOSPC`
 error. This supports sparse file semantics on the server side.
 If a server supports the `base:allocation` metadata context, then writing
-to an extent which has `NBD_STATE_HOLE` clear MUST NOT fail with ENOSPC
+to an extent which has `NBD_STATE_HOLE` clear MUST NOT fail with `ENOSPC`
 unless for reasons specified in the definition of another context.
 
 It defines the following flags for the flags field:
