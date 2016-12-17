@@ -776,7 +776,7 @@ one of two forms:
   listed; or
 * `base:[leaf-name]` where `[leaf-name]` is a context leaf-name
   that exists within the `base` namespace (currently just
-  `base:allocation`.
+  `base:allocation`).
 
 #### `base:allocation` metadata context
 
