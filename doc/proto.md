@@ -1046,7 +1046,6 @@ during option haggling in the fixed newstyle negotiation.
 
 * `NBD_REP_INFO` (3)
 
-<<<<<<< HEAD
     A detailed description about an aspect of an export.  The response
     to `NBD_OPT_INFO` and `NBD_OPT_GO` includes zero or more of these
     messages prior to a final error reply, or at least one before an
@@ -1129,10 +1128,6 @@ during option haggling in the fixed newstyle negotiation.
       - 32 bits, minimum block size  
       - 32 bits, preferred block size  
       - 32 bits, maximum block size  
-
-=======
-    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
->>>>>>> master
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
