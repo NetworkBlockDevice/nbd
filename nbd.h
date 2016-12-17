@@ -34,12 +34,14 @@ enum {
 	NBD_CMD_WRITE = 1,
 	NBD_CMD_DISC = 2,
 	NBD_CMD_FLUSH = 3,
-	NBD_CMD_TRIM = 4
+	NBD_CMD_TRIM = 4,
+	NBD_CMD_WRITE_ZEROES = 6
 };
 
 #define NBD_CMD_MASK_COMMAND 0x0000ffff
 #define NBD_CMD_SHIFT (16)
 #define NBD_CMD_FLAG_FUA ((1 << 0) << NBD_CMD_SHIFT)
+#define NBD_CMD_FLAG_NO_HOLE ((1 << 1) << NBD_CMD_SHIFT)
 
 /* values for flags field */
 #define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */
@@ -48,6 +50,7 @@ enum {
 #define NBD_FLAG_SEND_FUA	(1 << 3)	/* Send FUA (Force Unit Access) */
 #define NBD_FLAG_ROTATIONAL	(1 << 4)	/* Use elevator algorithm - rotational media */
 #define NBD_FLAG_SEND_TRIM	(1 << 5)	/* Send TRIM (discard) */
+#define NBD_FLAG_SEND_WRITE_ZEROES (1 << 6) 	/* Send NBD_CMD_WRITE_ZEROES */
 
 #define nbd_cmd(req) ((req)->cmd[0])
 

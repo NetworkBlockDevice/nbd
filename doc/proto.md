@@ -297,7 +297,7 @@ The server MAY process commands out of order, and MAY reply out of
 order, except that:
 
 * All write commands (that includes `NBD_CMD_WRITE`,
-  and `NBD_CMD_TRIM`) that the server
+  `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
   completes (i.e. replies to) prior to processing to a
   `NBD_CMD_FLUSH` MUST be written to non-volatile
   storage prior to replying to that `NBD_CMD_FLUSH`. This
@@ -887,8 +887,8 @@ The field has the following format:
   medium, and the client MAY schedule I/O accesses in a manner corresponding
   to the setting of this flag.
 - bit 5, `NBD_FLAG_SEND_TRIM`: exposes support for `NBD_CMD_TRIM`.
-- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: defined by the
-  experimental `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
+- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: exposes support for
+  `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_FLAG_NO_HOLE`.
 - bit 7, `NBD_FLAG_SEND_DF`: do not fragment a structured reply. The
   server MUST set this transmission flag to 1 if the
   `NBD_CMD_READ` request supports the `NBD_CMD_FLAG_DF` flag, and
@@ -1000,11 +1000,7 @@ of the newstyle negotiation.
     client MUST NOT make use of those extensions without first
     enabling the `NBD_OPT_STRUCTURED_REPLY` extension.
 
-- `NBD_OPT_BLOCK_SIZE` (9)
-
-    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
-
-- `NBD_OPT_LIST_META_CONTEXT` (10)
+- `NBD_OPT_LIST_META_CONTEXT` (9)
 
     Return a list of `NBD_REP_META_CONTEXT` replies, one per context,
     followed by an `NBD_REP_ACK`.
@@ -1067,7 +1063,7 @@ of the newstyle negotiation.
     The metadata context ID in these replies is reserved and SHOULD be
     set to zero; clients MUST disregard it.
 
-- `NBD_OPT_SET_META_CONTEXT` (11)
+- `NBD_OPT_SET_META_CONTEXT` (10)
 
     Change the set of active metadata contexts. Issuing this command
     replaces all previously-set metadata contexts; clients must ensure
@@ -1211,7 +1207,7 @@ valid may depend on negotiation during the handshake phase.
   `NBD_FLAG_SEND_FUA` has been negotiated, in which case the server MUST
   accept all commands with this bit set (even by ignoring the bit). The
   client SHOULD NOT set this bit unless the command has the potential of
-  writing data (current commands are `NBD_CMD_WRITE`
+  writing data (current commands are `NBD_CMD_WRITE`, `NBD_CMD_WRITE_ZEROES`
   and `NBD_CMD_TRIM`), however note that existing clients are known to set this
   bit on other commands. Subject to that, and provided `NBD_FLAG_SEND_FUA`
   is negotiated, the client MAY set this bit on all, no or some commands
@@ -1223,8 +1219,13 @@ valid may depend on negotiation during the handshake phase.
   not in fact write data (for instance on an `NBD_CMD_TRIM` in a situation
   where the command as a whole is ignored), the server MAY ignore this bit
   being set on such a command.
-- bit 1, `NBD_CMD_FLAG_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
-  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
+
+- bit 1, `NBD_CMD_FLAG_NO_HOLE`; valid during `NBD_CMD_WRITE_ZEROES`.
+  SHOULD be set to 1 if the client wants to ensure that the server does
+  not create a hole. The client MAY send `NBD_CMD_FLAG_NO_HOLE` even
+  if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
+  The server MUST support the use of this flag if it advertises
+  `NBD_FLAG_SEND_WRITE_ZEROES`.
 - bit 2, `NBD_CMD_FLAG_DF`; the "don't fragment" flag, valid during `NBD_CMD_READ`.
    SHOULD be set to 1 if the client requires the server to send at most one
    content chunk in reply.  MUST NOT be set unless the transmission
@@ -1534,14 +1535,37 @@ The following request types exist:
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
-    overwriting it again with `NBD_CMD_WRITE`.
+    overwriting it again with `NBD_CMD_WRITE` or `NBD_CMD_WRITE_ZEROES`.
 
     A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
     was set in the transmission flags field.
 
 * `NBD_CMD_WRITE_ZEROES` (6)
 
-    Defined by the experimental `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
+    A write request with no payload. *Offset* and *length* define the location
+    and amount of data to be zeroed.
+
+    The server MUST zero out the data on disk, and then send the reply
+    message. The server MAY send the reply message before the data has
+    reached permanent storage.
+
+    A client MUST NOT send a write zeroes request unless
+    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
+
+    By default, the server MAY use trimming to zero out the area, even
+    if it did not advertise `NBD_FLAG_SEND_TRIM`; but it MUST ensure
+    that the data reads back as zero.  However, the client MAY set the
+    command flag `NBD_CMD_FLAG_NO_HOLE` to inform the server that the
+    area MUST be fully provisioned, ensuring that future writes to the
+    same area will not cause fragmentation or cause failure due to
+    insufficient space.
+
+    If an error occurs, the server MUST set the appropriate error code
+    in the error field.
+
+    The server SHOULD return `ENOSPC` if it receives a write zeroes request
+    including one or more sectors beyond the size of the device. It SHOULD
+    return `EPERM` if it receives a write zeroes request on a read-only export.
 
 * `NBD_CMD_BLOCK_STATUS` (7)
 
