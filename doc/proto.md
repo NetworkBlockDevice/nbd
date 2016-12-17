@@ -732,7 +732,7 @@ structured replies MUST be negotiated first.
 
 Metadata contexts are identified by their names. The name MUST
 consist of a namespace, followed by a colon, followed by a leaf-name.
-The namespace must each consist entirely of printable non-whitespace
+The namespace must consist entirely of printable non-whitespace
 UTF-8 characters other than colons, and be non-empty. The entire name
 (namespace, colon, and leaf-name) MUST follow the restrictions for
 strings as laid out earlier in this document.
@@ -1051,17 +1051,18 @@ of the newstyle negotiation.
     matching context available to select (or every context
     available to select where no query is given), send
     sufficient context records back to allow a client with
-    knowledge of the namespace to select any context. Each
-    namespace returned MUST  begin with the relevant
-    namespace, followed by a colon, then printable non-whitespace
-    UTF-8 characters or spaces, with the entire string not exceeding
-    255 bytes. This may be helpful where a client can
+    knowledge of the namespace to select any context.
+     This may be helpful where a client can
     construct algorithmic queries. For instance, a client might
     reply simply with the namespace with no leaf-name (e.g.
     'X-FooBar:') or with a range of values (e.g.
     'X-ModifiedDate:20160310-20161214'). The semantics of
     such a reply are a matter for the definition of the
-    namespace.
+    namespace. However each namespace returned MUST begin
+    with the relevant namespace, followed by a colon, and then
+    other UTF-8 characters, with the entire string following the
+    restrictions for strings set out earlier in this
+    document.
 
     The metadata context ID in these replies is reserved and SHOULD be
     set to zero; clients MUST disregard it.
