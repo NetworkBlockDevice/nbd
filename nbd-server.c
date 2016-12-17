@@ -99,7 +99,6 @@
 #ifdef HAVE_SYS_DIRENT_H
 #include <sys/dirent.h>
 #endif
-#include <unistd.h>
 #include <getopt.h>
 #include <pwd.h>
 #include <grp.h>
@@ -284,6 +283,8 @@ static inline const char * getcommandname(uint64_t command) {
 		return "NBD_CMD_FLUSH";
 	case NBD_CMD_TRIM:
 		return "NBD_CMD_TRIM";
+	case NBD_CMD_WRITE_ZEROES:
+		return "NBD_CMD_WRITE_ZEROES";
 	default:
 		return "UNKNOWN";
 	}
@@ -1399,6 +1400,38 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	return 0;
 }
 
+
+/**
+ * Write an amount of zeroes at a given offset to the right file.
+ * This routine could be optimised by not calling expwrite. However,
+ * this is by far the simplest way to do it.
+ *
+ * @param req the request
+ * @param client The client we're going to write for.
+ * @return 0 on success, nonzero on failure
+ **/
+int expwrite_zeroes(struct nbd_request* req, CLIENT* client, int fua) {
+	off_t a = req->from;
+	size_t len = req->len;
+	size_t maxsize = 64LL*1024LL*1024LL;
+	/* use calloc() as sadly MAP_ANON is apparently not POSIX standard */
+	char *buf = calloc (1, maxsize);
+	int ret;
+	while (len > 0) {
+		size_t l = len;
+		if (l > maxsize)
+			l = maxsize;
+		ret = expwrite(a, buf, l, client, fua);
+		if (ret) {
+			free(buf);
+			return ret;
+		}
+		len -= l;
+	}
+	free(buf);
+	return 0;
+}
+
 /**
  * Flush data to a client
  *
@@ -1705,7 +1738,7 @@ hard_close:
 
 void send_export_info(CLIENT* client) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
-	uint16_t flags = NBD_FLAG_HAS_FLAGS;
+	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
 	socket_write(client, &size_host, 8);
 	if (client->server->flags & F_READONLY)
@@ -1879,7 +1912,7 @@ static void handle_write(struct work_package *pkg)
 	CLIENT *client = pkg->client;
 	struct nbd_request *req = pkg->req;
 	struct nbd_reply rep;
-	int fua = req->type & ~NBD_CMD_MASK_COMMAND;
+	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
 
 	DEBUG("handling write request\n");
 	setup_reply(&rep, req);
@@ -1933,13 +1966,34 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 	pthread_mutex_unlock(&(client->lock));
 }
 
+static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
+	struct nbd_reply rep;
+	DEBUG("handling write_zeroes request\n");
+	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
+	setup_reply(&rep, req);
+	if ((client->server->flags & F_READONLY) ||
+	    (client->server->flags & F_AUTOREADONLY)) {
+		DEBUG("[WRITE to READONLY!]");
+		rep.error = nbd_errno(EPERM);
+	} else if(expwrite_zeroes(req, client, fua)) {
+		DEBUG("Write_zeroes failed: %m");
+		rep.error = nbd_errno(errno);
+	}
+	// For now, don't trim
+	// TODO: handle this far more efficiently with reference to the
+	// actual backing driver
+	pthread_mutex_lock(&(client->lock));
+	writeit(client->net, &rep, sizeof rep);
+	pthread_mutex_unlock(&(client->lock));
+}
+
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
 	uint32_t type = package->req->type & NBD_CMD_MASK_COMMAND;
 	uint32_t flags = package->req->type & ~NBD_CMD_MASK_COMMAND;
 	struct nbd_reply rep;
 
-	if(flags & ~NBD_CMD_FLAG_FUA) {
+	if(flags & ~(NBD_CMD_FLAG_FUA | NBD_CMD_FLAG_NO_HOLE)) {
 		msg(LOG_ERR, "E: received invalid flag %d on command %d, ignoring", flags, type);
 		goto error;
 	}
@@ -1956,6 +2010,9 @@ static void handle_request(gpointer data, gpointer user_data) {
 			break;
 		case NBD_CMD_TRIM:
 			handle_trim(package->client, package->req);
+			break;
+		case NBD_CMD_WRITE_ZEROES:
+			handle_write_zeroes(package->client, package->req);
 			break;
 		default:
 			msg(LOG_ERR, "E: received unknown command %d of type, ignoring", package->req->type);
@@ -2012,186 +2069,6 @@ static int mainloop_threaded(CLIENT* client) {
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
 	}
-}
-
-/** sending macro. */
-#define SEND(cl,reply) { socket_write( cl, &reply, sizeof( reply )); \
-	if (client->transactionlogfd != -1) \
-		writeit(client->transactionlogfd, &reply, sizeof(reply)); }
-/** error macro. */
-#define ERROR(client,reply,errcode) { reply.error = nbd_errno(errcode); SEND(client,reply); reply.error = 0; }
-/**
- * Serve a file to a single client.
- *
- * @todo This beast needs to be split up in many tiny little manageable
- * pieces. Preferably with a chainsaw.
- *
- * @param client The client we're going to serve to.
- * @return when the client disconnects
- **/
-int mainloop(CLIENT *client) {
-	struct nbd_request request;
-	struct nbd_reply reply;
-	gboolean go_on=TRUE;
-#ifdef DODBG
-	int i = 0;
-#endif
-	send_export_info(client);
-	DEBUG("Entering request loop!\n");
-	reply.magic = htonl(NBD_REPLY_MAGIC);
-	reply.error = 0;
-	while (go_on) {
-		char buf[BUFSIZE];
-		char* p;
-		size_t len;
-		size_t currlen;
-		size_t writelen;
-		uint16_t command;
-#ifdef DODBG
-		i++;
-		printf("%d: ", i);
-#endif
-		socket_read(client, &request, sizeof(request));
-		if (client->transactionlogfd != -1)
-			writeit(client->transactionlogfd, &request, sizeof(request));
-
-		request.from = ntohll(request.from);
-		request.type = ntohl(request.type);
-		command = request.type & NBD_CMD_MASK_COMMAND;
-		len = ntohl(request.len);
-
-		DEBUG("%s from %llu (%llu) len %u, ", getcommandname(command),
-				(unsigned long long)request.from,
-				(unsigned long long)request.from / 512, len);
-
-		if (request.magic != htonl(NBD_REQUEST_MAGIC))
-			err("Not enough magic.");
-
-		memcpy(reply.handle, request.handle, sizeof(reply.handle));
-
-		if ((command==NBD_CMD_WRITE) || (command==NBD_CMD_READ) ||
-		    (command==NBD_CMD_TRIM)) {
-			if (request.from + len < request.from) { // 64 bit overflow!!
-				DEBUG("[Number too large!]");
-				ERROR(client, reply, EINVAL);
-				continue;
-			}
-
-			if (((off_t)request.from + len) > client->exportsize) {
-				DEBUG("[RANGE!]");
-				ERROR(client, reply, (command==NBD_CMD_WRITE) ? ENOSPC : EINVAL);
-				continue;
-			}
-
-			currlen = len;
-			if (currlen > BUFSIZE - sizeof(struct nbd_reply)) {
-				currlen = BUFSIZE - sizeof(struct nbd_reply);
-				if(!logged_oversized) {
-					msg(LOG_DEBUG, "oversized request (this is not a problem)");
-					logged_oversized = true;
-				}
-			}
-		}
-
-		switch (command) {
-
-		case NBD_CMD_DISC:
-			msg(LOG_INFO, "Disconnect request received.");
-                	if (client->server->flags & F_COPYONWRITE) { 
-				if (client->difmap) g_free(client->difmap) ;
-                		close(client->difffile);
-				unlink(client->difffilename);
-				free(client->difffilename);
-			}
-			go_on=FALSE;
-			continue;
-
-		case NBD_CMD_WRITE:
-			DEBUG("wr: net->buf, ");
-			while(len > 0) {
-				socket_read(client, buf, currlen);
-				DEBUG("buf->exp, ");
-				if ((client->server->flags & F_READONLY) ||
-				    (client->server->flags & F_AUTOREADONLY)) {
-					DEBUG("[WRITE to READONLY!]");
-					ERROR(client, reply, EPERM);
-					consume(client, len-currlen, buf, BUFSIZE);
-					continue;
-				}
-				if (expwrite(request.from, buf, currlen, client,
-					     request.type & NBD_CMD_FLAG_FUA)) {
-					DEBUG("Write failed: %m" );
-					ERROR(client, reply, errno);
-					consume(client, len-currlen, buf, BUFSIZE);
-					continue;
-				}
-				len -= currlen;
-				request.from += currlen;
-				currlen = (len < BUFSIZE) ? len : BUFSIZE;
-			}
-			SEND(client, reply);
-			DEBUG("OK!\n");
-			continue;
-
-		case NBD_CMD_FLUSH:
-			DEBUG("fl: ");
-			if (expflush(client)) {
-				DEBUG("Flush failed: %m");
-				ERROR(client, reply, errno);
-				continue;
-			}
-			SEND(client, reply);
-			DEBUG("OK!\n");
-			continue;
-
-		case NBD_CMD_READ:
-			DEBUG("exp->buf, ");
-			if (client->transactionlogfd != -1)
-				writeit(client->transactionlogfd, &reply, sizeof(reply));
-			socket_write(client, &reply, sizeof(reply));
-			p = buf;
-			writelen = currlen;
-			while(len > 0) {
-				if (expread(request.from, p, currlen, client)) {
-					DEBUG("Read failed: %m");
-					ERROR(client, reply, errno);
-					continue;
-				}
-				
-				DEBUG("buf->net, ");
-				socket_write(client, buf, writelen);
-				len -= currlen;
-				request.from += currlen;
-				currlen = (len < BUFSIZE) ? len : BUFSIZE;
-				p = buf;
-				writelen = currlen;
-			}
-			DEBUG("OK!\n");
-			continue;
-
-		case NBD_CMD_TRIM:
-			/* The kernel module sets discard_zeroes_data == 0,
-			 * so it is okay to do nothing.  */
-			if ((client->server->flags & F_READONLY) ||
-			    (client->server->flags & F_AUTOREADONLY)) {
-				DEBUG("[TRIM to READONLY!]");
-				ERROR(client, reply, EPERM);
-				continue;
-			}
-			if (exptrim(&request, client)) {
-				DEBUG("Trim failed: %m");
-				ERROR(client, reply, errno);
-				continue;
-			}
-			SEND(client, reply);
-			continue;
-
-		default:
-			DEBUG ("Ignoring unknown command\n");
-			continue;
-		}
-	}
-	return 0;
 }
 
 /**
