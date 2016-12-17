@@ -732,11 +732,10 @@ structured replies MUST be negotiated first.
 
 Metadata contexts are identified by their names. The name MUST
 consist of a namespace, followed by a colon, followed by a leaf-name.
-The namespace and the leaf-name must each consist entirely of
-printable non-whitespace UTF-8 characters other than colons,
-and be non-empty. The entire name (namespace, colon and leaf-name)
-MUST NOT exceed 255 bytes (and therefore both the namespace and
-leaf-name are guaranteed to be smaller than 255 bytes).
+The namespace must each consist entirely of printable non-whitespace
+UTF-8 characters other than colons, and be non-empty. The entire name
+(namespace, colon, and leaf-name) MUST follow the restrictions for
+strings as laid out earlier in this document.
 
 Namespaces MUST be consist of one of the following:
 - `base`, for metadata contexts defined by this document;
