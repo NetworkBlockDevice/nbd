@@ -1219,7 +1219,6 @@ valid may depend on negotiation during the handshake phase.
   not in fact write data (for instance on an `NBD_CMD_TRIM` in a situation
   where the command as a whole is ignored), the server MAY ignore this bit
   being set on such a command.
-
 - bit 1, `NBD_CMD_FLAG_NO_HOLE`; valid during `NBD_CMD_WRITE_ZEROES`.
   SHOULD be set to 1 if the client wants to ensure that the server does
   not create a hole. The client MAY send `NBD_CMD_FLAG_NO_HOLE` even
