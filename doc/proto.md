@@ -776,10 +776,6 @@ of the newstyle negotiation.
 
     Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
-- `NBD_OPT_BLOCK_SIZE` (9)
-
-    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
-
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
