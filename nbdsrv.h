@@ -43,6 +43,7 @@ typedef struct {
 				  disconnects */
 	gchar* servename;    /**< name of the export as selected by nbd-client */
 	int max_connections; /**< maximum number of opened connections */
+	int numclients;      /**< number of clients connected to this export */
 	gchar* transactionlog;/**< filename for transaction log */
 	gchar* cowdir;	     /**< directory for copy-on-write diff files. */
 } SERVER;
@@ -50,7 +51,7 @@ typedef struct {
 /**
   * Variables associated with a client connection
   */
-typedef struct {
+typedef struct _client {
 	uint64_t exportsize;    /**< size of the file we're exporting */
 	char *clientname;    /**< peer, in human-readable format */
 	struct sockaddr_storage clientaddr; /**< peer, in binary format, network byte order */
@@ -69,7 +70,11 @@ typedef struct {
 	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 	int transactionlogfd;/**< fd for transaction log */
 	int clientfeats;     /**< Features supported by this client */
-	pthread_mutex_t lock;
+	pthread_mutex_t lock; /**< socket lock */
+	void *tls_session; /**< TLS session context. Is NULL unless STARTTLS
+				has been negotiated. */
+	void (*socket_read)(struct _client*, void* buf, size_t len);
+	void (*socket_write)(struct _client*, void* buf, size_t len);
 } CLIENT;
 
 /**
@@ -102,6 +107,8 @@ typedef enum {
                                                old-style export. */
         NBDS_ERR_CFILE_DIR_UNKNOWN,       /**< A directory requested does not exist*/
         NBDS_ERR_CFILE_READDIR_ERR,       /**< Error occurred during readdir() */
+        NBDS_ERR_CFILE_INVALID_SPLICE,    /**< We can't use splice with the other options
+                                               specified for the export. */
         NBDS_ERR_SO_LINGER,               /**< Failed to set SO_LINGER to a socket */
         NBDS_ERR_SO_REUSEADDR,            /**< Failed to set SO_REUSEADDR to a socket */
         NBDS_ERR_SO_KEEPALIVE,            /**< Failed to set SO_KEEPALIVE to a socket */
@@ -140,7 +147,9 @@ typedef enum {
 #define F_TEMPORARY 1024  /**< Whether the backing file is temporary and should be created then unlinked */
 #define F_TRIM 2048       /**< Whether server wants TRIM (discard) to be sent by the client */
 #define F_FIXED 4096	  /**< Client supports fixed new-style protocol (and can thus send us extra options */
-#define F_TREEFILES 8192	  /**< flag to tell us a file is exported using -t */
+#define F_TREEFILES 8192  /**< flag to tell us a file is exported using -t */
+#define F_FORCEDTLS 16384 /**< TLS is required, either for the server as a whole or for a given export */
+#define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
 
 /* Functions */
 

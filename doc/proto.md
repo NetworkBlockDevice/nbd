@@ -287,13 +287,18 @@ The server MAY process commands out of order, and MAY reply out of
 order, except that:
 
 * All write commands (that includes `NBD_CMD_WRITE`,
-  and `NBD_CMD_TRIM`) that the server
+  `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
   completes (i.e. replies to) prior to processing to a
   `NBD_CMD_FLUSH` MUST be written to non-volatile
   storage prior to replying to that `NBD_CMD_FLUSH`. This
   paragraph only applies if `NBD_FLAG_SEND_FLUSH` is set within
   the transmission flags, as otherwise `NBD_CMD_FLUSH` will never
   be sent by the client to the server.
+
+* A client which uses multiple connections to a server to parallelize
+  commands MUST NOT issue an `NBD_CMD_FLUSH` request until it has
+  received the reply for all write commands which it expects to be
+  covered by the flush.
 
 * A server MUST NOT reply to a command that has `NBD_CMD_FLAG_FUA` set
   in its command flags until the data (if any) written by that command
@@ -400,9 +405,9 @@ server MUST support one of these modes.
 
 * The server insists upon TLS, and forces the client to
   upgrade by erroring any NBD options other than `NBD_OPT_STARTTLS`
-  with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this in practice means
-  that all option negotiation (apart from the `NBD_OPT_STARTTLS`
-  itself) is carried out with TLS; OR
+  or `NBD_OPT_ABORT` with `NBD_REP_ERR_TLS_REQD` ('FORCEDTLS'); this
+  in practice means that all option negotiation (apart from the
+  `NBD_OPT_STARTTLS` itself) is carried out with TLS; OR
 
 * The server provides TLS, and it is mandatory on zero or more
   exports, and is available at the client's option on all
@@ -805,10 +810,20 @@ The field has the following format:
   medium, and the client MAY schedule I/O accesses in a manner corresponding
   to the setting of this flag.
 - bit 5, `NBD_FLAG_SEND_TRIM`: exposes support for `NBD_CMD_TRIM`.
-- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: defined by the
-  experimental `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+- bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: exposes support for
+  `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_FLAG_NO_HOLE`.
 - bit 7, `NBD_FLAG_SEND_DF`: defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
+- bit 8, `NBD_FLAG_CAN_MULTI_CONN`: Indicates that the server operates
+  entirely without cache, or that the cache it uses is shared among all
+  connections to the given device. In particular, if this flag is
+  present, then the effects of `NBD_CMD_FLUSH` and `NBD_CMD_FLAG_FUA`
+  MUST be visible across all connections when the server sends its reply
+  to that command to the client. In the absense of this flag, clients
+  SHOULD NOT multiplex their commands over more than one connection to
+  the export.
+- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
+  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
@@ -1000,7 +1015,7 @@ of the newstyle negotiation.
 
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
-    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
 #### Option reply types
 
@@ -1031,6 +1046,7 @@ during option haggling in the fixed newstyle negotiation.
 
 * `NBD_REP_INFO` (3)
 
+<<<<<<< HEAD
     A detailed description about an aspect of an export.  The response
     to `NBD_OPT_INFO` and `NBD_OPT_GO` includes zero or more of these
     messages prior to a final error reply, or at least one before an
@@ -1114,6 +1130,9 @@ during option haggling in the fixed newstyle negotiation.
       - 32 bits, preferred block size  
       - 32 bits, maximum block size  
 
+=======
+    Defined by the experimental `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+>>>>>>> master
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -1164,7 +1183,7 @@ case that data is an error message string suitable for display to the user.
 
     The server is unwilling to enter transmission phase for a given
     export unless the client first acknowledges (via
-    `NBD_OPT_BLOCK_SIZE`) that it will obey non-default block sizing
+    `NBD_INFO_BLOCK_SIZE`) that it will obey non-default block sizing
     requirements.
 
 ### Transmission phase
@@ -1182,7 +1201,7 @@ valid may depend on negotiation during the handshake phase.
   `NBD_FLAG_SEND_FUA` has been negotiated, in which case the server MUST
   accept all commands with this bit set (even by ignoring the bit). The
   client SHOULD NOT set this bit unless the command has the potential of
-  writing data (current commands are `NBD_CMD_WRITE`
+  writing data (current commands are `NBD_CMD_WRITE`, `NBD_CMD_WRITE_ZEROES`
   and `NBD_CMD_TRIM`), however note that existing clients are known to set this
   bit on other commands. Subject to that, and provided `NBD_FLAG_SEND_FUA`
   is negotiated, the client MAY set this bit on all, no or some commands
@@ -1194,10 +1213,14 @@ valid may depend on negotiation during the handshake phase.
   not in fact write data (for instance on an `NBD_CMD_TRIM` in a situation
   where the command as a whole is ignored), the server MAY ignore this bit
   being set on such a command.
-- bit 1, `NBD_CMD_FLAG_NO_HOLE`; defined by the experimental `WRITE_ZEROES`
-  [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+- bit 1, `NBD_CMD_FLAG_NO_HOLE`; valid during `NBD_CMD_WRITE_ZEROES`.
+  SHOULD be set to 1 if the client wants to ensure that the server does
+  not create a hole. The client MAY send `NBD_CMD_FLAG_NO_HOLE` even
+  if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
+  The server MUST support the use of this flag if it advertises
+  `NBD_FLAG_SEND_WRITE_ZEROES`.
 - bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
 
 #### Request types
@@ -1213,12 +1236,9 @@ The following request types exist:
     of data, read from *offset* bytes into the file, unless an error
     condition has occurred.
 
-    If an error occurs, the server SHOULD set the appropriate error
-    code in the error field. The server MUST then either initiate
-    a hard disconnect, or send *length* bytes of data (these bytes MAY be
-    invalid, in which case they SHOULD be zero); this is true even if
-    the error is `EINVAL` for bad flags detected before even
-    attempting to read.
+    If an error occurs, the server SHOULD set the appropriate error code
+    in the error field. The server MAY then initiate a hard disconnect.
+    If it chooses not to, it MUST NOT send any payload for this request.
 
     If an error occurs while reading after the server has already sent
     out the reply header with an error field set to zero (i.e.,
@@ -1252,7 +1272,7 @@ The following request types exist:
 
 * `NBD_CMD_FLUSH` (3)
 
-    A flush request; a write barrier. The server MUST NOT send a
+    A flush request. The server MUST NOT send a
     successful reply header for this request before all write requests
     for which a reply has already been sent to the client have reached
     permanent storage (using fsync() or similar).
@@ -1271,14 +1291,37 @@ The following request types exist:
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
-    overwriting it again with `NBD_CMD_WRITE`.
+    overwriting it again with `NBD_CMD_WRITE` or `NBD_CMD_WRITE_ZEROES`.
 
     A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
     was set in the transmission flags field.
 
 * `NBD_CMD_WRITE_ZEROES` (6)
 
-    Defined by the experimental `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+    A write request with no payload. *Offset* and *length* define the location
+    and amount of data to be zeroed.
+
+    The server MUST zero out the data on disk, and then send the reply
+    message. The server MAY send the reply message before the data has
+    reached permanent storage.
+
+    A client MUST NOT send a write zeroes request unless
+    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
+
+    By default, the server MAY use trimming to zero out the area, even
+    if it did not advertise `NBD_FLAG_SEND_TRIM`; but it MUST ensure
+    that the data reads back as zero.  However, the client MAY set the
+    command flag `NBD_CMD_FLAG_NO_HOLE` to inform the server that the
+    area MUST be fully provisioned, ensuring that future writes to the
+    same area will not cause fragmentation or cause failure due to
+    insufficient space.
+
+    If an error occurs, the server MUST set the appropriate error code
+    in the error field.
+
+    The server SHOULD return `ENOSPC` if it receives a write zeroes request
+    including one or more sectors beyond the size of the device. It SHOULD
+    return `EPERM` if it receives a write zeroes request on a read-only export.
 
 * Other requests
 
@@ -1312,7 +1355,7 @@ The following error values are defined:
 * `EINVAL` (22), Invalid argument.
 * `ENOSPC` (28), No space left on device.
 * `EOVERFLOW` (75), defined in the  experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 * `ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `ENOSPC` if it receives a write request
@@ -1349,11 +1392,13 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `WRITE_ZEROES` [extension](https://github.com/yoe/nbd/blob/extension-write-zeroes/doc/proto.md).
+* The `WRITE_ZEROES` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-write-zeroes/doc/proto.md).
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/yoe/nbd/blob/extension-structured-reply/doc/proto.md)
+* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md)
 
-* The `INFO` [extension](https://github.com/yoe/nbd/blob/extension-info/doc/proto.md).
+* The `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+
+* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
