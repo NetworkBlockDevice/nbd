@@ -141,6 +141,7 @@
 
 #if HAVE_GNUTLS
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #endif
 
 /** Where our config file actually is */
@@ -1568,6 +1569,44 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 }
 
 #if HAVE_GNUTLS
+static int verify_cert(gnutls_session_t session) {
+	int ret;
+	unsigned int status, cert_list_size;
+	const gnutls_datum_t *cert_list;
+	gnutls_x509_crt_t cert;
+	time_t now = time(NULL);
+
+	ret = gnutls_certificate_verify_peers2(session, &status);
+	if(ret < 0 || status != 0 || gnutls_certificate_type_get(session) !=
+			GNUTLS_CRT_X509) {
+		goto err;
+	}
+
+	if(gnutls_x509_crt_init(&cert) < 0) {
+		goto err;
+	}
+
+	cert_list = gnutls_certificate_get_peers(session, &cert_list_size);
+	if(cert_list == NULL) {
+		goto err;
+	}
+	if(gnutls_x509_crt_import(cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0) {
+		goto err;
+	}
+	if(gnutls_x509_crt_get_activation_time(cert) > now) {
+		goto err;
+	}
+	if(gnutls_x509_crt_get_expiration_time(cert) < now) {
+		goto err;
+	}
+	// TODO: check CRLs and/or OCSP etc. Patches welcome.
+	msg(LOG_INFO, "client certificate verification successful");
+	return 0;
+err:
+	msg(LOG_ERR, "E: client certificate verification failed");
+	return GNUTLS_E_CERTIFICATE_ERROR;
+}
+
 CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, struct generic_conf *genconf) {
 #define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
 	gnutls_certificate_credentials_t x509_cred;
@@ -1588,6 +1627,7 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 
 	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
+	gnutls_certificate_set_verify_function(x509_cred, verify_cert);
 	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
 	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
 	check_rv(gnutls_priority_init(&priority_cache, "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE", NULL));
