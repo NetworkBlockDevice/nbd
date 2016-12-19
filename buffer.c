@@ -28,7 +28,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 #include "buffer.h"
 
-typedef struct buffer
+struct buffer
 {
   char *buf;
   ssize_t size;
@@ -36,7 +36,7 @@ typedef struct buffer
   ssize_t ridx;
   ssize_t widx;
   int empty;
-} buffer_t;
+};
 
 /* the buffer is organised internally as follows:
  *
