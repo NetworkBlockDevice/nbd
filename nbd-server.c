@@ -1791,6 +1791,8 @@ void send_export_info(CLIENT* client) {
 		flags |= NBD_FLAG_ROTATIONAL;
 	if (client->server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
+	if (!(client->server->flags & F_COPYONWRITE))
+		flags |= NBD_FLAG_CAN_MULTI_CONN;
 	flags = htons(flags);
 	socket_write(client, &flags, sizeof(flags));
 	if (!(glob_flags & F_NO_ZEROES)) {
