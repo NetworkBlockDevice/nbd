@@ -369,7 +369,7 @@ EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep 1
-		./nbd-tester-client -N export1 "${mydir}/integrity-test.tr" -C "${certdir}/selfsigned-cert.pem" -K "${certdir}/selfsigned-key.pem" localhost
+		./nbd-tester-client -N export1 -t "${mydir}/integrity-test.tr" -C "${certdir}/selfsigned-cert.pem" -K "${certdir}/selfsigned-key.pem" localhost
 		retval=$?
 	;;
 	*)
