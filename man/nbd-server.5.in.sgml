@@ -114,13 +114,48 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>
 	    Optional; boolean
-	   </para>
-	   <para>
-	     Whether to allow the client to fetch a list of exports from
-	     this server. If enabled, the client can run
-	     <command>nbd-client -l</command> to get a list of exports
-	     on this server.
-	   </para>
+	  </para>
+	  <para>
+	    Whether to allow the client to fetch a list of exports from
+	    this server. If enabled, the client can run
+	    <command>nbd-client -l</command> to get a list of exports
+	    on this server.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>force_tls</option></term>
+        <listitem>
+          <para>
+            Optional; boolean.
+          </para>
+          <para>
+            Switch the server to FORCEDTLS mode.
+          </para>
+          <para>
+	    Note: this is <emphasis>not</emphasis> the same as enabling
+	    the force_tls option for each and every export individually.
+	    The latter will allow certain options to be issued during
+	    negotiation (e.g., the "list exports" option, even if that
+	    would return an empty result set), whereas enabling this
+	    option will disallow the use of <emphasis>any</emphasis>
+	    option to be issued during negotiation, apart from the
+	    STARTTLS option itself (to switch the transport to TLS).
+          </para>
+          <para>
+            Using FORCEDTLS mode should result in a safer environment,
+            as the server will not allow any communication to take place
+            unless and until TLS has been negotiated. However, it also
+            makes it impossible to set up a nonencrypted export for the
+	    benefit of older clients, or for clients that want to swap
+	    and not deadlock.
+          </para>
+          <para>
+            Using this parameter without also specifying a value for the
+            other TLS-related parameters is possible, but silly.
+          </para>
+        </listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>group</option></term>
 	<listitem>
@@ -233,6 +268,24 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>splice</option></term>
+	<listitem>
+	  <para>Optional; boolean</para>
+	  <para>Allow the server to use the splice() system call to
+	  handle read or write calls when possible. Using splice can
+	  speed up handling of such calls significantly. Unfortunately,
+	  splice cannot be used in combination with TLS or the copyonwrite
+	  mode, and will only work for requests smaller than
+	  1MiB.</para>
+	  <para>To handle these situations, the server will exit with an
+	  appropriate error message if splice and copyonwrite are both
+	  enabled for an export; it will silently ignore the splice
+	  option if TLS is enabled, falling back on normal reads and
+	  writes; and it will similarly fall back on normal reads when
+	  the request size exceeds 1MiB.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>user</option></term>
         <listitem>
           <para>
@@ -261,6 +314,57 @@ manpage.1: manpage.sgml
 	    If specified, the server will listen on a UNIX domain socket
 	    with the specified name. Only newstyle negotiation is
 	    supported on UNIX domain sockets.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>keyfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 private key used for TLS negotiation
+          with the client. This option must be set to enable TLS.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>certfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 public certificate used for TLS negotiation
+          with the client. If <option>keyfile</option> is set but
+          <option>certfile</option> is not set, then the server will
+          attempt to read the certificate from the path specified
+          by <option>keyfile</option>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>cacertfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 CA certificate used for validating client
+          certificates supplied by the client. If this option is not
+          set then client certificates will not be checked.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>tlsonly</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will only serve exports
+	    using the TLS extension. If this option is not supplied,
+	    TLS is optional, unless <option>tlsonly</option> is set
+            in the section corresponding to the specific export.
+            In order for TLS to work at all, the <option>keyfile</option>
+            option must be specified in the generic section.</para>
 	  </para>
 	</listitem>
       </varlistentry>
@@ -397,6 +501,21 @@ manpage.1: manpage.sgml
 	    reliability in the case of an unclean shutdown at
 	    the expense of a degradation of performance. This option
 	    will have no effect unless supported by the client.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>force_tls</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>Require the use of TLS for this export to be available.</para>
+	  <para>When this option has been enabled for an export, clients
+	    that do not negotiate TLS will not see the export when they
+	    request a list of exports, and will not be able to connect to
+	    it.</para>
+	  <para>
+	    Enabling this option when TLS credentials have not been
+	    configured in the [generic] section is possible, but silly.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -827,6 +946,20 @@ manpage.1: manpage.sgml
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>tlsonly</option></term>
+	<listitem>
+	  <para>Optional; boolean.</para>
+	  <para>When this option is enabled,
+	    <command>nbd-server</command> will only serve the export
+	    using the TLS extension. If this option is not supplied,
+	    TLS is optional, unless <option>tlsonly</option> is set
+            in the generic section. In order for TLS to work at all,
+            the <option>keyfile</option> option must be specified in
+            the generic section.</para>
+	  </para>
 	</listitem>
       </varlistentry>
     </variablelist>

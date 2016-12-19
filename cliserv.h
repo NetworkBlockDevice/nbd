@@ -72,6 +72,7 @@ extern const u64 rep_magic;
 
 #define INFO(a) do { } while(0)
 
+int set_nonblocking(int fd, int nb);
 void setmysockopt(int sock);
 void err_nonfatal(const char *s);
 
@@ -95,6 +96,7 @@ void readit(int f, void *buf, size_t len);
 #define NBD_OPT_EXPORT_NAME	(1)	/** Client wants to select a named export (is followed by name of export) */
 #define NBD_OPT_ABORT		(2)	/** Client wishes to abort negotiation */
 #define NBD_OPT_LIST		(3)	/** Client request list of supported exports (not followed by data) */
+#define NBD_OPT_STARTTLS	(5)	/** Client wishes to initiate TLS */
 
 /* Replies the server can send during negotiation */
 #define NBD_REP_ACK		(1)	/** ACK a request. Data: option number to be acked */
@@ -104,6 +106,7 @@ void readit(int f, void *buf, size_t len);
 #define NBD_REP_ERR_POLICY	(2 | NBD_REP_FLAG_ERROR)	/** Client requested an option not allowed by server configuration. (e.g., the option was disabled) */
 #define NBD_REP_ERR_INVALID	(3 | NBD_REP_FLAG_ERROR)	/** Client issued an invalid request */
 #define NBD_REP_ERR_PLATFORM	(4 | NBD_REP_FLAG_ERROR)	/** Option not supported on this platform */
+#define NBD_REP_ERR_TLS_REQD	(5 | NBD_REP_FLAG_ERROR)	/** TLS required */
 
 /* Global flags */
 #define NBD_FLAG_FIXED_NEWSTYLE (1 << 0)	/* new-style export that actually supports extending */

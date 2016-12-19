@@ -1,4 +1,5 @@
 .deps
+.dirstamp
 Makefile
 autom4te.cache
 autoscan.log
@@ -38,6 +39,7 @@ install-sh
 configure
 man/*.sh
 man/*.sh.in
+man/manpage.log
 make-integrityhuge
 nbd-trdump
 missing
@@ -49,5 +51,6 @@ ltmain.sh
 support/lt*
 support/libtool.m4
 ar-lib
+tests/run/cliserv.c
 .debhelper
 *debhelper.log

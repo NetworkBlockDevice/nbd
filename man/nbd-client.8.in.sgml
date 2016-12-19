@@ -58,6 +58,7 @@ manpage.1: manpage.sgml
       <arg choice=plain><replaceable>host</replaceable></arg>
       <arg><replaceable>port</replaceable></arg>
       <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-connections <replaceable>num</replaceable></arg>
       <arg>-sdp</arg>
       <arg>-swap</arg>
       <arg>-persist</arg>
@@ -66,11 +67,16 @@ manpage.1: manpage.sgml
       <arg>-block-size <replaceable>block size</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
       <arg>-name <replaceable>name</replaceable></arg>
+      <arg>-certfile <replaceable>certfile</replaceable></arg>
+      <arg>-keyfile <replaceable>keyfile</replaceable></arg>
+      <arg>-cacertfile <replaceable>cacertfile</replaceable></arg>
+      <arg>-tlshostname <replaceable>hostname</replaceable></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
       <arg choice=plain><option>-unix <replaceable>path</replaceable></option></arg>
       <arg choice=plain><replaceable>nbd-device</replaceable></arg>
+      <arg>-connections <replaceable>num</replaceable></arg>
       <arg>-sdp</arg>
       <arg>-swap</arg>
       <arg>-persist</arg>
@@ -127,6 +133,16 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Use a blocksize of "block size". Default is 1024;
 	    allowed values are either 512, 1024, 2048 or 4096</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-connections <replaceable>num</replaceable></option></term>
+	<term><option>-C</option></term>
+	<listitem>
+	  <para>Use <replaceable>num</replaceable> connections to the
+	  server, to allow speeding up request handling, at the cost of higher
+	  resource usage on the server. Use of this option requires kernel
+	  support available first with Linux 4.9.
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -294,6 +310,88 @@ manpage.1: manpage.sgml
         </listitem>
       </varlistentry>
     </variablelist>
+    <refsect2>
+      <title>TLS support</title>
+      <para>Enabling any of the TLS-related options causes the client to
+        use the NBD_OPT_STARTTLS command to upgrade the connection to
+	TLS. Since negotiating TLS support from userspace for a kernel
+	socket would be very involved (if passing keys to kernel space
+	were even possible, which it isn't), the way this is implemented
+	is that the nbd-client process creates a socketpair, one side of
+	which it hands to the kernel, and the other side of which is
+	handed to an encrypting/decrypting proxy. This has the effect
+	that all communication will be encrypted before being sent over
+	the wire; however, doing so is not safe in combination with
+	swapping over an NBD device:</para>
+      <para>
+        In order to free memory by swapping, the kernel needs to be sure
+	that the write to the nbd device has finalized. For this, it
+	needs to be able to receive an NBD_CMD_WRITE reply which informs
+	it that the write has completed successfully and that the memory
+	may be released. Receiving data over the network, however,
+	requires that the kernel <emphasis>allocate</emphasis> memory
+	first, which is impossible if we're low on memory (a likely
+	situation when trying to swap). This is likely to cause a
+	deadlock when we're low on memory and there are high amounts of
+	network traffic.</para>
+      <para>To remedy this situation, the kernel sets the PF_MEMALLOC
+        option on the nbd socket; when low on memory, it will throw away
+	all packets except for those destined to a socket with that
+	option set, relying on the normal TCP retransmit system to
+	ensure that data is not lost. This avoids the deadlock described
+	above.</para>
+      <para>However, the PF_MEMALLOC option is set on the socket that is
+        connected to the nbd device, not the encrypted socket connected
+	to the encrypting/decrypting proxy. As such, when using TLS, the
+	PF_MEMALLOC option is not set on the socket that actually
+	receives data from the network, which means that the deadlock
+	reappears.</para>
+      <para>For this reason, if the <option>-swap</option> option is
+        used when TLS is in use, &dhpackage; will issue an appropriate
+	warning.</para>
+      <variablelist>
+        <varlistentry>
+          <term><option>-certfile <replaceable>file</replaceable></option></term>
+	  <term><option>-F</option></term>
+	  <listitem>
+	    <para>
+	      Use the specified file as the client certificate for TLS
+	      authentication to the server.
+	    </para>
+	  </listitem>
+        </varlistentry>
+	<varlistentry>
+	  <term><option>-keyfile <replaceable>file</replaceable></option></term>
+	  <term><option>-K</option></term>
+	  <listitem>
+	    <para>
+	      Use the specified file as the private key for the client
+	      cerificate.
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-cacertfile <replaceable>file</replaceable></option></term>
+	  <term><option>-A</option></term>
+	  <listitem>
+	    <para>
+	      Use the specified file as the CA certificate for TLS
+	      authentication to the server.
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>-tlshostname <replaceable>hostname</replaceable></option></term>
+	  <term><option>-H</option></term>
+	  <listitem>
+	    <para>
+	      Use the specified hostname for the TLS context. If not
+	      specified, the hostname used to connect to the server will
+	      be used.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </refsect2>
   </refsect1>
   <refsect1>
     <title>EXAMPLES</title>

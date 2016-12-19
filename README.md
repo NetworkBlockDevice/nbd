@@ -10,6 +10,10 @@ NBD README
   <img alt='build status' src='http://barbershop.grep.be/cgi-bin/buildstatus'>
 </a>
 
+<a href="https://bestpractices.coreinfrastructure.org/projects/281">
+  <img src="https://bestpractices.coreinfrastructure.org/projects/281/badge">
+</a>
+
 Welcome to the NBD userland support files!
 
 This package contains nbd-server and nbd-client.
