@@ -124,6 +124,32 @@ manpage.1: manpage.sgml
         </listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>cacertfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 CA certificate used for validating client
+          certificates supplied by the client. If this option is not
+          set then client certificates will not be checked.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>certfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 public certificate used for TLS negotiation
+          with the client. If <option>keyfile</option> is set but
+          <option>certfile</option> is not set, then the server will
+          attempt to read the certificate from the path specified
+          by <option>keyfile</option>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
         <term><option>force_tls</option></term>
         <listitem>
           <para>
@@ -196,6 +222,17 @@ manpage.1: manpage.sgml
 	    whatsoever have been configured, in which case it will
 	    exit with an appropriate error message)
 	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>keyfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 private key used for TLS negotiation
+          with the client. This option must be set to enable TLS.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -315,43 +352,6 @@ manpage.1: manpage.sgml
 	    with the specified name. Only newstyle negotiation is
 	    supported on UNIX domain sockets.
 	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>keyfile</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
-	  </para>
-	  <para>If this option is set, it should contain a path to
-          a PEM format X.509 private key used for TLS negotiation
-          with the client. This option must be set to enable TLS.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>certfile</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
-	  </para>
-	  <para>If this option is set, it should contain a path to
-          a PEM format X.509 public certificate used for TLS negotiation
-          with the client. If <option>keyfile</option> is set but
-          <option>certfile</option> is not set, then the server will
-          attempt to read the certificate from the path specified
-          by <option>keyfile</option>.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>cacertfile</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
-	  </para>
-	  <para>If this option is set, it should contain a path to
-          a PEM format X.509 CA certificate used for validating client
-          certificates supplied by the client. If this option is not
-          set then client certificates will not be checked.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
