@@ -368,6 +368,28 @@ manpage.1: manpage.sgml
 	  </para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+        <term><option>tlsprio</option></term>
+	<listitem>
+	  <para>Optional; string; default NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE</para>
+	  <para>This option allows to configure the GnuTLS priority
+	    string, which is used to select the algorithms which GnuTLS
+	    will allow to be negotiated with the client. The NBD
+	    STARTTLS specification requires that clients and servers
+	    require TLS1.2 or higher by default, so the default string
+	    disables all older versions of the TLS protocol.</para>
+	  <para>Not all versions of GnuTLS support the
+	    %SERVER_PRECEDENCE flag, which exists to signal that the
+	    server should pay no attention to the algorithm preferences
+	    selected by the client. If you're using an older version of
+	    GnuTLS (e.g., 2.12), it may be necessary to specify a
+	    priority string that does not include the %SERVER_PRECEDENCE
+	    flag.</para>
+	  <para>For an explanation of the possible values of this
+	    option, see the "Priority strings" chapter in the GnuTLS
+	    documentation.</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
   </refsect1>
   <refsect1>
