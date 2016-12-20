@@ -2025,7 +2025,7 @@ static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
 	// TODO: handle this far more efficiently with reference to the
 	// actual backing driver
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
