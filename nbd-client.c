@@ -47,7 +47,7 @@
 #define MY_NAME "nbd_client"
 #include "cliserv.h"
 
-#if HAVE_GNUTLS
+#if HAVE_GNUTLS && !defined(NOTLS)
 #include "crypto-gnutls.h"
 #endif
 
@@ -309,7 +309,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	if (write(sock, &client_flags, sizeof(client_flags)) < 0)
 		err("Failed/2.1: %m");
 
-#if HAVE_GNUTLS
+#if HAVE_GNUTLS && !defined(NOTLS)
         /* TLS */
         if (tls) {
 		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
@@ -676,7 +676,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
-#if HAVE_GNUTLS
+#if HAVE_GNUTLS && !defined(NOTLS)
 	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n");
 #endif
 	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
@@ -755,7 +755,7 @@ int main(int argc, char *argv[]) {
 
 	logging(MY_NAME);
 
-#if HAVE_GNUTLS
+#if HAVE_GNUTLS && !defined(NOTLS)
         tlssession_init();
 #endif
 
@@ -847,7 +847,7 @@ int main(int argc, char *argv[]) {
 		case 'u':
 			b_unix = 1;
 			break;
-#if HAVE_GNUTLS
+#if HAVE_GNUTLS && !defined(NOTLS)
 		case 'x':
 			tls = true;
 			break;
