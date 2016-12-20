@@ -3242,6 +3242,7 @@ int main(int argc, char *argv[]) {
 	dousers(genconf.user, genconf.group);
 
 #if HAVE_GNUTLS
+	gnutls_global_init();
 	static gnutls_dh_params_t dh_params;
 	gnutls_dh_params_init(&dh_params);
 	gnutls_dh_params_generate2(dh_params,
