@@ -318,7 +318,7 @@ void negotiate(int sock, u64 *rsize64, u32 *flags, char* name, uint32_t needed_f
 	} else {
 		if(read(sock, &tmp, sizeof(tmp)) < 0)
 			err("Failed/4: %m\n");
-		*flags |= (uint32_t)ntohs(tmp);
+		*flags = (uint32_t)ntohs(tmp);
 	}
 
 	if (read(sock, &buf, 124) < 0)
