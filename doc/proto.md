@@ -1602,8 +1602,9 @@ The following request types exist:
     code in the error field of an error chunk. However, if the error
     does not involve invalid usage (such as a request beyond the bounds
     of the file), a server MAY reply with a single block status
-    descriptor with *length* matching the requested length, and *status*
-    of 0 rather than reporting the error.
+    descriptor with *length* matching the requested length, rather than
+    reporting the error; in this case the context MAY mandate the
+    status returned.
 
     A client MAY initiate a hard disconnect if it detects that the
     server has sent an invalid chunk. The server SHOULD return `EINVAL`
