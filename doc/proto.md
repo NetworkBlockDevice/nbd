@@ -1026,9 +1026,9 @@ of the newstyle negotiation.
 
     For details on the query string, see under `NBD_OPT_SET_META_CONTEXT`.
 
-    The server MUST either reply with an error (for instance `EINVAL`
-    if the option is not supported), or reply with a list of
-    `NBD_REP_META_CONTEXT` replies followed by `NBD_REP_ACK`.
+    The server MUST either reply with an error (for instance
+    `NBD_REP_ERR_UNSUP` if the option is not supported), or reply with a
+    list of `NBD_REP_META_CONTEXT` replies followed by `NBD_REP_ACK`.
 
     If zero queries are sent, then the server MUST return all
     the metadata contexts that are available to the client to select
