@@ -307,7 +307,7 @@ order, except that:
   by the client.
 
 `NBD_CMD_FLUSH` is modelled on the Linux kernel empty bio with
-`REQ_FLUSH` set. `NBD_CMD_FLAG_FUA` is modelled on the Linux
+`REQ_PREFLUSH` set. `NBD_CMD_FLAG_FUA` is modelled on the Linux
 kernel bio with `REQ_FUA` set. In case of ambiguity in this
 specification, the
 [kernel documentation](https://www.kernel.org/doc/Documentation/block/writeback_cache_control.txt)
