@@ -697,6 +697,7 @@ The field has the following format:
   the export.
 - bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
   `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+- bit 10, `NBD_FLAG_SEND_RESIZE`: exposes support for `NBD_CMD_RESIZE`.
 
 Clients SHOULD ignore unknown flags.
 
@@ -988,6 +989,48 @@ The following request types exist:
     The server SHOULD return `ENOSPC` if it receives a write zeroes request
     including one or more sectors beyond the size of the device. It SHOULD
     return `EPERM` if it receives a write zeroes request on a read-only export.
+
+* `NBD_CMD_RESIZE` (7)
+
+    A resize request. The server should make the necessary changes by
+    either allocating more space or releasing space that is no longer
+    necessary in order to support the new size, and then send the reply
+    message. For the purpose of this message, the field `offset` in the
+    request header is used to signal the new requested size.
+
+    If an error occurs, the server SHOULD reply with one of the
+    following error codes:
+
+    - EPERM: server configuration does not allow this reply, or other
+      clients are also using the same export and the request was for a
+      smaller size. The latter is optional; servers are not required to
+      keep track of all clients using an export, and clients issuing
+      resize requests should make sure not to issue it unless they are
+      the only writer. At any rate, if this error is not issued, the new
+      device size MAY be visible to all clients or just to the one that
+      issued the resize request.
+    - EIO: I/O error occurred while trying to resize the device
+    - ENOSPC: the resize was for an increase in space, and requires more
+      space than is available to the server
+    - ESHUTDOWN: the server is in the process of being shut down.
+
+    Clients MUST NOT send a resize request unless the
+    `NBD_FLAG_SEND_RESIZE` flag was set in the transmission flags field.
+
+    If the resize was successful, clients MAY now issue other requests
+    up to the new size as requested in the request header. If the new
+    size is larger than it was before the request, requests beyond the
+    new size but not beyond the old one MUST fail with ENOSPC.
+
+    Clients MUST NOT issue requests for offsets in the area between the
+    old and new sizes between the time this request is issued and the
+    reply has been received. That is, in case of a "resize smaller" they
+    SHOULD NOT issue requests for offsets beyond the new size, and in
+    case of a "resize larger" they SHOULD NOT issue requests for offsets
+    beyond the old size. The behaviour of servers in respond to clients
+    issuing such requests anyway is not defined by this specification.
+    Additionally, clients MUST also make sure that no such requests are
+    outstanding when the resize request is sent.
 
 * Other requests
 
