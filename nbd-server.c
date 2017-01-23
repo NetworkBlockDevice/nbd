@@ -1325,8 +1325,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
-			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
-			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
+			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) return -1;
 		} else { /* the block is not there */
 			DEBUG("Page %llu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
@@ -1371,11 +1370,8 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
-			myseek(client->difffile,
-					client->difmap[mapcnt]*DIFFPAGESIZE+offset);
-			if (write(client->difffile, buf, wrlen) != wrlen) return -1 ;
+			if (pwrite(client->difffile, buf, wrlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != wrlen) return -1 ;
 		} else { /* the block is not there */
-			myseek(client->difffile,client->difffilelen*DIFFPAGESIZE) ;
 			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
 			DEBUG("Page %llu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
