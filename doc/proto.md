@@ -1019,8 +1019,9 @@ The following request types exist:
 
     If the resize was successful, clients MAY now issue other requests
     up to the new size as requested in the request header. If the new
-    size is larger than it was before the request, requests beyond the
-    new size but not beyond the old one MUST fail with ENOSPC.
+    size is smaller than it was before the request, requests beyond the
+    new size but not beyond the old one MUST fail with ENOSPC, and vice
+    versa.
 
     Clients MUST NOT issue requests for offsets in the area between the
     old and new sizes between the time this request is issued and the
