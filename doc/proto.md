@@ -287,7 +287,7 @@ order, except that:
 
 * All write commands (that includes `NBD_CMD_WRITE`,
   `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
-  completes (i.e. replies to) prior to processing to a
+  completes (i.e. replies to) prior to processing a
   `NBD_CMD_FLUSH` MUST be written to non-volatile
   storage prior to replying to that `NBD_CMD_FLUSH`. This
   paragraph only applies if `NBD_FLAG_SEND_FLUSH` is set within
@@ -698,7 +698,7 @@ The field has the following format:
 - bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
   `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 - bit 10, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
-  [extensio](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
@@ -991,7 +991,12 @@ The following request types exist:
     including one or more sectors beyond the size of the device. It SHOULD
     return `EPERM` if it receives a write zeroes request on a read-only export.
 
-* `NBD_CMD_RESIZE` (7)
+* `NBD_CMD_BLOCK_STATUS` (7)
+
+    Defined by the experimental `BLOCK_STATUS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
+* `NBD_CMD_RESIZE` (8)
 
     Defined by the experimental `RESIZE`
     [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
