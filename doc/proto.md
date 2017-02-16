@@ -287,7 +287,7 @@ order, except that:
 
 * All write commands (that includes `NBD_CMD_WRITE`,
   `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
-  completes (i.e. replies to) prior to processing to a
+  completes (i.e. replies to) prior to processing a
   `NBD_CMD_FLUSH` MUST be written to non-volatile
   storage prior to replying to that `NBD_CMD_FLUSH`. This
   paragraph only applies if `NBD_FLAG_SEND_FLUSH` is set within
@@ -990,7 +990,12 @@ The following request types exist:
     including one or more sectors beyond the size of the device. It SHOULD
     return `EPERM` if it receives a write zeroes request on a read-only export.
 
-* `NBD_CMD_RESIZE` (7)
+* `NBD_CMD_BLOCK_STATUS` (7)
+
+    Defined by the experimental `BLOCK_STATUS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
+* `NBD_CMD_RESIZE` (8)
 
     A resize request. The server should make the necessary changes by
     either allocating more space or releasing space that is no longer
