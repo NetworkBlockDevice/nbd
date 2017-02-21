@@ -52,5 +52,7 @@ support/lt*
 support/libtool.m4
 ar-lib
 tests/run/cliserv.c
+tests/run/crypto-gnutls.c
+tests/run/buffer.c
 .debhelper
 *debhelper.log
