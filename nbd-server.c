@@ -262,6 +262,7 @@ struct generic_conf {
 	gchar *certfile;        /**< certificate file             */
 	gchar *keyfile;         /**< key file                     */
 	gchar *cacertfile;      /**< CA certificate file          */
+	gchar *tlsprio;		/**< TLS priority string	  */
         gint flags;             /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
@@ -778,6 +779,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "certfile",   FALSE, PARAM_STRING,    &(genconftmp.certfile),   0 },
 		{ "keyfile",    FALSE, PARAM_STRING,    &(genconftmp.keyfile),    0 },
 		{ "cacertfile", FALSE, PARAM_STRING,    &(genconftmp.cacertfile), 0 },
+		{ "tlsprio",	FALSE,  PARAM_STRING,   &(genconftmp.tlsprio),    0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -795,6 +797,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	gint j;
 
         memset(&genconftmp, 0, sizeof(struct generic_conf));
+
+	genconftmp.tlsprio = "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE";
 
         if (genconf) {
                 /* Use the passed configuration values as defaults. The
@@ -1626,7 +1630,7 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	gnutls_certificate_set_verify_function(x509_cred, verify_cert);
 	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
 	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
-	check_rv(gnutls_priority_init(&priority_cache, "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE", NULL));
+	check_rv(gnutls_priority_init(&priority_cache, genconf->tlsprio, NULL));
 	check_rv(gnutls_init(session, GNUTLS_SERVER));
 	check_rv(gnutls_priority_set(*session, priority_cache));
 	check_rv(gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, x509_cred));
@@ -3238,6 +3242,7 @@ int main(int argc, char *argv[]) {
 	dousers(genconf.user, genconf.group);
 
 #if HAVE_GNUTLS
+	gnutls_global_init();
 	static gnutls_dh_params_t dh_params;
 	gnutls_dh_params_init(&dh_params);
 	gnutls_dh_params_generate2(dh_params,
