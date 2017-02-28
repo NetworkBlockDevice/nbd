@@ -290,6 +290,16 @@ AC_PREPROC_IFELSE(
 	[AC_MSG_RESULT([yes]); NEED_BSD_SOURCE=1])
 AC_DEFINE([NEED_BSD_SOURCE], $NEED_BSD_SOURCE, [Define to 1 if _BSD_SOURCE needs to be defined before certain inclusions])
 
+PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1, [have_libnl3=yes], [have_libnl3=no])
+if test "${have_libnl3}" = "yes"
+then
+	AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
+	CFLAGS+=" $LIBNL3_CFLAGS"
+	LIBS+=" $LIBNL3_LIBS"
+else
+	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
+fi
+
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
