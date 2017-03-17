@@ -606,12 +606,6 @@ exports. It is not possible to avoid downgrade attacks
 on exports which may be served either via TLS or in plain
 text unless the client insists on TLS.
 
-### Status
-
-This functionality has not yet been implemented by the reference
-implementation, but was implemented by qemu and subsequently
-by other users, so has been moved out of the "experimental" section.
-
 ## Values
 
 This section describes the value and meaning of constants (other than
