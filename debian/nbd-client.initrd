@@ -61,6 +61,13 @@ case "$nbdroot" in
 		nbdsrv="${nbdroot%,*}"
 		nbdport="${nbdroot#*,}"
 		;;
+	\[*\]:/*)
+		# [ipv6]:/path
+		nbdsrv=${nbdroot%\]*}
+		nbdsrv=${nbdsrv#\[}
+		nbdpath=${nbdroot#\[$nbdsrv\]}
+		nbdpath=${nbdpath#:}
+		;;
 	\[*\]*)
 		# [ipv6]:port/path
 		nbdsrv=${nbdroot%\]*}
@@ -69,6 +76,12 @@ case "$nbdroot" in
 		nbdportpath=${nbdportpath#:}
 		nbdport=${nbdportpath%%/*}
 		nbdpath=${nbdportpath#$nbdport}
+		;;
+	/*|*:/*)
+		# ipv4:/path
+		nbdsrv=${nbdroot%%[:/]*}
+		nbdpath=${nbdroot#$nbdsrv}
+		nbdpath=${nbdpath#:}
 		;;
 	*)
 		# ipv4:port/path
