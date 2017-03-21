@@ -2,7 +2,7 @@ dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],
-  m4_esyscmd(support/genver.sh | tr -d '\n'),
+  [3.15.2],
   [wouter@debian.org],,
   [http://nbd.sourceforge.net/])
 m4_define([serial_tests], [

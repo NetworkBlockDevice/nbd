@@ -6,8 +6,10 @@ nbd (1:3.15.2-2) unstable; urgency=medium
   * Fix IPv6 case of port-specifying exports, too. Patch by Vagrant as
     well; Closes: #840612.
   * Fix up Makefile.am so it really works on kFreeBSD, now.
+  * Change configure.ac to hardcode version number rather than regenerating it
+    from git tags (which doesn't work on the Debian branch...)
 
- -- Wouter Verhelst <wouter@debian.org>  Tue, 21 Mar 2017 13:58:54 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 21 Mar 2017 14:41:37 +0100
 
 nbd (1:3.15.2-1) unstable; urgency=medium
 
