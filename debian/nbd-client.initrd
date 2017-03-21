@@ -63,6 +63,8 @@ case "$nbdroot" in
 		;;
 	\[*\]:/*)
 		# [ipv6]:/path
+		# Note: this is specifically written to be compatible with NFS
+		# URLs
 		nbdsrv=${nbdroot%\]*}
 		nbdsrv=${nbdsrv#\[}
 		nbdpath=${nbdroot#\[$nbdsrv\]}
@@ -79,6 +81,8 @@ case "$nbdroot" in
 		;;
 	/*|*:/*)
 		# ipv4:/path
+		# Note: this is specifically written to be compatible with NFS
+		# URLs
 		nbdsrv=${nbdroot%%[:/]*}
 		nbdpath=${nbdroot#$nbdsrv}
 		nbdpath=${nbdpath#:}
