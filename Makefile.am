@@ -19,6 +19,10 @@ nbd_server_LDADD = @GLIB_LIBS@ libnbdsrv.la libcliserv.la
 nbd_trdump_LDADD = libcliserv.la
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h nbd-debug.h
 EXTRA_DIST = maketr CodingStyle autogen.sh README.md support/genver.sh
+if GNUTLS
+nbd_server_CFLAGS += @GnuTLS_CFLAGS@
+nbd_server_LDADD += @GnuTLS_LIBS@
+endif
 if CLIENT
 sbin_PROGRAMS = nbd-client
 if GNUTLS
@@ -29,9 +33,6 @@ min_nbd_client_LDADD = $(client_libs)
 nbd_client_SOURCES = $(client_srcs) crypto-gnutls.c crypto-gnutls.h buffer.c buffer.h
 nbd_client_CFLAGS = $(client_flags) @GnuTLS_CFLAGS@
 nbd_client_LDADD = $(client_libs) @GnuTLS_LIBS@
-
-nbd_server_CFLAGS += @GnuTLS_CFLAGS@
-nbd_server_LDADD += @GnuTLS_LIBS@
 else
 nbd_client_SOURCES = $(client_srcs)
 nbd_client_CFLAGS = $(client_flags)
