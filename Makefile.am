@@ -38,4 +38,3 @@ nbd_client_CFLAGS = $(client_flags)
 nbd_client_LDADD = $(client_libs)
 endif
 endif
-endif
