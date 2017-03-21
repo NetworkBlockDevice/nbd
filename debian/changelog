@@ -1,10 +1,12 @@
-nbd (1:3.15.2-2) UNRELEASED; urgency=medium
+nbd (1:3.15.2-2) unstable; urgency=medium
 
   * Fix support for NFS-style exports that have ":/" in the name, to be
     better at backwards compatibility. Patch from Vagrant Cascadian;
     Closes: #846998. Thanks, Vagrant.
+  * Fix IPv6 case of port-specifying exports, too. Patch by Vagrant as
+    well; Closes: #840612.
 
- -- Wouter Verhelst <wouter@debian.org>  Tue, 21 Mar 2017 13:20:12 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Tue, 21 Mar 2017 13:26:43 +0100
 
 nbd (1:3.15.2-1) unstable; urgency=medium
 
