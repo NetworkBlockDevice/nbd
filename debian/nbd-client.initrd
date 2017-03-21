@@ -77,7 +77,7 @@ case "$nbdroot" in
 		nbdportpath=${nbdroot#\[$nbdsrv\]}
 		nbdportpath=${nbdportpath#:}
 		nbdport=${nbdportpath%%/*}
-		nbdpath=${nbdportpath#$nbdport}
+		nbdpath=${nbdportpath#$nbdport/}
 		;;
 	/*|*:/*)
 		# ipv4:/path
