@@ -5,7 +5,8 @@ nbd (1:3.15.2-2) unstable; urgency=medium
     Closes: #846998. Thanks, Vagrant.
   * Fix IPv6 case of port-specifying exports, too. Patch by Vagrant as
     well; Closes: #840612.
-  * Fix up Makefile.am so it really works on kFreeBSD, now.
+  * Fix up Makefile.am so it really works on kFreeBSD, now, and rerun
+    autotools.
   * Change configure.ac to hardcode version number rather than regenerating it
     from git tags (which doesn't work on the Debian branch...)
 
