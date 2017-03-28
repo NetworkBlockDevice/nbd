@@ -51,3 +51,9 @@ nbdtab_parser.tab.h: $(srcdir)/nbdtab_parser.y
 	bison -d $^ > $@
 
 AM_DISTCHECK_CONFIGURE_FLAGS=--enable-syslog
+
+if NETLINK
+bin_PROGRAMS += nbd-get-status
+nbd_get_status_SOURCES = nbd-get-status.c cliserv.c
+nbd_get_status_CFLAGS = @CFLAGS@
+endif

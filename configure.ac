@@ -311,6 +311,8 @@ else
 	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
 fi
 
+AM_CONDITIONAL(NETLINK, [test "$HAVE_NETLINK" = "1"])
+
 AC_MSG_CHECKING([whether man pages are requested])
 AC_ARG_ENABLE([manpages],
 	AS_HELP_STRING([--disable-manpages], [Do not install man pages]),
