@@ -172,6 +172,26 @@ int openunix(const char *path) {
 	return sock;
 }
 
+void send_request(int sock, uint32_t opt, ssize_t datasize, void* data) {
+	struct {
+		uint64_t magic;
+		uint32_t opt;
+		uint32_t datasize;
+	} __attribute__((packed)) header = {
+		ntohll(opts_magic),
+		ntohl(opt),
+		ntohl(datasize),
+	};
+	if(datasize < 0) {
+		datasize = strlen((char*)data);
+		header.datasize = htonl(datasize);
+	}
+	writeit(sock, &header, sizeof(header));
+	if(datasize != 0) {
+		writeit(sock, data, datasize);
+	}
+}
+
 void ask_list(int sock) {
 	uint32_t opt;
 	uint32_t opt_server;
@@ -182,20 +202,7 @@ void ask_list(int sock) {
 	const int BUF_SIZE = 1024;
 	char buf[BUF_SIZE];
 
-	magic = ntohll(opts_magic);
-	if (write(sock, &magic, sizeof(magic)) < 0)
-		err("Failed/2.2: %m");
-
-	/* Ask for the list */
-	opt = htonl(NBD_OPT_LIST);
-	if(write(sock, &opt, sizeof(opt)) < 0) {
-		err("writing list option failed: %m");
-	}
-	/* Send the length (zero) */
-	len = htonl(0);
-	if(write(sock, &len, sizeof(len)) < 0) {
-		err("writing length failed: %m");
-	}
+	send_request(sock, NBD_OPT_LIST, 0, NULL);
 	/* newline, move away from the "Negotiation:" line */
 	printf("\n");
 	do {
@@ -259,15 +266,7 @@ void ask_list(int sock) {
 			}
 		}
 	} while(reptype != NBD_REP_ACK);
-	opt=htonl(NBD_OPT_ABORT);
-	len=htonl(0);
-	magic=htonll(opts_magic);
-	if (write(sock, &magic, sizeof(magic)) < 0)
-		err("Failed/2.2: %m");
-	if (write(sock, &opt, sizeof(opt)) < 0)
-		err("Failed writing abort");
-	if (write(sock, &len, sizeof(len)) < 0)
-		err("Failed writing length");
+	send_request(sock, NBD_OPT_ABORT, 0, NULL);
 }
 
 void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls) {
@@ -318,18 +317,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 		uint32_t tmp32;
 		uint64_t tmp64;
 
-		/* magic */
-		tmp64 = htonll(opts_magic);
-		if (write(sock, &tmp64, sizeof(tmp64)) < 0)
-			err( "Could not write magic: %m");
-		/* starttls */
-		tmp32 = htonl(NBD_OPT_STARTTLS);
-		if (write(sock, &tmp32, sizeof(tmp32)) < 0)
-			err("Could not write option: %m");
-		/* length of data */
-		tmp32 = htonl(0);
-		if (write(sock, &tmp32, sizeof(tmp32)) < 0)
-			err("Could not write option length: %m");
+		send_request(sock, NBD_OPT_STARTTLS, 0, NULL);
 
 		if (read(sock, &tmp64, sizeof(tmp64)) < 0)
 			err("Could not read cliserv_magic: %m");
@@ -417,19 +405,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	}
 
 	/* Write the export name that we're after */
-	magic = htonll(opts_magic);
-	if (write(sock, &magic, sizeof(magic)) < 0)
-		err("Failed/2.2: %m");
-
-	opt = ntohl(NBD_OPT_EXPORT_NAME);
-	if (write(sock, &opt, sizeof(opt)) < 0)
-		err("Failed/2.3: %m");
-	namesize = (u32)strlen(name);
-	namesize = ntohl(namesize);
-	if (write(sock, &namesize, sizeof(namesize)) < 0)
-		err("Failed/2.4: %m");
-	if (write(sock, name, strlen(name)) < 0)
-		err("Failed/2.4: %m");
+	send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
 
 	readit(sock, &size64, sizeof(size64));
 	size64 = ntohll(size64);
