@@ -1502,7 +1502,6 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 	}
 }
 
-int do_run(gchar* command, gchar* file);
 void setupexport(CLIENT* client);
 int copyonwrite_prepare(CLIENT* client);
 void send_export_info(CLIENT* client);
@@ -1620,6 +1619,25 @@ int set_peername(int net, CLIENT *client) {
             peername, client->exportname);
 	client->clientname=g_strdup(peername);
 	return 0;
+}
+
+/**
+ * Run a command. This is used for the ``prerun'' and ``postrun'' config file
+ * options
+ *
+ * @param command the command to be ran. Read from the config file
+ * @param file the file name we're about to export
+ **/
+int do_run(gchar* command, gchar* file) {
+	gchar* cmd;
+	int retval=0;
+
+	if(command && *command) {
+		cmd = g_strdup_printf(command, file);
+		retval=system(cmd);
+		g_free(cmd);
+	}
+	return retval;
 }
 
 /**
@@ -2458,25 +2476,6 @@ int copyonwrite_prepare(CLIENT* client) {
 	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1 ;
 
 	return 0;
-}
-
-/**
- * Run a command. This is used for the ``prerun'' and ``postrun'' config file
- * options
- *
- * @param command the command to be ran. Read from the config file
- * @param file the file name we're about to export
- **/
-int do_run(gchar* command, gchar* file) {
-	gchar* cmd;
-	int retval=0;
-
-	if(command && *command) {
-		cmd = g_strdup_printf(command, file);
-		retval=system(cmd);
-		g_free(cmd);
-	}
-	return retval;
 }
 
 /**
