@@ -1502,7 +1502,6 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 	}
 }
 
-int copyonwrite_prepare(CLIENT* client);
 void send_export_info(CLIENT* client);
 
 /**
@@ -1754,6 +1753,30 @@ void setupexport(CLIENT* client) {
 	if(treefile) {
 		msg(LOG_INFO, "Total number of (potential) files: %" PRId64, (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
 	}
+}
+
+int copyonwrite_prepare(CLIENT* client) {
+	off_t i;
+	gchar* dir;
+	gchar* export_base;
+	if (client->server->cowdir != NULL) {
+		dir = g_strdup(client->server->cowdir);
+	} else {
+		dir = g_strdup(dirname(client->exportname));
+	}
+	export_base = g_strdup(basename(client->exportname));
+	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
+		(int)getpid());
+	g_free(dir);
+	g_free(export_base);
+	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
+	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
+	if (client->difffile<0) err("Could not create diff file (%m)") ;
+	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
+		err("Could not allocate memory") ;
+	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1 ;
+
+	return 0;
 }
 
 /**
@@ -2451,30 +2474,6 @@ static int mainloop_threaded(CLIENT* client) {
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
 	}
-}
-
-int copyonwrite_prepare(CLIENT* client) {
-	off_t i;
-	gchar* dir;
-	gchar* export_base;
-	if (client->server->cowdir != NULL) {
-		dir = g_strdup(client->server->cowdir);
-	} else {
-		dir = g_strdup(dirname(client->exportname));
-	}
-	export_base = g_strdup(basename(client->exportname));
-	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
-		(int)getpid());
-	g_free(dir);
-	g_free(export_base);
-	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
-	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
-	if (client->difffile<0) err("Could not create diff file (%m)") ;
-	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
-		err("Could not allocate memory") ;
-	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1 ;
-
-	return 0;
 }
 
 /**
