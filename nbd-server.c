@@ -1497,7 +1497,7 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 		header.datasize = htonl(datasize);
 	}
 	socket_write(client, &header, sizeof(header));
-	if(datasize != 0) {
+	if(data != NULL) {
 		socket_write(client, data, datasize);
 	}
 }
