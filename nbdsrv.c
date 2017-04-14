@@ -286,9 +286,3 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
 	return 0;
 }
-
-void myseek(int handle,off_t a) {
-	if (lseek(handle, a, SEEK_SET) < 0) {
-		err("Can not seek locally!\n");
-	}
-}

@@ -1,7 +1,6 @@
 ACLOCAL_AMFLAGS = -I support
 SUBDIRS = . man doc tests systemd gznbd
 bin_PROGRAMS = nbd-server nbd-trdump
-sbin_PROGRAMS = @NBD_CLIENT_NAME@
 EXTRA_PROGRAMS = nbd-client make-integrityhuge
 noinst_LTLIBRARIES = libnbdsrv.la libcliserv.la
 libcliserv_la_SOURCES = cliserv.h cliserv.c
@@ -20,6 +19,8 @@ nbd_server_LDADD = @GLIB_LIBS@ libnbdsrv.la libcliserv.la
 nbd_trdump_LDADD = libcliserv.la
 make_integrityhuge_SOURCES = make-integrityhuge.c cliserv.h nbd.h nbd-debug.h
 EXTRA_DIST = maketr CodingStyle autogen.sh README.md support/genver.sh
+if CLIENT
+sbin_PROGRAMS = nbd-client
 if GNUTLS
 nbd_client_SOURCES += crypto-gnutls.c crypto-gnutls.h buffer.c buffer.h
 nbd_client_CFLAGS += @GnuTLS_CFLAGS@
@@ -27,4 +28,5 @@ nbd_client_LDADD += @GnuTLS_LIBS@
 
 nbd_server_CFLAGS += @GnuTLS_CFLAGS@
 nbd_server_LDADD += @GnuTLS_LIBS@
+endif
 endif

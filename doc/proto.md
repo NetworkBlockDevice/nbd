@@ -288,7 +288,7 @@ order, except that:
 
 * All write commands (that includes `NBD_CMD_WRITE`,
   `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_TRIM`) that the server
-  completes (i.e. replies to) prior to processing to a
+  completes (i.e. replies to) prior to processing a
   `NBD_CMD_FLUSH` MUST be written to non-volatile
   storage prior to replying to that `NBD_CMD_FLUSH`. This
   paragraph only applies if `NBD_FLAG_SEND_FLUSH` is set within
@@ -308,7 +308,7 @@ order, except that:
   by the client.
 
 `NBD_CMD_FLUSH` is modelled on the Linux kernel empty bio with
-`REQ_FLUSH` set. `NBD_CMD_FLAG_FUA` is modelled on the Linux
+`REQ_PREFLUSH` set. `NBD_CMD_FLAG_FUA` is modelled on the Linux
 kernel bio with `REQ_FUA` set. In case of ambiguity in this
 specification, the
 [kernel documentation](https://www.kernel.org/doc/Documentation/block/writeback_cache_control.txt)
@@ -635,12 +635,6 @@ exports. It is not possible to avoid downgrade attacks
 on exports which may be served either via TLS or in plain
 text unless the client insists on TLS.
 
-### Status
-
-This functionality has not yet been implemented by the reference
-implementation, but was implemented by qemu and subsequently
-by other users, so has been moved out of the "experimental" section.
-
 ## Block size constraints
 
 During transmission phase, several operations are constrained by the
@@ -824,6 +818,8 @@ The field has the following format:
   the export.
 - bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
   `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+- bit 10, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
@@ -1317,6 +1313,16 @@ The following request types exist:
     The server SHOULD return `ENOSPC` if it receives a write zeroes request
     including one or more sectors beyond the size of the device. It SHOULD
     return `EPERM` if it receives a write zeroes request on a read-only export.
+
+* `NBD_CMD_BLOCK_STATUS` (7)
+
+    Defined by the experimental `BLOCK_STATUS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
+* `NBD_CMD_RESIZE` (8)
+
+    Defined by the experimental `RESIZE`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 * Other requests
 

@@ -53,7 +53,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 #define PRIORITY "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2"
 
-typedef struct tlssession
+struct tlssession
 {
   gnutls_certificate_credentials_t creds;
   gnutls_session_t session;
@@ -62,7 +62,7 @@ typedef struct tlssession
   int (*erroutfn) (void *opaque, const char *format, va_list ap);
   int debug;
   void *opaque;
-} tlssession_t;
+};
 
 #define BUF_SIZE 65536
 #define BUF_HWM ((BUF_SIZE*3)/4)

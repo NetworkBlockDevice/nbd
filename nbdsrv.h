@@ -207,12 +207,4 @@ uint64_t size_autodetect(int fhandle);
  * @param client the client for which we're processing this request
  **/
 int exptrim(struct nbd_request* req, CLIENT* client);
-
-/**
- * seek to a position in a file, with error handling.
- * @param handle a filedescriptor
- * @param a position to seek to
- * @todo get rid of this.
- **/
-void myseek(int handle, off_t a);
 #endif //NBDSRV_H

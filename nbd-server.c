@@ -141,6 +141,7 @@
 
 #if HAVE_GNUTLS
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #endif
 
 /** Where our config file actually is */
@@ -261,6 +262,7 @@ struct generic_conf {
 	gchar *certfile;        /**< certificate file             */
 	gchar *keyfile;         /**< key file                     */
 	gchar *cacertfile;      /**< CA certificate file          */
+	gchar *tlsprio;		/**< TLS priority string	  */
         gint flags;             /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
@@ -777,6 +779,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "certfile",   FALSE, PARAM_STRING,    &(genconftmp.certfile),   0 },
 		{ "keyfile",    FALSE, PARAM_STRING,    &(genconftmp.keyfile),    0 },
 		{ "cacertfile", FALSE, PARAM_STRING,    &(genconftmp.cacertfile), 0 },
+		{ "tlsprio",	FALSE,  PARAM_STRING,   &(genconftmp.tlsprio),    0 },
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
@@ -794,6 +797,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	gint j;
 
         memset(&genconftmp, 0, sizeof(struct generic_conf));
+
+	genconftmp.tlsprio = "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE";
 
         if (genconf) {
                 /* Use the passed configuration values as defaults. The
@@ -1324,8 +1329,7 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
-			myseek(client->difffile, client->difmap[mapcnt]*DIFFPAGESIZE+offset);
-			if (read(client->difffile, buf, rdlen) != rdlen) return -1;
+			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) return -1;
 		} else { /* the block is not there */
 			DEBUG("Page %llu is not here, we read the original one\n",
 			       (unsigned long long)mapcnt);
@@ -1370,11 +1374,8 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
-			myseek(client->difffile,
-					client->difmap[mapcnt]*DIFFPAGESIZE+offset);
-			if (write(client->difffile, buf, wrlen) != wrlen) return -1 ;
+			if (pwrite(client->difffile, buf, wrlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != wrlen) return -1 ;
 		} else { /* the block is not there */
-			myseek(client->difffile,client->difffilelen*DIFFPAGESIZE) ;
 			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
 			DEBUG("Page %llu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
@@ -1568,6 +1569,44 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 }
 
 #if HAVE_GNUTLS
+static int verify_cert(gnutls_session_t session) {
+	int ret;
+	unsigned int status, cert_list_size;
+	const gnutls_datum_t *cert_list;
+	gnutls_x509_crt_t cert;
+	time_t now = time(NULL);
+
+	ret = gnutls_certificate_verify_peers2(session, &status);
+	if(ret < 0 || status != 0 || gnutls_certificate_type_get(session) !=
+			GNUTLS_CRT_X509) {
+		goto err;
+	}
+
+	if(gnutls_x509_crt_init(&cert) < 0) {
+		goto err;
+	}
+
+	cert_list = gnutls_certificate_get_peers(session, &cert_list_size);
+	if(cert_list == NULL) {
+		goto err;
+	}
+	if(gnutls_x509_crt_import(cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0) {
+		goto err;
+	}
+	if(gnutls_x509_crt_get_activation_time(cert) > now) {
+		goto err;
+	}
+	if(gnutls_x509_crt_get_expiration_time(cert) < now) {
+		goto err;
+	}
+	// TODO: check CRLs and/or OCSP etc. Patches welcome.
+	msg(LOG_INFO, "client certificate verification successful");
+	return 0;
+err:
+	msg(LOG_ERR, "E: client certificate verification failed");
+	return GNUTLS_E_CERTIFICATE_ERROR;
+}
+
 CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflags, struct generic_conf *genconf) {
 #define check_rv(c) if((c)<0) { retval = NULL; goto exit; }
 	gnutls_certificate_credentials_t x509_cred;
@@ -1588,9 +1627,10 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 
 	check_rv(gnutls_certificate_allocate_credentials(&x509_cred));
+	gnutls_certificate_set_verify_function(x509_cred, verify_cert);
 	check_rv(gnutls_certificate_set_x509_trust_file(x509_cred, genconf->cacertfile, GNUTLS_X509_FMT_PEM));
 	check_rv(gnutls_certificate_set_x509_key_file(x509_cred, genconf->certfile, genconf->keyfile, GNUTLS_X509_FMT_PEM));
-	check_rv(gnutls_priority_init(&priority_cache, "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE", NULL));
+	check_rv(gnutls_priority_init(&priority_cache, genconf->tlsprio, NULL));
 	check_rv(gnutls_init(session, GNUTLS_SERVER));
 	check_rv(gnutls_priority_set(*session, priority_cache));
 	check_rv(gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, x509_cred));
@@ -1751,6 +1791,8 @@ void send_export_info(CLIENT* client) {
 		flags |= NBD_FLAG_ROTATIONAL;
 	if (client->server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
+	if (!(client->server->flags & F_COPYONWRITE))
+		flags |= NBD_FLAG_CAN_MULTI_CONN;
 	flags = htons(flags);
 	socket_write(client, &flags, sizeof(flags));
 	if (!(glob_flags & F_NO_ZEROES)) {
@@ -1983,7 +2025,7 @@ static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
 	// TODO: handle this far more efficiently with reference to the
 	// actual backing driver
 	pthread_mutex_lock(&(client->lock));
-	writeit(client->net, &rep, sizeof rep);
+	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
 }
 
@@ -2498,11 +2540,15 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 msg(LOG_ERR, "Modern initial negotiation failed");
                 goto handler_err;
         }
-	len = strlen(client->server->servename);
-	writeit(commsocket, &len, sizeof len);
-	writeit(commsocket, client->server->servename, len);
-	readit(commsocket, &acl, 1);
-	close(commsocket);
+	if(dontfork) {
+		acl = 'Y';
+	} else {
+		len = strlen(client->server->servename);
+		writeit(commsocket, &len, sizeof len);
+		writeit(commsocket, client->server->servename, len);
+		readit(commsocket, &acl, 1);
+		close(commsocket);
+	}
 
 	switch(acl) {
 		case 'N':
@@ -3196,6 +3242,7 @@ int main(int argc, char *argv[]) {
 	dousers(genconf.user, genconf.group);
 
 #if HAVE_GNUTLS
+	gnutls_global_init();
 	static gnutls_dh_params_t dh_params;
 	gnutls_dh_params_init(&dh_params);
 	gnutls_dh_params_generate2(dh_params,
