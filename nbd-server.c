@@ -1910,10 +1910,15 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			client->clientfeats = cflags;
 			pthread_mutex_init(&(client->lock), NULL);
 			free(name);
+			if(!commit_client(client)) {
+				goto out;
+			}
+			send_export_info(client);
 			return client;
 		}
 	}
 	err("Negotiation failed/8a: Requested export not found, or is TLS-only and client did not negotiate TLS");
+out:
 	free(name);
 	return NULL;
 }
@@ -2107,8 +2112,6 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			// selected option, so return from here
 			// if that is chosen.
 			if(handle_export_name(client, opt, servers, cflags) != NULL) {
-				commit_client(client);
-				send_export_info(client);
 				return client;
 			} else {
 				goto hard_close;
@@ -3222,9 +3225,9 @@ int main(int argc, char *argv[]) {
 			client->net = -1;
 			client->modern = TRUE;
 			client->exportsize = OFFT_MAX;
-			if(set_peername(0, client))
+			if(!commit_client(client)) {
 				exit(EXIT_FAILURE);
-			commit_client(client);
+			}
 			mainloop_threaded(client);
 			return 0;
 		}
