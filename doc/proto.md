@@ -656,7 +656,7 @@ and MUST do so unless it has agreed on block size constraints via out
 of band means.
 
 Some servers are able to make optimizations, such as opening files
-with O_DIRECT, if they know that the client will obey a particular
+with `O_DIRECT`, if they know that the client will obey a particular
 minimum block size, where it must fall back to safer but slower code
 if the client might send unaligned requests. For that reason, if a
 client issues an `NBD_OPT_GO` including an `NBD_INFO_BLOCK_SIZE`
