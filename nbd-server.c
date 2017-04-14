@@ -220,6 +220,7 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       and IPv6 from the same socket (like,
 			       e.g., FreeBSD) */
 GArray* childsocks;	/**< parent-side sockets for communication with children */
+int commsocket;		/**< child-side socket for communication with parent */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -1501,6 +1502,90 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 	}
 }
 
+int set_peername(int net, CLIENT *client);
+int do_run(gchar* command, gchar* file);
+void setupexport(CLIENT* client);
+int copyonwrite_prepare(CLIENT* client);
+void send_export_info(CLIENT* client);
+
+/**
+  * Commit to exporting the chosen export
+  *
+  * When a client sends NBD_OPT_EXPORT_NAME or NBD_OPT_GO, we need to do
+  * a number of things (verify whether the client is allowed access, try
+  * to open files, etc etc) before we're ready to actually serve the
+  * export.
+  *
+  * This function does all those things.
+  *
+  * @param client the CLIENT structure with .server and .net members set
+  * up correctly
+  * @return true if the client is allowed access to the export, false
+  * otherwise
+  */
+static bool commit_client(CLIENT* client) {
+	char acl;
+	uint32_t len;
+
+	/* Check whether we exceeded the maximum number of allowed
+	 * clients already */
+	if(dontfork) {
+		acl = 'Y';
+	} else {
+		len = strlen(client->server->servename);
+		writeit(commsocket, &len, sizeof len);
+		writeit(commsocket, client->server->servename, len);
+		readit(commsocket, &acl, 1);
+		close(commsocket);
+	}
+	switch(acl) {
+		case 'N':
+			msg(LOG_ERR, "Connection not allowed (too many clients)");
+			return false;
+		case 'X':
+			msg(LOG_ERR, "Connection not allowed (unknown by parent?!?)");
+			return false;
+	}
+
+	/* Check whether the client is listed in the authfile */
+        if (set_peername(client->net, client)) {
+                msg(LOG_ERR, "Failed to set peername");
+		return false;
+        }
+
+        if (!authorized_client(client)) {
+                msg(LOG_INFO, "Client '%s' is not authorized to access",
+                    client->clientname);
+		return false;
+        }
+
+	/* Set up the transactionlog, if we need one */
+	if (client->server->transactionlog && (client->transactionlogfd == -1)) {
+		if((client->transactionlogfd =
+					open(client->server->transactionlog,
+						O_WRONLY | O_CREAT,
+						S_IRUSR | S_IWUSR)) ==
+				-1) {
+			msg(LOG_INFO, "Could not open transactionlog %s, moving on without it",
+					client->server->transactionlog);
+		}
+	}
+
+	/* Run any pre scripts that we may need */
+	if (do_run(client->server->prerun, client->exportname)) {
+		msg(LOG_INFO, "Client '%s' not allowed access by prerun script",
+				client->clientname);
+		return false;
+	}
+	setupexport(client);
+
+	if (client->server->flags & F_COPYONWRITE) {
+		copyonwrite_prepare(client);
+	}
+
+	setmysockopt(client->net);
+}
+
 static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
 	uint32_t namelen;
 	char* name;
@@ -1727,6 +1812,8 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			// selected option, so return from here
 			// if that is chosen.
 			if(handle_export_name(client, opt, servers, cflags) != NULL) {
+				commit_client(client);
+				send_export_info(client);
 				return client;
 			} else {
 				goto hard_close;
@@ -2075,7 +2162,6 @@ static int mainloop_threaded(CLIENT* client) {
 	struct nbd_request* req;
 	struct work_package* pkg;
 
-	send_export_info(client);
 	DEBUG("Entering request loop\n");
 	while(1) {
 		req = calloc(sizeof (struct nbd_request), 1);
@@ -2107,6 +2193,12 @@ static int mainloop_threaded(CLIENT* client) {
 		}
 		if(req->type == NBD_CMD_DISC) {
 			g_thread_pool_free(tpool, FALSE, TRUE);
+			do_run(client->server->postrun,
+					client->exportname);
+			if(client->transactionlogfd != -1) {
+				close(client->transactionlogfd);
+				client->transactionlogfd = -1;
+			}
 			return 0;
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
@@ -2271,45 +2363,6 @@ int do_run(gchar* command, gchar* file) {
 		g_free(cmd);
 	}
 	return retval;
-}
-
-/**
- * Serve a connection. 
- *
- * @todo allow for multithreading, perhaps use libevent. Not just yet, though;
- * follow the road map.
- *
- * @param client a connected client
- **/
-void serveconnection(CLIENT *client) {
-	if (client->server->transactionlog && (client->transactionlogfd == -1))
-	{
-		if (-1 == (client->transactionlogfd = open(client->server->transactionlog,
-							   O_WRONLY | O_CREAT,
-							   S_IRUSR | S_IWUSR)))
-			g_warning("Could not open transaction log %s",
-				  client->server->transactionlog);
-	}
-
-	if(do_run(client->server->prerun, client->exportname)) {
-		exit(EXIT_FAILURE);
-	}
-	setupexport(client);
-
-	if (client->server->flags & F_COPYONWRITE) {
-		copyonwrite_prepare(client);
-	}
-
-	setmysockopt(client->net);
-
-	mainloop_threaded(client);
-	do_run(client->server->postrun, client->exportname);
-
-	if (-1 != client->transactionlogfd)
-	{
-		close(client->transactionlogfd);
-		client->transactionlogfd = -1;
-	}
 }
 
 /**
@@ -2499,9 +2552,6 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
         CLIENT *client = NULL;
         int sock_flags_old;
         int sock_flags_new;
-	int commsocket;
-	char acl;
-	uint32_t len;
 
         net = socket_accept(sock);
         if (net < 0)
@@ -2540,35 +2590,6 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 msg(LOG_ERR, "Modern initial negotiation failed");
                 goto handler_err;
         }
-	if(dontfork) {
-		acl = 'Y';
-	} else {
-		len = strlen(client->server->servename);
-		writeit(commsocket, &len, sizeof len);
-		writeit(commsocket, client->server->servename, len);
-		readit(commsocket, &acl, 1);
-		close(commsocket);
-	}
-
-	switch(acl) {
-		case 'N':
-			msg(LOG_ERR, "Connection not allowed (too many clients)");
-			goto handler_err;
-		case 'X':
-			msg(LOG_ERR, "Connection not allowed (unknown by parent?!?)");
-			goto handler_err;
-	}
-
-        if (set_peername(net, client)) {
-                msg(LOG_ERR, "Failed to set peername");
-                goto handler_err;
-        }
-
-        if (!authorized_client(client)) {
-                msg(LOG_INFO, "Client '%s' is not authorized to access",
-                    client->clientname);
-                goto handler_err;
-        }
 
         if (!dontfork) {
                 int i;
@@ -2596,7 +2617,7 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
         }
 
         msg(LOG_INFO, "Starting to serve");
-        serveconnection(client);
+        mainloop_threaded(client);
         exit(EXIT_SUCCESS);
 
 handler_err:
@@ -3209,7 +3230,8 @@ int main(int argc, char *argv[]) {
 			client->exportsize = OFFT_MAX;
 			if(set_peername(0, client))
 				exit(EXIT_FAILURE);
-			serveconnection(client);
+			commit_client(client);
+			mainloop_threaded(client);
 			return 0;
 		}
 	}
