@@ -1879,6 +1879,8 @@ static bool commit_client(CLIENT* client) {
 	}
 
 	setmysockopt(client->net);
+
+	return true;
 }
 
 static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
