@@ -126,3 +126,21 @@ void readit(int f, void *buf, size_t len) {
 		}
 	}
 }
+
+/**
+ * Write data from a buffer into a filedescriptor
+ *
+ * @param f a file descriptor
+ * @param buf a buffer containing data
+ * @param len the number of bytes to be written
+ **/
+void writeit(int f, void *buf, size_t len) {
+	ssize_t res;
+	while (len > 0) {
+		DEBUG("+");
+		if ((res = write(f, buf, len)) <= 0)
+			err("Send failed: %m");
+		len -= res;
+		buf += res;
+	}
+}
