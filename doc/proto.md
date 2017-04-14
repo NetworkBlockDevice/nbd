@@ -915,11 +915,11 @@ of the newstyle negotiation.
 
     Data (both commands):
 
-    - 16 bits, number of information requests
-    - 16 bits x n - list of `NBD_INFO` information requests
     - 32 bits, length of name (unsigned); MUST be no larger than the
       option data length - 6
     - String: name of the export
+    - 16 bits, number of information requests
+    - 16 bits x n - list of `NBD_INFO` information requests
 
     The client MAY list one or more items of specific information it
     is seeking in the list of information requests, or it MAY specify
