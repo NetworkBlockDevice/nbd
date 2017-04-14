@@ -1502,11 +1502,125 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 	}
 }
 
-int set_peername(int net, CLIENT *client);
 int do_run(gchar* command, gchar* file);
 void setupexport(CLIENT* client);
 int copyonwrite_prepare(CLIENT* client);
 void send_export_info(CLIENT* client);
+
+/**
+ * Find the name of the file we have to serve. This will use g_strdup_printf
+ * to put the IP address of the client inside a filename containing
+ * "%s" (in the form as specified by the "virtstyle" option). That name
+ * is then written to client->exportname.
+ *
+ * @param net A socket connected to an nbd client
+ * @param client information about the client. The IP address in human-readable
+ * format will be written to a new char* buffer, the address of which will be
+ * stored in client->clientname.
+ * @return: 0 - OK, -1 - failed.
+ **/
+int set_peername(int net, CLIENT *client) {
+	struct sockaddr_storage netaddr;
+	struct sockaddr* addr = (struct sockaddr*)&netaddr;
+	socklen_t addrinlen = sizeof( struct sockaddr_storage );
+	struct addrinfo hints;
+	struct addrinfo *ai = NULL;
+	char peername[NI_MAXHOST];
+	char netname[NI_MAXHOST];
+	char *tmp = NULL;
+	int i;
+	int e;
+
+	if (getsockname(net, addr, &addrinlen) < 0) {
+		msg(LOG_INFO, "getsockname failed: %m");
+		return -1;
+	}
+
+	if(netaddr.ss_family == AF_UNIX) {
+		client->clientaddr.ss_family = AF_UNIX;
+		strcpy(peername, "unix");
+	} else {
+		if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
+			msg(LOG_INFO, "getpeername failed: %m");
+			return -1;
+		}
+		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
+				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
+			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+			return -1;
+		}
+
+		memset(&hints, '\0', sizeof (hints));
+		hints.ai_flags = AI_ADDRCONFIG;
+		e = getaddrinfo(peername, NULL, &hints, &ai);
+
+		if(e != 0) {
+			msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+			freeaddrinfo(ai);
+			return -1;
+		}
+	}
+
+	if(strncmp(peername, "::ffff:", 7) == 0) {
+		memmove(peername, peername+7, strlen(peername));
+	}
+
+	switch(client->server->virtstyle) {
+		case VIRT_NONE:
+			msg(LOG_DEBUG, "virtualization is off");
+			client->exportname=g_strdup(client->server->exportname);
+			break;
+		case VIRT_IPHASH:
+			msg(LOG_DEBUG, "virtstyle iphash");
+			for(i=0;i<strlen(peername);i++) {
+				if(peername[i]=='.') {
+					peername[i]='/';
+				}
+			}
+		case VIRT_IPLIT:
+			msg(LOG_DEBUG, "virtstyle ipliteral");
+			client->exportname=g_strdup_printf(client->server->exportname, peername);
+			break;
+		case VIRT_CIDR:
+			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
+			memcpy(&netaddr, &(client->clientaddr), addrinlen);
+			int addrbits;
+			if(client->clientaddr.ss_family == AF_UNIX) {
+				tmp = g_strdup(peername);
+			} else {
+				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
+				if(ai->ai_family == AF_INET) {
+					addrbits = 32;
+				} else if(ai->ai_family == AF_INET6) {
+					addrbits = 128;
+				}
+				uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
+				for(int i = 0; i < addrbits; i+=8) {
+					int masklen = client->server->cidrlen - i;
+					masklen = masklen > 0 ? masklen : 0;
+					uint8_t mask = getmaskbyte(masklen);
+					*addrptr &= mask;
+					addrptr++;
+				}
+				getnameinfo((struct sockaddr *) &netaddr, addrinlen,
+								netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
+				tmp=g_strdup_printf("%s/%s", netname, peername);
+			}
+
+			if(tmp != NULL) {
+				client->exportname=g_strdup_printf(client->server->exportname, tmp);
+				g_free(tmp);
+			}
+
+			break;
+	}
+
+	freeaddrinfo(ai);
+        msg(LOG_INFO, "connect from %s, assigned file is %s",
+            peername, client->exportname);
+	client->clientname=g_strdup(peername);
+	return 0;
+}
 
 /**
   * Commit to exporting the chosen export
@@ -2363,121 +2477,6 @@ int do_run(gchar* command, gchar* file) {
 		g_free(cmd);
 	}
 	return retval;
-}
-
-/**
- * Find the name of the file we have to serve. This will use g_strdup_printf
- * to put the IP address of the client inside a filename containing
- * "%s" (in the form as specified by the "virtstyle" option). That name
- * is then written to client->exportname.
- *
- * @param net A socket connected to an nbd client
- * @param client information about the client. The IP address in human-readable
- * format will be written to a new char* buffer, the address of which will be
- * stored in client->clientname.
- * @return: 0 - OK, -1 - failed.
- **/
-int set_peername(int net, CLIENT *client) {
-	struct sockaddr_storage netaddr;
-	struct sockaddr* addr = (struct sockaddr*)&netaddr;
-	socklen_t addrinlen = sizeof( struct sockaddr_storage );
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	char peername[NI_MAXHOST];
-	char netname[NI_MAXHOST];
-	char *tmp = NULL;
-	int i;
-	int e;
-
-	if (getsockname(net, addr, &addrinlen) < 0) {
-		msg(LOG_INFO, "getsockname failed: %m");
-		return -1;
-	}
-
-	if(netaddr.ss_family == AF_UNIX) {
-		client->clientaddr.ss_family = AF_UNIX;
-		strcpy(peername, "unix");
-	} else {
-		if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
-			msg(LOG_INFO, "getpeername failed: %m");
-			return -1;
-		}
-		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
-				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
-			return -1;
-		}
-
-		memset(&hints, '\0', sizeof (hints));
-		hints.ai_flags = AI_ADDRCONFIG;
-		e = getaddrinfo(peername, NULL, &hints, &ai);
-
-		if(e != 0) {
-			msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
-			freeaddrinfo(ai);
-			return -1;
-		}
-	}
-
-	if(strncmp(peername, "::ffff:", 7) == 0) {
-		memmove(peername, peername+7, strlen(peername));
-	}
-
-	switch(client->server->virtstyle) {
-		case VIRT_NONE:
-			msg(LOG_DEBUG, "virtualization is off");
-			client->exportname=g_strdup(client->server->exportname);
-			break;
-		case VIRT_IPHASH:
-			msg(LOG_DEBUG, "virtstyle iphash");
-			for(i=0;i<strlen(peername);i++) {
-				if(peername[i]=='.') {
-					peername[i]='/';
-				}
-			}
-		case VIRT_IPLIT:
-			msg(LOG_DEBUG, "virtstyle ipliteral");
-			client->exportname=g_strdup_printf(client->server->exportname, peername);
-			break;
-		case VIRT_CIDR:
-			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
-			memcpy(&netaddr, &(client->clientaddr), addrinlen);
-			int addrbits;
-			if(client->clientaddr.ss_family == AF_UNIX) {
-				tmp = g_strdup(peername);
-			} else {
-				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
-				if(ai->ai_family == AF_INET) {
-					addrbits = 32;
-				} else if(ai->ai_family == AF_INET6) {
-					addrbits = 128;
-				}
-				uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
-				for(int i = 0; i < addrbits; i+=8) {
-					int masklen = client->server->cidrlen - i;
-					masklen = masklen > 0 ? masklen : 0;
-					uint8_t mask = getmaskbyte(masklen);
-					*addrptr &= mask;
-					addrptr++;
-				}
-				getnameinfo((struct sockaddr *) &netaddr, addrinlen,
-								netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
-				tmp=g_strdup_printf("%s/%s", netname, peername);
-			}
-
-			if(tmp != NULL) {
-				client->exportname=g_strdup_printf(client->server->exportname, tmp);
-				g_free(tmp);
-			}
-
-			break;
-	}
-
-	freeaddrinfo(ai);
-        msg(LOG_INFO, "connect from %s, assigned file is %s",
-            peername, client->exportname);
-	client->clientname=g_strdup(peername);
-	return 0;
 }
 
 /**
