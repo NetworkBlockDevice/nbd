@@ -1786,7 +1786,7 @@ bool copyonwrite_prepare(CLIENT* client) {
 	return true;
 }
 
-void send_export_info(CLIENT* client) {
+void send_export_info(CLIENT* client, bool maybe_zeroes) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
@@ -1805,7 +1805,7 @@ void send_export_info(CLIENT* client) {
 		flags |= NBD_FLAG_CAN_MULTI_CONN;
 	flags = htons(flags);
 	socket_write(client, &flags, sizeof(flags));
-	if (!(glob_flags & F_NO_ZEROES)) {
+	if (!(glob_flags & F_NO_ZEROES) && maybe_zeroes) {
 		char zeros[128];
 		memset(zeros, '\0', sizeof(zeros));
 		socket_write(client, zeros, 124);
@@ -1928,7 +1928,7 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			if(!commit_client(client, serve)) {
 				goto out;
 			}
-			send_export_info(client);
+			send_export_info(client, true);
 			return client;
 		}
 	}
@@ -2068,6 +2068,80 @@ exit:
 #endif
 
 /**
+  * Handle an NBD_OPT_INFO or NBD_OPT_GO request.
+  *
+  * XXX this matches the proposal I sent out, rather than the officially
+  * documented version of this command. Need to bring the two in sync
+  * one way or the other.
+  */
+static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
+	uint32_t namelen;
+	char *name;
+	int i;
+	SERVER *server = NULL;
+	uint16_t n_requests;
+	uint16_t request;
+	char buf[1024];
+	bool sent_export = false;
+
+	socket_read(client, &namelen, sizeof(namelen));
+	namelen = ntohl(namelen);
+	if(namelen > 0) {
+		name = malloc(namelen + 1);
+		name[namelen] = 0;
+		socket_read(client, name, namelen);
+	} else {
+		name = strdup("");
+	}
+	for(i=0; i<servers->len; i++) {
+		SERVER *serve = &(g_array_index(servers, SERVER, i));
+		if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
+			continue;
+		}
+		if (!strcmp(serve->servename, name)) {
+			server = serve;
+		}
+	}
+	free(name);
+	socket_read(client, &n_requests, sizeof(n_requests));
+	n_requests = ntohs(n_requests);
+	if(!server) {
+		consume(client, n_requests * sizeof(request), buf,
+				sizeof(buf));
+		msg(LOG_INFO, "Client requested NBD_OPT_INFO or NBD_OPT_GO on a nonexisting export");
+		return false;
+	}
+	if (opt == NBD_OPT_GO) {
+		client->clientfeats = cflags;
+		if(!commit_client(client, server)) {
+			send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "Access denied by server configuration");
+			return false;
+		}
+	}
+	for(i=0; i<n_requests; i++) {
+		socket_read(client, &request, sizeof(request));
+		switch(ntohs(request)) {
+			case NBD_INFO_EXPORT:
+				send_reply(client, opt, NBD_REP_INFO, 12, NULL);
+				socket_write(client, &request, 2);
+				send_export_info(client, false);
+				sent_export = true;
+				break;
+			default:
+				// ignore all other options for now.
+				break;
+		}
+	}
+	if(!sent_export) {
+		request = htons(NBD_INFO_EXPORT);
+		send_reply(client, opt, NBD_REP_INFO, 12, NULL);
+		socket_write(client, &request, 2);
+		send_export_info(client, false);
+	}
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
+}
+
+/**
  * Do the initial negotiation.
  *
  * @param net The socket we're doing the negotiation over.
@@ -2158,6 +2232,12 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 				goto hard_close;
 			}
 #endif
+			break;
+		case NBD_OPT_GO:
+		case NBD_OPT_INFO:
+			if(handle_info(client, opt, servers, cflags) && opt == NBD_OPT_GO) {
+				return client;
+			}
 			break;
 		default:
 			consume_len(client);
