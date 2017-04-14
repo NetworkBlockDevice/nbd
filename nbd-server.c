@@ -1827,10 +1827,15 @@ void send_export_info(CLIENT* client) {
   * @return true if the client is allowed access to the export, false
   * otherwise
   */
-static bool commit_client(CLIENT* client) {
+static bool commit_client(CLIENT* client, SERVER* server) {
 	char acl;
 	uint32_t len;
 
+	client->server = server;
+	client->exportsize = OFFT_MAX;
+	client->modern = TRUE;
+	client->transactionlogfd = -1;
+	pthread_mutex_init(&(client->lock), NULL);
 	/* Check whether we exceeded the maximum number of allowed
 	 * clients already */
 	if(dontfork) {
@@ -1918,14 +1923,9 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			continue;
 		}
 		if(!strcmp(serve->servename, name)) {
-			client->server = serve;
-			client->exportsize = OFFT_MAX;
-			client->modern = TRUE;
-			client->transactionlogfd = -1;
 			client->clientfeats = cflags;
-			pthread_mutex_init(&(client->lock), NULL);
 			free(name);
-			if(!commit_client(client)) {
+			if(!commit_client(client, serve)) {
 				goto out;
 			}
 			send_export_info(client);
@@ -3236,11 +3236,8 @@ int main(int argc, char *argv[]) {
 			err("inetd mode requires syslog");
 #endif
 			CLIENT* client = g_malloc(sizeof(CLIENT));
-			client->server = serve;
 			client->net = -1;
-			client->modern = TRUE;
-			client->exportsize = OFFT_MAX;
-			if(!commit_client(client)) {
+			if(!commit_client(client, serve)) {
 				exit(EXIT_FAILURE);
 			}
 			mainloop_threaded(client);
