@@ -1641,7 +1641,7 @@ int do_run(gchar* command, gchar* file) {
  * Also, split a single exportfile into multiple ones, if that was asked.
  * @param client information on the client which we want to setup export for
  **/
-void setupexport(CLIENT* client) {
+bool setupexport(CLIENT* client) {
 	int i;
 	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
@@ -1700,7 +1700,8 @@ void setupexport(CLIENT* client) {
 				error_string=g_strdup_printf(
 					"Could not open exported file %s: %%m",
 					tmpname);
-				err(error_string);
+				err_nonfatal(error_string);
+				return false;
 			}
 
 			if (temporary) {
@@ -1720,7 +1721,8 @@ void setupexport(CLIENT* client) {
 			if (!lastsize && cancreate) {
 				assert(!multifile);
 				if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
-					err("Could not expand file: %m");
+					err_nonfatal("Could not expand file: %m");
+					return false;
 				}
 				lastsize = client->server->expected_size;
 				break; /* don't look for any more files */
@@ -1737,7 +1739,8 @@ void setupexport(CLIENT* client) {
 		if(client->server->expected_size) {
 			/* desired size must be <= total calculated size */
 			if(client->server->expected_size > client->exportsize) {
-				err("Size of exported file is too big\n");
+				err_nonfatal("Size of exported file is too big\n");
+				return false;
 			}
 
 			client->exportsize = client->server->expected_size;
@@ -1751,9 +1754,10 @@ void setupexport(CLIENT* client) {
 	if(treefile) {
 		msg(LOG_INFO, "Total number of (potential) files: %" PRId64, (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
 	}
+	return true;
 }
 
-int copyonwrite_prepare(CLIENT* client) {
+bool copyonwrite_prepare(CLIENT* client) {
 	off_t i;
 	gchar* dir;
 	gchar* export_base;
@@ -1769,12 +1773,17 @@ int copyonwrite_prepare(CLIENT* client) {
 	g_free(export_base);
 	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
-	if (client->difffile<0) err("Could not create diff file (%m)") ;
-	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
-		err("Could not allocate memory") ;
-	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1 ;
+	if (client->difffile<0) {
+		err("Could not create diff file (%m)");
+		return false;
+	}
+	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL) {
+		err("Could not allocate memory");
+		return false;
+	}
+	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1;
 
-	return 0;
+	return true;
 }
 
 void send_export_info(CLIENT* client) {
@@ -1872,10 +1881,14 @@ static bool commit_client(CLIENT* client) {
 				client->clientname);
 		return false;
 	}
-	setupexport(client);
+	if(!setupexport(client)) {
+		return false;
+	}
 
 	if (client->server->flags & F_COPYONWRITE) {
-		copyonwrite_prepare(client);
+		if(!copyonwrite_prepare(client)) {
+			return false;
+		}
 	}
 
 	setmysockopt(client->net);
