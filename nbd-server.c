@@ -1502,8 +1502,6 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 	}
 }
 
-void send_export_info(CLIENT* client);
-
 /**
  * Find the name of the file we have to serve. This will use g_strdup_printf
  * to put the IP address of the client inside a filename containing
@@ -1777,6 +1775,32 @@ int copyonwrite_prepare(CLIENT* client) {
 	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1 ;
 
 	return 0;
+}
+
+void send_export_info(CLIENT* client) {
+	uint64_t size_host = htonll((u64)(client->exportsize));
+	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
+
+	socket_write(client, &size_host, 8);
+	if (client->server->flags & F_READONLY)
+		flags |= NBD_FLAG_READ_ONLY;
+	if (client->server->flags & F_FLUSH)
+		flags |= NBD_FLAG_SEND_FLUSH;
+	if (client->server->flags & F_FUA)
+		flags |= NBD_FLAG_SEND_FUA;
+	if (client->server->flags & F_ROTATIONAL)
+		flags |= NBD_FLAG_ROTATIONAL;
+	if (client->server->flags & F_TRIM)
+		flags |= NBD_FLAG_SEND_TRIM;
+	if (!(client->server->flags & F_COPYONWRITE))
+		flags |= NBD_FLAG_CAN_MULTI_CONN;
+	flags = htons(flags);
+	socket_write(client, &flags, sizeof(flags));
+	if (!(glob_flags & F_NO_ZEROES)) {
+		char zeros[128];
+		memset(zeros, '\0', sizeof(zeros));
+		socket_write(client, zeros, 124);
+	}
 }
 
 /**
@@ -2132,32 +2156,6 @@ hard_close:
 	close(net);
 	g_free(client);
 	return NULL;
-}
-
-void send_export_info(CLIENT* client) {
-	uint64_t size_host = htonll((u64)(client->exportsize));
-	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
-
-	socket_write(client, &size_host, 8);
-	if (client->server->flags & F_READONLY)
-		flags |= NBD_FLAG_READ_ONLY;
-	if (client->server->flags & F_FLUSH)
-		flags |= NBD_FLAG_SEND_FLUSH;
-	if (client->server->flags & F_FUA)
-		flags |= NBD_FLAG_SEND_FUA;
-	if (client->server->flags & F_ROTATIONAL)
-		flags |= NBD_FLAG_ROTATIONAL;
-	if (client->server->flags & F_TRIM)
-		flags |= NBD_FLAG_SEND_TRIM;
-	if (!(client->server->flags & F_COPYONWRITE))
-		flags |= NBD_FLAG_CAN_MULTI_CONN;
-	flags = htons(flags);
-	socket_write(client, &flags, sizeof(flags));
-	if (!(glob_flags & F_NO_ZEROES)) {
-		char zeros[128];
-		memset(zeros, '\0', sizeof(zeros));
-		socket_write(client, zeros, 124);
-	}
 }
 
 static int nbd_errno(int errcode) {
