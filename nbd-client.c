@@ -196,6 +196,7 @@ void ask_list(int sock) {
 	uint32_t opt;
 	uint32_t opt_server;
 	uint32_t len;
+	uint32_t lenn;
 	uint32_t reptype;
 	uint64_t magic;
 	int rlen;
@@ -244,25 +245,37 @@ void ask_list(int sock) {
 			}
 			exit(EXIT_FAILURE);
 		} else {
-			if(len) {
+			if(reptype != NBD_REP_ACK) {
 				if(reptype != NBD_REP_SERVER) {
 					err("Server sent us a reply we don't understand!");
 				}
-				if(read(sock, &len, sizeof(len)) < 0) {
+				if(read(sock, &lenn, sizeof(lenn)) < 0) {
 					fprintf(stderr, "\nE: could not read export name length from server\n");
 					exit(EXIT_FAILURE);
 				}
-				len=ntohl(len);
-				if (len >= BUF_SIZE) {
+				lenn=ntohl(lenn);
+				if (lenn >= BUF_SIZE) {
 					fprintf(stderr, "\nE: export name on server too long\n");
 					exit(EXIT_FAILURE);
 				}
-				if(read(sock, buf, len) < 0) {
+				if(read(sock, buf, lenn) < 0) {
 					fprintf(stderr, "\nE: could not read export name from server\n");
 					exit(EXIT_FAILURE);
 				}
-				buf[len] = 0;
-				printf("%s\n", buf);
+				buf[lenn] = 0;
+				printf("%s", buf);
+				len -= lenn;
+				len -= sizeof(lenn);
+				if(len > 0) {
+					if(read(sock, buf, len) < 0) {
+						fprintf(stderr, "\nE: could not read export description from server\n");
+						exit(EXIT_FAILURE);
+					}
+					buf[len] = 0;
+					printf(": %s\n", buf);
+				} else {
+					printf("\n");
+				}
 			}
 		}
 	} while(reptype != NBD_REP_ACK);

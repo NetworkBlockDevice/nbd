@@ -129,7 +129,7 @@ manpage.1: manpage.sgml
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>conns=<replaceable>number</replaceabl></option></term>
+	  <term><option>conns=<replaceable>number</replaceable></option></term>
 	  <listitem>
 	    <para>The number of connections to use for this device.
 	    Corresponds to the <option>-C</option> option on the command
