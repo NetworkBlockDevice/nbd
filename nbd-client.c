@@ -30,6 +30,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include "netdb-compat.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <syslog.h>
@@ -598,7 +599,7 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 				err("Ioctl/1.1c failed: %m\n");
 			}
 		}
-		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, (u64)tmp_blocksize * size);
+		fprintf(stderr, "bs=%d, sz=%" PRIu64 " bytes\n", blocksize, (u64)tmp_blocksize * size);
 	}
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
