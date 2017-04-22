@@ -111,6 +111,8 @@ void writeit(int f, void *buf, size_t len);
 #define NBD_REP_ERR_INVALID	(3 | NBD_REP_FLAG_ERROR)	/**< Client issued an invalid request */
 #define NBD_REP_ERR_PLATFORM	(4 | NBD_REP_FLAG_ERROR)	/**< Option not supported on this platform */
 #define NBD_REP_ERR_TLS_REQD	(5 | NBD_REP_FLAG_ERROR)	/**< TLS required */
+#define NBD_REP_ERR_UNKNOWN	(6 | NBD_REP_FLAG_ERROR)	/**< NBD_OPT_INFO or ..._GO requested on unknown export */
+#define NBD_REP_ERR_BLOCK_SIZE_REQD (8 | NBD_REP_FLAG_ERROR)	/**< Server is not willing to serve the export without the block size being negotiated */
 
 /* Global flags */
 #define NBD_FLAG_FIXED_NEWSTYLE (1 << 0)	/**< new-style export that actually supports extending */

@@ -2065,6 +2065,8 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	uint16_t request;
 	char buf[1024];
 	bool sent_export = false;
+	uint32_t reptype = NBD_REP_ERR_UNKNOWN;
+	char *msg = "Export unknown";
 
 	socket_read(client, &namelen, sizeof(namelen));
 	namelen = ntohl(namelen);
@@ -2077,10 +2079,12 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	}
 	for(i=0; i<servers->len; i++) {
 		SERVER *serve = &(g_array_index(servers, SERVER, i));
-		if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
-			continue;
-		}
 		if (!strcmp(serve->servename, name)) {
+			if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
+				reptype = NBD_REP_ERR_TLS_REQD;
+				msg = "TLS is required for that export";
+				continue;
+			}
 			server = serve;
 		}
 	}
@@ -2090,7 +2094,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	if(!server) {
 		consume(client, n_requests * sizeof(request), buf,
 				sizeof(buf));
-		msg(LOG_INFO, "Client requested NBD_OPT_INFO or NBD_OPT_GO on a nonexisting export");
+		send_reply(client, opt, reptype, -1, msg);
 		return false;
 	}
 	if (opt == NBD_OPT_GO) {
