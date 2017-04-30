@@ -30,6 +30,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include "netdb-compat.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <syslog.h>
@@ -187,9 +188,48 @@ void send_request(int sock, uint32_t opt, ssize_t datasize, void* data) {
 		header.datasize = htonl(datasize);
 	}
 	writeit(sock, &header, sizeof(header));
-	if(datasize != 0) {
+	if(data != NULL) {
 		writeit(sock, data, datasize);
 	}
+}
+
+void send_info_request(int sock, uint32_t opt, int n_reqs, uint16_t* reqs, char* name) {
+	uint16_t rlen = htons(n_reqs);
+	uint32_t nlen = htonl(strlen(name));
+
+	send_request(sock, opt, sizeof(uint32_t) + strlen(name) + sizeof(uint16_t) + n_reqs * sizeof(uint16_t), NULL);
+	writeit(sock, &nlen, sizeof(nlen));
+	writeit(sock, name, strlen(name));
+	writeit(sock, &rlen, sizeof(rlen));
+	if(n_reqs > 0) {
+		writeit(sock, reqs, n_reqs * sizeof(uint16_t));
+	}
+}
+
+struct reply {
+	uint64_t magic;
+	uint32_t opt;
+	uint32_t reply_type;
+	uint32_t datasize;
+	char data[];
+} __attribute__((packed));
+
+struct reply* read_reply(int sock) {
+	struct reply *retval = malloc(sizeof(struct reply));
+	readit(sock, retval, sizeof(*retval));
+	retval->magic = ntohll(retval->magic);
+	retval->opt = ntohl(retval->opt);
+	retval->reply_type = ntohl(retval->reply_type);
+	retval->datasize = ntohl(retval->datasize);
+	if (retval->magic != rep_magic) {
+		fprintf(stderr, "E: received invalid negotiation magic %" PRIu64 " (expected %" PRIu64 ")", retval->magic, rep_magic);
+		exit(EXIT_FAILURE);
+	}
+	if (retval->datasize > 0) {
+		retval = realloc(retval, sizeof(struct reply) + retval->datasize);
+		readit(sock, &(retval->data), retval->datasize);
+	}
+	return retval;
 }
 
 void ask_list(int sock) {
@@ -282,8 +322,24 @@ void ask_list(int sock) {
 	send_request(sock, NBD_OPT_ABORT, 0, NULL);
 }
 
+void parse_sizes(char *buf, uint64_t *size, uint16_t *flags) {
+	memcpy(size, buf, sizeof(*size));
+	*size = ntohll(*size);
+	buf += sizeof(size);
+	memcpy(flags, buf, sizeof(*flags));
+	*flags = ntohs(*flags);
+
+	if ((*size>>12) > (uint64_t)~0UL) {
+		printf("size = %luMB", (unsigned long)(*size>>20));
+		err("Exported device is too big for me. Get 64-bit machine :-(\n");
+	} else {
+		printf("size = %luMB", (unsigned long)(*size>>20));
+	}
+	printf("\n");
+}
+
 void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls) {
-	u64 magic, size64;
+	u64 magic;
 	uint16_t tmp;
 	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
@@ -417,27 +473,52 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 		exit(EXIT_SUCCESS);
 	}
 
-	/* Write the export name that we're after */
-	send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
+	send_info_request(sock, NBD_OPT_GO, 0, NULL, name);
 
-	readit(sock, &size64, sizeof(size64));
-	size64 = ntohll(size64);
-
-	if ((size64>>12) > (uint64_t)~0UL) {
-		printf("size = %luMB", (unsigned long)(size64>>20));
-		err("Exported device is too big for me. Get 64-bit machine :-(\n");
-	} else
-		printf("size = %luMB", (unsigned long)(size64>>20));
-
-	readit(sock, &tmp, sizeof(tmp));
-	*flags = (uint32_t)ntohs(tmp);
-
-	if (!(global_flags & NBD_FLAG_NO_ZEROES)) {
-		readit(sock, &buf, 124);
-	}
-	printf("\n");
-
-	*rsize64 = size64;
+	struct reply *rep = NULL;
+	
+	do {
+		if(rep != NULL) free(rep);
+		rep = read_reply(sock);
+		if(rep->reply_type & NBD_REP_FLAG_ERROR) {
+			if(rep->reply_type == NBD_REP_ERR_UNSUP) {
+				free(rep);
+				/* server doesn't support NBD_OPT_GO or NBD_OPT_INFO,
+				 * fall back to NBD_OPT_EXPORT_NAME */
+				send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
+				char b[sizeof(*flags) + sizeof(*rsize64)];
+				readit(sock, b, sizeof(b));
+				parse_sizes(b, rsize64, flags);
+				if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
+					readit(sock, buf, 124);
+				}
+				return;
+			} else {
+				err("Unknown error in reply to NBD_OPT_GO; cannot continue");
+				exit(EXIT_FAILURE);
+			}
+		}
+		uint16_t info_type;
+		switch(rep->reply_type) {
+			case NBD_REP_INFO:
+				memcpy(&info_type, rep->data, 2);
+				info_type = htons(info_type);
+				switch(info_type) {
+					case NBD_INFO_EXPORT:
+						parse_sizes(rep->data + 2, rsize64, flags);
+						break;
+					default:
+						// ignore these, don't need them
+						break;
+				}
+				break;
+			case NBD_REP_ACK:
+				break;
+			default:
+				err_nonfatal("Unknown reply to NBD_OPT_GO received");
+		}
+	} while(rep->reply_type != NBD_REP_ACK);
+	free(rep);
 }
 
 bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname) {
@@ -598,7 +679,7 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 				err("Ioctl/1.1c failed: %m\n");
 			}
 		}
-		fprintf(stderr, "bs=%d, sz=%llu bytes\n", blocksize, (u64)tmp_blocksize * size);
+		fprintf(stderr, "bs=%d, sz=%" PRIu64 " bytes\n", blocksize, (u64)tmp_blocksize * size);
 	}
 
 	ioctl(nbd, NBD_CLEAR_SOCK);

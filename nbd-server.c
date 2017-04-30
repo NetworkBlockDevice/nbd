@@ -220,6 +220,7 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       and IPv6 from the same socket (like,
 			       e.g., FreeBSD) */
 GArray* childsocks;	/**< parent-side sockets for communication with children */
+int commsocket;		/**< child-side socket for communication with parent */
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -1478,9 +1479,408 @@ static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_
 		header.datasize = htonl(datasize);
 	}
 	socket_write(client, &header, sizeof(header));
-	if(datasize != 0) {
+	if(data != NULL) {
 		socket_write(client, data, datasize);
 	}
+}
+
+/**
+ * Find the name of the file we have to serve. This will use g_strdup_printf
+ * to put the IP address of the client inside a filename containing
+ * "%s" (in the form as specified by the "virtstyle" option). That name
+ * is then written to client->exportname.
+ *
+ * @param net A socket connected to an nbd client
+ * @param client information about the client. The IP address in human-readable
+ * format will be written to a new char* buffer, the address of which will be
+ * stored in client->clientname.
+ * @return: 0 - OK, -1 - failed.
+ **/
+int set_peername(int net, CLIENT *client) {
+	struct sockaddr_storage netaddr;
+	struct sockaddr* addr = (struct sockaddr*)&netaddr;
+	socklen_t addrinlen = sizeof( struct sockaddr_storage );
+	struct addrinfo hints;
+	struct addrinfo *ai = NULL;
+	char peername[NI_MAXHOST];
+	char netname[NI_MAXHOST];
+	char *tmp = NULL;
+	int i;
+	int e;
+
+	if (getsockname(net, addr, &addrinlen) < 0) {
+		msg(LOG_INFO, "getsockname failed: %m");
+		return -1;
+	}
+
+	if(netaddr.ss_family == AF_UNIX) {
+		client->clientaddr.ss_family = AF_UNIX;
+		strcpy(peername, "unix");
+	} else {
+		if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
+			msg(LOG_INFO, "getpeername failed: %m");
+			return -1;
+		}
+		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
+				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
+			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
+			return -1;
+		}
+
+		memset(&hints, '\0', sizeof (hints));
+		hints.ai_flags = AI_ADDRCONFIG;
+		e = getaddrinfo(peername, NULL, &hints, &ai);
+
+		if(e != 0) {
+			msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
+			freeaddrinfo(ai);
+			return -1;
+		}
+	}
+
+	if(strncmp(peername, "::ffff:", 7) == 0) {
+		memmove(peername, peername+7, strlen(peername));
+	}
+
+	switch(client->server->virtstyle) {
+		case VIRT_NONE:
+			msg(LOG_DEBUG, "virtualization is off");
+			client->exportname=g_strdup(client->server->exportname);
+			break;
+		case VIRT_IPHASH:
+			msg(LOG_DEBUG, "virtstyle iphash");
+			for(i=0;i<strlen(peername);i++) {
+				if(peername[i]=='.') {
+					peername[i]='/';
+				}
+			}
+		case VIRT_IPLIT:
+			msg(LOG_DEBUG, "virtstyle ipliteral");
+			client->exportname=g_strdup_printf(client->server->exportname, peername);
+			break;
+		case VIRT_CIDR:
+			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
+			memcpy(&netaddr, &(client->clientaddr), addrinlen);
+			int addrbits;
+			if(client->clientaddr.ss_family == AF_UNIX) {
+				tmp = g_strdup(peername);
+			} else {
+				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
+				if(ai->ai_family == AF_INET) {
+					addrbits = 32;
+				} else if(ai->ai_family == AF_INET6) {
+					addrbits = 128;
+				}
+				uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
+				for(int i = 0; i < addrbits; i+=8) {
+					int masklen = client->server->cidrlen - i;
+					masklen = masklen > 0 ? masklen : 0;
+					uint8_t mask = getmaskbyte(masklen);
+					*addrptr &= mask;
+					addrptr++;
+				}
+				getnameinfo((struct sockaddr *) &netaddr, addrinlen,
+								netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
+				tmp=g_strdup_printf("%s/%s", netname, peername);
+			}
+
+			if(tmp != NULL) {
+				client->exportname=g_strdup_printf(client->server->exportname, tmp);
+				g_free(tmp);
+			}
+
+			break;
+	}
+
+	freeaddrinfo(ai);
+        msg(LOG_INFO, "connect from %s, assigned file is %s",
+            peername, client->exportname);
+	client->clientname=g_strdup(peername);
+	return 0;
+}
+
+/**
+ * Run a command. This is used for the ``prerun'' and ``postrun'' config file
+ * options
+ *
+ * @param command the command to be ran. Read from the config file
+ * @param file the file name we're about to export
+ **/
+int do_run(gchar* command, gchar* file) {
+	gchar* cmd;
+	int retval=0;
+
+	if(command && *command) {
+		cmd = g_strdup_printf(command, file);
+		retval=system(cmd);
+		g_free(cmd);
+	}
+	return retval;
+}
+
+/**
+ * Set up client export array, which is an array of FILE_INFO.
+ * Also, split a single exportfile into multiple ones, if that was asked.
+ * @param client information on the client which we want to setup export for
+ **/
+bool setupexport(CLIENT* client) {
+	int i;
+	off_t laststartoff = 0, lastsize = 0;
+	int multifile = (client->server->flags & F_MULTIFILE);
+	int treefile = (client->server->flags & F_TREEFILES);
+	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
+	int cancreate = (client->server->expected_size) && !multifile;
+
+	if (treefile) {
+		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
+		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
+	} else {
+		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
+
+		/* If multi-file, open as many files as we can.
+		 * If not, open exactly one file.
+		 * Calculate file sizes as we go to get total size. */
+		for(i=0; ; i++) {
+			FILE_INFO fi;
+			gchar *tmpname;
+			gchar* error_string;
+
+			if (i)
+				cancreate = 0;
+			/* if expected_size is specified, and this is the first file, we can create the file */
+			mode_t mode = (client->server->flags & F_READONLY) ?
+			  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
+
+			if (temporary) {
+				tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
+				DEBUG( "Opening %s\n", tmpname );
+				fi.fhandle = mkstemp(tmpname);
+			} else {
+				if(multifile) {
+					tmpname=g_strdup_printf("%s.%d", client->exportname, i);
+				} else {
+					tmpname=g_strdup(client->exportname);
+				}
+				DEBUG( "Opening %s\n", tmpname );
+				fi.fhandle = open(tmpname, mode, 0600);
+				if(fi.fhandle == -1 && mode == O_RDWR) {
+					/* Try again because maybe media was read-only */
+					fi.fhandle = open(tmpname, O_RDONLY);
+					if(fi.fhandle != -1) {
+						/* Opening the base file in copyonwrite mode is
+						 * okay */
+						if(!(client->server->flags & F_COPYONWRITE)) {
+							client->server->flags |= F_AUTOREADONLY;
+							client->server->flags |= F_READONLY;
+						}
+					}
+				}
+			}
+			if(fi.fhandle == -1) {
+				if(multifile && i>0)
+					break;
+				error_string=g_strdup_printf(
+					"Could not open exported file %s: %%m",
+					tmpname);
+				err_nonfatal(error_string);
+				return false;
+			}
+
+			if (temporary) {
+				unlink(tmpname); /* File will stick around whilst FD open */
+			}
+
+			fi.startoff = laststartoff + lastsize;
+			g_array_append_val(client->export, fi);
+			g_free(tmpname);
+
+			/* Starting offset and size of this file will be used to
+			 * calculate starting offset of next file */
+			laststartoff = fi.startoff;
+			lastsize = size_autodetect(fi.fhandle);
+
+			/* If we created the file, it will be length zero */
+			if (!lastsize && cancreate) {
+				assert(!multifile);
+				if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
+					err_nonfatal("Could not expand file: %m");
+					return false;
+				}
+				lastsize = client->server->expected_size;
+				break; /* don't look for any more files */
+			}
+
+			if(!multifile || temporary)
+				break;
+		}
+
+		/* Set export size to total calculated size */
+		client->exportsize = laststartoff + lastsize;
+
+		/* Export size may be overridden */
+		if(client->server->expected_size) {
+			/* desired size must be <= total calculated size */
+			if(client->server->expected_size > client->exportsize) {
+				err_nonfatal("Size of exported file is too big\n");
+				return false;
+			}
+
+			client->exportsize = client->server->expected_size;
+		}
+	}
+
+	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
+	if(multifile) {
+		msg(LOG_INFO, "Total number of files: %d", i);
+	}
+	if(treefile) {
+		msg(LOG_INFO, "Total number of (potential) files: %" PRId64, (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
+	}
+	return true;
+}
+
+bool copyonwrite_prepare(CLIENT* client) {
+	off_t i;
+	gchar* dir;
+	gchar* export_base;
+	if (client->server->cowdir != NULL) {
+		dir = g_strdup(client->server->cowdir);
+	} else {
+		dir = g_strdup(dirname(client->exportname));
+	}
+	export_base = g_strdup(basename(client->exportname));
+	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
+		(int)getpid());
+	g_free(dir);
+	g_free(export_base);
+	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
+	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
+	if (client->difffile<0) {
+		err("Could not create diff file (%m)");
+		return false;
+	}
+	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL) {
+		err("Could not allocate memory");
+		return false;
+	}
+	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1;
+
+	return true;
+}
+
+void send_export_info(CLIENT* client, bool maybe_zeroes) {
+	uint64_t size_host = htonll((u64)(client->exportsize));
+	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
+
+	socket_write(client, &size_host, 8);
+	if (client->server->flags & F_READONLY)
+		flags |= NBD_FLAG_READ_ONLY;
+	if (client->server->flags & F_FLUSH)
+		flags |= NBD_FLAG_SEND_FLUSH;
+	if (client->server->flags & F_FUA)
+		flags |= NBD_FLAG_SEND_FUA;
+	if (client->server->flags & F_ROTATIONAL)
+		flags |= NBD_FLAG_ROTATIONAL;
+	if (client->server->flags & F_TRIM)
+		flags |= NBD_FLAG_SEND_TRIM;
+	if (!(client->server->flags & F_COPYONWRITE))
+		flags |= NBD_FLAG_CAN_MULTI_CONN;
+	flags = htons(flags);
+	socket_write(client, &flags, sizeof(flags));
+	if (!(glob_flags & F_NO_ZEROES) && maybe_zeroes) {
+		char zeros[128];
+		memset(zeros, '\0', sizeof(zeros));
+		socket_write(client, zeros, 124);
+	}
+}
+
+/**
+  * Commit to exporting the chosen export
+  *
+  * When a client sends NBD_OPT_EXPORT_NAME or NBD_OPT_GO, we need to do
+  * a number of things (verify whether the client is allowed access, try
+  * to open files, etc etc) before we're ready to actually serve the
+  * export.
+  *
+  * This function does all those things.
+  *
+  * @param client the CLIENT structure with .server and .net members set
+  * up correctly
+  * @return true if the client is allowed access to the export, false
+  * otherwise
+  */
+static bool commit_client(CLIENT* client, SERVER* server) {
+	char acl;
+	uint32_t len;
+
+	client->server = server;
+	client->exportsize = OFFT_MAX;
+	client->modern = TRUE;
+	client->transactionlogfd = -1;
+	pthread_mutex_init(&(client->lock), NULL);
+	/* Check whether we exceeded the maximum number of allowed
+	 * clients already */
+	if(dontfork) {
+		acl = 'Y';
+	} else {
+		len = strlen(client->server->servename);
+		writeit(commsocket, &len, sizeof len);
+		writeit(commsocket, client->server->servename, len);
+		readit(commsocket, &acl, 1);
+		close(commsocket);
+	}
+	switch(acl) {
+		case 'N':
+			msg(LOG_ERR, "Connection not allowed (too many clients)");
+			return false;
+		case 'X':
+			msg(LOG_ERR, "Connection not allowed (unknown by parent?!?)");
+			return false;
+	}
+
+	/* Check whether the client is listed in the authfile */
+        if (set_peername(client->net, client)) {
+                msg(LOG_ERR, "Failed to set peername");
+		return false;
+        }
+
+        if (!authorized_client(client)) {
+                msg(LOG_INFO, "Client '%s' is not authorized to access",
+                    client->clientname);
+		return false;
+        }
+
+	/* Set up the transactionlog, if we need one */
+	if (client->server->transactionlog && (client->transactionlogfd == -1)) {
+		if((client->transactionlogfd =
+					open(client->server->transactionlog,
+						O_WRONLY | O_CREAT,
+						S_IRUSR | S_IWUSR)) ==
+				-1) {
+			msg(LOG_INFO, "Could not open transactionlog %s, moving on without it",
+					client->server->transactionlog);
+		}
+	}
+
+	/* Run any pre scripts that we may need */
+	if (do_run(client->server->prerun, client->exportname)) {
+		msg(LOG_INFO, "Client '%s' not allowed access by prerun script",
+				client->clientname);
+		return false;
+	}
+	if(!setupexport(client)) {
+		return false;
+	}
+
+	if (client->server->flags & F_COPYONWRITE) {
+		if(!copyonwrite_prepare(client)) {
+			return false;
+		}
+	}
+
+	setmysockopt(client->net);
+
+	return true;
 }
 
 static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
@@ -1505,17 +1905,17 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			continue;
 		}
 		if(!strcmp(serve->servename, name)) {
-			client->server = serve;
-			client->exportsize = OFFT_MAX;
-			client->modern = TRUE;
-			client->transactionlogfd = -1;
 			client->clientfeats = cflags;
-			pthread_mutex_init(&(client->lock), NULL);
 			free(name);
+			if(!commit_client(client, serve)) {
+				goto out;
+			}
+			send_export_info(client, true);
 			return client;
 		}
 	}
 	err("Negotiation failed/8a: Requested export not found, or is TLS-only and client did not negotiate TLS");
+out:
 	free(name);
 	return NULL;
 }
@@ -1650,6 +2050,90 @@ exit:
 #endif
 
 /**
+  * Handle an NBD_OPT_INFO or NBD_OPT_GO request.
+  *
+  * XXX this matches the proposal I sent out, rather than the officially
+  * documented version of this command. Need to bring the two in sync
+  * one way or the other.
+  */
+static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
+	uint32_t namelen, len;
+	char *name;
+	int i;
+	SERVER *server = NULL;
+	uint16_t n_requests;
+	uint16_t request;
+	char buf[1024];
+	bool sent_export = false;
+	uint32_t reptype = NBD_REP_ERR_UNKNOWN;
+	char *msg = "Export unknown";
+
+	socket_read(client, &len, sizeof(len));
+	len = htonl(len);
+	socket_read(client, &namelen, sizeof(namelen));
+	namelen = htonl(namelen);
+	if(namelen > (len - 6)) {
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "An OPT_INFO request cannot be smaller than the length of the name + 6");
+		socket_read(client, buf, len - sizeof(namelen));
+	}
+	if(namelen > 0) {
+		name = malloc(namelen + 1);
+		name[namelen] = 0;
+		socket_read(client, name, namelen);
+	} else {
+		name = strdup("");
+	}
+	for(i=0; i<servers->len; i++) {
+		SERVER *serve = &(g_array_index(servers, SERVER, i));
+		if (!strcmp(serve->servename, name)) {
+			if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
+				reptype = NBD_REP_ERR_TLS_REQD;
+				msg = "TLS is required for that export";
+				continue;
+			}
+			server = serve;
+		}
+	}
+	free(name);
+	socket_read(client, &n_requests, sizeof(n_requests));
+	n_requests = ntohs(n_requests);
+	if(!server) {
+		consume(client, n_requests * sizeof(request), buf,
+				sizeof(buf));
+		send_reply(client, opt, reptype, -1, msg);
+		return false;
+	}
+	if (opt == NBD_OPT_GO) {
+		client->clientfeats = cflags;
+		if(!commit_client(client, server)) {
+			send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "Access denied by server configuration");
+			return false;
+		}
+	}
+	for(i=0; i<n_requests; i++) {
+		socket_read(client, &request, sizeof(request));
+		switch(ntohs(request)) {
+			case NBD_INFO_EXPORT:
+				send_reply(client, opt, NBD_REP_INFO, 12, NULL);
+				socket_write(client, &request, 2);
+				send_export_info(client, false);
+				sent_export = true;
+				break;
+			default:
+				// ignore all other options for now.
+				break;
+		}
+	}
+	if(!sent_export) {
+		request = htons(NBD_INFO_EXPORT);
+		send_reply(client, opt, NBD_REP_INFO, 12, NULL);
+		socket_write(client, &request, 2);
+		send_export_info(client, false);
+	}
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
+}
+
+/**
  * Do the initial negotiation.
  *
  * @param net The socket we're doing the negotiation over.
@@ -1741,6 +2225,12 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			}
 #endif
 			break;
+		case NBD_OPT_GO:
+		case NBD_OPT_INFO:
+			if(handle_info(client, opt, servers, cflags) && opt == NBD_OPT_GO) {
+				return client;
+			}
+			break;
 		default:
 			consume_len(client);
 			send_reply(client, opt, NBD_REP_ERR_UNSUP, -1, "The given option is unknown to this server implementation");
@@ -1756,32 +2246,6 @@ hard_close:
 	close(net);
 	g_free(client);
 	return NULL;
-}
-
-void send_export_info(CLIENT* client) {
-	uint64_t size_host = htonll((u64)(client->exportsize));
-	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
-
-	socket_write(client, &size_host, 8);
-	if (client->server->flags & F_READONLY)
-		flags |= NBD_FLAG_READ_ONLY;
-	if (client->server->flags & F_FLUSH)
-		flags |= NBD_FLAG_SEND_FLUSH;
-	if (client->server->flags & F_FUA)
-		flags |= NBD_FLAG_SEND_FUA;
-	if (client->server->flags & F_ROTATIONAL)
-		flags |= NBD_FLAG_ROTATIONAL;
-	if (client->server->flags & F_TRIM)
-		flags |= NBD_FLAG_SEND_TRIM;
-	if (!(client->server->flags & F_COPYONWRITE))
-		flags |= NBD_FLAG_CAN_MULTI_CONN;
-	flags = htons(flags);
-	socket_write(client, &flags, sizeof(flags));
-	if (!(glob_flags & F_NO_ZEROES)) {
-		char zeros[128];
-		memset(zeros, '\0', sizeof(zeros));
-		socket_write(client, zeros, 124);
-	}
 }
 
 static int nbd_errno(int errcode) {
@@ -2057,7 +2521,6 @@ static int mainloop_threaded(CLIENT* client) {
 	struct nbd_request* req;
 	struct work_package* pkg;
 
-	send_export_info(client);
 	DEBUG("Entering request loop\n");
 	while(1) {
 		req = calloc(sizeof (struct nbd_request), 1);
@@ -2089,324 +2552,16 @@ static int mainloop_threaded(CLIENT* client) {
 		}
 		if(req->type == NBD_CMD_DISC) {
 			g_thread_pool_free(tpool, FALSE, TRUE);
+			do_run(client->server->postrun,
+					client->exportname);
+			if(client->transactionlogfd != -1) {
+				close(client->transactionlogfd);
+				client->transactionlogfd = -1;
+			}
 			return 0;
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
 	}
-}
-
-/**
- * Set up client export array, which is an array of FILE_INFO.
- * Also, split a single exportfile into multiple ones, if that was asked.
- * @param client information on the client which we want to setup export for
- **/
-void setupexport(CLIENT* client) {
-	int i;
-	off_t laststartoff = 0, lastsize = 0;
-	int multifile = (client->server->flags & F_MULTIFILE);
-	int treefile = (client->server->flags & F_TREEFILES);
-	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
-	int cancreate = (client->server->expected_size) && !multifile;
-
-	if (treefile) {
-		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
-		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
-	} else {
-		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
-
-		/* If multi-file, open as many files as we can.
-		 * If not, open exactly one file.
-		 * Calculate file sizes as we go to get total size. */
-		for(i=0; ; i++) {
-			FILE_INFO fi;
-			gchar *tmpname;
-			gchar* error_string;
-
-			if (i)
-				cancreate = 0;
-			/* if expected_size is specified, and this is the first file, we can create the file */
-			mode_t mode = (client->server->flags & F_READONLY) ?
-			  O_RDONLY : (O_RDWR | (cancreate?O_CREAT:0));
-
-			if (temporary) {
-				tmpname=g_strdup_printf("%s.%d-XXXXXX", client->exportname, i);
-				DEBUG( "Opening %s\n", tmpname );
-				fi.fhandle = mkstemp(tmpname);
-			} else {
-				if(multifile) {
-					tmpname=g_strdup_printf("%s.%d", client->exportname, i);
-				} else {
-					tmpname=g_strdup(client->exportname);
-				}
-				DEBUG( "Opening %s\n", tmpname );
-				fi.fhandle = open(tmpname, mode, 0600);
-				if(fi.fhandle == -1 && mode == O_RDWR) {
-					/* Try again because maybe media was read-only */
-					fi.fhandle = open(tmpname, O_RDONLY);
-					if(fi.fhandle != -1) {
-						/* Opening the base file in copyonwrite mode is
-						 * okay */
-						if(!(client->server->flags & F_COPYONWRITE)) {
-							client->server->flags |= F_AUTOREADONLY;
-							client->server->flags |= F_READONLY;
-						}
-					}
-				}
-			}
-			if(fi.fhandle == -1) {
-				if(multifile && i>0)
-					break;
-				error_string=g_strdup_printf(
-					"Could not open exported file %s: %%m",
-					tmpname);
-				err(error_string);
-			}
-
-			if (temporary) {
-				unlink(tmpname); /* File will stick around whilst FD open */
-			}
-
-			fi.startoff = laststartoff + lastsize;
-			g_array_append_val(client->export, fi);
-			g_free(tmpname);
-
-			/* Starting offset and size of this file will be used to
-			 * calculate starting offset of next file */
-			laststartoff = fi.startoff;
-			lastsize = size_autodetect(fi.fhandle);
-
-			/* If we created the file, it will be length zero */
-			if (!lastsize && cancreate) {
-				assert(!multifile);
-				if(ftruncate (fi.fhandle, client->server->expected_size)<0) {
-					err("Could not expand file: %m");
-				}
-				lastsize = client->server->expected_size;
-				break; /* don't look for any more files */
-			}
-
-			if(!multifile || temporary)
-				break;
-		}
-
-		/* Set export size to total calculated size */
-		client->exportsize = laststartoff + lastsize;
-
-		/* Export size may be overridden */
-		if(client->server->expected_size) {
-			/* desired size must be <= total calculated size */
-			if(client->server->expected_size > client->exportsize) {
-				err("Size of exported file is too big\n");
-			}
-
-			client->exportsize = client->server->expected_size;
-		}
-	}
-
-	msg(LOG_INFO, "Size of exported file/device is %llu", (unsigned long long)client->exportsize);
-	if(multifile) {
-		msg(LOG_INFO, "Total number of files: %d", i);
-	}
-	if(treefile) {
-		msg(LOG_INFO, "Total number of (potential) files: %" PRId64, (client->exportsize+TREEPAGESIZE-1)/TREEPAGESIZE);
-	}
-}
-
-int copyonwrite_prepare(CLIENT* client) {
-	off_t i;
-	gchar* dir;
-	gchar* export_base;
-	if (client->server->cowdir != NULL) {
-		dir = g_strdup(client->server->cowdir);
-	} else {
-		dir = g_strdup(dirname(client->exportname));
-	}
-	export_base = g_strdup(basename(client->exportname));
-	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
-		(int)getpid());
-	g_free(dir);
-	g_free(export_base);
-	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
-	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
-	if (client->difffile<0) err("Could not create diff file (%m)") ;
-	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL)
-		err("Could not allocate memory") ;
-	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1 ;
-
-	return 0;
-}
-
-/**
- * Run a command. This is used for the ``prerun'' and ``postrun'' config file
- * options
- *
- * @param command the command to be ran. Read from the config file
- * @param file the file name we're about to export
- **/
-int do_run(gchar* command, gchar* file) {
-	gchar* cmd;
-	int retval=0;
-
-	if(command && *command) {
-		cmd = g_strdup_printf(command, file);
-		retval=system(cmd);
-		g_free(cmd);
-	}
-	return retval;
-}
-
-/**
- * Serve a connection. 
- *
- * @todo allow for multithreading, perhaps use libevent. Not just yet, though;
- * follow the road map.
- *
- * @param client a connected client
- **/
-void serveconnection(CLIENT *client) {
-	if (client->server->transactionlog && (client->transactionlogfd == -1))
-	{
-		if (-1 == (client->transactionlogfd = open(client->server->transactionlog,
-							   O_WRONLY | O_CREAT,
-							   S_IRUSR | S_IWUSR)))
-			g_warning("Could not open transaction log %s",
-				  client->server->transactionlog);
-	}
-
-	if(do_run(client->server->prerun, client->exportname)) {
-		exit(EXIT_FAILURE);
-	}
-	setupexport(client);
-
-	if (client->server->flags & F_COPYONWRITE) {
-		copyonwrite_prepare(client);
-	}
-
-	setmysockopt(client->net);
-
-	mainloop_threaded(client);
-	do_run(client->server->postrun, client->exportname);
-
-	if (-1 != client->transactionlogfd)
-	{
-		close(client->transactionlogfd);
-		client->transactionlogfd = -1;
-	}
-}
-
-/**
- * Find the name of the file we have to serve. This will use g_strdup_printf
- * to put the IP address of the client inside a filename containing
- * "%s" (in the form as specified by the "virtstyle" option). That name
- * is then written to client->exportname.
- *
- * @param net A socket connected to an nbd client
- * @param client information about the client. The IP address in human-readable
- * format will be written to a new char* buffer, the address of which will be
- * stored in client->clientname.
- * @return: 0 - OK, -1 - failed.
- **/
-int set_peername(int net, CLIENT *client) {
-	struct sockaddr_storage netaddr;
-	struct sockaddr* addr = (struct sockaddr*)&netaddr;
-	socklen_t addrinlen = sizeof( struct sockaddr_storage );
-	struct addrinfo hints;
-	struct addrinfo *ai = NULL;
-	char peername[NI_MAXHOST];
-	char netname[NI_MAXHOST];
-	char *tmp = NULL;
-	int i;
-	int e;
-
-	if (getsockname(net, addr, &addrinlen) < 0) {
-		msg(LOG_INFO, "getsockname failed: %m");
-		return -1;
-	}
-
-	if(netaddr.ss_family == AF_UNIX) {
-		client->clientaddr.ss_family = AF_UNIX;
-		strcpy(peername, "unix");
-	} else {
-		if (getpeername(net, (struct sockaddr *) &(client->clientaddr), &addrinlen) < 0) {
-			msg(LOG_INFO, "getpeername failed: %m");
-			return -1;
-		}
-		if((e = getnameinfo((struct sockaddr *)&(client->clientaddr), addrinlen,
-				peername, sizeof (peername), NULL, 0, NI_NUMERICHOST))) {
-			msg(LOG_INFO, "getnameinfo failed: %s", gai_strerror(e));
-			return -1;
-		}
-
-		memset(&hints, '\0', sizeof (hints));
-		hints.ai_flags = AI_ADDRCONFIG;
-		e = getaddrinfo(peername, NULL, &hints, &ai);
-
-		if(e != 0) {
-			msg(LOG_INFO, "getaddrinfo failed: %s", gai_strerror(e));
-			freeaddrinfo(ai);
-			return -1;
-		}
-	}
-
-	if(strncmp(peername, "::ffff:", 7) == 0) {
-		memmove(peername, peername+7, strlen(peername));
-	}
-
-	switch(client->server->virtstyle) {
-		case VIRT_NONE:
-			msg(LOG_DEBUG, "virtualization is off");
-			client->exportname=g_strdup(client->server->exportname);
-			break;
-		case VIRT_IPHASH:
-			msg(LOG_DEBUG, "virtstyle iphash");
-			for(i=0;i<strlen(peername);i++) {
-				if(peername[i]=='.') {
-					peername[i]='/';
-				}
-			}
-		case VIRT_IPLIT:
-			msg(LOG_DEBUG, "virtstyle ipliteral");
-			client->exportname=g_strdup_printf(client->server->exportname, peername);
-			break;
-		case VIRT_CIDR:
-			msg(LOG_DEBUG, "virtstyle cidr %d", client->server->cidrlen);
-			memcpy(&netaddr, &(client->clientaddr), addrinlen);
-			int addrbits;
-			if(client->clientaddr.ss_family == AF_UNIX) {
-				tmp = g_strdup(peername);
-			} else {
-				assert((ai->ai_family == AF_INET) || (ai->ai_family == AF_INET6));
-				if(ai->ai_family == AF_INET) {
-					addrbits = 32;
-				} else if(ai->ai_family == AF_INET6) {
-					addrbits = 128;
-				}
-				uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
-				for(int i = 0; i < addrbits; i+=8) {
-					int masklen = client->server->cidrlen - i;
-					masklen = masklen > 0 ? masklen : 0;
-					uint8_t mask = getmaskbyte(masklen);
-					*addrptr &= mask;
-					addrptr++;
-				}
-				getnameinfo((struct sockaddr *) &netaddr, addrinlen,
-								netname, sizeof (netname), NULL, 0, NI_NUMERICHOST);
-				tmp=g_strdup_printf("%s/%s", netname, peername);
-			}
-
-			if(tmp != NULL) {
-				client->exportname=g_strdup_printf(client->server->exportname, tmp);
-				g_free(tmp);
-			}
-
-			break;
-	}
-
-	freeaddrinfo(ai);
-        msg(LOG_INFO, "connect from %s, assigned file is %s",
-            peername, client->exportname);
-	client->clientname=g_strdup(peername);
-	return 0;
 }
 
 /**
@@ -2481,9 +2636,6 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
         CLIENT *client = NULL;
         int sock_flags_old;
         int sock_flags_new;
-	int commsocket;
-	char acl;
-	uint32_t len;
 
         net = socket_accept(sock);
         if (net < 0)
@@ -2522,35 +2674,6 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 msg(LOG_ERR, "Modern initial negotiation failed");
                 goto handler_err;
         }
-	if(dontfork) {
-		acl = 'Y';
-	} else {
-		len = strlen(client->server->servename);
-		writeit(commsocket, &len, sizeof len);
-		writeit(commsocket, client->server->servename, len);
-		readit(commsocket, &acl, 1);
-		close(commsocket);
-	}
-
-	switch(acl) {
-		case 'N':
-			msg(LOG_ERR, "Connection not allowed (too many clients)");
-			goto handler_err;
-		case 'X':
-			msg(LOG_ERR, "Connection not allowed (unknown by parent?!?)");
-			goto handler_err;
-	}
-
-        if (set_peername(net, client)) {
-                msg(LOG_ERR, "Failed to set peername");
-                goto handler_err;
-        }
-
-        if (!authorized_client(client)) {
-                msg(LOG_INFO, "Client '%s' is not authorized to access",
-                    client->clientname);
-                goto handler_err;
-        }
 
         if (!dontfork) {
                 int i;
@@ -2578,7 +2701,7 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
         }
 
         msg(LOG_INFO, "Starting to serve");
-        serveconnection(client);
+        mainloop_threaded(client);
         exit(EXIT_SUCCESS);
 
 handler_err:
@@ -3185,13 +3308,11 @@ int main(int argc, char *argv[]) {
 			err("inetd mode requires syslog");
 #endif
 			CLIENT* client = g_malloc(sizeof(CLIENT));
-			client->server = serve;
 			client->net = -1;
-			client->modern = TRUE;
-			client->exportsize = OFFT_MAX;
-			if(set_peername(0, client))
+			if(!commit_client(client, serve)) {
 				exit(EXIT_FAILURE);
-			serveconnection(client);
+			}
+			mainloop_threaded(client);
 			return 0;
 		}
 	}
