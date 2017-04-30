@@ -2057,7 +2057,7 @@ exit:
   * one way or the other.
   */
 static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
-	uint32_t namelen;
+	uint32_t namelen, len;
 	char *name;
 	int i;
 	SERVER *server = NULL;
@@ -2068,8 +2068,14 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	uint32_t reptype = NBD_REP_ERR_UNKNOWN;
 	char *msg = "Export unknown";
 
+	socket_read(client, &len, sizeof(len));
+	len = htonl(len);
 	socket_read(client, &namelen, sizeof(namelen));
-	namelen = ntohl(namelen);
+	namelen = htonl(namelen);
+	if(namelen > (len - 6)) {
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "An OPT_INFO request cannot be smaller than the length of the name + 6");
+		socket_read(client, buf, len - sizeof(namelen));
+	}
 	if(namelen > 0) {
 		name = malloc(namelen + 1);
 		name[namelen] = 0;
