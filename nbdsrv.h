@@ -73,8 +73,9 @@ typedef struct _client {
 	pthread_mutex_t lock; /**< socket lock */
 	void *tls_session; /**< TLS session context. Is NULL unless STARTTLS
 				has been negotiated. */
-	void (*socket_read)(struct _client*, void* buf, size_t len);
-	void (*socket_write)(struct _client*, void* buf, size_t len);
+	int (*socket_read)(struct _client*, void* buf, size_t len);
+	int (*socket_write)(struct _client*, void* buf, size_t len);
+	void (*socket_closed)(struct _client*);
 } CLIENT;
 
 /**
