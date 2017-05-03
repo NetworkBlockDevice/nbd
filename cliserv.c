@@ -108,8 +108,9 @@ uint64_t ntohll(uint64_t a) {
  * @param f a file descriptor
  * @param buf a buffer
  * @param len the number of bytes to be read
+ * @return 0 on completion, or -1 on failure
  **/
-void readit(int f, void *buf, size_t len) {
+int readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
@@ -119,12 +120,14 @@ void readit(int f, void *buf, size_t len) {
 			buf += res;
 		} else if (res < 0) {
 			if(errno != EAGAIN) {
-				err("Read failed: %m");
+				err_nonfatal("Read failed: %m");
+				return -1;
 			}
 		} else {
-			err("Read failed: End of file");
+			return -1;
 		}
 	}
+	return 0;
 }
 
 /**
@@ -133,14 +136,23 @@ void readit(int f, void *buf, size_t len) {
  * @param f a file descriptor
  * @param buf a buffer containing data
  * @param len the number of bytes to be written
+ * @return 0 on success, or -1 if the socket was closed
  **/
-void writeit(int f, void *buf, size_t len) {
+int writeit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");
-		if ((res = write(f, buf, len)) <= 0)
-			err("Send failed: %m");
+		if ((res = write(f, buf, len)) <= 0) {
+			switch(errno) {
+				case EAGAIN:
+					break;
+				default:
+					err_nonfatal("Send failed: %m");
+					return -1;
+			}
+		}
 		len -= res;
 		buf += res;
 	}
+	return 0;
 }

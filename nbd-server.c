@@ -294,7 +294,7 @@ static inline const char * getcommandname(uint64_t command) {
 }
 
 #if HAVE_GNUTLS
-static void writeit_tls(gnutls_session_t s, void *buf, size_t len) {
+static int writeit_tls(gnutls_session_t s, void *buf, size_t len) {
 	ssize_t res;
 	char *m;
 	while(len > 0) {
@@ -305,17 +305,18 @@ static void writeit_tls(gnutls_session_t s, void *buf, size_t len) {
 			g_free(m);
 		} else if(res < 0) {
 			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
-			err(m);
+			err_nonfatal(m);
 			g_free(m);
-			return;
+			return -1;
 		} else {
 			len -= res;
 			buf += res;
 		}
 	}
+	return 0;
 }
 
-static void readit_tls(gnutls_session_t s, void *buf, size_t len) {
+static int readit_tls(gnutls_session_t s, void *buf, size_t len) {
 	ssize_t res;
 	char *m;
 	while(len > 0) {
@@ -326,36 +327,40 @@ static void readit_tls(gnutls_session_t s, void *buf, size_t len) {
 			g_free(m);
 		} else if(res < 0) {
 			m = g_strdup_printf("could not receive data: %s", gnutls_strerror(res));
-			err(m);
+			err_nonfatal(m);
 			g_free(m);
-			return;
+			return -1;
 		} else {
 			len -= res;
 			buf += res;
 		}
 	}
+	return 0;
 }
 
-static void socket_read_tls(CLIENT* client, void *buf, size_t len) {
-	readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+static int socket_read_tls(CLIENT* client, void *buf, size_t len) {
+	return readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
 
-static void socket_write_tls(CLIENT* client, void *buf, size_t len) {
-	writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
+static int socket_write_tls(CLIENT* client, void *buf, size_t len) {
+	return writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
 #endif // HAVE_GNUTLS
 
-static void socket_read_notls(CLIENT* client, void *buf, size_t len) {
-	readit(client->net, buf, len);
+static int socket_read_notls(CLIENT* client, void *buf, size_t len) {
+	return readit(client->net, buf, len);
 }
 
-static void socket_write_notls(CLIENT* client, void *buf, size_t len) {
-	writeit(client->net, buf, len);
+static int socket_write_notls(CLIENT* client, void *buf, size_t len) {
+	return writeit(client->net, buf, len);
 }
 
 static void socket_read(CLIENT* client, void *buf, size_t len) {
 	g_assert(client->socket_read != NULL);
-	client->socket_read(client, buf, len);
+	if(client->socket_read(client, buf, len)<0) {
+		g_assert(client->socket_closed != NULL);
+		client->socket_closed(client);
+	}
 }
 
 /**
@@ -389,10 +394,51 @@ static inline void consume_len(CLIENT* c) {
 	consume(c, len, buf, sizeof(buf));
 }
 
-
 static void socket_write(CLIENT* client, void *buf, size_t len) {
 	g_assert(client->socket_write != NULL);
-	client->socket_write(client, buf, len);
+	if(client->socket_write(client, buf, len)<0) {
+		g_assert(client->socket_closed != NULL);
+		client->socket_closed(client);
+	}
+}
+
+static inline void socket_closed_negotiate(CLIENT* client) {
+	err("Negotiation failed: %m");
+}
+
+/**
+ * Run a command. This is used for the ``prerun'' and ``postrun'' config file
+ * options
+ *
+ * @param command the command to be ran. Read from the config file
+ * @param file the file name we're about to export
+ **/
+int do_run(gchar* command, gchar* file) {
+	gchar* cmd;
+	int retval=0;
+
+	if(command && *command) {
+		cmd = g_strdup_printf(command, file);
+		retval=system(cmd);
+		g_free(cmd);
+	}
+	return retval;
+}
+
+static inline void finalize_client(CLIENT* client) {
+	g_thread_pool_free(tpool, FALSE, TRUE);
+	do_run(client->server->postrun, client->exportname);
+	if(client->transactionlogfd != -1) {
+		close(client->transactionlogfd);
+		client->transactionlogfd = -1;
+	}
+}
+
+static inline void socket_closed_transmission(CLIENT* client) {
+	int saved_errno = errno;
+	finalize_client(client);
+	errno = saved_errno;
+	err("Connection dropped: %m");
 }
 
 #ifdef HAVE_SPLICE
@@ -1600,25 +1646,6 @@ int set_peername(int net, CLIENT *client) {
 }
 
 /**
- * Run a command. This is used for the ``prerun'' and ``postrun'' config file
- * options
- *
- * @param command the command to be ran. Read from the config file
- * @param file the file name we're about to export
- **/
-int do_run(gchar* command, gchar* file) {
-	gchar* cmd;
-	int retval=0;
-
-	if(command && *command) {
-		cmd = g_strdup_printf(command, file);
-		retval=system(cmd);
-		g_free(cmd);
-	}
-	return retval;
-}
-
-/**
  * Set up client export array, which is an array of FILE_INFO.
  * Also, split a single exportfile into multiple ones, if that was asked.
  * @param client information on the client which we want to setup export for
@@ -1868,6 +1895,7 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 				client->clientname);
 		return false;
 	}
+	client->socket_closed = socket_closed_transmission;
 	if(!setupexport(client)) {
 		return false;
 	}
@@ -2551,13 +2579,7 @@ static int mainloop_threaded(CLIENT* client) {
 				socket_read(client, pkg->data, req->len);
 		}
 		if(req->type == NBD_CMD_DISC) {
-			g_thread_pool_free(tpool, FALSE, TRUE);
-			do_run(client->server->postrun,
-					client->exportname);
-			if(client->transactionlogfd != -1) {
-				close(client->transactionlogfd);
-				client->transactionlogfd = -1;
-			}
+			finalize_client(client);
 			return 0;
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
