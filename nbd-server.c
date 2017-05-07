@@ -112,6 +112,8 @@
 #include <pthread.h>
 #endif
 
+#include <semaphore.h>
+
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
@@ -221,6 +223,7 @@ GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
 			       e.g., FreeBSD) */
 GArray* childsocks;	/**< parent-side sockets for communication with children */
 int commsocket;		/**< child-side socket for communication with parent */
+static sem_t file_wait_sem;
 
 bool logged_oversized=false;  /**< whether we logged oversized requests already */
 
@@ -474,6 +477,7 @@ void usage() {
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
+	       "\t-w|--wait-file\t\twait for file\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
@@ -504,6 +508,9 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	if(serve->flags & F_COPYONWRITE) {
 		printf("\tcopyonwrite = true\n");
 	}
+	if(serve->flags & F_WAIT) {
+		printf("\twaitfile = true\n");
+	}
 	if(serve->expected_size) {
 		printf("\tfilesize = %lld\n", (long long int)serve->expected_size);
 	}
@@ -527,6 +534,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
+		{"wait-file", no_argument, NULL, 'w'},
 		{"dont-fork", no_argument, NULL, 'd'},
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"config-file", required_argument, NULL, 'C'},
@@ -550,7 +558,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cdl:mo:rp:M:V", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cwdl:mo:rp:M:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -620,6 +628,9 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
+		        break;
+		case 'w': 
+			serve->flags |=F_WAIT;
 		        break;
 		case 'd': 
 			dontfork = 1;
@@ -779,6 +790,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "multifile",	FALSE,	PARAM_BOOL,	&(s.flags),		F_MULTIFILE },
 		{ "treefiles",	FALSE,	PARAM_BOOL,	&(s.flags),		F_TREEFILES },
 		{ "copyonwrite", FALSE,	PARAM_BOOL,	&(s.flags),		F_COPYONWRITE },
+		{ "waitfile",   FALSE,	PARAM_BOOL,	&(s.flags),		F_WAIT },
 		{ "sparse_cow",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SPARSE },
 		{ "sdp",	FALSE,	PARAM_BOOL,	&(s.flags),		F_SDP },
 		{ "sync",	FALSE,  PARAM_BOOL,	&(s.flags),		F_SYNC },
@@ -971,6 +983,14 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 			g_key_file_free(cfile);
 			return NULL;
 		}
+		if ((s.flags & F_COPYONWRITE) && (s.flags & F_WAIT)) {
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_INVALID_WAIT,
+				    "Cannot mix copyonwrite with waitfile for an export in group %s",
+				    groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
+			return NULL;
+		}
 		/* Don't need to free this, it's not our string */
 		virtstyle=NULL;
 		/* Don't append values for the [generic] group */
@@ -1066,6 +1086,11 @@ static void sigterm_handler(const int s G_GNUC_UNUSED) {
  **/
 static void sighup_handler(const int s G_GNUC_UNUSED) {
         is_sighup_caught = 1;
+}
+
+static void sigusr1_handler(const int s G_GNUC_UNUSED) {
+	msg(LOG_INFO, "Got SIGUSR1");
+	sem_post(&file_wait_sem);
 }
 
 /**
@@ -1344,9 +1369,10 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 	off_t rdlen, offset;
 	off_t mapcnt, mapl, maph, pagestart;
 
-	if (!(client->server->flags & F_COPYONWRITE))
-		return(rawexpread_fully(a, buf, len, client));
 	DEBUG("Asked to read %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
+
+	if (!(client->server->flags & F_COPYONWRITE) && !((client->server->flags & F_WAIT) && (client->export == NULL)))
+		return(rawexpread_fully(a, buf, len, client));
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
@@ -1355,18 +1381,32 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		offset=a-pagestart;
 		rdlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
 			len : (size_t)DIFFPAGESIZE-offset;
+		if (!(client->server->flags & F_COPYONWRITE))
+			pthread_rwlock_rdlock(&client->export_lock);
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
-			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) return -1;
+			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) goto fail;
 		} else { /* the block is not there */
-			DEBUG("Page %llu is not here, we read the original one\n",
-			       (unsigned long long)mapcnt);
-			if(rawexpread_fully(a, buf, rdlen, client)) return -1;
+			if ((client->server->flags & F_WAIT) && (client->export == NULL)){
+				DEBUG("Page %llu is not here, and waiting for file\n",
+				       (unsigned long long)mapcnt);
+				goto fail;
+			} else {
+				DEBUG("Page %llu is not here, we read the original one\n",
+				       (unsigned long long)mapcnt);
+				if(rawexpread_fully(a, buf, rdlen, client)) goto fail;
+			}
 		}
+		if (!(client->server->flags & F_COPYONWRITE))
+			pthread_rwlock_unlock(&client->export_lock);
 		len-=rdlen; a+=rdlen; buf+=rdlen;
 	}
 	return 0;
+fail:
+	if (!(client->server->flags & F_COPYONWRITE))
+		pthread_rwlock_unlock(&client->export_lock);
+	return -1;
 }
 
 /**
@@ -1388,9 +1428,11 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	off_t pagestart;
 	off_t offset;
 
-	if (!(client->server->flags & F_COPYONWRITE))
-		return(rawexpwrite_fully(a, buf, len, client, fua)); 
 	DEBUG("Asked to write %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
+
+
+	if (!(client->server->flags & F_COPYONWRITE) && !((client->server->flags & F_WAIT) && (client->export == NULL)))
+		return(rawexpwrite_fully(a, buf, len, client, fua)); 
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -1400,23 +1442,32 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		wrlen=(0<DIFFPAGESIZE-offset && len<(size_t)(DIFFPAGESIZE-offset)) ?
 			len : (size_t)DIFFPAGESIZE-offset;
 
+		if (!(client->server->flags & F_COPYONWRITE))
+			pthread_rwlock_rdlock(&client->export_lock);
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
-			if (pwrite(client->difffile, buf, wrlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != wrlen) return -1 ;
+			if (pwrite(client->difffile, buf, wrlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != wrlen) goto fail;
 		} else { /* the block is not there */
 			client->difmap[mapcnt]=(client->server->flags&F_SPARSE)?mapcnt:client->difffilelen++;
 			DEBUG("Page %llu is not here, we put it at %lu\n",
 			       (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
-			rdlen=DIFFPAGESIZE ;
-			if (rawexpread_fully(pagestart, pagebuf, rdlen, client))
-				return -1;
+			if ((offset != 0) || (wrlen != DIFFPAGESIZE)){
+				if ((client->server->flags & F_WAIT) && (client->export == NULL)){
+					DEBUG("error: we can write only whole page while waiting for file\n");
+					goto fail;
+				}
+				rdlen=DIFFPAGESIZE ;
+				if (rawexpread_fully(pagestart, pagebuf, rdlen, client))
+					goto fail;
+			}
 			memcpy(pagebuf+offset,buf,wrlen) ;
-			if (write(client->difffile, pagebuf, DIFFPAGESIZE) !=
-					DIFFPAGESIZE)
-				return -1;
+			if (write(client->difffile, pagebuf, DIFFPAGESIZE) != DIFFPAGESIZE)
+				goto fail;
 		}						    
+		if (!(client->server->flags & F_COPYONWRITE))
+			pthread_rwlock_unlock(&client->export_lock);
 		len-=wrlen ; a+=wrlen ; buf+=wrlen ;
 	}
 	if (client->server->flags & F_SYNC) {
@@ -1428,6 +1479,11 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 		fdatasync(client->difffile);
 	}
 	return 0;
+fail:
+	if (!(client->server->flags & F_COPYONWRITE))
+		pthread_rwlock_unlock(&client->export_lock);
+	return -1;
+	
 }
 
 
@@ -1472,6 +1528,10 @@ int expflush(CLIENT *client) {
 	gint i;
 
         if (client->server->flags & F_COPYONWRITE) {
+		return fsync(client->difffile);
+	}
+
+        if (client->server->flags & F_WAIT) {
 		return fsync(client->difffile);
 	}
 
@@ -1645,6 +1705,69 @@ int set_peername(int net, CLIENT *client) {
 	return 0;
 }
 
+int commit_diff(CLIENT* client, bool lock, int fhandle){
+	int dirtycount = 0;
+	int pagecount = client->exportsize/DIFFPAGESIZE;
+	off_t offset;
+	char* buf = malloc(sizeof(char)*DIFFPAGESIZE);
+
+	for (int i=0; i<pagecount; i++){
+		offset = DIFFPAGESIZE*i;
+		if (lock)
+			pthread_rwlock_wrlock(&client->export_lock);
+		if (client->difmap[i] != (u32)-1){
+			dirtycount += 1;
+			DEBUG("flushing dirty page %d, offset %ld\n", i, offset);
+			if (pread(client->difffile, buf, DIFFPAGESIZE, client->difmap[i]*DIFFPAGESIZE) != DIFFPAGESIZE)
+				break;
+			if (pwrite(fhandle, buf, DIFFPAGESIZE, offset) != DIFFPAGESIZE)
+				break;
+			client->difmap[i] = (u32)-1;
+		}
+		if (lock)
+			pthread_rwlock_unlock(&client->export_lock);
+	}
+
+	return dirtycount;
+}
+
+void* wait_file(void *void_ptr){
+	CLIENT* client = (CLIENT *)void_ptr;
+	FILE_INFO fi;
+	GArray* export;
+	mode_t mode = O_RDWR;
+	int dirtycount;
+
+	fi.fhandle = -1;
+	fi.startoff = 0;
+
+	while (fi.fhandle < 1){
+		sem_wait(&file_wait_sem);
+		msg(LOG_INFO, "checking for file %s", client->server->exportname);
+		fi.fhandle = open(client->server->exportname, mode);
+	}
+
+	msg(LOG_INFO, "File %s appeared, fd %d", client->server->exportname, fi.fhandle);
+
+	// first time there may be lot of data so we lock only per page
+	do {
+		dirtycount = commit_diff(client, true, fi.fhandle);
+	} while (dirtycount > 0);
+	
+	//last time we lock export for the whole time until we switch write destination
+	pthread_rwlock_wrlock(&client->export_lock);
+	do {
+		dirtycount = commit_diff(client, false, fi.fhandle);
+	} while (dirtycount > 0);
+
+	export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
+	g_array_append_val(export, fi);
+
+	client->export = export;
+	pthread_rwlock_unlock(&client->export_lock);
+	msg(LOG_INFO, "Waiting for file ended, switching to exported file %s", client->server->exportname);
+}
+
 /**
  * Set up client export array, which is an array of FILE_INFO.
  * Also, split a single exportfile into multiple ones, if that was asked.
@@ -1658,9 +1781,18 @@ bool setupexport(CLIENT* client) {
 	int temporary = (client->server->flags & F_TEMPORARY) && !multifile;
 	int cancreate = (client->server->expected_size) && !multifile;
 
-	if (treefile) {
+	if (treefile || (client->server->flags & F_WAIT)) {
 		client->export = NULL; // this could be thousands of files so we open handles on demand although its slower
 		client->exportsize = client->server->expected_size; // available space is not checked, as it could change during runtime anyway
+
+		if(client->server->flags & F_WAIT){
+			pthread_t wait_file_thread;
+			if (pthread_create(&wait_file_thread, NULL, wait_file, client)){
+				DEBUG("failed to create wait_file thread");
+				return false;
+			}
+		}
+
 	} else {
 		client->export = g_array_new(TRUE, TRUE, sizeof(FILE_INFO));
 
@@ -1844,7 +1976,11 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 	client->exportsize = OFFT_MAX;
 	client->modern = TRUE;
 	client->transactionlogfd = -1;
-	pthread_mutex_init(&(client->lock), NULL);
+	int rc = pthread_mutex_init(&(client->lock), NULL);
+	if (pthread_rwlock_init(&client->export_lock, NULL)){
+                msg(LOG_ERR, "Unable to initialize write lock");
+		return false;
+	}
 	/* Check whether we exceeded the maximum number of allowed
 	 * clients already */
 	if(dontfork) {
@@ -1901,6 +2037,12 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 	}
 
 	if (client->server->flags & F_COPYONWRITE) {
+		if(!copyonwrite_prepare(client)) {
+			return false;
+		}
+	}
+
+	if (client->server->flags & F_WAIT) {
 		if(!copyonwrite_prepare(client)) {
 			return false;
 		}
@@ -3193,6 +3335,12 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;
 	if(sigaction(SIGHUP, &sa, NULL) == -1)
+		err("sigaction: %m");
+
+	sa.sa_handler = sigusr1_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if(sigaction(SIGUSR1, &sa, NULL) == -1)
 		err("sigaction: %m");
 }
 
