@@ -2159,6 +2159,8 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		send_export_info(client, false);
 	}
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
+
+	return true;
 }
 
 /**
