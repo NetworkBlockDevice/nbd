@@ -2179,6 +2179,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 	client->net = net;
 	client->socket_read = socket_read_notls;
 	client->socket_write = socket_write_notls;
+	client->socket_closed = socket_closed_negotiate;
 
 	assert(servers != NULL);
 	socket_write(client, INIT_PASSWD, 8);
