@@ -1616,6 +1616,8 @@ int set_peername(int net, CLIENT *client) {
 					addrbits = 32;
 				} else if(ai->ai_family == AF_INET6) {
 					addrbits = 128;
+				} else {
+					g_assert_not_reached();
 				}
 				uint8_t* addrptr = (uint8_t*)(((struct sockaddr*)&netaddr)->sa_data);
 				for(int i = 0; i < addrbits; i+=8) {
