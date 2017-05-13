@@ -2852,7 +2852,7 @@ void serveloop(GArray* servers, struct generic_conf *genconf) {
 	for(i=0;i<modernsocks->len;i++) {
 		int sock = g_array_index(modernsocks, int, i);
 		FD_SET(sock, &mset);
-		mmax=sock>max?sock:max;
+		mmax=sock>mmax?sock:mmax;
 	}
 
 	/* Construct a signal mask which is used to make signal testing and
