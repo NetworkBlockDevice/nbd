@@ -1726,7 +1726,7 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 	return dirtycount;
 }
 
-void* wait_file(void *void_ptr){
+void* wait_file(void *void_ptr) {
 	CLIENT* client = (CLIENT *)void_ptr;
 	FILE_INFO fi;
 	GArray* export;
