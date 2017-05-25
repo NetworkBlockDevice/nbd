@@ -1722,6 +1722,7 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 			pthread_rwlock_unlock(&client->export_lock);
 	}
 
+	free(buf);
 	return dirtycount;
 }
 
