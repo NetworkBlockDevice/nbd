@@ -1761,6 +1761,8 @@ void* wait_file(void *void_ptr){
 	client->export = export;
 	pthread_rwlock_unlock(&client->export_lock);
 	msg(LOG_INFO, "Waiting for file ended, switching to exported file %s", client->server->exportname);
+
+	return NULL;
 }
 
 /**
