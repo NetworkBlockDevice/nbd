@@ -982,7 +982,7 @@ int main(int argc, char *argv[]) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
-	if(!opts & NBDC_DO_LIST) {
+	if(!(opts & NBDC_DO_LIST)) {
 		nbd = open(nbddev, O_RDWR);
 		if (nbd < 0)
 			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
