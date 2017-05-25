@@ -1627,7 +1627,7 @@ skipdequeue:
 			free(prc);
 		}
 
-		if (!(printer++ % 1000)
+		if (!(printer++ % 5000)
 		    || !(readtransactionfile || txqueue.numitems
 			 || inflight.numitems))
 			printf
