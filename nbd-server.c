@@ -2072,16 +2072,14 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			client->clientfeats = cflags;
 			free(name);
 			if(!commit_client(client, serve)) {
-				goto out;
+				return NULL;
 			}
 			send_export_info(client, true);
 			return client;
 		}
 	}
-	err("Negotiation failed/8a: Requested export not found, or is TLS-only and client did not negotiate TLS");
-out:
 	free(name);
-	return NULL;
+	err("Negotiation failed/8a: Requested export not found, or is TLS-only and client did not negotiate TLS");
 }
 
 static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
