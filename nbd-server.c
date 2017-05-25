@@ -2332,7 +2332,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			err_nonfatal("Negotiation failed/5a: magic mismatch");
-			return NULL;
+			goto hard_close;
 		}
 		socket_read(client, &opt, sizeof(opt));
 		opt = ntohl(opt);
@@ -2865,7 +2865,6 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
 
 handler_err:
         g_free(client);
-        close(net);
 
         if (!dontfork) {
                 exit(EXIT_FAILURE);
