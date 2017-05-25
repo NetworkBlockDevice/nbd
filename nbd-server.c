@@ -477,7 +477,6 @@ void usage() {
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
-	       "\t-w|--wait-file\t\twait for file\n"
 	       "\t-C|--config-file\tspecify an alternate configuration file\n"
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
@@ -508,9 +507,6 @@ void dump_section(SERVER* serve, gchar* section_header) {
 	if(serve->flags & F_COPYONWRITE) {
 		printf("\tcopyonwrite = true\n");
 	}
-	if(serve->flags & F_WAIT) {
-		printf("\twaitfile = true\n");
-	}
 	if(serve->expected_size) {
 		printf("\tfilesize = %lld\n", (long long int)serve->expected_size);
 	}
@@ -534,7 +530,6 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
-		{"wait-file", no_argument, NULL, 'w'},
 		{"dont-fork", no_argument, NULL, 'd'},
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"config-file", required_argument, NULL, 'C'},
@@ -628,9 +623,6 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 			break;
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
-		        break;
-		case 'w': 
-			serve->flags |=F_WAIT;
 		        break;
 		case 'd': 
 			dontfork = 1;
