@@ -59,6 +59,7 @@ typedef struct _client {
 	GArray *export;    /**< array of FILE_INFO of exported files;
 			       array size is always 1 unless we're
 			       doing the multiple file option */
+	pthread_rwlock_t export_lock;
 	int net;	     /**< The actual client socket */
 	SERVER *server;	     /**< The server this client is getting data from */
 	char* difffilename;  /**< filename of the copy-on-write file, if any */
@@ -118,6 +119,8 @@ typedef enum {
         NBDS_ERR_BIND,                    /**< Failed to bind an address to socket */
         NBDS_ERR_LISTEN,                  /**< Failed to start listening on a socket */
         NBDS_ERR_SYS,                     /**< Underlying system call or library error */
+        NBDS_ERR_CFILE_INVALID_WAIT,      /**< We can't use wait with the other options
+                                               specified for the export. */
 } NBDS_ERRS;
 
 /**
@@ -151,6 +154,7 @@ typedef enum {
 #define F_TREEFILES 8192  /**< flag to tell us a file is exported using -t */
 #define F_FORCEDTLS 16384 /**< TLS is required, either for the server as a whole or for a given export */
 #define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
+#define F_WAIT 65536      /**< flag to tell us to wait for file creation */
 
 /* Functions */
 
