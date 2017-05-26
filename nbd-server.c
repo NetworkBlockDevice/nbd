@@ -2345,7 +2345,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 		magic = ntohll(magic);
 		if(magic != opts_magic) {
 			err_nonfatal("Negotiation failed/5a: magic mismatch");
-			goto hard_close;
+			goto handler_err;
 		}
 		socket_read(client, &opt, sizeof(opt));
 		opt = ntohl(opt);
@@ -2355,7 +2355,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			if(opt == NBD_OPT_EXPORT_NAME) {
 				// can't send an error message for EXPORT_NAME,
 				// so must do hard close
-				goto hard_close;
+				goto handler_err;
 			}
 			if(opt == NBD_OPT_ABORT) {
 				// handled below
@@ -2373,7 +2373,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			if(handle_export_name(client, opt, servers, cflags) != NULL) {
 				return client;
 			} else {
-				goto hard_close;
+				goto handler_err;
 			}
 			break;
 		case NBD_OPT_LIST:
@@ -2399,7 +2399,7 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			}
 			if(handle_starttls(client, opt, servers, cflags, genconf) == NULL) {
 				// can't recover from failed TLS negotiation.
-				goto hard_close;
+				goto handler_err;
 			}
 #endif
 			break;
@@ -2417,11 +2417,10 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 	} while((opt != NBD_OPT_EXPORT_NAME) && (opt != NBD_OPT_ABORT));
 	if(opt == NBD_OPT_ABORT) {
 		err_nonfatal("Session terminated by client");
-		goto hard_close;
+		goto handler_err;
 	}
 	err_nonfatal("Weird things happened: reached end of negotiation without success");
-hard_close:
-	close(net);
+handler_err:
 	g_free(client);
 	return NULL;
 }
@@ -2877,6 +2876,7 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
         exit(EXIT_SUCCESS);
 
 handler_err:
+	close(net);
         g_free(client);
 
         if (!dontfork) {
