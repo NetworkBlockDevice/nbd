@@ -2888,10 +2888,19 @@ static int handle_childname(GArray* servers, int socket)
 {
 	uint32_t len;
 	char *buf;
-	int i;
+	int i, r, rt = 0;
 
-	if(read(socket, &len, sizeof len) == 0) {
-		return -1;
+	while(rt < sizeof(len)) {
+		switch((r = read(socket, &len, sizeof len))) {
+			case 0:
+				return -1;
+			case -1:
+				err_nonfatal(LOG_INFO, "Error reading from acl socket: %m");
+				return -1;
+			default:
+				rt += r;
+				break;
+		}
 	}
 	buf = g_malloc0(len);
 	readit(socket, buf, len);
