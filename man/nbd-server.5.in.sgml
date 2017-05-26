@@ -984,6 +984,31 @@ manpage.1: manpage.sgml
 	  </para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+        <term><option>waitfile</option></term>
+	<listitem>
+	  <para>Optional; string.</para>
+	  <para>When this option is set, <command>nbd-server</command>
+	    will allow writes to this export, but not reads, until the
+	    server is sent a SIGUSR1 command. Any writes to the export
+	    will be stored in a diff file with the same algorithm as for
+	    the copy-on-write option. In particular, this means that the
+	    <option>cowdir</option> option is in effect for this option,
+	    too.</para>
+	  <para>The backend file (as per the exportname parameter) need
+	    not exist until the SIGUSR1 signal is sent to the
+	    server.</para>
+	  <para>Once SIGUSR1 is received, <command>nbd-server</command>
+	    will open the main export file, and start merging all
+	    outstanding writes into it. Once this operation finishes,
+	    the diff file will be removed, and the server will allow
+	    normal use of the export.</para>
+	  </para>This allows the out-of-band live migration of an export
+	    from one server to another.
+	  <para>Note that this option cannot be combined with the
+	    copy-on-write option itself.</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
     
   </refsect1>
