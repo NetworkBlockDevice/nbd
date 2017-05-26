@@ -1713,14 +1713,14 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 			dirtycount += 1;
 			DEBUG("flushing dirty page %d, offset %ld\n", i, offset);
 			if (pread(client->difffile, buf, DIFFPAGESIZE, client->difmap[i]*DIFFPAGESIZE) != DIFFPAGESIZE) {
-				msg(LOG_WARN, "could not read while committing diff: %m");
+				msg(LOG_WARNING, "could not read while committing diff: %m");
 				if(lock) {
 					pthread_rwlock_unlock(&client->export_lock);
 				}
 				break;
 			}
 			if (pwrite(fhandle, buf, DIFFPAGESIZE, offset) != DIFFPAGESIZE) {
-				msg(LOG_WARN, "could not write while committing diff: %m");
+				msg(LOG_WARNING, "could not write while committing diff: %m");
 				if (lock) {
 					pthread_rwlock_unlock(&client->export_lock);
 				}
