@@ -1781,7 +1781,7 @@ void* wait_file(void *void_ptr) {
  * @param client information on the client which we want to setup export for
  **/
 bool setupexport(CLIENT* client) {
-	int i;
+	int i = 0;
 	off_t laststartoff = 0, lastsize = 0;
 	int multifile = (client->server->flags & F_MULTIFILE);
 	int treefile = (client->server->flags & F_TREEFILES);
