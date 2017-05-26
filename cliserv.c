@@ -51,16 +51,16 @@ void err_nonfatal(const char *s) {
 
 	strncpy(s1, s, sizeof(s1));
 	if ((s2 = strstr(s, "%m"))) {
-		strcpy(s1 + (s2 - s), strerror(errno));
+		strncpy(s1 + (s2 - s), strerror(errno), sizeof(s1) - (s2 - s));
 		s2 += 2;
-		strcpy(s1 + strlen(s1), s2);
+		strncpy(s1 + strlen(s1), s2, sizeof(s1) - strlen(s1));
 	}
 #ifndef	sun
 	/* Solaris doesn't have %h in syslog */
 	else if ((s2 = strstr(s, "%h"))) {
-		strcpy(s1 + (s2 - s), hstrerror(h_errno));
+		strncpy(s1 + (s2 - s), hstrerror(h_errno), sizeof(s1) - (s2 - s));
 		s2 += 2;
-		strcpy(s1 + strlen(s1), s2);
+		strncpy(s1 + strlen(s1), s2, sizeof(s1) - strlen(s1));
 	}
 #endif
 
