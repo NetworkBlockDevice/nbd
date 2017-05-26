@@ -39,3 +39,5 @@ nbd_client_CFLAGS = $(client_flags)
 nbd_client_LDADD = $(client_libs)
 endif
 endif
+
+AM_DISTCHECK_CONFIGURE_FLAGS=--enable-syslog
