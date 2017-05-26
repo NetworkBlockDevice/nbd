@@ -1062,7 +1062,9 @@ int main(int argc, char *argv[]) {
 				}
 				nanosleep(&req, NULL);
 			}
-			open(nbddev, O_RDONLY);
+			if(open(nbddev, O_RDONLY) < 0) {
+				perror("could not open device for updating partition table");
+			}
 			exit(0);
 		}
 #endif
