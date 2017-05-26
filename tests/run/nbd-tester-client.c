@@ -587,6 +587,7 @@ int setup_unix_connection(gchar * unixsock, gchar * name, CONNECTION_TYPE ctype,
 	memset(&addr, 0, sizeof(struct sockaddr_un));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, unixsock, sizeof addr.sun_path);
+	addr.sun_path[sizeof(addr.sun_path)-1] = '\0';
 	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
