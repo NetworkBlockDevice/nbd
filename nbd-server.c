@@ -2895,7 +2895,7 @@ static int handle_childname(GArray* servers, int socket)
 			case 0:
 				return -1;
 			case -1:
-				err_nonfatal(LOG_INFO, "Error reading from acl socket: %m");
+				err_nonfatal("Error reading from acl socket: %m");
 				return -1;
 			default:
 				rt += r;
