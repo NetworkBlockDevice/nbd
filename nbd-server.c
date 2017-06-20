@@ -435,6 +435,9 @@ static inline void finalize_client(CLIENT* client) {
 		close(client->transactionlogfd);
 		client->transactionlogfd = -1;
 	}
+	if(client->server->flags & F_COPYONWRITE) {
+		unlink(client->difffilename);
+	}
 }
 
 static inline void socket_closed_transmission(CLIENT* client) {
