@@ -1,16 +1,17 @@
 # Translation of nbd debconf templates to French
-# Copyright (C) 2007-2009 Debian French l10n team <debian-l10n-french@lists.debian.org>
+# Copyright (C) 2007-2017 Debian French l10n team <debian-l10n-french@lists.debian.org>
 # This file is distributed under the same license as the nbd package.
 #
 # Translators:
 # Christian Perrier <bubulle@debian.org>, 2007, 2009, 2010, 2011, 2015.
+# Alban Vidal <alban.vidal@zordhak.fr>, 2017.
 msgid ""
 msgstr ""
-"Project-Id-Version: \n"
-"Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2016-06-30 21:30+0200\n"
-"PO-Revision-Date: 2015-10-15 19:03+0100\n"
-"Last-Translator: Christian Perrier <bubulle@debian.org>\n"
+"Project-Id-Version: nbd 1_3.15.2-3\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2017-04-25 14:29+0000\n"
+"PO-Revision-Date: 2017-06-21 08:45+0100\n"
+"Last-Translator: Alban Vidal <alban.vidal@zordhak.fr>\n"
 "Language-Team: French <debian-l10n-french@lists.debian.org>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
@@ -23,12 +24,11 @@ msgstr ""
 #. Description
 #: ../nbd-client.templates:2001
 msgid "AUTO_GEN is set to \"n\" in /etc/nbd-client"
-msgstr "Variable AUTO_GEN égale à « n » dans /etc/nbd-client"
+msgstr "AUTO_GEN est égale à « n » dans /etc/nbd-client"
 
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
-#, fuzzy
 #| msgid ""
 #| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
 #| "to \"n\". The file will therefore not be regenerated automatically."
@@ -38,7 +38,8 @@ msgid ""
 "automatically generated."
 msgstr ""
 "Le fichier /etc/nbd-client comporte une ligne qui définit la variable "
-"AUTO_GEN à « n ». Le fichier ne sera donc pas recréé automatiquement."
+"AUTO_GEN à « n ». Cela indique que vous désirez que la configuration de nbd "
+"ne soit pas générée automatiquement."
 
 #. Type: error
 #. Description
@@ -54,6 +55,16 @@ msgid ""
 "to allow the configuration to be migrated, or write the nbdtab file yourself "
 "manually."
 msgstr ""
+"Depuis nbd-client version 1:3.14-1, le fichier /etc/nbd-client n’est plus "
+"utilisé lors de la configuration au démarrage ; à la place de celui-ci, le "
+"fichier /etc/nbdtab est utilisé, et ce avec un format différent. Les options "
+"de configuration debconf ont été supprimées, et ce fichier ne sera pas "
+"généré automatiquement, sauf si cette mise à niveau a généré un fichier /etc/"
+"nbdtab à partir du fichier /etc/nbd-client si AUTO_GEN n’a pas été définie à "
+"« n ». Avec cela, vous devez donc commenter la ligne AUTO_GEN dans le "
+"fichier /etc/nbd-client et lancer la commande « dpkg-reconfigure nbd-"
+"client » pour permettre la migration de la configuration. Sinon, vous pouvez "
+"vous-même écrire le contenu du fichier /etc/nbdtab."
 
 #. Type: error
 #. Description
@@ -62,12 +73,14 @@ msgid ""
 "If you do not take either of those steps, your nbd-client boot-time "
 "configuration will not be functional."
 msgstr ""
+"Si vous ne choisissez aucune de ces étapes, la configuration lors du "
+"démarrage de nbd-client ne pourra pas fonctionner."
 
 #. Type: note
 #. Description
 #: ../nbd-client.templates:3001
 msgid "KILLALL is no longer supported"
-msgstr ""
+msgstr "KILLALL n'est plus pris en charge"
 
 #. Type: note
 #. Description
@@ -79,6 +92,12 @@ msgid ""
 "operation no longer supports killing devices that are not specified in "
 "nbdtab."
 msgstr ""
+"Vous avez un fichier /etc/nbd-client dans lequel la variable shell KILLALL "
+"n’est pas définie à « false ». Depuis nbd-client version 1:3.14-1, la "
+"séquence de démarrage a été modifiée pour utiliser le fichier /etc/nbdtab au "
+"lieu de /etc/nbd-client, et ce mode de fonctionnement ne gère plus "
+"l’arrêt de périphériques qui ne sont pas spécifiés dans le fichier /etc/"
+"nbdtab."
 
 #. Type: note
 #. Description
@@ -88,12 +107,16 @@ msgid ""
 "file moved to /etc/nbd-client.old, but please note that you must bring down "
 "any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
+"Votre configuration a été migrée vers le fichier /etc/nbdtab, et le fichier /"
+"etc/nbd-client a été renommé en /etc/nbd-client.old. À partir de maintenant, "
+"veuillez vous assurer de désactiver manuellement les périphériques qui ne "
+"sont pas spécifiés dans le fichier /etc/nbdtab."
 
 #. Type: string
 #. Description
 #: ../nbd-server.templates:2001
 msgid "Number of nbd-server instances to run:"
-msgstr "Nombre d'instance de nbd-server à exécuter :"
+msgstr "Nombre d'instances de nbd-server à exécuter :"
 
 #. Type: string
 #. Description
@@ -167,48 +190,36 @@ msgstr ""
 "l'adresse IP dans le nom de fichier. Veuillez consulter la page de manuel de "
 "nbd-server(5) pour plus d'informations."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "Variable AUTO_GEN égale à « n » dans /etc/nbd-server"
+#~ msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+#~ msgstr "Variable AUTO_GEN égale à « n » dans /etc/nbd-server"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-"Le fichier /etc/nbd-server comporte une ligne qui définit la variable "
-"AUTO_GEN à « n ». Le fichier ne sera donc pas recréé automatiquement."
+#~ msgid ""
+#~ "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable "
+#~ "to \"n\". The file will therefore not be regenerated automatically."
+#~ msgstr ""
+#~ "Le fichier /etc/nbd-server comporte une ligne qui définit la variable "
+#~ "AUTO_GEN à « n ». Le fichier ne sera donc pas recréé automatiquement."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-"Veuillez noter que la version actuelle du paquet nbd-server n'utilise plus /"
-"etc/nbd-server. À la place, un fichier de configuration est lu par nbd-"
-"server lui-même : il gère plus d'options qui sont détaillées dans « man 5 "
-"ndb-server »."
+#~ msgid ""
+#~ "Note that the current version of the nbd-server package no longer uses /"
+#~ "etc/nbd-server. Instead it uses a new configuration file, read by nbd-"
+#~ "server itself (rather than the init script), which supports more options. "
+#~ "See \"man 5 nbd-server\" for details."
+#~ msgstr ""
+#~ "Veuillez noter que la version actuelle du paquet nbd-server n'utilise "
+#~ "plus /etc/nbd-server. À la place, un fichier de configuration est lu par "
+#~ "nbd-server lui-même : il gère plus d'options qui sont détaillées dans "
+#~ "« man 5 ndb-server »."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
-msgstr ""
-"Si vous supprimez ou commentez la ligne AUTO_GEN, un fichier /etc/nbd-server/"
-"config sera créé au nouveau format, à partir de la configuration actuelle. "
-"Tant que cette opération n'aura pas été effectuée, l'installation du serveur "
-"nbd ne sera pas opérationnelle."
+#~ msgid ""
+#~ "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+#~ "config in the new format may be generated based on the current "
+#~ "configuration. Until then, the nbd-server installation will be broken."
+#~ msgstr ""
+#~ "Si vous supprimez ou commentez la ligne AUTO_GEN, un fichier /etc/nbd-"
+#~ "server/config sera créé au nouveau format, à partir de la configuration "
+#~ "actuelle. Tant que cette opération n'aura pas été effectuée, "
+#~ "l'installation du serveur nbd ne sera pas opérationnelle."
 
 #~ msgid ""
 #~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
