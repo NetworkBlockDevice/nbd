@@ -58,6 +58,9 @@
 
 #define NBDC_DO_LIST 1
 
+/* tcp keepalive frequency */
+int tcpkeepalive = 0;
+
 int check_conn(char* devname, int do_print) {
 	char buf[256];
 	char* p;
@@ -142,6 +145,31 @@ int opennet(char *name, char* portstr, int sdp) {
 	}
 
 	setmysockopt(sock);
+
+	if (tcpkeepalive > 0) {
+		int optval = 1;
+		socklen_t optlen = sizeof(optval);
+		if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+			err_nonfatal("Failed to set SO_KEEPALIVE: %m");
+			sock = -1;
+			goto err;
+		}
+#ifdef TCP_KEEPIDLE
+		if (ioctl(sock, TCP_KEEPIDLE, tcpkeepalive) == -1) {
+			err_nonfatal("Failed to set TCP_KEEPIDLE: %m");
+			sock = -1;
+			goto err;
+		}
+#endif
+#ifdef TCP_KEEPINTVL
+		if (ioctl(sock, TCP_KEEPINTVL, tcpkeepalive) == -1) {
+			err_nonfatal("Failed to set TCP_KEEPINTVL: %m");
+			sock = -1;
+			goto err;
+		}
+#endif
+	}
+
 err:
 	freeaddrinfo(ai);
 	return sock;
@@ -819,6 +847,7 @@ int main(int argc, char *argv[]) {
 		{ "cacertfile", required_argument, NULL, 'A' },
 		{ "tlshostname", required_argument, NULL, 'H' },
 		{ "enable-tls", no_argument, NULL, 'x' },
+		{ "keepalive", required_argument, NULL, 'k' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
@@ -829,7 +858,7 @@ int main(int argc, char *argv[]) {
         tlssession_init();
 #endif
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:x", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:xk:", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -941,6 +970,9 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "E: TLS support not compiled in\n");
                         exit(EXIT_FAILURE);
 #endif
+		case 'k':
+			tcpkeepalive = (int)strtol(optarg, NULL, 0);
+			break;
 		default:
 			fprintf(stderr, "E: option eaten by 42 mice\n");
 			exit(EXIT_FAILURE);

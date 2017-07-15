@@ -66,6 +66,7 @@ manpage.1: manpage.sgml
       <arg>-systemd-mark</arg>
       <arg>-block-size <replaceable>block size</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
+      <arg>-keepalive <replaceable>seconds</replaceable></arg>
       <arg>-name <replaceable>name</replaceable></arg>
       <arg>-certfile <replaceable>certfile</replaceable></arg>
       <arg>-keyfile <replaceable>keyfile</replaceable></arg>
@@ -164,6 +165,16 @@ manpage.1: manpage.sgml
 	  and will be part of kernel 2.6.24.</para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+        <term><option>-keepalive</option></term>
+	<replaceable>seconds</replaceable></option></term>
+        <term><option>-k</option></term>
+        <listitem>
+          <para>Specify the time (in seconds) the connection needs to remain idle
+           before TCP starts sending keepalive probes, and the time between each
+           subsequent keepalive probe.</para>
+        </listitem>
+       </varlistentry>
       <varlistentry>
 	<term><option>port</option></term>
 	<listitem>

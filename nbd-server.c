@@ -155,6 +155,9 @@ int glob_flags=0;
 /* Whether we should avoid forking */
 int dontfork = 0;
 
+/* tcp keepalive frequency */
+int tcpkeepalive = 0;
+
 /**
  * The highest value a variable of type off_t can reach. This is a signed
  * integer, so set all bits except for the leftmost one.
@@ -539,6 +542,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 		{"pid-file", required_argument, NULL, 'p'},
 		{"output-config", required_argument, NULL, 'o'},
 		{"max-connection", required_argument, NULL, 'M'},
+		{"keepalive", required_argument, NULL, 'k'},
 		{"version", no_argument, NULL, 'V'},
 		{0,0,0,0}
 	};
@@ -556,7 +560,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	serve=g_new0(SERVER, 1);
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cwdl:mo:rp:M:V", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cwdl:mo:rp:M:k:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -640,6 +644,9 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 			break;
 		case 'M':
 			serve->max_connections = strtol(optarg, NULL, 0);
+			break;
+		case 'k':
+			tcpkeepalive = (int)strtol(optarg, NULL, 0);
 			break;
 		case 'V':
 			printf("This is nbd-server version " VERSION "\n");
@@ -2842,6 +2849,27 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 msg(LOG_ERR, "Failed to set socket to blocking mode");
                 goto handler_err;
         }
+
+	if (tcpkeepalive > 0) {
+		int optval = 1;
+		socklen_t optlen = sizeof(optval);
+		if (setsockopt(net, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+			msg(LOG_ERR, "Failed to set SO_KEEPALIVE");
+			goto handler_err;
+		}
+#ifdef TCP_KEEPIDLE
+		if (ioctl(net, TCP_KEEPIDLE, tcpkeepalive) == -1) {
+			msg(LOG_ERR, "Failed to set TCP_KEEPIDLE");
+			goto handler_err;
+		}
+#endif
+#ifdef TCP_KEEPINTVL
+		if (ioctl(net, TCP_KEEPINTVL, tcpkeepalive) == -1) {
+			msg(LOG_ERR, "Failed to set TCP_KEEPINTVL");
+			goto handler_err;
+		}
+#endif
+	}
 
         client = negotiate(net, servers, genconf);
         if (!client) {
