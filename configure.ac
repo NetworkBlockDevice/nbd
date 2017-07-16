@@ -78,7 +78,7 @@ if test $DODBG -eq 1; then
     AC_MSG_ERROR([You requested both syslog logging and a debugging version of the server. Bad idea!])
   fi
   AC_DEFINE(DODBG,1,[Define if you want a debugging version of nbd-server (lots of copious output)])
-  AC_DEFINE(NOFORK,1,[Define if you don't want the nbd-server to fork()])
+  AC_DEFINE(NOFORK,1,[Define if you do not want the nbd-server to fork()])
 else
   AC_MSG_RESULT([no])
 fi
