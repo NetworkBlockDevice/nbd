@@ -3,6 +3,7 @@ Description=NBD client connection for %i
 Documentation=man:nbd-client
 PartOf=nbd.service
 Before=dev-%i.device
+After=network-online.target
 Conflicts=shutdown.target
 DefaultDependencies=no
 [Service]
