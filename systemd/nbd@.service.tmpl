@@ -3,6 +3,7 @@ Description=NBD client connection for %i
 Documentation=man:nbd-client
 PartOf=nbd.service
 Before=dev-%i.device
+DefaultDependencies=no
 [Service]
 Type=forking
 ExecStart=@sbindir@/nbd-client %i
