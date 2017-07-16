@@ -60,7 +60,9 @@
 #include "lfs.h"
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE 500 /* to get pread/pwrite */
-#define _BSD_SOURCE /* to get DT_* macros */
+#if NEED_BSD_SOURCE
+#define _BSD_SOURCE /* to get DT_* macros on some platforms */
+#endif
 #define _DARWIN_C_SOURCE /* to get DT_* macros on OS X */
 
 #include <assert.h>

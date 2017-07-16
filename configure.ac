@@ -280,6 +280,16 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 )
 CFLAGS="$my_save_cflags"
 
+AC_MSG_CHECKING([whether _BSD_SOURCE needs to be defined for DT_* macros])
+AC_PREPROC_IFELSE(
+	[AC_LANG_PROGRAM([[#include <dirent.h>]],
+			 [[#ifndef DT_UNKNOWN
+#error nope
+#endif]])],
+	[AC_MSG_RESULT([no]); NEED_BSD_SOURCE=0],
+	[AC_MSG_RESULT([yes]); NEED_BSD_SOURCE=1])
+AC_DEFINE([NEED_BSD_SOURCE], $NEED_BSD_SOURCE)
+
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
