@@ -3,7 +3,7 @@ dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],
   m4_esyscmd(support/genver.sh | tr -d '\n'),
-  [wouter@debian.org],,
+  [nbd-general@other.debian.org],,
   [http://nbd.sourceforge.net/])
 m4_define([serial_tests], [
   m4_esyscmd([automake --version |
