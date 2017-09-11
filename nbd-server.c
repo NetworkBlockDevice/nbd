@@ -496,6 +496,7 @@ void usage() {
 	       "\t\taddress of the machine trying to connect\n" 
 	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
 	printf("Using configuration file %s\n", CFILE);
+	printf("For help, or when encountering bugs, please contact %s\n", PACKAGE_BUGREPORT);
 }
 
 /* Dumps a config file section of the given SERVER*, and exits. */

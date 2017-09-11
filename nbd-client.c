@@ -737,7 +737,7 @@ void usage(char* errmsg, ...) {
 		vfprintf(stderr, tmp, ap);
 		va_end(ap);
 	} else {
-		fprintf(stderr, "nbd-client version %s\n", PACKAGE_VERSION);
+		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
@@ -746,6 +746,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -c nbd_device\n");
 	fprintf(stderr, "Or   : nbd-client -h|--help\n");
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
+	fprintf(stderr, "Or   : nbd-client -V|--version\n");
 #if HAVE_GNUTLS && !defined(NOTLS)
 	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n");
 #endif
@@ -754,6 +755,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
 	fprintf(stderr, "blocksizes other than 1024 without patches\n");
 	fprintf(stderr, "Default value for port is 10809. Note that port must always be numeric\n");
+	fprintf(stderr, "Bug reports and general discussion should go to %s\n", PACKAGE_BUGREPORT);
 }
 
 void disconnect(char* device) {
@@ -819,6 +821,7 @@ int main(int argc, char *argv[]) {
 		{ "cacertfile", required_argument, NULL, 'A' },
 		{ "tlshostname", required_argument, NULL, 'H' },
 		{ "enable-tls", no_argument, NULL, 'x' },
+		{ "version", no_argument, NULL, 'V' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
@@ -829,7 +832,7 @@ int main(int argc, char *argv[]) {
         tlssession_init();
 #endif
 
-	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uC:K:A:H:x", long_options, NULL))>=0) {
+	while((c=getopt_long_only(argc, argv, "-b:c:d:hlnN:pSst:uVC:K:A:H:x", long_options, NULL))>=0) {
 		switch(c) {
 		case 1:
 			// non-option argument
@@ -917,6 +920,9 @@ int main(int argc, char *argv[]) {
 		case 'u':
 			b_unix = 1;
 			break;
+		case 'V':
+			printf("This is %s, from %s\n", PROG_NAME, PACKAGE_STRING);
+			return 0;
 #if HAVE_GNUTLS && !defined(NOTLS)
 		case 'x':
 			tls = true;
