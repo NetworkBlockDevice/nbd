@@ -67,6 +67,7 @@ manpage.1: manpage.sgml
       <arg><option>-o <replaceable>section name</replaceable></option></arg>
       <arg><option>-C <replaceable>config file</replaceable></option></arg>
       <arg><option>-M <replaceable>max connections</replaceable></option></arg>
+      <arg><option>-k <replaceable>keepalive time</replaceable></option></arg>
       <arg><option>-V</option></arg>
       <arg><option>-d</option></arg>
     </cmdsynopsis>
@@ -222,6 +223,14 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Specify the maximum number of opened connections. If this
 	  parameter is not specified, no limit is set.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-k</option></term>
+	<listitem>
+	  <para>Specify the time (in seconds) the connection needs to remain idle
+          before TCP starts sending keepalive probes, and the time between each
+          subsequent keepalive probe.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
