@@ -1051,11 +1051,7 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 						 1024, i);
 			--requests;
 		}
-<<<<<<< HEAD
-		if (!(printer++ % 100)) {
-=======
 		if(print == NULL) {
->>>>>>> master
 			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	} while (requests);
