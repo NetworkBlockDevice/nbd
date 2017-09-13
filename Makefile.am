@@ -28,10 +28,10 @@ sbin_PROGRAMS = nbd-client
 if GNUTLS
 sbin_PROGRAMS += min-nbd-client
 min_nbd_client_SOURCES = $(client_srcs)
-min_nbd_client_CFLAGS = $(client_flags) -DNOTLS
+min_nbd_client_CFLAGS = $(client_flags) -DNOTLS -DPROG_NAME='"min-nbd-client"'
 min_nbd_client_LDADD = $(client_libs)
 nbd_client_SOURCES = $(client_srcs) crypto-gnutls.c crypto-gnutls.h buffer.c buffer.h
-nbd_client_CFLAGS = $(client_flags) @GnuTLS_CFLAGS@
+nbd_client_CFLAGS = $(client_flags) @GnuTLS_CFLAGS@ -DPROG_NAME='"nbd-client"'
 nbd_client_LDADD = $(client_libs) @GnuTLS_LIBS@
 else
 nbd_client_SOURCES = $(client_srcs)
@@ -39,3 +39,5 @@ nbd_client_CFLAGS = $(client_flags)
 nbd_client_LDADD = $(client_libs)
 endif
 endif
+
+AM_DISTCHECK_CONFIGURE_FLAGS=--enable-syslog

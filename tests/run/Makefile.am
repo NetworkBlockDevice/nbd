@@ -19,12 +19,13 @@ buffer.c:
 crypto-gnutls.c:
 	rm -f crypto-gnutls.c
 	ln -s $(top_srcdir)/crypto-gnutls.c crypto-gnutls.c
-nbd_tester_client_SOURCES = nbd-tester-client.c cliserv.c
+nbd_tester_client_SOURCES = nbd-tester-client.c
+nodist_nbd_tester_client_SOURCES = cliserv.c
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
 nbd_tester_client_CPPFLAGS = -I$(top_srcdir)
 nbd_tester_client_LDADD = @GLIB_LIBS@
 if GNUTLS
-nbd_tester_client_SOURCES += buffer.c crypto-gnutls.c
+nodist_nbd_tester_client_SOURCES += buffer.c crypto-gnutls.c
 nbd_tester_client_CFLAGS += @GnuTLS_CFLAGS@
 nbd_tester_client_LDADD += @GnuTLS_LIBS@
 endif

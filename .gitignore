@@ -56,3 +56,4 @@ tests/run/crypto-gnutls.c
 tests/run/buffer.c
 .debhelper
 *debhelper.log
+min-nbd-client

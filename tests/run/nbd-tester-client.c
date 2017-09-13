@@ -587,6 +587,7 @@ int setup_unix_connection(gchar * unixsock, gchar * name, CONNECTION_TYPE ctype,
 	memset(&addr, 0, sizeof(struct sockaddr_un));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, unixsock, sizeof addr.sun_path);
+	addr.sun_path[sizeof(addr.sun_path)-1] = '\0';
 	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
@@ -913,6 +914,7 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 	int serverflags = 0;
 	signed int do_write = TRUE;
 	pid_t mypid = getpid();
+	char *print = getenv("NBD_TEST_SILENT");
 
 	if (!(testflags & TEST_WRITE))
 		testflags &= ~TEST_FLUSH;
@@ -945,7 +947,6 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 			 strerror(errno));
 		goto err_open;
 	}
-	int printer = 0;
 	for (i = 0; i + 1024 <= size; i += 1024) {
 		if (do_write) {
 			int sendfua = (testflags & TEST_FLUSH)
@@ -1031,7 +1032,7 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 			retval = -1;
 			goto err_open;
 		}
-		if (!(printer++ % 100)) {
+		if(print == NULL) {
 			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	}
@@ -1050,7 +1051,11 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 						 1024, i);
 			--requests;
 		}
+<<<<<<< HEAD
 		if (!(printer++ % 100)) {
+=======
+		if(print == NULL) {
+>>>>>>> master
 			printf("%d: Requests: %d  \r", (int)mypid, requests);
 		}
 	} while (requests);
@@ -1183,6 +1188,7 @@ int integrity_test(gchar * hostname, gchar * unixsock, int port, char *name,
 	uint64_t seq = 1;
 	uint64_t processed = 0;
 	uint64_t printer = 0;
+	char *do_print = getenv("NBD_TEST_SILENT");
 	uint64_t xfer = 0;
 	int readtransactionfile = 1;
 	int blocked = 0;
@@ -1627,7 +1633,7 @@ skipdequeue:
 			free(prc);
 		}
 
-		if (!(printer++ % 1000)
+		if (do_print == NULL && !(printer++ % 5000)
 		    || !(readtransactionfile || txqueue.numitems
 			 || inflight.numitems))
 			printf

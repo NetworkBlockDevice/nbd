@@ -84,7 +84,9 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *
 			DEBUG("Creating a dummy tempfile for reading");
 			gchar * tmpname;
 			tmpname = g_strdup_printf("dummy-XXXXXX");
+			mode_t oldmode = umask(77);
 			handle = mkstemp(tmpname);
+			umask(oldmode);
 			if (handle>0) {
 				unlink(tmpname); /* File will stick around whilst FD open */
 			} else {
