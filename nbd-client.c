@@ -46,7 +46,7 @@
 
 #include <linux/ioctl.h>
 
-#ifdef HAVE_NETLINK
+#if HAVE_NETLINK
 #include "nbd-netlink.h"
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
@@ -66,7 +66,7 @@
 
 #define NBDC_DO_LIST 1
 
-#ifdef HAVE_NETLINK
+#if HAVE_NETLINK
 static int callback(struct nl_msg *msg, void *arg) {
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 	struct nlattr *msg_attr[NBD_ATTR_MAX + 1];
@@ -864,7 +864,7 @@ void usage(char* errmsg, ...) {
 	} else {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
-#ifdef HAVE_NETLINK
+#if HAVE_NETLINK
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] -L\n");
 #else
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
@@ -901,7 +901,7 @@ void disconnect(char* device) {
 	printf("done\n");
 }
 
-#ifdef HAVE_NETLINK
+#if HAVE_NETLINK
 static const char *short_opts = "-A:b:c:C:d:H:hK:LlnN:pSst:uVx";
 #else
 static const char *short_opts = "-A:b:c:C:d:H:hK:lnN:pSst:uVx";
@@ -947,7 +947,7 @@ int main(int argc, char *argv[]) {
 		{ "help", no_argument, NULL, 'h' },
 		{ "list", no_argument, NULL, 'l' },
 		{ "name", required_argument, NULL, 'N' },
-#ifdef HAVE_NETLINK
+#if HAVE_NETLINK
 		{ "netlink", no_argument, NULL, 'L' },
 #endif
 		{ "nofork", no_argument, NULL, 'n' },
@@ -1037,7 +1037,7 @@ int main(int argc, char *argv[]) {
 			opts |= NBDC_DO_LIST;
 			nbddev="";
 			break;
-#ifdef HAVE_NETLINK
+#if HAVE_NETLINK
 		case 'L':
 			netlink = 1;
 			break;
