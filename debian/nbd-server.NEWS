@@ -1,0 +1,5 @@
+nbd (1:3.16.2-2) unstable; urgency=medium
+
+  * foo bar baz
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 09 Oct 2017 14:24:39 +0200
