@@ -1100,9 +1100,12 @@ of the newstyle negotiation.
 - `NBD_OPT_STRUCTURED_REPLY` (8)
 
     The client wishes to use structured replies during the
-    transmission phase.  The option request has no additional data.
+    transmission phase.  The client MUST NOT send any additional data
+    with the option, and the server SHOULD reject a request that
+    includes data with `NBD_REP_ERR_INVALID`.
 
-    The server replies with the following:
+    The server replies with the following, or with an error permitted
+    elsewhere in this document:
 
     - `NBD_REP_ACK`: Structured replies have been negotiated; the
       server MUST use structured replies to the `NBD_CMD_READ`
@@ -1320,11 +1323,12 @@ valid may depend on negotiation during the handshake phase.
   if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
   The server MUST support the use of this flag if it advertises
   `NBD_FLAG_SEND_WRITE_ZEROES`.
-- bit 2, `NBD_CMD_FLAG_DF`; the "don't fragment" flag, valid during `NBD_CMD_READ`.
-   SHOULD be set to 1 if the client requires the server to send at most one
-   content chunk in reply.  MUST NOT be set unless the transmission
-   flags include `NBD_FLAG_SEND_DF`.  Use of this flag MAY trigger an
-   `EOVERFLOW` error chunk, if the request length is too large.
+- bit 2, `NBD_CMD_FLAG_DF`; the "don't fragment" flag, valid during
+  `NBD_CMD_READ`.  SHOULD be set to 1 if the client requires the
+  server to send at most one content chunk in reply.  MUST NOT be set
+  unless the transmission flags include `NBD_FLAG_SEND_DF`.  Use of
+  this flag MAY trigger an `EOVERFLOW` error chunk, if the request
+  length is too large.
 
 ##### Structured reply flags
 
@@ -1349,7 +1353,9 @@ unrecognized flags.
 These values are used in the "type" field of a structured reply.
 Some chunk types can additionally be categorized by role, such as
 *error chunks* or *content chunks*.  Each type determines how to
-interpret the "length" bytes of payload.
+interpret the "length" bytes of payload.  If the client receives
+an unknown or unexpected type, other than an *error chunk*, it
+MUST initiate a hard disconnect.
 
 - `NBD_REPLY_TYPE_NONE` (0)
 
@@ -1362,14 +1368,14 @@ interpret the "length" bytes of payload.
 
 - `NBD_REPLY_TYPE_OFFSET_DATA` (1)
 
-  This chunk type is in the content chunk category.  *length* MUST
-  be at least 9.  It represents the contents of *length - 8* bytes
-  of the file, starting at *offset*.  The data MUST lie within the
-  bounds of the original offset and length of the client's
-  request, and MUST NOT overlap with the bounds of any earlier
-  content chunk or error chunk in the same reply.  This chunk MAY
-  be used more than once in a reply, unless the `NBD_CMD_FLAG_DF`
-  flag was set.  Valid as a reply to `NBD_CMD_READ`.
+  This chunk type is in the content chunk category.  *length* MUST be
+  at least 9.  It represents the contents of *length - 8* bytes of the
+  file, starting at the absolute *offset* from the start of the
+  export.  The data MUST lie within the bounds of the original offset
+  and length of the client's request, and MUST NOT overlap with the
+  bounds of any earlier content chunk or error chunk in the same
+  reply.  This chunk MAY be used more than once in a reply, unless the
+  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to `NBD_CMD_READ`.
 
   The payload is structured as:
 
@@ -1378,15 +1384,14 @@ interpret the "length" bytes of payload.
 
 - `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
 
-  This chunk type is in the content chunk category.  *length* MUST
-  be exactly 12.  It represents that the contents of *hole size*
-  bytes starting at *offset* read as all zeroes.  The hole MUST
-  lie within the bounds of the original offset and length of the
-  client's request, and MUST NOT overlap with the bounds of any
-  earlier content chunk or error chunk in the same reply.  This
-  chunk MAY be used more than once in a reply, unless the
-  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to
-  `NBD_CMD_READ`.
+  This chunk type is in the content chunk category.  *length* MUST be
+  exactly 12.  It represents that the contents of *hole size* bytes,
+  starting at the absolute *offset* from the start of the export, read
+  as all zeroes.  The hole MUST lie within the bounds of the original
+  offset and length of the client's request, and MUST NOT overlap with
+  the bounds of any earlier content chunk or error chunk in the same
+  reply.  This chunk MAY be used more than once in a reply, unless the
+  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to `NBD_CMD_READ`.
 
   The payload is structured as:
 
