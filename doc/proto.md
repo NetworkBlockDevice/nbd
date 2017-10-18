@@ -197,6 +197,11 @@ reply to any option it has sent (note that some options e.g.
 `NBD_OPT_LIST` have multiple replies, and the final reply is
 the last of those).
 
+Some messages the client sends instruct the server to change some of
+its internal state.  The client SHOULD NOT send such messages more
+than once; if it does, the server MAY fail the repeated message with
+`NBD_REP_ERR_INVALID`.
+
 #### Termination of the session during option haggling
 
 There are three possible mechanisms to end option haggling:
