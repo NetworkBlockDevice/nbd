@@ -861,6 +861,10 @@ of the newstyle negotiation.
     The client desires to abort the negotiation and terminate the
     session. The server MUST reply with `NBD_REP_ACK`.
 
+    The client SHOULD NOT send any additional data with the option;
+    however, a server SHOULD ignore any data sent by the client rather
+    than rejecting the request as invalid.
+
     Previous versions of this document were unclear on whether
     the server should send a reply to `NBD_OPT_ABORT`. Therefore
     the client SHOULD gracefully handle the server closing the
@@ -877,6 +881,10 @@ of the newstyle negotiation.
     list if TLS has not been negotiated, the server is operating in
     SELECTIVETLS mode, and the entry concerned is a TLS-only export.
 
+    The client MUST NOT send any additional data with the option, and
+    the server SHOULD reject a request that includes data with
+    `NBD_REP_ERR_INVALID`.
+
 - `NBD_OPT_PEEK_EXPORT` (4)
 
     Was defined by the (withdrawn) experimental `PEEK_EXPORT` extension;
@@ -886,9 +894,11 @@ of the newstyle negotiation.
 
     The client wishes to initiate TLS.
 
-    The server MUST either reply with `NBD_REP_ACK` after which
-    point the connection is upgraded to TLS, or an error reply
-    explicitly permitted by this document.
+    The client MUST NOT send any additional data with the option.  The
+    server MUST either reply with `NBD_REP_ACK` after which point the
+    connection is upgraded to TLS, or an error reply explicitly
+    permitted by this document (for example, `NBD_REP_ERR_INVALID` if
+    the client included data).
 
     See the section on TLS above for further details.
 
@@ -1145,8 +1155,10 @@ case that data is an error message string suitable for display to the user.
 * `NBD_REP_ERR_INVALID` (2^31 + 3)
 
     The option sent by the client is known by this server, but was
-    determined by the server to be syntactically invalid. For instance,
-    the client sent an `NBD_OPT_LIST` with nonzero data length.
+    determined by the server to be syntactically or semantically
+    invalid. For instance, the client sent an `NBD_OPT_LIST` with
+    nonzero data length, or the client sent a second
+    `NBD_OPT_STARTTLS` after TLS was already negotiated.
 
 * `NBD_REP_ERR_PLATFORM` (2^31 + 4)
 
