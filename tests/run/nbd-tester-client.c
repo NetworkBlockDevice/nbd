@@ -818,7 +818,6 @@ int handshake_test(gchar * hostname, gchar * unixsock, int port, char *name,
 	int serverflags = 0;
 	char buf[256];
 	u64 tmp64;
-	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
 	uint32_t tmp32 = 0;
 
 	/* This should work */
