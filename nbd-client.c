@@ -144,9 +144,8 @@ nla_put_failure:
 
 static void netlink_disconnect(char *nbddev) {
 	struct nl_sock *socket;
-	struct nlattr *sock_attr;
 	struct nl_msg *msg;
-	int driver_id, ret;
+	int driver_id;
 
 	int index = -1;
 	if (nbddev) {
@@ -358,7 +357,6 @@ struct reply* read_reply(int sock) {
 }
 
 void ask_list(int sock) {
-	uint32_t opt;
 	uint32_t opt_server;
 	uint32_t len;
 	uint32_t lenn;
@@ -468,8 +466,6 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	uint16_t tmp;
 	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
-	uint32_t opt;
-	uint32_t namesize;
 	int sock = *sockp;
 
 	printf("Negotiation: ");

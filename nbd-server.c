@@ -1992,7 +1992,10 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 	client->exportsize = OFFT_MAX;
 	client->modern = TRUE;
 	client->transactionlogfd = -1;
-	int rc = pthread_mutex_init(&(client->lock), NULL);
+	if(pthread_mutex_init(&(client->lock), NULL)) {
+		msg(LOG_ERR, "Unable to initialize mutex");
+		return false;
+	}
 	if (pthread_rwlock_init(&client->export_lock, NULL)){
                 msg(LOG_ERR, "Unable to initialize write lock");
 		return false;
@@ -2517,8 +2520,6 @@ static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 {
 	struct nbd_reply rep;
 	int pipefd[2];
-	int max_pipe_size = 1 * 1024 * 1024;
-	int pipe_size;
 
 	// splice doesn't work with TLS
 	if (client->tls_session != NULL)
