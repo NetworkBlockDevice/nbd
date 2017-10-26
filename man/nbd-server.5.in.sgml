@@ -124,6 +124,32 @@ manpage.1: manpage.sgml
         </listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>cacertfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 CA certificate used for validating client
+          certificates supplied by the client. If this option is not
+          set then client certificates will not be checked.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>certfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 public certificate used for TLS negotiation
+          with the client. If <option>keyfile</option> is set but
+          <option>certfile</option> is not set, then the server will
+          attempt to read the certificate from the path specified
+          by <option>keyfile</option>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
         <term><option>force_tls</option></term>
         <listitem>
           <para>
@@ -196,6 +222,17 @@ manpage.1: manpage.sgml
 	    whatsoever have been configured, in which case it will
 	    exit with an appropriate error message)
 	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>keyfile</option></term>
+	<listitem>
+	  <para>
+	    Optional; string
+	  </para>
+	  <para>If this option is set, it should contain a path to
+          a PEM format X.509 private key used for TLS negotiation
+          with the client. This option must be set to enable TLS.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -318,43 +355,6 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>keyfile</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
-	  </para>
-	  <para>If this option is set, it should contain a path to
-          a PEM format X.509 private key used for TLS negotiation
-          with the client. This option must be set to enable TLS.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>certfile</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
-	  </para>
-	  <para>If this option is set, it should contain a path to
-          a PEM format X.509 public certificate used for TLS negotiation
-          with the client. If <option>keyfile</option> is set but
-          <option>certfile</option> is not set, then the server will
-          attempt to read the certificate from the path specified
-          by <option>keyfile</option>.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>cacertfile</option></term>
-	<listitem>
-	  <para>
-	    Optional; string
-	  </para>
-	  <para>If this option is set, it should contain a path to
-          a PEM format X.509 CA certificate used for validating client
-          certificates supplied by the client. If this option is not
-          set then client certificates will not be checked.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
         <term><option>tlsonly</option></term>
 	<listitem>
 	  <para>Optional; boolean.</para>
@@ -366,6 +366,28 @@ manpage.1: manpage.sgml
             In order for TLS to work at all, the <option>keyfile</option>
             option must be specified in the generic section.</para>
 	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>tlsprio</option></term>
+	<listitem>
+	  <para>Optional; string; default NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE</para>
+	  <para>This option allows to configure the GnuTLS priority
+	    string, which is used to select the algorithms which GnuTLS
+	    will allow to be negotiated with the client. The NBD
+	    STARTTLS specification requires that clients and servers
+	    require TLS1.2 or higher by default, so the default string
+	    disables all older versions of the TLS protocol.</para>
+	  <para>Not all versions of GnuTLS support the
+	    %SERVER_PRECEDENCE flag, which exists to signal that the
+	    server should pay no attention to the algorithm preferences
+	    selected by the client. If you're using an older version of
+	    GnuTLS (e.g., 2.12), it may be necessary to specify a
+	    priority string that does not include the %SERVER_PRECEDENCE
+	    flag.</para>
+	  <para>For an explanation of the possible values of this
+	    option, see the "Priority strings" chapter in the GnuTLS
+	    documentation.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
@@ -960,6 +982,31 @@ manpage.1: manpage.sgml
             the <option>keyfile</option> option must be specified in
             the generic section.</para>
 	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>waitfile</option></term>
+	<listitem>
+	  <para>Optional; string.</para>
+	  <para>When this option is set, <command>nbd-server</command>
+	    will allow writes to this export, but not reads, until the
+	    server is sent a SIGUSR1 command. Any writes to the export
+	    will be stored in a diff file with the same algorithm as for
+	    the copy-on-write option. In particular, this means that the
+	    <option>cowdir</option> option is in effect for this option,
+	    too.</para>
+	  <para>The backend file (as per the exportname parameter) need
+	    not exist until the SIGUSR1 signal is sent to the
+	    server.</para>
+	  <para>Once SIGUSR1 is received, <command>nbd-server</command>
+	    will open the main export file, and start merging all
+	    outstanding writes into it. Once this operation finishes,
+	    the diff file will be removed, and the server will allow
+	    normal use of the export.</para>
+	  </para>This allows the out-of-band live migration of an export
+	    from one server to another.
+	  <para>Note that this option cannot be combined with the
+	    copy-on-write option itself.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
