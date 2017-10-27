@@ -3,7 +3,7 @@ dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2006 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],
   m4_esyscmd(support/genver.sh | tr -d '\n'),
-  [wouter@debian.org],,
+  [nbd@other.debian.org],,
   [http://nbd.sourceforge.net/])
 m4_define([serial_tests], [
   m4_esyscmd([automake --version |
@@ -78,7 +78,7 @@ if test $DODBG -eq 1; then
     AC_MSG_ERROR([You requested both syslog logging and a debugging version of the server. Bad idea!])
   fi
   AC_DEFINE(DODBG,1,[Define if you want a debugging version of nbd-server (lots of copious output)])
-  AC_DEFINE(NOFORK,1,[Define if you don't want the nbd-server to fork()])
+  AC_DEFINE(NOFORK,1,[Define if you do not want the nbd-server to fork()])
 else
   AC_MSG_RESULT([no])
 fi
@@ -253,14 +253,14 @@ case $host_os in
 		AC_MSG_RESULT(no)
 		;;
 esac
-AC_SUBST(NBD_CLIENT_NAME)
+AM_CONDITIONAL(CLIENT, [test ! -z "$NBD_CLIENT_NAME"])
 AC_SEARCH_LIBS(bind, socket,, AC_MSG_ERROR([Could not find an implementation of the bind() system call]))
 AC_SEARCH_LIBS(inet_ntoa, nsl,, AC_MSG_ERROR([Could not find an implementation of the inet_ntoa() system call]))
 AC_SEARCH_LIBS(daemon, resolv,, AC_MSG_ERROR([Could not find an implementation of the daemon() system call]))
 AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h sys/uio.h])
 AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]), gthread)
 
 my_save_cflags="$CFLAGS"
@@ -279,6 +279,26 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 	]
 )
 CFLAGS="$my_save_cflags"
+
+AC_MSG_CHECKING([whether _BSD_SOURCE needs to be defined for DT_* macros])
+AC_PREPROC_IFELSE(
+	[AC_LANG_PROGRAM([[#include <dirent.h>]],
+			 [[#ifndef DT_UNKNOWN
+#error nope
+#endif]])],
+	[AC_MSG_RESULT([no]); NEED_BSD_SOURCE=0],
+	[AC_MSG_RESULT([yes]); NEED_BSD_SOURCE=1])
+AC_DEFINE([NEED_BSD_SOURCE], $NEED_BSD_SOURCE, [Define to 1 if _BSD_SOURCE needs to be defined before certain inclusions])
+
+PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1, [have_libnl3=yes], [have_libnl3=no])
+if test "${have_libnl3}" = "yes"
+then
+	AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
+	CFLAGS+=" $LIBNL3_CFLAGS"
+	LIBS+=" $LIBNL3_LIBS"
+else
+	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
+fi
 
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T

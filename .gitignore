@@ -50,3 +50,4 @@ ltmain.sh
 *.la
 ar-lib
 tests/run/cliserv.c
+min-nbd-client

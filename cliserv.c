@@ -51,16 +51,16 @@ void err_nonfatal(const char *s) {
 
 	strncpy(s1, s, sizeof(s1));
 	if ((s2 = strstr(s, "%m"))) {
-		strcpy(s1 + (s2 - s), strerror(errno));
+		strncpy(s1 + (s2 - s), strerror(errno), sizeof(s1) - (s2 - s));
 		s2 += 2;
-		strcpy(s1 + strlen(s1), s2);
+		strncpy(s1 + strlen(s1), s2, sizeof(s1) - strlen(s1));
 	}
 #ifndef	sun
 	/* Solaris doesn't have %h in syslog */
 	else if ((s2 = strstr(s, "%h"))) {
-		strcpy(s1 + (s2 - s), hstrerror(h_errno));
+		strncpy(s1 + (s2 - s), hstrerror(h_errno), sizeof(s1) - (s2 - s));
 		s2 += 2;
-		strcpy(s1 + strlen(s1), s2);
+		strncpy(s1 + strlen(s1), s2, sizeof(s1) - strlen(s1));
 	}
 #endif
 
@@ -108,8 +108,9 @@ uint64_t ntohll(uint64_t a) {
  * @param f a file descriptor
  * @param buf a buffer
  * @param len the number of bytes to be read
+ * @return 0 on completion, or -1 on failure
  **/
-void readit(int f, void *buf, size_t len) {
+int readit(int f, void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("*");
@@ -119,10 +120,39 @@ void readit(int f, void *buf, size_t len) {
 			buf += res;
 		} else if (res < 0) {
 			if(errno != EAGAIN) {
-				err("Read failed: %m");
+				err_nonfatal("Read failed: %m");
+				return -1;
 			}
 		} else {
-			err("Read failed: End of file");
+			return -1;
 		}
 	}
+	return 0;
+}
+
+/**
+ * Write data from a buffer into a filedescriptor
+ *
+ * @param f a file descriptor
+ * @param buf a buffer containing data
+ * @param len the number of bytes to be written
+ * @return 0 on success, or -1 if the socket was closed
+ **/
+int writeit(int f, void *buf, size_t len) {
+	ssize_t res;
+	while (len > 0) {
+		DEBUG("+");
+		if ((res = write(f, buf, len)) <= 0) {
+			switch(errno) {
+				case EAGAIN:
+					break;
+				default:
+					err_nonfatal("Send failed: %m");
+					return -1;
+			}
+		}
+		len -= res;
+		buf += res;
+	}
+	return 0;
 }
