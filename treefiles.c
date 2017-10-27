@@ -84,7 +84,9 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *
 			DEBUG("Creating a dummy tempfile for reading");
 			gchar * tmpname;
 			tmpname = g_strdup_printf("dummy-XXXXXX");
+			mode_t oldmode = umask(77);
 			handle = mkstemp(tmpname);
+			umask(oldmode);
 			if (handle>0) {
 				unlink(tmpname); /* File will stick around whilst FD open */
 			} else {
@@ -93,7 +95,9 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *
 			g_free(tmpname);
 		}
 		char *n = "\0";
-		myseek(handle,TREEPAGESIZE-1);
+		if(lseek(handle,TREEPAGESIZE-1, SEEK_SET) < 0) {
+			err("Could not create tree file!\n");
+		}
 		ssize_t c = write(handle,n,1);
 		if (c<1) {
 			err("Error setting tree block file size %m");
