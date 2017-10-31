@@ -448,7 +448,7 @@ void ask_list(int sock) {
 void parse_sizes(char *buf, uint64_t *size, uint16_t *flags) {
 	memcpy(size, buf, sizeof(*size));
 	*size = ntohll(*size);
-	buf += sizeof(size);
+	buf += sizeof(*size);
 	memcpy(flags, buf, sizeof(*flags));
 	*flags = ntohs(*flags);
 
