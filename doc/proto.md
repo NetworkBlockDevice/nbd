@@ -723,9 +723,9 @@ preferred block size or export size, and SHOULD be at least 2^25
 than a power of 2.  For convenience, the server MAY advertise a
 maximum block size that is larger than the export size, although in
 that case, the client MUST treat the export size as the effective
-maximum block size (as further constrained by a non-zero offset).
+maximum block size (as further constrained by a nonzero offset).
 
-Where a transmission request can have a non-zero *offset* and/or
+Where a transmission request can have a nonzero *offset* and/or
 *length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
 the client MUST ensure that *offset* and *length* are integer
 multiples of any advertised minimum block size, and SHOULD use integer
