@@ -1237,7 +1237,10 @@ The following request types exist:
 
 * `NBD_CMD_READ` (0)
 
-    A read request. Length and offset define the data to be read.
+    A read request. Length and offset define the data to be read. The
+    client SHOULD NOT request a read length of 0; the behavior of a
+    server on such a request is unspecified although the server SHOULD
+    NOT disconnect.
 
     The server MUST reply with a reply header,
     followed immediately by *length* bytes
@@ -1257,7 +1260,10 @@ The following request types exist:
 
     A write request. Length and offset define the location and amount of
     data to be written. The client MUST follow the request header with
-    *length* number of bytes to be written to the device.
+    *length* number of bytes to be written to the device. The client
+    SHOULD NOT request a write length of 0; the behavior of a server on
+    such a request is unspecified although the server SHOULD NOT
+    disconnect.
 
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
@@ -1293,9 +1299,14 @@ The following request types exist:
 
 * `NBD_CMD_TRIM` (4)
 
-    A hint to the server that the data defined by len and offset is no
-    longer needed. A server MAY discard len bytes starting at offset, but
-    is not required to.
+    A hint to the server that the data defined by length and offset is
+    no longer needed. A server MAY discard *length* bytes starting at
+    offset, but is not required to; and MAY round *offset* up and
+    *length* down to meet internal alignment constraints so that only
+    a portion of the client's request is actually discarded. The
+    client SHOULD NOT request a trim length of 0; the behavior of a
+    server on such a request is unspecified although the server SHOULD
+    NOT disconnect.
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
@@ -1306,8 +1317,10 @@ The following request types exist:
 
 * `NBD_CMD_WRITE_ZEROES` (6)
 
-    A write request with no payload. *Offset* and *length* define the location
-    and amount of data to be zeroed.
+    A write request with no payload. *Offset* and *length* define the
+    location and amount of data to be zeroed. The client SHOULD NOT
+    request a write length of 0; the behavior of a server on such a
+    request is unspecified although the server SHOULD NOT disconnect.
 
     The server MUST zero out the data on disk, and then send the reply
     message. The server MAY send the reply message before the data has
