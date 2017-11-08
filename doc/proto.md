@@ -405,7 +405,7 @@ S: 16 bits, flags
 S: 16 bits, type  
 S: 64 bits, handle  
 S: 32 bits, length of payload (unsigned)  
-S: *length* bytes of payload data (if *length* is non-zero)  
+S: *length* bytes of payload data (if *length* is nonzero)  
 
 The use of *length* in the reply allows context-free division of
 the overall server traffic into individual reply messages; the
@@ -792,9 +792,9 @@ preferred block size or export size, and SHOULD be at least 2^25
 than a power of 2.  For convenience, the server MAY advertise a
 maximum block size that is larger than the export size, although in
 that case, the client MUST treat the export size as the effective
-maximum block size (as further constrained by a non-zero offset).
+maximum block size (as further constrained by a nonzero offset).
 
-Where a transmission request can have a non-zero *offset* and/or
+Where a transmission request can have a nonzero *offset* and/or
 *length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
 the client MUST ensure that *offset* and *length* are integer
 multiples of any advertised minimum block size, and SHOULD use integer
@@ -1400,7 +1400,7 @@ MUST initiate a hard disconnect.
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
-`NBD_REPLY_TYPE_ERROR`.  If non-zero, *message length* indicates
+`NBD_REPLY_TYPE_ERROR`.  If nonzero, *message length* indicates
 that an optional error string message appears next, suitable for
 display to a human user.  The header *length* then covers any
 remaining structured fields at the end.
@@ -1436,7 +1436,7 @@ remaining structured fields at the end.
 
   The payload is structured as:
 
-  32 bits: error (MUST be non-zero)  
+  32 bits: error (MUST be nonzero)  
   16 bits: message length (no more than header *length* - 14)  
   *message length* bytes: optional string suitable for
      direct display to a human being  
@@ -1458,7 +1458,9 @@ The following request types exist:
     A read request. Length and offset define the data to be read. The
     server MUST reply with either a simple reply or a structured
     reply, according to whether the structured replies have been
-    negotiated using `NBD_OPT_STRUCTURED_REPLY`.
+    negotiated using `NBD_OPT_STRUCTURED_REPLY`. The client SHOULD NOT
+    request a read length of 0; the behavior of a server on such a
+    request is unspecified although the server SHOULD NOT disconnect.
 
     *Simple replies*
 
@@ -1555,7 +1557,10 @@ The following request types exist:
 
     A write request. Length and offset define the location and amount of
     data to be written. The client MUST follow the request header with
-    *length* number of bytes to be written to the device.
+    *length* number of bytes to be written to the device. The client
+    SHOULD NOT request a write length of 0; the behavior of a server on
+    such a request is unspecified although the server SHOULD NOT
+    disconnect.
 
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
@@ -1591,9 +1596,14 @@ The following request types exist:
 
 * `NBD_CMD_TRIM` (4)
 
-    A hint to the server that the data defined by len and offset is no
-    longer needed. A server MAY discard len bytes starting at offset, but
-    is not required to.
+    A hint to the server that the data defined by length and offset is
+    no longer needed. A server MAY discard *length* bytes starting at
+    offset, but is not required to; and MAY round *offset* up and
+    *length* down to meet internal alignment constraints so that only
+    a portion of the client's request is actually discarded. The
+    client SHOULD NOT request a trim length of 0; the behavior of a
+    server on such a request is unspecified although the server SHOULD
+    NOT disconnect.
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
@@ -1604,8 +1614,10 @@ The following request types exist:
 
 * `NBD_CMD_WRITE_ZEROES` (6)
 
-    A write request with no payload. *Offset* and *length* define the location
-    and amount of data to be zeroed.
+    A write request with no payload. *Offset* and *length* define the
+    location and amount of data to be zeroed. The client SHOULD NOT
+    request a write length of 0; the behavior of a server on such a
+    request is unspecified although the server SHOULD NOT disconnect.
 
     The server MUST zero out the data on disk, and then send the reply
     message. The server MAY send the reply message before the data has
