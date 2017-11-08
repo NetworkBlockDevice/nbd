@@ -673,7 +673,7 @@ manpage.1: manpage.sgml
 	    write something to a log file, or similar.
 	  </para>
 	  <para>
-	    If the command runs with a non-zero exit status,
+	    If the command runs with a nonzero exit status,
 	    then nbd-server will assume the export will fail,
 	    and refuse to serve it.
 	  </para>

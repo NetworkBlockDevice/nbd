@@ -17,7 +17,7 @@ const u64 rep_magic = 0x3e889045565a9LL;
  * Set a socket to blocking or non-blocking
  *
  * @param fd The socket's FD
- * @param nb non-zero to set to non-blocking, else 0 to set to blocking
+ * @param nb nonzero to set to non-blocking, else 0 to set to blocking
  * @return 0 - OK, -1 failed
  */
 int set_nonblocking(int fd, int nb) {
