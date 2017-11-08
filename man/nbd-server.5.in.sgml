@@ -355,20 +355,6 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
-        <term><option>tlsonly</option></term>
-	<listitem>
-	  <para>Optional; boolean.</para>
-	  <para>When this option is enabled,
-	    <command>nbd-server</command> will only serve exports
-	    using the TLS extension. If this option is not supplied,
-	    TLS is optional, unless <option>tlsonly</option> is set
-            in the section corresponding to the specific export.
-            In order for TLS to work at all, the <option>keyfile</option>
-            option must be specified in the generic section.</para>
-	  </para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
         <term><option>tlsprio</option></term>
 	<listitem>
 	  <para>Optional; string; default NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE</para>
