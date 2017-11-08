@@ -848,7 +848,7 @@ The procedure works as follows:
   of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
 
 A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
-non-zero number of metadata contexts during negotiation. Servers SHOULD
+nonzero number of metadata contexts during negotiation. Servers SHOULD
 reply to clients sending `NBD_CMD_BLOCK_STATUS` without
 selecting metadata contexts with `EINVAL`.
 
@@ -1663,14 +1663,14 @@ MUST initiate a hard disconnect.
 
     The payload starts with:
 
-        * 32 bits, metadata context ID
+        * 32 bits, metadata context ID  
 
     and is followed by a list of one or more descriptors, each with this
     layout:
 
         * 32 bits, length of the extent to which the status below
-          applies (unsigned, MUST be non-zero)
-        * 32 bits, status flags
+          applies (unsigned, MUST be nonzero)  
+        * 32 bits, status flags  
 
     If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
     then every reply chunk MUST NOT contain more than one descriptor.
