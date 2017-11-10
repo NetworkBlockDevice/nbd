@@ -1182,12 +1182,12 @@ case that data is an error message string suitable for display to the user.
 
     The requested export is not available.
 
-* `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
+* `NBD_REP_ERR_SHUTDOWN` (2^31 + 7)
 
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
 
-* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^31 + 8)
 
     The server is unwilling to enter transmission phase for a given
     export unless the client first acknowledges (via
