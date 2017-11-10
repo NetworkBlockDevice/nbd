@@ -1372,7 +1372,7 @@ interpret the "length" bytes of payload.  If the client receives
 an unknown or unexpected type, other than an *error chunk*, it
 MUST initiate a hard disconnect.
 
-- `NBD_REPLY_TYPE_NONE` (0)
+* `NBD_REPLY_TYPE_NONE` (0)
 
   *length* MUST be 0 (and the payload field omitted).  This chunk
   type MUST always be used with the `NBD_REPLY_FLAG_DONE` bit set
@@ -1381,7 +1381,7 @@ MUST initiate a hard disconnect.
   chunks were sent, then this type implies that the overall client
   request is successful.  Valid as a reply to any request.
 
-- `NBD_REPLY_TYPE_OFFSET_DATA` (1)
+* `NBD_REPLY_TYPE_OFFSET_DATA` (1)
 
   This chunk type is in the content chunk category.  *length* MUST be
   at least 9.  It represents the contents of *length - 8* bytes of the
@@ -1397,7 +1397,7 @@ MUST initiate a hard disconnect.
   64 bits: offset (unsigned)  
   *length - 8* bytes: data  
 
-- `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
+* `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
 
   This chunk type is in the content chunk category.  *length* MUST be
   exactly 12.  It represents that the contents of *hole size* bytes,
@@ -1413,6 +1413,10 @@ MUST initiate a hard disconnect.
   64 bits: offset (unsigned)  
   32 bits: hole size (unsigned, MUST be nonzero)  
 
+* `NBD_REPLY_TYPE_BLOCK_STATUS` (3)
+
+  Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
 `NBD_REPLY_TYPE_ERROR`.  If nonzero, *message length* indicates
@@ -1420,7 +1424,7 @@ that an optional error string message appears next, suitable for
 display to a human user.  The header *length* then covers any
 remaining structured fields at the end.
 
-- `NBD_REPLY_TYPE_ERROR` (2^15 + 1)
+* `NBD_REPLY_TYPE_ERROR` (2^15 + 1)
 
   This chunk type is in the error chunk category.  *length* MUST
   be at least 6.  This chunk represents that an error occurred,
@@ -1435,7 +1439,7 @@ remaining structured fields at the end.
   *message length* bytes: optional string suitable for
     direct display to a human being  
 
-- `NBD_REPLY_TYPE_ERROR_OFFSET` (2^15 + 2)
+* `NBD_REPLY_TYPE_ERROR_OFFSET` (2^15 + 2)
 
   This chunk type is in the error chunk category.  *length* MUST
   be at least 14.  This reply represents that an error occurred at
