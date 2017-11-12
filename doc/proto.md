@@ -894,9 +894,7 @@ The field has the following format:
   to that command to the client. In the absense of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
-- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
-  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
-- bit 10, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
+- bit 9, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
   [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
@@ -906,7 +904,7 @@ Clients SHOULD ignore unknown flags.
 These values are used in the "option" field during the option haggling
 of the newstyle negotiation.
 
-- `NBD_OPT_EXPORT_NAME` (1)
+* `NBD_OPT_EXPORT_NAME` (1)
 
     Choose the export which the client would like to use, end option
     haggling, and proceed to the transmission phase.
@@ -934,7 +932,7 @@ of the newstyle negotiation.
     if `NBD_OPT_GO` is not supported (not falling back will prevent
     it from connecting to old servers).
 
-- `NBD_OPT_ABORT` (2)
+* `NBD_OPT_ABORT` (2)
 
     The client desires to abort the negotiation and terminate the
     session. The server MUST reply with `NBD_REP_ACK`.
@@ -951,7 +949,7 @@ of the newstyle negotiation.
     the client sending an `NBD_OPT_ABORT` and closing the connection
     without waiting for a reply.
 
-- `NBD_OPT_LIST` (3)
+* `NBD_OPT_LIST` (3)
 
     Return zero or more `NBD_REP_SERVER` replies, one for each export,
     followed by `NBD_REP_ACK` or an error (such as
@@ -963,12 +961,12 @@ of the newstyle negotiation.
     the server SHOULD reject a request that includes data with
     `NBD_REP_ERR_INVALID`.
 
-- `NBD_OPT_PEEK_EXPORT` (4)
+* `NBD_OPT_PEEK_EXPORT` (4)
 
     Was defined by the (withdrawn) experimental `PEEK_EXPORT` extension;
     not in use.
 
-- `NBD_OPT_STARTTLS` (5)
+* `NBD_OPT_STARTTLS` (5)
 
     The client wishes to initiate TLS.
 
@@ -980,7 +978,7 @@ of the newstyle negotiation.
 
     See the section on TLS above for further details.
 
-- `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
+* `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
 
     Both options have identical formats for requests and replies. The only
     difference is that after a successful reply to `NBD_OPT_GO` (i.e. one
@@ -1093,11 +1091,11 @@ of the newstyle negotiation.
     NOT send further option requests unless the final reply from the
     server indicates an error.
 
-- `NBD_OPT_GO` (7)
+* `NBD_OPT_GO` (7)
 
     See above under `NBD_OPT_INFO`.
 
-- `NBD_OPT_STRUCTURED_REPLY` (8)
+* `NBD_OPT_STRUCTURED_REPLY` (8)
 
     The client wishes to use structured replies during the
     transmission phase.  The client MUST NOT send any additional data
@@ -1122,12 +1120,20 @@ of the newstyle negotiation.
     client MUST NOT make use of those extensions without first
     enabling the `NBD_OPT_STRUCTURED_REPLY` extension.
 
+* `NBD_OPT_LIST_META_CONTEXT` (9)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
+* `NBD_OPT_SET_META_CONTEXT` (10)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
 during option haggling in the fixed newstyle negotiation.
 
-- `NBD_REP_ACK` (1)
+* `NBD_REP_ACK` (1)
 
     Will be sent by the server when it accepts the option and no further
     information is available, or when sending data related to the option
@@ -1234,6 +1240,10 @@ during option haggling in the fixed newstyle negotiation.
       - 32 bits, preferred block size  
       - 32 bits, maximum block size  
 
+* `NBD_REP_META_CONTEXT` (4)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
 case that data is an error message string suitable for display to the user.
@@ -1276,17 +1286,21 @@ case that data is an error message string suitable for display to the user.
 
     The requested export is not available.
 
-* `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
+* `NBD_REP_ERR_SHUTDOWN` (2^31 + 7)
 
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
 
-* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^31 + 8)
 
     The server is unwilling to enter transmission phase for a given
     export unless the client first acknowledges (via
     `NBD_INFO_BLOCK_SIZE`) that it will obey non-default block sizing
     requirements.
+
+* `NBD_REP_ERR_TOO_BIG` (2^31 + 9)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 ### Transmission phase
 
@@ -1329,6 +1343,7 @@ valid may depend on negotiation during the handshake phase.
   unless the transmission flags include `NBD_FLAG_SEND_DF`.  Use of
   this flag MAY trigger an `EOVERFLOW` error chunk, if the request
   length is too large.
+- bit 3, `NBD_CMD_FLAG_REQ_ONE`; defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 ##### Structured reply flags
 
@@ -1719,11 +1734,11 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md)
+* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
-* The `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md) (based on the `STRUCTURED_REPLY` extension).
 
-* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+* The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
