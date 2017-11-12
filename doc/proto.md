@@ -1029,9 +1029,7 @@ The field has the following format:
   to that command to the client. In the absense of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
-- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
-  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
-- bit 10, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
+- bit 9, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
   [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
@@ -1041,7 +1039,7 @@ Clients SHOULD ignore unknown flags.
 These values are used in the "option" field during the option haggling
 of the newstyle negotiation.
 
-- `NBD_OPT_EXPORT_NAME` (1)
+* `NBD_OPT_EXPORT_NAME` (1)
 
     Choose the export which the client would like to use, end option
     haggling, and proceed to the transmission phase.
@@ -1069,7 +1067,7 @@ of the newstyle negotiation.
     if `NBD_OPT_GO` is not supported (not falling back will prevent
     it from connecting to old servers).
 
-- `NBD_OPT_ABORT` (2)
+* `NBD_OPT_ABORT` (2)
 
     The client desires to abort the negotiation and terminate the
     session. The server MUST reply with `NBD_REP_ACK`.
@@ -1086,7 +1084,7 @@ of the newstyle negotiation.
     the client sending an `NBD_OPT_ABORT` and closing the connection
     without waiting for a reply.
 
-- `NBD_OPT_LIST` (3)
+* `NBD_OPT_LIST` (3)
 
     Return zero or more `NBD_REP_SERVER` replies, one for each export,
     followed by `NBD_REP_ACK` or an error (such as
@@ -1098,12 +1096,12 @@ of the newstyle negotiation.
     the server SHOULD reject a request that includes data with
     `NBD_REP_ERR_INVALID`.
 
-- `NBD_OPT_PEEK_EXPORT` (4)
+* `NBD_OPT_PEEK_EXPORT` (4)
 
     Was defined by the (withdrawn) experimental `PEEK_EXPORT` extension;
     not in use.
 
-- `NBD_OPT_STARTTLS` (5)
+* `NBD_OPT_STARTTLS` (5)
 
     The client wishes to initiate TLS.
 
@@ -1115,7 +1113,7 @@ of the newstyle negotiation.
 
     See the section on TLS above for further details.
 
-- `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
+* `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
 
     Both options have identical formats for requests and replies. The only
     difference is that after a successful reply to `NBD_OPT_GO` (i.e. one
@@ -1228,11 +1226,11 @@ of the newstyle negotiation.
     NOT send further option requests unless the final reply from the
     server indicates an error.
 
-- `NBD_OPT_GO` (7)
+* `NBD_OPT_GO` (7)
 
     See above under `NBD_OPT_INFO`.
 
-- `NBD_OPT_STRUCTURED_REPLY` (8)
+* `NBD_OPT_STRUCTURED_REPLY` (8)
 
     The client wishes to use structured replies during the
     transmission phase.  The client MUST NOT send any additional data
@@ -1257,7 +1255,7 @@ of the newstyle negotiation.
     client MUST NOT make use of those extensions without first
     enabling the `NBD_OPT_STRUCTURED_REPLY` extension.
 
-- `NBD_OPT_LIST_META_CONTEXT` (9)
+* `NBD_OPT_LIST_META_CONTEXT` (9)
 
     Return a list of `NBD_REP_META_CONTEXT` replies, one per context,
     followed by an `NBD_REP_ACK`.
@@ -1320,7 +1318,7 @@ of the newstyle negotiation.
     The metadata context ID in these replies is reserved and SHOULD be
     set to zero; clients MUST disregard it.
 
-- `NBD_OPT_SET_META_CONTEXT` (10)
+* `NBD_OPT_SET_META_CONTEXT` (10)
 
     Change the set of active metadata contexts. Issuing this command
     replaces all previously-set metadata contexts; clients must ensure
@@ -1364,13 +1362,13 @@ of the newstyle negotiation.
 These values are used in the "reply type" field, sent by the server
 during option haggling in the fixed newstyle negotiation.
 
-- `NBD_REP_ACK` (1)
+* `NBD_REP_ACK` (1)
 
     Will be sent by the server when it accepts the option and no further
     information is available, or when sending data related to the option
     (in the case of `NBD_OPT_LIST`) has finished. No data.
 
-- `NBD_REP_SERVER` (2)
+* `NBD_REP_SERVER` (2)
 
     A description of an export. Data:
 
@@ -1386,7 +1384,7 @@ during option haggling in the fixed newstyle negotiation.
       particular client request, this field is defined to be a string
       suitable for direct display to a human being.
 
-- `NBD_REP_INFO` (3)
+* `NBD_REP_INFO` (3)
 
     A detailed description about an aspect of an export.  The response
     to `NBD_OPT_INFO` and `NBD_OPT_GO` includes zero or more of these
@@ -1471,7 +1469,7 @@ during option haggling in the fixed newstyle negotiation.
       - 32 bits, preferred block size  
       - 32 bits, maximum block size  
 
-- `NBD_REP_META_CONTEXT` (4)
+* `NBD_REP_META_CONTEXT` (4)
 
     A description of a metadata context. Data:
 
@@ -1612,7 +1610,7 @@ interpret the "length" bytes of payload.  If the client receives
 an unknown or unexpected type, other than an *error chunk*, it
 MUST initiate a hard disconnect.
 
-- `NBD_REPLY_TYPE_NONE` (0)
+* `NBD_REPLY_TYPE_NONE` (0)
 
   *length* MUST be 0 (and the payload field omitted).  This chunk
   type MUST always be used with the `NBD_REPLY_FLAG_DONE` bit set
@@ -1621,7 +1619,7 @@ MUST initiate a hard disconnect.
   chunks were sent, then this type implies that the overall client
   request is successful.  Valid as a reply to any request.
 
-- `NBD_REPLY_TYPE_OFFSET_DATA` (1)
+* `NBD_REPLY_TYPE_OFFSET_DATA` (1)
 
   This chunk type is in the content chunk category.  *length* MUST be
   at least 9.  It represents the contents of *length - 8* bytes of the
@@ -1637,7 +1635,7 @@ MUST initiate a hard disconnect.
   64 bits: offset (unsigned)  
   *length - 8* bytes: data  
 
-- `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
+* `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
 
   This chunk type is in the content chunk category.  *length* MUST be
   exactly 12.  It represents that the contents of *hole size* bytes,
@@ -1653,7 +1651,7 @@ MUST initiate a hard disconnect.
   64 bits: offset (unsigned)  
   32 bits: hole size (unsigned, MUST be nonzero)  
 
-- `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
+* `NBD_REPLY_TYPE_BLOCK_STATUS` (3)
 
     *length* MUST be 4 + (a positive integer multiple of 8).  This reply
     represents a series of consecutive block descriptors where the sum
@@ -1691,7 +1689,7 @@ that an optional error string message appears next, suitable for
 display to a human user.  The header *length* then covers any
 remaining structured fields at the end.
 
-- `NBD_REPLY_TYPE_ERROR` (2^15 + 1)
+* `NBD_REPLY_TYPE_ERROR` (2^15 + 1)
 
   This chunk type is in the error chunk category.  *length* MUST
   be at least 6.  This chunk represents that an error occurred,
@@ -1706,7 +1704,7 @@ remaining structured fields at the end.
   *message length* bytes: optional string suitable for
     direct display to a human being  
 
-- `NBD_REPLY_TYPE_ERROR_OFFSET` (2^15 + 2)
+* `NBD_REPLY_TYPE_ERROR_OFFSET` (2^15 + 2)
 
   This chunk type is in the error chunk category.  *length* MUST
   be at least 14.  This reply represents that an error occurred at
@@ -2045,11 +2043,11 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md)
+* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
-* The `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md) (based on the `STRUCTURED_REPLY` extension).
 
-* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+* The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
