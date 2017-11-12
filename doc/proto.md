@@ -1653,34 +1653,34 @@ MUST initiate a hard disconnect.
 
 * `NBD_REPLY_TYPE_BLOCK_STATUS` (3)
 
-    *length* MUST be 4 + (a positive integer multiple of 8).  This reply
-    represents a series of consecutive block descriptors where the sum
-    of the length fields within the descriptors MUST not be greater than the
-    length of the original request. This chunk type MUST appear exactly
-    once per metadata ID in a structured reply.
+  *length* MUST be 4 + (a positive integer multiple of 8).  This reply
+  represents a series of consecutive block descriptors where the sum
+  of the length fields within the descriptors MUST not be greater than
+  the length of the original request. This chunk type MUST appear
+  exactly once per metadata ID in a structured reply.
 
-    The payload starts with:
+  The payload starts with:
 
-        * 32 bits, metadata context ID  
+  32 bits, metadata context ID  
 
-    and is followed by a list of one or more descriptors, each with this
-    layout:
+  and is followed by a list of one or more descriptors, each with this
+  layout:
 
-        * 32 bits, length of the extent to which the status below
-          applies (unsigned, MUST be nonzero)  
-        * 32 bits, status flags  
+  32 bits, length of the extent to which the status below
+     applies (unsigned, MUST be nonzero)  
+  32 bits, status flags  
 
-    If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
-    then every reply chunk MUST NOT contain more than one descriptor.
+  If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
+  then every reply chunk MUST NOT contain more than one descriptor.
 
-    Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
-    its request, the server MAY return fewer descriptors in the reply
-    than would be required to fully specify the whole range of requested
-    information to the client, if looking up the information would be
-    too resource-intensive for the server, so long as at least one
-    extent is returned. Servers should however be aware that most
-    clients implementations will then simply ask for the next extent
-    instead.
+  Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
+  its request, the server MAY return fewer descriptors in the reply
+  than would be required to fully specify the whole range of requested
+  information to the client, if looking up the information would be
+  too resource-intensive for the server, so long as at least one
+  extent is returned. Servers should however be aware that most
+  clients implementations will then simply ask for the next extent
+  instead.
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
