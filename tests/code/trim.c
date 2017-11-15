@@ -71,10 +71,5 @@ int main(void) {
 	count_assert(g_off == 0);
 	count_assert(g_len == 1024*1024);
 
-	req.from = 1024 * 1024 * 1024;
-	req.len = 1024 * 1024;
-	count_assert(exptrim(&req, &cl) == -1);
-	count_assert(errno == EINVAL);
-
 	return 0;
 }
