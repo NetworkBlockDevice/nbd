@@ -177,6 +177,8 @@ then
 	esac
 fi
 
+m4_ifndef([PKG_CHECK_MODULES], [m4_fatal([Missing pkg-config M4 macros. Please ensure that pkg-config is installed.])])
+
 dnl AC_MSG_CHECKING([where to puth systemd unit files])
 dnl AC_ARG_WITH(
 dnl   systemd,
