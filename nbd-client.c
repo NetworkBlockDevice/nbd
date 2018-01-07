@@ -602,21 +602,34 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 		if(rep != NULL) free(rep);
 		rep = read_reply(sock);
 		if(rep->reply_type & NBD_REP_FLAG_ERROR) {
-			if(rep->reply_type == NBD_REP_ERR_UNSUP) {
-				free(rep);
-				/* server doesn't support NBD_OPT_GO or NBD_OPT_INFO,
-				 * fall back to NBD_OPT_EXPORT_NAME */
-				send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
-				char b[sizeof(*flags) + sizeof(*rsize64)];
-				readit(sock, b, sizeof(b));
-				parse_sizes(b, rsize64, flags);
-				if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
-					readit(sock, buf, 124);
-				}
-				return;
-			} else {
-				err("Unknown error in reply to NBD_OPT_GO; cannot continue");
-				exit(EXIT_FAILURE);
+			switch(rep->reply_type) {
+				case NBD_REP_ERR_UNSUP:
+					/* server doesn't support NBD_OPT_GO or NBD_OPT_INFO,
+					 * fall back to NBD_OPT_EXPORT_NAME */
+					send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
+					char b[sizeof(*flags) + sizeof(*rsize64)];
+					readit(sock, b, sizeof(b));
+					parse_sizes(b, rsize64, flags);
+					if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
+						readit(sock, buf, 124);
+					}
+					free(rep);
+					return;
+				case NBD_REP_ERR_POLICY:
+					if(rep->datasize > 0) {
+						err("Connection not allowed by server policy. Server said: %s", rep->data);
+					} else {
+						err("Connection not allowed by server policy.");
+					}
+					exit(EXIT_FAILURE);
+				default:
+					if(rep->datasize > 0) {
+						err("Unknown error returned by server. Server said: %s", rep->data);
+					} else {
+						err("Unknown error returned by server.");
+					}
+					free(rep);
+					exit(EXIT_FAILURE);
 			}
 		}
 		uint16_t info_type;
