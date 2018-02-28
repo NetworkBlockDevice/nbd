@@ -355,7 +355,8 @@ S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`; used to be
    `NBD_REPLY_MAGIC`)  
 S: 32 bits, error (MAY be zero)  
 S: 64 bits, handle  
-S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)  
+S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
+    *error* is zero)  
 
 #### Structured reply chunk message
 

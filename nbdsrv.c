@@ -236,16 +236,9 @@ uint64_t size_autodetect(int fhandle) {
 }
 
 int exptrim(struct nbd_request* req, CLIENT* client) {
-	/* Don't trim when we're read only */
-	if(client->server->flags & F_READONLY) {
-		errno = EINVAL;
-		return -1;
-	}
-	/* Don't trim beyond the size of the device, please */
-	if(req->from + req->len > client->exportsize) {
-		errno = EINVAL;
-		return -1;
-	}
+	/* Caller did range checking */
+	assert(!(client->server->flags & F_READONLY));
+	assert(req->from + req->len <= client->exportsize);
 	/* For copy-on-write, we should trim on the diff file. Not yet
 	 * implemented. */
 	if(client->server->flags & F_COPYONWRITE) {
