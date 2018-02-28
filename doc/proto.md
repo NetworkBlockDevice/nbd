@@ -1413,7 +1413,7 @@ MUST initiate a hard disconnect.
   64 bits: offset (unsigned)  
   32 bits: hole size (unsigned, MUST be nonzero)  
 
-* `NBD_REPLY_TYPE_BLOCK_STATUS` (3)
+* `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
 
   Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
