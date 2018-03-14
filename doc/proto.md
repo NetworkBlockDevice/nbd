@@ -860,9 +860,11 @@ The procedure works as follows:
   of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
 
 A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
-nonzero number of metadata contexts during negotiation. Servers SHOULD
-reply to clients sending `NBD_CMD_BLOCK_STATUS` without
-selecting metadata contexts with `EINVAL`.
+nonzero number of metadata contexts during negotiation, and used the
+same export name for the subsequent `NBD_OPT_GO` (or
+`NBD_OPT_EXPORT_NAME`). Servers SHOULD reply with `EINVAL` to clients
+sending `NBD_CMD_BLOCK_STATUS` without selecting at least one metadata
+context.
 
 The reply to the `NBD_CMD_BLOCK_STATUS` request MUST be sent as a
 structured reply; this implies that in order to use metadata querying,
@@ -895,7 +897,9 @@ requires no specific semantics of metadata contexts, except that all the
 information they provide MUST be representable within the flags field as
 defined for `NBD_REPLY_TYPE_BLOCK_STATUS`. Likewise, save in respect of
 the `base:` namespace, the syntax of query strings is not specified by this
-document.
+document, other than the recommendation that the empty leaf-name makes
+sense as a wildcard for a client query during `NBD_OPT_LIST_META_CONTEXT`,
+but SHOULD NOT select any contexts during `NBD_OPT_SET_META_CONTEXT`.
 
 Server implementations SHOULD ensure the syntax for query strings they
 support and semantics for resulting metadata context is documented similarly
@@ -910,11 +914,16 @@ sparse file context).
 
 The query string within the `base:` metadata context can take
 one of two forms:
-* `base:` - in which case all metadata contexts within `base:` are
-  listed; or
-* `base:[leaf-name]` where `[leaf-name]` is a context leaf-name
-  that exists within the `base` namespace (currently just
-  `base:allocation`).
+* `base:` - the server MUST ignore this form during
+  `NBD_OPT_SET_META_CONTEXT`, and MUST support this as a wildcard during
+  `NBD_OPT_LIST_META_CONTEXT`, in which case the server's reply will
+  contain a response for each supported metadata context within the
+  `base:` namespace (currently just `base:allocation`, although a
+  future revision of the standard might return multiple contexts); or
+* `base:[leaf-name]` to select `[leaf-name]` as a context leaf-name
+  that might exist within the `base` namespace.  If a `[leaf-name]`
+  requested by the client is not recognized, the server MUST ignore
+  it rather than report an error.
 
 #### `base:allocation` metadata context
 
@@ -1270,12 +1279,7 @@ of the newstyle negotiation.
 * `NBD_OPT_LIST_META_CONTEXT` (9)
 
     Return a list of `NBD_REP_META_CONTEXT` replies, one per context,
-    followed by an `NBD_REP_ACK`.
-
-    If the query string is syntactically invalid, the server SHOULD send
-    `NBD_REP_ERR_INVALID`. If the query string is syntactically valid
-    but finds no metadata contexts, the server MUST send a single
-    reply of type `NBD_REP_ACK`.
+    followed by an `NBD_REP_ACK` or an error.
 
     This option MUST NOT be requested unless structured replies have
     been negotiated first. If a client attempts to do so, a server
@@ -1289,25 +1293,53 @@ of the newstyle negotiation.
     - Zero or more queries, each being:
        - 32 bits, length of query.
        - String, query to list a subset of the available metadata
-         contexts.
+         contexts.  The syntax of this query is
+         implementation-defined, except that it MUST start with a
+         namespace and a colon.
 
-    For details on the query string, see under `NBD_OPT_SET_META_CONTEXT`.
+    For details on the query string, see the "Metadata querying"
+    section; note that a namespace may document that a different set
+    of queries are valid for `NBD_OPT_LIST_META_CONTEXT` than for
+    `NBD_OPT_SET_META_CONTEXT`, such as when using an empty
+    leaf-name for wildcarding.
 
-    The server MUST either reply with an error (for instance
-    `NBD_REP_ERR_UNSUP` if the option is not supported), or reply with a
-    list of `NBD_REP_META_CONTEXT` replies followed by `NBD_REP_ACK`.
+    If the option request is syntactically invalid (such as a query
+    length that would require reading beyond the original length given
+    in the option header), the server MUST fail the request with
+    `NBD_REP_ERR_INVALID`.  For requests that are semantically invalid
+    (such as lacking the required colon that delimits the namespace,
+    or using a leaf name that is invalid for a known namespace), the
+    server MAY fail the request with `NBD_REP_ERR_INVALID`.  However,
+    the server MUST ignore query strings belonging to an unknown
+    namespace.  If none of the query strings find any metadata
+    contexts, the server MUST send a single reply of type
+    `NBD_REP_ACK`.
+
+    The server MUST reply with a list of zero or more
+    `NBD_REP_META_CONTEXT` replies, followed by either a final
+    `NBD_REP_ACK` on success or by an error (for instance
+    `NBD_REP_ERR_UNSUP` if the option is not supported).  If an error
+    is returned, the client MUST disregard any context replies that
+    may have been sent.
 
     If zero queries are sent, then the server MUST return all
     the metadata contexts that are available to the client to select
-    on the given export with `NBD_OPT_SET_META_CONTEXT`, except
-    as set out below.
+    on the given export.  However, this list may include
+    wildcards that require a further `NBD_OPT_LIST_META_CONTEXT` with
+    the wildcard as a query, rather than an actual context that is
+    appropriate as a query to `NBD_OPT_SET_META_CONTEXT`,
+    as set out below.  In this case, the server SHOULD NOT fail with
+    `NBD_REP_ERR_TOO_BIG`.
 
     If one or more queries are sent, then the server MUST return
     those metadata contexts that are available to the client to
     select on the given export with `NBD_OPT_SET_META_CONTEXT`,
     and which match one or more of the queries given. The
     support of wildcarding within the leaf-name portion of
-    the query string is dependent upon the namespace.
+    the query string is dependent upon the namespace.  The
+    server MAY send contexts in a different order
+    than in the client's query.  In this case, the server MAY fail
+    with `NBD_REP_ERR_TOO_BIG` if too many queries are requested.
 
     In either case, however, for any given namespace the
     server MAY, instead of exhaustively listing every
@@ -1318,8 +1350,8 @@ of the newstyle negotiation.
      This may be helpful where a client can
     construct algorithmic queries. For instance, a client might
     reply simply with the namespace with no leaf-name (e.g.
-    'X-FooBar:') or with a range of values (e.g.
-    'X-ModifiedDate:20160310-20161214'). The semantics of
+    'x-FooBar:') or with a range of values (e.g.
+    'x-ModifiedDate:20160310-20161214'). The semantics of
     such a reply are a matter for the definition of the
     namespace. However each namespace returned MUST begin
     with the relevant namespace, followed by a colon, and then
@@ -1333,16 +1365,21 @@ of the newstyle negotiation.
 * `NBD_OPT_SET_META_CONTEXT` (10)
 
     Change the set of active metadata contexts. Issuing this command
-    replaces all previously-set metadata contexts; clients must ensure
+    replaces all previously-set metadata contexts (including when this
+    command fails); clients must ensure
     that all metadata contexts they are interested in are selected with
     the final query that they sent.
 
+    This option MUST NOT be requested unless structured replies have
+    been negotiated first. If a client attempts to do so, a server
+    SHOULD send `NBD_REP_ERR_INVALID`.
+
     A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless
     within the negotiation phase it sent `NBD_OPT_SET_META_CONTEXT`
-    at least once, and the final time it was sent, it referred
-    to the export name that was ultimately selected, the server
-    responded without an error, and returned at least one metadata
-    context.
+    at least once, and where the final time it was sent, it referred
+    to the same export name that was ultimately selected for transmission
+    phase, and where the server responded by returning least one
+    metadata context without error.
 
     Data:
     - 32 bits, length of export name.
@@ -1361,7 +1398,10 @@ of the newstyle negotiation.
     seeks to select too many contexts. Otherwise
     the server MUST reply with a number of `NBD_REP_META_CONTEXT`
     replies, one for each selected metadata context, each with a unique
-    metadata context ID, followed by `NBD_REP_ACK`. The metadata context
+    metadata context ID, followed by `NBD_REP_ACK`. The server MAY
+    ignore queries that do not select a single metadata context, and
+    MAY return selected contexts in a different order than in the
+    client's request.  The metadata context
     ID is transient and may vary across calls to `NBD_OPT_SET_META_CONTEXT`;
     clients MUST therefore treat the ID as an opaque value and not (for
     instance) cache it between connections. It is not an error if a
@@ -1940,19 +1980,24 @@ The following request types exist:
 * `NBD_CMD_BLOCK_STATUS` (7)
 
     A block status query request. Length and offset define the range of
-    interest.
+    interest.  The client SHOULD NOT request a status length of 0;
+    the behavior of a server on such a request is unspecified although
+    the server SHOULD NOT disconnect.
 
     A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless
     within the negotiation phase it sent `NBD_OPT_SET_META_CONTEXT`
-    at least once, and the final time it was sent, it referred
-    to the export name that was finally selected, the server
-    responded without an error, and returned at least one metadata
-    context. This in turn requires the client to
+    at least once, and where the final time that was sent, it referred
+    to the same export name used to enter transmission phase, and where
+    the server returned at least one metadata context without an error.
+    This in turn requires the client to
     first negotiate structured replies. For a successful return, the
-    server MUST use a structured reply, containing at least one chunk of
-    type `NBD_REPLY_TYPE_BLOCK_STATUS`, where the status field of each
+    server MUST use a structured reply, containing exactly one chunk of
+    type `NBD_REPLY_TYPE_BLOCK_STATUS` per selected context id, where the
+    status field of each
     descriptor is determined by the flags field as defined by the
-    metadata context.
+    metadata context.  The server MAY send chunks in
+    a different order than the context ids were assigned in reply to
+    `NBD_OPT_SET_META_CONTEXT`.
 
     The list of block status descriptors within the
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
@@ -1960,11 +2005,17 @@ The following request types exist:
     *length* fields of each descriptor MUST not be greater than the
     overall *length* of the request. This means that the server MAY
     return less data than required. However the server MUST return at
-    least one status descriptor.  The server SHOULD use different
-    *status* values between consecutive descriptors, and SHOULD use
+    least one status descriptor (and since each status descriptor has
+    a non-zero length, a client can always make progress on a
+    successful return).  The server SHOULD use different
+    *status* values between consecutive descriptors where feasible, although
+    the client SHOULD be prepared to handle consecutive descriptors
+    with the same *status* value.  The server SHOULD use
     descriptor lengths that are an integer multiple of 512 bytes where
     possible (the first and last descriptor of an unaligned query being
-    the most obvious places for an exception). The status flags are
+    the most obvious places for an exception), and MUST use descriptor
+    lengths that are an integer multiple of any advertised minimum
+    block size. The status flags are
     intentionally defined so that a server MAY always safely report a
     status of 0 for any block, although the server SHOULD return
     additional status values when they can be easily detected.
