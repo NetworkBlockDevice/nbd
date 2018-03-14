@@ -1584,7 +1584,7 @@ The following request types exist:
 
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
-    reached permanent storage.
+    reached permanent storage, unless `NBD_CMD_FLAG_FUA` is in use.
 
     If an error occurs, the server MUST set the appropriate error code
     in the error field.
@@ -1641,7 +1641,7 @@ The following request types exist:
 
     The server MUST zero out the data on disk, and then send the reply
     message. The server MAY send the reply message before the data has
-    reached permanent storage.
+    reached permanent storage, unless `NBD_CMD_FLAG_FUA` is in use.
 
     A client MUST NOT send a write zeroes request unless
     `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
