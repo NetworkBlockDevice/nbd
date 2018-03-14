@@ -2592,19 +2592,16 @@ static void handle_write(struct work_package *pkg)
 	DEBUG("handling write request\n");
 	setup_reply(&rep, req);
 
-	if ((client->server->flags & F_READONLY) ||
-	    (client->server->flags & F_AUTOREADONLY)) {
-		DEBUG("[WRITE to READONLY!]");
-		rep.error = nbd_errno(EPERM);
 #ifdef HAVE_SPLICE
-	} else if (!pkg->data) {
+	if (!pkg->data) {
 		if (expsplice(pkg->pipefd[0], req->from, req->len, client,
 			      SPLICE_OUT, fua)) {
 			DEBUG("Splice failed: %M");
 			rep.error = nbd_errno(errno);
 		}
+	} else
 #endif
-	} else {
+	{
 		if(expwrite(req->from, pkg->data, req->len, client, fua)) {
 			DEBUG("Write failed: %m");
 			rep.error = nbd_errno(errno);
@@ -2646,11 +2643,7 @@ static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
 	DEBUG("handling write_zeroes request\n");
 	int fua = !!(req->type & NBD_CMD_FLAG_FUA);
 	setup_reply(&rep, req);
-	if ((client->server->flags & F_READONLY) ||
-	    (client->server->flags & F_AUTOREADONLY)) {
-		DEBUG("[WRITE to READONLY!]");
-		rep.error = nbd_errno(EPERM);
-	} else if(expwrite_zeroes(req, client, fua)) {
+	if(expwrite_zeroes(req, client, fua)) {
 		DEBUG("Write_zeroes failed: %m");
 		rep.error = nbd_errno(errno);
 	}
@@ -2662,11 +2655,31 @@ static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
 	pthread_mutex_unlock(&(client->lock));
 }
 
+
+static bool bad_write(CLIENT* client, struct nbd_request* req) {
+	if ((client->server->flags & F_READONLY) ||
+	    (client->server->flags & F_AUTOREADONLY)) {
+		DEBUG("[WRITE to READONLY!]");
+		return true;
+	}
+	return false;
+}
+
+static bool bad_range(CLIENT* client, struct nbd_request* req) {
+	if(req->from > client->exportsize ||
+	   req->from + req->len > client->exportsize) {
+		DEBUG("[out of bounds!]");
+		return true;
+	}
+	return false;
+}
+
 static void handle_request(gpointer data, gpointer user_data) {
 	struct work_package* package = (struct work_package*) data;
 	uint32_t type = package->req->type & NBD_CMD_MASK_COMMAND;
 	uint32_t flags = package->req->type & ~NBD_CMD_MASK_COMMAND;
 	struct nbd_reply rep;
+	int err = EINVAL;
 
 	if(flags & ~(NBD_CMD_FLAG_FUA | NBD_CMD_FLAG_NO_HOLE)) {
 		msg(LOG_ERR, "E: received invalid flag %d on command %d, ignoring", flags, type);
@@ -2675,18 +2688,44 @@ static void handle_request(gpointer data, gpointer user_data) {
 
 	switch(type) {
 		case NBD_CMD_READ:
+			if (bad_range(package->client, package->req)) {
+				goto error;
+			}
 			handle_read(package->client, package->req);
 			break;
 		case NBD_CMD_WRITE:
+			if (bad_write(package->client, package->req)) {
+				err = EPERM;
+				goto error;
+			}
+			if (bad_range(package->client, package->req)) {
+				err = ENOSPC;
+				goto error;
+			}
 			handle_write(package);
 			break;
 		case NBD_CMD_FLUSH:
 			handle_flush(package->client, package->req);
 			break;
 		case NBD_CMD_TRIM:
+			if (bad_write(package->client, package->req)) {
+				err = EPERM;
+				goto error;
+			}
+			if (bad_range(package->client, package->req)) {
+				goto error;
+			}
 			handle_trim(package->client, package->req);
 			break;
 		case NBD_CMD_WRITE_ZEROES:
+			if (bad_write(package->client, package->req)) {
+				err = EPERM;
+				goto error;
+			}
+			if (bad_range(package->client, package->req)) {
+				err = ENOSPC;
+				goto error;
+			}
 			handle_write_zeroes(package->client, package->req);
 			break;
 		default:
@@ -2696,7 +2735,7 @@ static void handle_request(gpointer data, gpointer user_data) {
 	goto end;
 error:
 	setup_reply(&rep, package->req);
-	rep.error = nbd_errno(EINVAL);
+	rep.error = nbd_errno(err);
 	pthread_mutex_lock(&(package->client->lock));
 	socket_write(package->client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(package->client->lock));

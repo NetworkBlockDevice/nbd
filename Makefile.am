@@ -35,7 +35,7 @@ nbd_client_CFLAGS = $(client_flags) @GnuTLS_CFLAGS@ -DPROG_NAME='"nbd-client"'
 nbd_client_LDADD = $(client_libs) @GnuTLS_LIBS@
 else
 nbd_client_SOURCES = $(client_srcs)
-nbd_client_CFLAGS = $(client_flags)
+nbd_client_CFLAGS = $(client_flags) -DNOTLS -DPROG_NAME='"nbd-client"'
 nbd_client_LDADD = $(client_libs)
 endif
 endif

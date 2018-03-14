@@ -7,4 +7,5 @@ compiler:
   - gcc
 install: 
   - sh .travis/before_install
+group: travis_latest
 script: ./autogen.sh && ./configure && make && make NBD_TEST_SILENT=1 check
