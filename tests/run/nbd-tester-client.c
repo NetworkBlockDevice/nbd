@@ -537,6 +537,12 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		goto err;
 	}
 #endif
+	if(testflags & TEST_EXPECT_ERROR) {
+		struct sigaction act;
+		memset(&act, '0', sizeof act);
+		act.sa_handler = SIG_IGN;
+		sigaction(SIGPIPE, &act, NULL);
+	}
 	/* magic */
 	tmp64 = htonll(opts_magic);
 	WRITE_ALL_ERRCHK(sock, &tmp64, sizeof(tmp64), err,
@@ -926,7 +932,12 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 				      CONNECTION_TYPE_FULL,
 				      &serverflags, testflags)) < 0) {
 			g_warning("Could not open socket: %s", errstr);
-			retval = -1;
+			if(testflags & TEST_EXPECT_ERROR) {
+				g_message("Test failed, as expected");
+				retval = 0;
+			} else {
+				retval = -1;
+			}
 			goto err;
 		}
 	}
