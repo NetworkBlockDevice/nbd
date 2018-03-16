@@ -874,7 +874,7 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] -L\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n");
 #else
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 #endif
@@ -945,7 +945,7 @@ int main(int argc, char *argv[]) {
 	bool tls = false;
 	struct sigaction sa;
 	int num_connections = 1;
-	int netlink = 0;
+	int netlink = 1;
 	int need_disconnect = 0;
 	int *sockfds;
 	struct option long_options[] = {
@@ -957,7 +957,7 @@ int main(int argc, char *argv[]) {
 		{ "list", no_argument, NULL, 'l' },
 		{ "name", required_argument, NULL, 'N' },
 #if HAVE_NETLINK
-		{ "netlink", no_argument, NULL, 'L' },
+		{ "nonetlink", no_argument, NULL, 'L' },
 #endif
 		{ "nofork", no_argument, NULL, 'n' },
 		{ "persist", no_argument, NULL, 'p' },
@@ -1048,7 +1048,7 @@ int main(int argc, char *argv[]) {
 			break;
 #if HAVE_NETLINK
 		case 'L':
-			netlink = 1;
+			netlink = 0;
 			break;
 #endif
 		case 'm':
