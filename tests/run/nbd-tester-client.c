@@ -820,9 +820,7 @@ int handshake_test(gchar * hostname, gchar * unixsock, int port, char *name,
 		   int sock, char sock_is_open, char close_sock, int testflags)
 {
 	int retval = -1;
-	int i = 0;
 	int serverflags = 0;
-	char buf[256];
 	u64 tmp64;
 	uint32_t tmp32 = 0;
 
@@ -1639,7 +1637,7 @@ skipdequeue:
 			free(prc);
 		}
 
-		if (do_print == NULL && !(printer++ % 5000)
+		if ((do_print == NULL && !(printer++ % 5000))
 		    || !(readtransactionfile || txqueue.numitems
 			 || inflight.numitems))
 			printf
