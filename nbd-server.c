@@ -1106,7 +1106,6 @@ static void sigusr1_handler(const int s G_GNUC_UNUSED) {
  * @return 0 on success, -1 on failure
  **/
 int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* maxbytes ) {
-
 	GArray * const export = client->export;
 
 	/* Negative offset not allowed */
