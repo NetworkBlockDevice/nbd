@@ -2215,6 +2215,7 @@ CLIENT* handle_starttls(CLIENT* client, int opt, GArray* servers, uint32_t cflag
 
 	if (ret < 0) {
 		err_nonfatal(gnutls_strerror(ret));
+		gnutls_bye(*session, GNUTLS_SHUT_RDWR);
 		gnutls_deinit(*session);
 		g_free(session);
 		return NULL;
