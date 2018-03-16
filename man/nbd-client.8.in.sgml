@@ -240,21 +240,15 @@ manpage.1: manpage.sgml
         <term><option>-nonetlink</option></term>
         <term><option>-L</option></term>
         <listitem>
-          <para>Normally, &dhpackage; will attempt to use the netlink
-          interface to configure an NBD device. When the kernel does not
-          support the netlink interface (a kernel of 4.12 or above is
-          required for netlink configuration), &dhpackage; will fall
-          back on the older ioctl configuration interface to configure
-          the device.
-          </para>
-          <para>When the detection code fails for some reason, this
-          option may be useful. In all other cases, use of netlink to
-          configure the device is recommended.
-          </para>
+	  <para>Starting with version 3.17, &dhpackage; will default to
+	  using the netlink interface to configure an NBD device. This
+	  option allows to use the older ioctl() interface to configure
+	  the device.
+	  </para>
 	  <para>This option is only available if &dhpackage; was
 	  compiled against libnl-genl. If that is not the case,
-	  nbd-client will only be able to use the ioctl
-	  interface.</para>
+	  nbd-client will only be able to use the ioctl interface (and
+	  the option will not be available).</para>
 	  <para>Note that a future version of &dhpackage; will
 	  <emphasis>require</emphasis> the use of netlink, but it has
 	  not yet been decided when that will be the case.</para>
