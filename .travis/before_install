@@ -16,6 +16,7 @@ case $(uname -s) in
 			touch ${i%in.sgml}sh.in
 		done
 		brew update
+		brew upgrade
 		brew install glib gnutls
 	;;
 esac

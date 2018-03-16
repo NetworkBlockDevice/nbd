@@ -1,28 +1,18 @@
 NBD README
 ==========
 
-<a href="https://scan.coverity.com/projects/1243">
-  <img alt="Coverity Scan Build Status"
-         src="https://scan.coverity.com/projects/1243/badge.svg"/>
-</a>
-
-<a href='http://barbershop.grep.be:8010/'>
-  <img alt='build status' src='http://barbershop.grep.be/cgi-bin/buildstatus'>
-</a>
-
-<a href="https://bestpractices.coreinfrastructure.org/projects/281">
-  <img src="https://bestpractices.coreinfrastructure.org/projects/281/badge">
-</a>
-
 Welcome to the NBD userland support files!
 
 This package contains nbd-server and nbd-client.
 
-To install the package, do the normal `configure`/`make`/`make install`
-dance. You'll need to install it on both the client and the server.
-
-Note that released nbd tarballs are found on
+To install the package, download the source and do the normal
+`configure`/`make`/`make install` dance. You'll need to install it on both the
+client and the server. Note that released nbd tarballs are found on
 [sourceforge](http://sourceforge.net/projects/nbd/files/nbd/).
+
+For compiling from git, do a checkout, install the SGML tools
+(docbook2man), and then run './autogen.sh' while inside your checkout.
+Then, see above.
 
 Contributing
 ------------
@@ -119,3 +109,13 @@ If you're packaging NBD for a different operating system that isn't in
 the above list, I'd like to know about it.
 
 For questions, please use the `nbd-general@lists.sourceforge.net` mailinglist.
+
+Badges
+======
+
+[![Download Network Block Device](https://img.shields.io/sourceforge/dm/nbd.svg)](https://sourceforge.net/projects/nbd/files/latest/download)
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/1243/badge.svg)](https://scan.coverity.com/projects/1243)
+[![CII badge](https://bestpractices.coreinfrastructure.org/projects/281/badge)](https://bestpractices.coreinfrastructure.org/projects/281)
+[![Travis](https://img.shields.io/travis/NetworkBlockDevice/nbd.svg)](https://travis-ci.org/NetworkBlockDevice/nbd)
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/nbd.svg)](https://repology.org/metapackage/nbd)

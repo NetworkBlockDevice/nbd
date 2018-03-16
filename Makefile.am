@@ -5,7 +5,7 @@ EXTRA_PROGRAMS = nbd-client make-integrityhuge
 noinst_LTLIBRARIES = libnbdsrv.la libcliserv.la
 libcliserv_la_SOURCES = cliserv.h cliserv.c
 libcliserv_la_CFLAGS = @CFLAGS@
-client_srcs = nbd-client.c cliserv.h
+client_srcs = nbd-client.c cliserv.h nbd-netlink.h
 nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h nbdsrv.h backend.h \
 	netdb-compat.h
 nbd_trdump_SOURCES = nbd-trdump.c cliserv.h nbd.h
@@ -35,7 +35,7 @@ nbd_client_CFLAGS = $(client_flags) @GnuTLS_CFLAGS@ -DPROG_NAME='"nbd-client"'
 nbd_client_LDADD = $(client_libs) @GnuTLS_LIBS@
 else
 nbd_client_SOURCES = $(client_srcs)
-nbd_client_CFLAGS = $(client_flags)
+nbd_client_CFLAGS = $(client_flags) -DNOTLS -DPROG_NAME='"nbd-client"'
 nbd_client_LDADD = $(client_libs)
 endif
 endif

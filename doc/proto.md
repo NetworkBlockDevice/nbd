@@ -197,6 +197,11 @@ reply to any option it has sent (note that some options e.g.
 `NBD_OPT_LIST` have multiple replies, and the final reply is
 the last of those).
 
+Some messages the client sends instruct the server to change some of
+its internal state.  The client SHOULD NOT send such messages more
+than once; if it does, the server MAY fail the repeated message with
+`NBD_REP_ERR_INVALID`.
+
 #### Termination of the session during option haggling
 
 There are three possible mechanisms to end option haggling:
@@ -263,20 +268,31 @@ a soft disconnect.
 
 ### Transmission
 
-There are two message types in the transmission phase: the request,
-and the reply.  The
+There are three message types in the transmission phase: the request,
+the simple reply, and the structured reply chunk.  The
 transmission phase consists of a series of transactions, where the
-client submits requests and the server sends corresponding replies.
-The phase continues until
+client submits requests and the server sends corresponding replies
+with either a single simple reply or a series of one or more
+structured reply chunks per request.  The phase continues until
 either side terminates transmission; this can be performed cleanly
 only by the client.
 
+Note that without client negotiation, the server MUST use only simple
+replies, and that it is impossible to tell by reading the server
+traffic in isolation whether a data field will be present; the simple
+reply is also problematic for error handling of the `NBD_CMD_READ`
+request.  Therefore, structured replies can be used to create a
+a context-free server stream; see below.
+
 Replies need not be sent in the same order as requests (i.e., requests
-may be handled by the server asynchronously).
+may be handled by the server asynchronously), and structured reply
+chunks from one request may be interleaved with reply messages from
+other requests; however, there may be constraints that prevent
+arbitrary reordering of structured reply chunks within a given reply.
 Clients SHOULD use a handle that is distinct from all other currently
 pending transactions, but MAY reuse handles that are no longer in
 flight; handles need not be consecutive.  In each reply message
-the server MUST use the same value for
+(whether simple or structured), the server MUST use the same value for
 handle as was sent by the client in the corresponding request.  In
 this way, the client can correlate which request is receiving a
 response.
@@ -326,16 +342,75 @@ C: 64 bits, offset (unsigned)
 C: 32 bits, length (unsigned)  
 C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
 
-#### Reply message
+#### Simple reply message
 
-The reply message MUST be sent by the server in response to all
-requests (save for `NBD_CMD_DISC`). The message looks as
+The simple reply message MUST be sent by the server in response to all
+requests if structured replies have not been negotiated using
+`NBD_OPT_STRUCTURED_REPLY`. If structured replies have been negotiated, a simple
+reply MAY be used as a reply to any request other than `NBD_CMD_READ`,
+but only if the reply has no data payload.  The message looks as
 follows:
 
-S: 32 bits, 0x67446698, magic (`NBD_REPLY_MAGIC`)  
+S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`; used to be
+   `NBD_REPLY_MAGIC`)  
 S: 32 bits, error (MAY be zero)  
 S: 64 bits, handle  
-S: (*length* bytes of data if the request is of type `NBD_CMD_READ`)  
+S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
+    *error* is zero)  
+
+#### Structured reply chunk message
+
+Some of the major downsides of the default simple reply to
+`NBD_CMD_READ` are as follows.  First, it is not possible to support
+partial reads or early errors (the command must succeed or fail as a
+whole, and either *length* bytes of data must be sent or a hard disconnect
+must be initiated, even if the failure is `EINVAL` due to bad flags).
+Second, there is no way to efficiently skip over portions of a sparse
+file that are known to contain all zeroes.  Finally, it is not
+possible to reliably decode the server traffic without also having
+context of what pending read requests were sent by the client.
+Therefore structured replies are also permitted if negotiated.
+
+A structured reply in the transmission phase consists of one or
+more structured reply chunk messages.  The server MUST NOT send
+this reply type unless the client has successfully negotiated
+structured replies via `NBD_OPT_STRUCTURED_REPLY`.  Conversely, if
+structured replies are negotiated, the server MUST use a
+structured reply for any response with a payload, and MUST NOT use
+a simple reply for `NBD_CMD_READ` (even for the case of an early
+`EINVAL` due to bad flags), but MAY use either a simple reply or a
+structured reply to all other requests.  The server SHOULD prefer
+sending errors via a structured reply, as the error can then be
+accompanied by a string payload to present to a human user.
+
+A structured reply MAY occupy multiple structured chunk messages
+(all with the same value for "handle"), and the
+`NBD_REPLY_FLAG_DONE` reply flag is used to identify the final
+chunk.  Unless further documented by individual requests below,
+the chunks MAY be sent in any order, except that the chunk with
+the flag `NBD_REPLY_FLAG_DONE` MUST be sent last.  Even when a
+command documents further constraints between chunks of one reply,
+it is always safe to interleave chunks of that reply with messages
+related to other requests.  A server SHOULD try to minimize the
+number of chunks sent in a reply, but MUST NOT mark a chunk as
+final if there is still a possibility of detecting an error before
+transmission of that chunk completes.  A structured reply is
+considered successful only if it did not contain any error chunks,
+although the client MAY be able to determine partial success based
+on the chunks received.
+
+A structured reply chunk message looks as follows:
+
+S: 32 bits, 0x668e33ef, magic (`NBD_STRUCTURED_REPLY_MAGIC`)  
+S: 16 bits, flags  
+S: 16 bits, type  
+S: 64 bits, handle  
+S: 32 bits, length of payload (unsigned)  
+S: *length* bytes of payload data (if *length* is nonzero)  
+
+The use of *length* in the reply allows context-free division of
+the overall server traffic into individual reply messages; the
+*type* field describes how to further interpret the payload.
 
 #### Terminating the transmission phase
 
@@ -718,9 +793,9 @@ preferred block size or export size, and SHOULD be at least 2^25
 than a power of 2.  For convenience, the server MAY advertise a
 maximum block size that is larger than the export size, although in
 that case, the client MUST treat the export size as the effective
-maximum block size (as further constrained by a non-zero offset).
+maximum block size (as further constrained by a nonzero offset).
 
-Where a transmission request can have a non-zero *offset* and/or
+Where a transmission request can have a nonzero *offset* and/or
 *length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
 the client MUST ensure that *offset* and *length* are integer
 multiples of any advertised minimum block size, and SHOULD use integer
@@ -806,8 +881,12 @@ The field has the following format:
 - bit 5, `NBD_FLAG_SEND_TRIM`: exposes support for `NBD_CMD_TRIM`.
 - bit 6, `NBD_FLAG_SEND_WRITE_ZEROES`: exposes support for
   `NBD_CMD_WRITE_ZEROES` and `NBD_CMD_FLAG_NO_HOLE`.
-- bit 7, `NBD_FLAG_SEND_DF`: defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
+- bit 7, `NBD_FLAG_SEND_DF`: do not fragment a structured reply. The
+  server MUST set this transmission flag to 1 if the
+  `NBD_CMD_READ` request supports the `NBD_CMD_FLAG_DF` flag, and
+  MUST leave this flag clear if structured replies have not been
+  negotiated. Clients MUST NOT set the `NBD_CMD_FLAG_DF` request
+  flag unless this transmission flag is set.
 - bit 8, `NBD_FLAG_CAN_MULTI_CONN`: Indicates that the server operates
   entirely without cache, or that the cache it uses is shared among all
   connections to the given device. In particular, if this flag is
@@ -816,9 +895,7 @@ The field has the following format:
   to that command to the client. In the absense of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
-- bit 9, `NBD_FLAG_SEND_BLOCK_STATUS`: defined by the experimental
-  `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
-- bit 10, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
+- bit 9, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
   [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
@@ -828,7 +905,7 @@ Clients SHOULD ignore unknown flags.
 These values are used in the "option" field during the option haggling
 of the newstyle negotiation.
 
-- `NBD_OPT_EXPORT_NAME` (1)
+* `NBD_OPT_EXPORT_NAME` (1)
 
     Choose the export which the client would like to use, end option
     haggling, and proceed to the transmission phase.
@@ -856,10 +933,14 @@ of the newstyle negotiation.
     if `NBD_OPT_GO` is not supported (not falling back will prevent
     it from connecting to old servers).
 
-- `NBD_OPT_ABORT` (2)
+* `NBD_OPT_ABORT` (2)
 
     The client desires to abort the negotiation and terminate the
     session. The server MUST reply with `NBD_REP_ACK`.
+
+    The client SHOULD NOT send any additional data with the option;
+    however, a server SHOULD ignore any data sent by the client rather
+    than rejecting the request as invalid.
 
     Previous versions of this document were unclear on whether
     the server should send a reply to `NBD_OPT_ABORT`. Therefore
@@ -869,7 +950,7 @@ of the newstyle negotiation.
     the client sending an `NBD_OPT_ABORT` and closing the connection
     without waiting for a reply.
 
-- `NBD_OPT_LIST` (3)
+* `NBD_OPT_LIST` (3)
 
     Return zero or more `NBD_REP_SERVER` replies, one for each export,
     followed by `NBD_REP_ACK` or an error (such as
@@ -877,22 +958,28 @@ of the newstyle negotiation.
     list if TLS has not been negotiated, the server is operating in
     SELECTIVETLS mode, and the entry concerned is a TLS-only export.
 
-- `NBD_OPT_PEEK_EXPORT` (4)
+    The client MUST NOT send any additional data with the option, and
+    the server SHOULD reject a request that includes data with
+    `NBD_REP_ERR_INVALID`.
+
+* `NBD_OPT_PEEK_EXPORT` (4)
 
     Was defined by the (withdrawn) experimental `PEEK_EXPORT` extension;
     not in use.
 
-- `NBD_OPT_STARTTLS` (5)
+* `NBD_OPT_STARTTLS` (5)
 
     The client wishes to initiate TLS.
 
-    The server MUST either reply with `NBD_REP_ACK` after which
-    point the connection is upgraded to TLS, or an error reply
-    explicitly permitted by this document.
+    The client MUST NOT send any additional data with the option.  The
+    server MUST either reply with `NBD_REP_ACK` after which point the
+    connection is upgraded to TLS, or an error reply explicitly
+    permitted by this document (for example, `NBD_REP_ERR_INVALID` if
+    the client included data).
 
     See the section on TLS above for further details.
 
-- `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
+* `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
 
     Both options have identical formats for requests and replies. The only
     difference is that after a successful reply to `NBD_OPT_GO` (i.e. one
@@ -1005,20 +1092,49 @@ of the newstyle negotiation.
     NOT send further option requests unless the final reply from the
     server indicates an error.
 
-- `NBD_OPT_GO` (7)
+* `NBD_OPT_GO` (7)
 
     See above under `NBD_OPT_INFO`.
 
-- `NBD_OPT_STRUCTURED_REPLY` (8)
+* `NBD_OPT_STRUCTURED_REPLY` (8)
 
-    Defined by the experimental `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
+    The client wishes to use structured replies during the
+    transmission phase.  The client MUST NOT send any additional data
+    with the option, and the server SHOULD reject a request that
+    includes data with `NBD_REP_ERR_INVALID`.
+
+    The server replies with the following, or with an error permitted
+    elsewhere in this document:
+
+    - `NBD_REP_ACK`: Structured replies have been negotiated; the
+      server MUST use structured replies to the `NBD_CMD_READ`
+      transmission request.  Other extensions that require structured
+      replies may now be negotiated.
+    - For backwards compatibility, clients SHOULD be prepared to also
+      handle `NBD_REP_ERR_UNSUP`; in this case, no structured replies
+      will be sent.
+
+    It is envisioned that future extensions will add other new
+    requests that may require a data payload in the reply.  A server
+    that supports such extensions SHOULD NOT advertise those
+    extensions until the client negotiates structured replies; and a
+    client MUST NOT make use of those extensions without first
+    enabling the `NBD_OPT_STRUCTURED_REPLY` extension.
+
+* `NBD_OPT_LIST_META_CONTEXT` (9)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
+* `NBD_OPT_SET_META_CONTEXT` (10)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
 during option haggling in the fixed newstyle negotiation.
 
-- `NBD_REP_ACK` (1)
+* `NBD_REP_ACK` (1)
 
     Will be sent by the server when it accepts the option and no further
     information is available, or when sending data related to the option
@@ -1125,6 +1241,10 @@ during option haggling in the fixed newstyle negotiation.
       - 32 bits, preferred block size  
       - 32 bits, maximum block size  
 
+* `NBD_REP_META_CONTEXT` (4)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
 case that data is an error message string suitable for display to the user.
@@ -1145,8 +1265,10 @@ case that data is an error message string suitable for display to the user.
 * `NBD_REP_ERR_INVALID` (2^31 + 3)
 
     The option sent by the client is known by this server, but was
-    determined by the server to be syntactically invalid. For instance,
-    the client sent an `NBD_OPT_LIST` with nonzero data length.
+    determined by the server to be syntactically or semantically
+    invalid. For instance, the client sent an `NBD_OPT_LIST` with
+    nonzero data length, or the client sent a second
+    `NBD_OPT_STARTTLS` after TLS was already negotiated.
 
 * `NBD_REP_ERR_PLATFORM` (2^31 + 4)
 
@@ -1165,21 +1287,27 @@ case that data is an error message string suitable for display to the user.
 
     The requested export is not available.
 
-* `NBD_REP_ERR_SHUTDOWN` (2^32 + 7)
+* `NBD_REP_ERR_SHUTDOWN` (2^31 + 7)
 
     The server is unwilling to continue negotiation as it is in the
     process of being shut down.
 
-* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^32 + 8)
+* `NBD_REP_ERR_BLOCK_SIZE_REQD` (2^31 + 8)
 
     The server is unwilling to enter transmission phase for a given
     export unless the client first acknowledges (via
     `NBD_INFO_BLOCK_SIZE`) that it will obey non-default block sizing
     requirements.
 
+* `NBD_REP_ERR_TOO_BIG` (2^31 + 9)
+
+    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
 ### Transmission phase
 
-#### Command flags
+#### Flag fields
+
+##### Command flags
 
 This field of 16 bits is sent by the client with every request and provides
 additional information to the server to execute the command. Refer to
@@ -1210,9 +1338,136 @@ valid may depend on negotiation during the handshake phase.
   if `NBD_FLAG_SEND_TRIM` was not set in the transmission flags field.
   The server MUST support the use of this flag if it advertises
   `NBD_FLAG_SEND_WRITE_ZEROES`.
-- bit 2, `NBD_CMD_FLAG_DF`; defined by the experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
+- bit 2, `NBD_CMD_FLAG_DF`; the "don't fragment" flag, valid during
+  `NBD_CMD_READ`.  SHOULD be set to 1 if the client requires the
+  server to send at most one content chunk in reply.  MUST NOT be set
+  unless the transmission flags include `NBD_FLAG_SEND_DF`.  Use of
+  this flag MAY trigger an `EOVERFLOW` error chunk, if the request
+  length is too large.
+- bit 3, `NBD_CMD_FLAG_REQ_ONE`; defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
 
+##### Structured reply flags
+
+This field of 16 bits is sent by the server as part of every
+structured reply.
+
+- bit 0, `NBD_REPLY_FLAG_DONE`; the server MUST clear this bit if
+  more structured reply chunks will be sent for the same client
+  request, and MUST set this bit if this is the final reply.  This
+  bit MUST always be set for the `NBD_REPLY_TYPE_NONE` chunk,
+  although any other chunk type can also be used as the final
+  chunk.
+
+The server MUST NOT set any other flags without first negotiating
+the extension with the client, unless the client can usefully
+react to the response without interpreting the flag (for instance
+if the flag is some form of hint).  Clients MUST ignore
+unrecognized flags.
+
+#### Structured reply types
+
+These values are used in the "type" field of a structured reply.
+Some chunk types can additionally be categorized by role, such as
+*error chunks* or *content chunks*.  Each type determines how to
+interpret the "length" bytes of payload.  If the client receives
+an unknown or unexpected type, other than an *error chunk*, it
+MUST initiate a hard disconnect.
+
+* `NBD_REPLY_TYPE_NONE` (0)
+
+  *length* MUST be 0 (and the payload field omitted).  This chunk
+  type MUST always be used with the `NBD_REPLY_FLAG_DONE` bit set
+  (that is, it may appear at most once in a structured reply, and
+  is only useful as the final reply chunk).  If no earlier error
+  chunks were sent, then this type implies that the overall client
+  request is successful.  Valid as a reply to any request.
+
+* `NBD_REPLY_TYPE_OFFSET_DATA` (1)
+
+  This chunk type is in the content chunk category.  *length* MUST be
+  at least 9.  It represents the contents of *length - 8* bytes of the
+  file, starting at the absolute *offset* from the start of the
+  export.  The data MUST lie within the bounds of the original offset
+  and length of the client's request, and MUST NOT overlap with the
+  bounds of any earlier content chunk or error chunk in the same
+  reply.  This chunk MAY be used more than once in a reply, unless the
+  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to `NBD_CMD_READ`.
+
+  The payload is structured as:
+
+  64 bits: offset (unsigned)  
+  *length - 8* bytes: data  
+
+* `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
+
+  This chunk type is in the content chunk category.  *length* MUST be
+  exactly 12.  It represents that the contents of *hole size* bytes,
+  starting at the absolute *offset* from the start of the export, read
+  as all zeroes.  The hole MUST lie within the bounds of the original
+  offset and length of the client's request, and MUST NOT overlap with
+  the bounds of any earlier content chunk or error chunk in the same
+  reply.  This chunk MAY be used more than once in a reply, unless the
+  `NBD_CMD_FLAG_DF` flag was set.  Valid as a reply to `NBD_CMD_READ`.
+
+  The payload is structured as:
+
+  64 bits: offset (unsigned)  
+  32 bits: hole size (unsigned, MUST be nonzero)  
+
+* `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
+
+  Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+
+All error chunk types have bit 15 set, and begin with the same
+*error*, *message length*, and optional *message* fields as
+`NBD_REPLY_TYPE_ERROR`.  If nonzero, *message length* indicates
+that an optional error string message appears next, suitable for
+display to a human user.  The header *length* then covers any
+remaining structured fields at the end.
+
+* `NBD_REPLY_TYPE_ERROR` (2^15 + 1)
+
+  This chunk type is in the error chunk category.  *length* MUST
+  be at least 6.  This chunk represents that an error occurred,
+  and the client MAY NOT make any assumptions about partial
+  success. This type SHOULD NOT be used more than once in a
+  structured reply.  Valid as a reply to any request.
+
+  The payload is structured as:
+
+  32 bits: error (MUST be nonzero)  
+  16 bits: message length (no more than header *length* - 6)  
+  *message length* bytes: optional string suitable for
+    direct display to a human being  
+
+* `NBD_REPLY_TYPE_ERROR_OFFSET` (2^15 + 2)
+
+  This chunk type is in the error chunk category.  *length* MUST
+  be at least 14.  This reply represents that an error occurred at
+  a given offset, which MUST lie within the original offset and
+  length of the request; the client can use this offset to
+  determine if request had any partial success.  This chunk type
+  MAY appear multiple times in a structured reply, although the
+  same offset SHOULD NOT be repeated.  Likewise, if content chunks
+  were sent earlier in the structured reply, the server SHOULD NOT
+  send multiple distinct offsets that lie within the bounds of a
+  single content chunk.  Valid as a reply to `NBD_CMD_READ`,
+  `NBD_CMD_WRITE`, and `NBD_CMD_TRIM`.
+
+  The payload is structured as:
+
+  32 bits: error (MUST be nonzero)  
+  16 bits: message length (no more than header *length* - 14)  
+  *message length* bytes: optional string suitable for
+     direct display to a human being  
+  64 bits: offset (unsigned)  
+
+If the client receives an unknown or unexpected type with bit 15
+set, it MUST consider the current reply as errored, but MAY
+continue transmission unless it detects that *message length* is
+too large to fit within the *length* specified by the header.  For
+all other messages with unknown or unexpected type or inconsistent
+contents, the client MUST initiate a hard disconnect.
 
 #### Request types
 
@@ -1220,12 +1475,19 @@ The following request types exist:
 
 * `NBD_CMD_READ` (0)
 
-    A read request. Length and offset define the data to be read.
+    A read request. Length and offset define the data to be read. The
+    server MUST reply with either a simple reply or a structured
+    reply, according to whether the structured replies have been
+    negotiated using `NBD_OPT_STRUCTURED_REPLY`. The client SHOULD NOT
+    request a read length of 0; the behavior of a server on such a
+    request is unspecified although the server SHOULD NOT disconnect.
 
-    The server MUST reply with a reply header,
-    followed immediately by *length* bytes
-    of data, read from *offset* bytes into the file, unless an error
-    condition has occurred.
+    *Simple replies*
+
+    If structured replies were not negotiated, then a read request
+    MUST always be answered by a simple reply, as documented above
+    (using magic 0x67446698 `NBD_SIMPLE_REPLY_MAGIC`, and containing
+    length bytes of data according to the client's request).
 
     If an error occurs, the server SHOULD set the appropriate error code
     in the error field. The server MAY then initiate a hard disconnect.
@@ -1236,11 +1498,89 @@ The following request types exist:
     signalling no error), the server MUST immediately initiate a
     hard disconnect; it MUST NOT send any further data to the client.
 
+    *Structured replies*
+
+    If structured replies are negotiated, then a read request MUST
+    result in a structured reply with one or more chunks (each using
+    magic 0x668e33ef `NBD_STRUCTURED_REPLY_MAGIC`), where the final
+    chunk has the flag `NBD_REPLY_FLAG_DONE`, and with the following
+    additional constraints.
+
+    The server MAY split the reply into any number of content chunks;
+    each chunk MUST describe at least one byte, although to minimize
+    overhead, the server SHOULD use chunks with lengths and offsets as
+    an integer multiple of 512 bytes, where possible (the first and
+    last chunk of an unaligned read being the most obvious places for
+    an exception).  The server MUST NOT send content chunks that
+    overlap with any earlier content or error chunk, and MUST NOT send
+    chunks that describe data outside the offset and length of the
+    request, but MAY send the content chunks in any order (the client
+    MUST reassemble content chunks into the correct order), and MAY
+    send additional content chunks even after reporting an error chunk.
+    Note that a request for more than 2^32 - 8 bytes MUST be split
+    into at least two chunks, so as not to overflow the length field
+    of a reply while still allowing space for the offset of each
+    chunk.  When no error is detected, the server MUST send enough
+    data chunks to cover the entire region described by the offset and
+    length of the client's request.
+
+    To minimize traffic, the server MAY use a content or error chunk
+    as the final chunk by setting the `NBD_REPLY_FLAG_DONE` flag, but
+    MUST NOT do so for a content chunk if it would still be possible
+    to detect an error while transmitting the chunk.  The
+    `NBD_REPLY_TYPE_NONE` chunk is always acceptable as the final
+    chunk.
+
+    If an error is detected, the server MUST still complete the
+    transmission of any current chunk (it MUST use padding bytes which
+    SHOULD be zero, for any remaining data portion of a chunk with
+    type `NBD_REPLY_TYPE_OFFSET_DATA`), but MAY omit further content
+    chunks.  The server MUST include an error chunk as one of the
+    subsequent chunks, but MAY defer the error reporting behind other
+    queued chunks.  An error chunk of type `NBD_REPLY_TYPE_ERROR`
+    implies that the client MAY NOT make any assumptions about
+    validity of data chunks (whether sent before or after the error
+    chunk), and if used, SHOULD be the only error chunk in the reply.
+    On the other hand, an error chunk of type
+    `NBD_REPLY_TYPE_ERROR_OFFSET` gives fine-grained information about
+    which earlier data chunk(s) encountered a failure; as such, a
+    server MAY still usefully follow it with further non-overlapping
+    content chunks or with error offsets for other content chunks.
+    The server MAY send an error chunk with no corresponding content
+    chunk, but MUST ensure that the content chunk is sent first if a
+    content and error chunk cover the same offset.  Generally, a
+    server SHOULD NOT mix errors with offsets with a generic error.
+    As long as all errors are accompanied by offsets, the client MAY
+    assume that any data chunks with no subsequent error offset are
+    valid, that chunks with an overlapping error offset errors are
+    valid up until the reported offset, and that portions of the read
+    that do not have a corresponding content chunk are not valid.
+
+    A client MAY initiate a hard disconnect if it detects that the server
+    has sent invalid chunks (such as overlapping data, or not enough
+    data before claiming success).
+
+    In order to avoid the burden of reassembly, the client MAY set the
+    `NBD_CMD_FLAG_DF` flag ("don't fragment").  If this flag is set,
+    the server MUST send at most one content chunk, although it MAY
+    still send multiple chunks (the remaining chunks would be error
+    chunks or a final type of `NBD_REPLY_TYPE_NONE`).  If the area
+    being read contains both data and a hole, the server MUST use
+    `NBD_REPLY_TYPE_OFFSET_DATA` with the zeroes explicitly present.
+    A server MAY reject a client's request with the error `EOVERFLOW`
+    if the length is too large to send without fragmentation, in which
+    case it MUST NOT send a content chunk; however, the server MUST
+    support unfragmented reads in which the client's request length
+    does not exceed 65,536 bytes.
+
 * `NBD_CMD_WRITE` (1)
 
     A write request. Length and offset define the location and amount of
     data to be written. The client MUST follow the request header with
-    *length* number of bytes to be written to the device.
+    *length* number of bytes to be written to the device. The client
+    SHOULD NOT request a write length of 0; the behavior of a server on
+    such a request is unspecified although the server SHOULD NOT
+    disconnect.
 
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
@@ -1276,9 +1616,14 @@ The following request types exist:
 
 * `NBD_CMD_TRIM` (4)
 
-    A hint to the server that the data defined by len and offset is no
-    longer needed. A server MAY discard len bytes starting at offset, but
-    is not required to.
+    A hint to the server that the data defined by length and offset is
+    no longer needed. A server MAY discard *length* bytes starting at
+    offset, but is not required to; and MAY round *offset* up and
+    *length* down to meet internal alignment constraints so that only
+    a portion of the client's request is actually discarded. The
+    client SHOULD NOT request a trim length of 0; the behavior of a
+    server on such a request is unspecified although the server SHOULD
+    NOT disconnect.
 
     After issuing this command, a client MUST NOT make any assumptions
     about the contents of the export affected by this command, until
@@ -1289,8 +1634,10 @@ The following request types exist:
 
 * `NBD_CMD_WRITE_ZEROES` (6)
 
-    A write request with no payload. *Offset* and *length* define the location
-    and amount of data to be zeroed.
+    A write request with no payload. *Offset* and *length* define the
+    location and amount of data to be zeroed. The client SHOULD NOT
+    request a write length of 0; the behavior of a server on such a
+    request is unspecified although the server SHOULD NOT disconnect.
 
     The server MUST zero out the data on disk, and then send the reply
     message. The server MAY send the reply message before the data has
@@ -1355,8 +1702,7 @@ The following error values are defined:
 * `ENOMEM` (12), Cannot allocate memory.
 * `EINVAL` (22), Invalid argument.
 * `ENOSPC` (28), No space left on device.
-* `EOVERFLOW` (75), defined in the  experimental `STRUCTURED_REPLY`
-  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
+* `EOVERFLOW` (75), Value too large.
 * `ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `ENOSPC` if it receives a write request
@@ -1393,11 +1739,11 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md)
+* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
 
-* The `INFO` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-info/doc/proto.md).
+* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md) (based on the `STRUCTURED_REPLY` extension).
 
-* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+* The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help

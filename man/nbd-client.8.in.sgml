@@ -63,6 +63,7 @@ manpage.1: manpage.sgml
       <arg>-swap</arg>
       <arg>-persist</arg>
       <arg>-nofork</arg>
+      <arg>-nonetlink</arg>
       <arg>-systemd-mark</arg>
       <arg>-block-size <replaceable>block size</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
@@ -81,6 +82,7 @@ manpage.1: manpage.sgml
       <arg>-swap</arg>
       <arg>-persist</arg>
       <arg>-nofork</arg>
+      <arg>-nonetlink</arg>
       <arg>-systemd-mark</arg>
       <arg>-block-size <replaceable>block size</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
@@ -102,6 +104,11 @@ manpage.1: manpage.sgml
       <command>&dhpackage;</command>
       <arg choice="plain"><option>-l <replaceable>host</replaceable></option></arg>
       <arg>port</arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>&dhpackage;</command>
+      <arg>-netlink</arg>
+      <arg choice="plain"><option>-l <replaceable>host</replaceable></option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
@@ -230,6 +237,24 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>-nonetlink</option></term>
+        <term><option>-L</option></term>
+        <listitem>
+	  <para>Starting with version 3.17, &dhpackage; will default to
+	  using the netlink interface to configure an NBD device. This
+	  option allows to use the older ioctl() interface to configure
+	  the device.
+	  </para>
+	  <para>This option is only available if &dhpackage; was
+	  compiled against libnl-genl. If that is not the case,
+	  nbd-client will only be able to use the ioctl interface (and
+	  the option will not be available).</para>
+	  <para>Note that a future version of &dhpackage; will
+	  <emphasis>require</emphasis> the use of netlink, but it has
+	  not yet been decided when that will be the case.</para>
+        </listitem>
+      </varlistentry
+      <varlistentry>
 	<term><option>-persist</option></term>
 	<term><option>-p</option></term>
 	<listitem>
@@ -294,6 +319,21 @@ manpage.1: manpage.sgml
 	    Specifies the name of the export that we want to use. If not
 	    specified, nbd-client will ask for a "default" export, if
 	    one exists on the server.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-netlink</option></term>
+	<term><option>-L</option></term>
+	<listitem>
+	  <para>
+            Use the netlink interface to setup a new device.  If no device is
+            specified then an empty one will be selected or a new one will be
+            created if there are no existing empty devices available.  This
+            option does not leave the client waiting for the device to exit.
+          </para>
+          <para>
+            If this is used with disconnect then you must specify a device.
 	  </para>
 	</listitem>
       </varlistentry>

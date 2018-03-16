@@ -57,3 +57,4 @@ tests/run/buffer.c
 .debhelper
 *debhelper.log
 min-nbd-client
+support/*.m4

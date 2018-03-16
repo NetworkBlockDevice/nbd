@@ -177,6 +177,8 @@ then
 	esac
 fi
 
+m4_ifndef([PKG_CHECK_MODULES], [m4_fatal([Missing pkg-config M4 macros. Please ensure that pkg-config is installed.])])
+
 dnl AC_MSG_CHECKING([where to puth systemd unit files])
 dnl AC_ARG_WITH(
 dnl   systemd,
@@ -261,7 +263,7 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h sys/uio.h])
-AM_PATH_GLIB_2_0(2.26.0, [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]), gthread)
+PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.26.0 gthread-2.0 >= 2.26.0], [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 
 my_save_cflags="$CFLAGS"
 CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
@@ -289,6 +291,16 @@ AC_PREPROC_IFELSE(
 	[AC_MSG_RESULT([no]); NEED_BSD_SOURCE=0],
 	[AC_MSG_RESULT([yes]); NEED_BSD_SOURCE=1])
 AC_DEFINE([NEED_BSD_SOURCE], $NEED_BSD_SOURCE, [Define to 1 if _BSD_SOURCE needs to be defined before certain inclusions])
+
+PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1, [have_libnl3=yes], [have_libnl3=no])
+if test "${have_libnl3}" = "yes"
+then
+	AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
+	CFLAGS+=" $LIBNL3_CFLAGS"
+	LIBS+=" $LIBNL3_LIBS"
+else
+	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
+fi
 
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
