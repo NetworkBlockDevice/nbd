@@ -949,7 +949,7 @@ int main(int argc, char *argv[]) {
 	bool tls = false;
 	struct sigaction sa;
 	int num_connections = 1;
-	int netlink = 1;
+	int netlink = HAVE_NETLINK;
 	int need_disconnect = 0;
 	int *sockfds;
 	struct option long_options[] = {
