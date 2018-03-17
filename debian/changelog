@@ -1,3 +1,10 @@
+nbd (1:3.17-3) UNRELEASED; urgency=medium
+
+  * debian/control: update Vcs-* package fields to point to salsa, not
+    alioth.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 17 Mar 2018 23:16:47 +0100
+
 nbd (1:3.17-2) unstable; urgency=medium
 
   * Add missing build-dependency on libnl-genl-dev
