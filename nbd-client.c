@@ -623,6 +623,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 					} else {
 						err("Connection not allowed by server policy.");
 					}
+					free(rep);
 					exit(EXIT_FAILURE);
 				default:
 					if(rep->datasize > 0) {
