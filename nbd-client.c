@@ -1113,6 +1113,9 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	if (netlink && timeout == 0)
+		timeout = 1;
+
 	if (need_disconnect) {
 		if (netlink)
 			netlink_disconnect(nbddev);
