@@ -3,6 +3,8 @@ nbd (1:3.17-3) UNRELEASED; urgency=medium
   * debian/control: update Vcs-* package fields to point to salsa, not
     alioth.
   * debian/control: bump Standards-Version to 4.1.3 (no relevant changes)
+  * debian/control: limit the libnl-genl-dev dependency to linux-any
+    (since nbd-client isn't built on !linux)
 
  -- Wouter Verhelst <wouter@debian.org>  Sat, 17 Mar 2018 23:16:47 +0100
 
