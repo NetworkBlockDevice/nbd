@@ -623,6 +623,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 					} else {
 						err("Connection not allowed by server policy.");
 					}
+					free(rep);
 					exit(EXIT_FAILURE);
 				default:
 					if(rep->datasize > 0) {
@@ -1268,7 +1269,7 @@ int main(int argc, char *argv[]) {
 
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
 			int error = errno;
-			fprintf(stderr, "nbd,%d: Kernel call returned: %d", main_pid, error);
+			fprintf(stderr, "nbd,%d: Kernel call returned: %s\n", main_pid, strerror(errno));
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
@@ -1307,7 +1308,7 @@ int main(int argc, char *argv[]) {
 			/* We're on 2.4. It's not clearly defined what exactly
 			 * happened at this point. Probably best to quit, now
 			 */
-			fprintf(stderr, "Kernel call returned.");
+			fprintf(stderr, "Kernel call returned.\n");
 			cont=0;
 		}
 	} while(cont);
