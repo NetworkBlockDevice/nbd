@@ -1054,6 +1054,11 @@ The field has the following format:
   the export.
 - bit 9, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
   [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
+- bit 10, `NBD_FLAG_SEND_CACHE`: documents that the server understands
+  `NBD_CMD_CACHE`; however, note that server implementations exist
+  which support the command without advertising this bit, and
+  conversely that this bit does not guarantee that the command will
+  succeed or have an impact.
 
 Clients SHOULD ignore unknown flags.
 
@@ -1945,6 +1950,41 @@ The following request types exist:
     A client MUST NOT send a trim request unless `NBD_FLAG_SEND_TRIM`
     was set in the transmission flags field.
 
+* `NBD_CMD_CACHE` (5)
+
+    A cache request.  The client is informing the server that it plans
+    to access the area specified by *offset* and *length*.  The server
+    MAY use this information to speed up further access to that area
+    (for example, by performing the actions of `NBD_CMD_READ` but
+    replying with just status instead of a payload, by using
+    posix_fadvise(), or by retrieving remote data into a local cache
+    so that future reads and unaligned writes to that region are
+    faster).  However, it is unspecified what the server's actual
+    caching mechanism is (if any), whether there is a limit on how
+    much can be cached at once, and whether writes to a cached region
+    have write-through or write-back semantics.  Thus, even when this
+    command reports success, there is no guarantee of an actual
+    performance gain.  A future version of this standard may add
+    command flags to request particular caching behaviors, where a
+    server would reply with an error if that behavior cannot be
+    accomplished.
+
+    If an error occurs, the server MUST set the appropriate error code
+    in the error field. However failure on this operation does not
+    imply that further read and write requests on this area will fail,
+    and, other than any difference in performance, there MUST NOT be
+    any difference in semantics compared to if the client had not used
+    this command.  When no command flags are in use, the server MAY
+    send a reply prior to the requested area being fully cached.
+
+    Note that client implementations exist which attempt to send a
+    cache request even when `NBD_FLAG_SEND_CACHE` was not set in the
+    transmission flags field, however, these implementations do not
+    use any command flags.  A server MAY advertise
+    `NBD_FLAG_SEND_CACHE` even if the command has no effect or always
+    fails with `EINVAL`; however, if it advertised the command, the
+    server MUST reject any command flags it does not recognize.
+
 * `NBD_CMD_WRITE_ZEROES` (6)
 
     A write request with no payload. *Offset* and *length* define the
@@ -2041,9 +2081,6 @@ The following request types exist:
     interoperability, authors of such implementations SHOULD contact the
     maintainer of this document, so that these messages can be listed here
     to avoid conflicting implementations.
-
-    Currently one such message is known: `NBD_CMD_CACHE`, with type set to
-    5, implemented by xnbd.
 
 #### Error values
 
