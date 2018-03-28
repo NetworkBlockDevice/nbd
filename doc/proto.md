@@ -776,9 +776,9 @@ client would be unable to access the final few bytes of the export.
 The preferred block size represents the minimum size at which aligned
 requests will have efficient I/O, avoiding behaviour such as
 read-modify-write.  If advertised, this MUST be a power of 2 at least
-as large as the smaller of the minimum block size and 2^12 (4,096),
-although larger values (such as the minimum granularity of a hole) are
-also appropriate.  The preferred block size MAY be larger than the
+as large as the maximum of the minimum block size and 2^9 (512),
+although larger values (such as 4,096, or even the minimum granularity of a hole) are
+more typical.  The preferred block size MAY be larger than the
 export size, in which case the client is unable to utilize the
 preferred block size for that export.  The server MAY advertise an
 export size that is not an integer multiple of the preferred block
