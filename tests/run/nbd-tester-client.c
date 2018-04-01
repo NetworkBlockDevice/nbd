@@ -633,6 +633,35 @@ end:
 	return sock;
 }
 
+int setup_inetd_connection(gchar **argv)
+{
+	int sv[2];
+	pid_t child;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1) {
+		strncpy(errstr, strerror(errno), errstr_len);
+		return -1;
+	}
+
+	child = vfork();
+	if (child == 0) {
+		dup2(sv[0], 0);
+		close(sv[0]);
+		close(sv[1]);
+		execvp(argv[0], argv);
+	} else if (child == -1) {
+		close(sv[0]);
+		close(sv[1]);
+		strncpy(errstr, strerror(errno), errstr_len);
+		return -1;
+	}
+
+	close(sv[0]);
+	setmysockopt(sv[1]);
+
+	return sv[1];
+}
+
 int close_connection(int sock, CLOSE_TYPE type)
 {
 	struct nbd_request req;
@@ -1687,7 +1716,7 @@ typedef int (*testfunc) (char *, int, char, int);
 int main(int argc, char **argv)
 {
 	gchar *hostname = NULL, *unixsock = NULL;
-	long int p = 0;
+	long int p = 10809;
 	char *name = NULL;
 	int sock = -1;
 	int c;
@@ -1714,16 +1743,13 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	logging(MY_NAME);
-	while ((c = getopt(argc, argv, "FN:t:owfilu:hC:K:A:H:")) >= 0) {
+	while ((c = getopt(argc, argv, "FN:t:owfilu:hC:K:A:H:I")) >= 0) {
 		switch (c) {
 		case 1:
 			handle_nonopt(optarg, &hostname, &p);
 			break;
 		case 'N':
 			name = g_strdup(optarg);
-			if (!p) {
-				p = 10809;
-			}
 			break;
 		case 'F':
 			testflags |= TEST_EXPECT_ERROR;
@@ -1742,6 +1768,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			testflags |= TEST_FLUSH;
+			break;
+		case 'I':
+			p = -1;
 			break;
 		case 'i':
 			test = integrity_test;
@@ -1778,8 +1807,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	while (optind < argc) {
-		handle_nonopt(argv[optind++], &hostname, &p);
+	if (p != -1) {
+		while (optind < argc) {
+			handle_nonopt(argv[optind++], &hostname, &p);
+		}
 	}
 
 	if (keyfile && !certfile)
@@ -1792,8 +1823,10 @@ int main(int argc, char **argv)
 		sock = setup_inet_connection(hostname, p);
 	} else if (unixsock != NULL) {
 		sock = setup_unix_connection(unixsock);
+	} else if (p == -1) {
+		sock = setup_inetd_connection(argv + optind);
 	} else {
-		g_error("need a hostname or a unix domain socket!");
+		g_error("need a hostname, a unix domain socket or inetd-mode command line!");
 		return -1;
 	}
 
