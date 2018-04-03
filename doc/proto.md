@@ -740,27 +740,29 @@ receives. Clients MAY issue `NBD_OPT_INFO` with `NBD_INFO_BLOCK_SIZE` to
 learn the server's constraints without committing to them.
 
 If block size constraints have not been advertised or agreed on externally,
-then a client SHOULD assume a default minimum block size of 1, a preferred
-block size of 2^12 (4,096), and a maximum block size of the smaller of
-the export size or 0xffffffff (effectively unlimited).  A server that
+then a server SHOULD support a default minimum block size of 1, a preferred
+block size of 2^12 (4,096), and a maximum block size that is effectively unlimited (0xffffffff, or the export size if that
+is smaller), while a client desiring maximum interoperability SHOULD
+constrain its requests to a minimum block size of 2^9 (512), and limit
+`NBD_CMD_READ` and `NBD_CMD_WRITE` commands to a maximum block size of
+2^25 (33,554,432).  A server that
 wants to enforce block sizes other than the defaults specified here
 MAY refuse to go into transmission phase with a client that uses
-`NBD_OPT_EXPORT_NAME` (via a hard disconnect) or which fails to use
-`NBD_INFO_BLOCK_SIZE` with `NBD_OPT_GO` (where the server uses
-`NBD_REP_ERR_BLOCK_SIZE_REQD`), although a server SHOULD permit such
-clients if block size constraints are the default or can be agreed on
-externally.  When allowing such clients, the server MUST cleanly error
-commands that fall outside block size constraints without corrupting
-data; even so, this may limit interoperability.
+`NBD_OPT_EXPORT_NAME` (via a hard disconnect) or which uses
+`NBD_OPT_GO` without requesting `NBD_INFO_BLOCK_SIZE` (via an error reply of
+`NBD_REP_ERR_BLOCK_SIZE_REQD`); but servers SHOULD NOT refuse clients
+that do not request sizing information when the server supports
+default sizing or where sizing constraints can be agreed on
+externally.  When allowing clients that did not negotiate sizing via
+NBD, a server that enforces stricter block size constraints than the
+defaults MUST cleanly error commands that fall outside the constraints
+without corrupting data; even so, enforcing constraints in this manner
+may limit interoperability.
 
 A client MAY choose to operate as if tighter block size constraints had
 been specified (for example, even when the server advertises the default
 minimum block size of 1, a client may safely use a minimum block size
-of 2^9 (512), a preferred block size of 2^16 (65,536), and a maximum
-block size of 2^25 (33,554,432)).  Notwithstanding any maximum block
-size advertised, either the server or the client MAY initiate a hard
-disconnect if the size of a request or a reply is large enough to be
-deemed a denial of service attack.
+of 2^9 (512)).
 
 The minimum block size represents the smallest addressable length and
 alignment within the export, although writing to an area that small
@@ -776,21 +778,21 @@ client would be unable to access the final few bytes of the export.
 The preferred block size represents the minimum size at which aligned
 requests will have efficient I/O, avoiding behaviour such as
 read-modify-write.  If advertised, this MUST be a power of 2 at least
-as large as the smaller of the minimum block size and 2^12 (4,096),
-although larger values (such as the minimum granularity of a hole) are
-also appropriate.  The preferred block size MAY be larger than the
+as large as the maximum of the minimum block size and 2^9 (512),
+although larger values (such as 4,096, or even the minimum granularity of a hole) are
+more typical.  The preferred block size MAY be larger than the
 export size, in which case the client is unable to utilize the
 preferred block size for that export.  The server MAY advertise an
 export size that is not an integer multiple of the preferred block
 size.
 
 The maximum block size represents the maximum length that the server
-is willing to handle in one request.  If advertised, it MUST be either
-an integer multiple of the minimum block size or the value 0xffffffff
-for no inherent limit, MUST be at least as large as the smaller of the
-preferred block size or export size, and SHOULD be at least 2^25
-(33,554,432) if the export is that large, but MAY be something other
-than a power of 2.  For convenience, the server MAY advertise a
+is willing to handle in one request.  If advertised, it MAY be
+something other than a power of 2, but MUST be either an integer
+multiple of the minimum block size or the value 0xffffffff for no
+inherent limit, MUST be at least as large as the smaller of the
+preferred block size or export size, and SHOULD be at least 2^20
+(1,048,576) if the export is that large.  For convenience, the server MAY advertise a
 maximum block size that is larger than the export size, although in
 that case, the client MUST treat the export size as the effective
 maximum block size (as further constrained by a nonzero offset).
@@ -804,9 +806,18 @@ those requests, the client MUST NOT use a *length* larger than any
 advertised maximum block size or which, when added to *offset*, would
 exceed the export size.  The server SHOULD report an `EINVAL` error if
 the client's request is not aligned to advertised minimum block size
-boundaries, or is larger than the advertised maximum block size,
-although the server MAY instead initiate a hard disconnect if a large
-*length* could be deemed as a denial of service attack.
+boundaries, or is larger than the advertised maximum block size.
+Notwithstanding any maximum block size advertised, either the server
+or the client MAY initiate a hard disconnect if the payload of an
+`NBD_CMD_WRITE` request or `NBD_CMD_READ` reply would be large enough
+to be deemed a denial of service attack; however, for maximum
+portability, any *length* less than 2^25 (33,554,432) bytes SHOULD NOT
+be considered a denial of service attack (even if the advertised
+maximum block size is smaller).  For all other commands, where the
+*length* is not reflected in the payload (such as `NBD_CMD_TRIM` or
+`NBD_CMD_WRITE_ZEROES`), a server SHOULD merely fail the command with
+an `EINVAL` error for a client that exceeds the maximum block size,
+rather than initiating a hard disconnect.
 
 ## Metadata querying
 
@@ -1849,7 +1860,7 @@ The following request types exist:
 
     The server MUST write the data to disk, and then send the reply
     message. The server MAY send the reply message before the data has
-    reached permanent storage.
+    reached permanent storage, unless `NBD_CMD_FLAG_FUA` is in use.
 
     If an error occurs, the server MUST set the appropriate error code
     in the error field.
@@ -1906,7 +1917,7 @@ The following request types exist:
 
     The server MUST zero out the data on disk, and then send the reply
     message. The server MAY send the reply message before the data has
-    reached permanent storage.
+    reached permanent storage, unless `NBD_CMD_FLAG_FUA` is in use.
 
     A client MUST NOT send a write zeroes request unless
     `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.

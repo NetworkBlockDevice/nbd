@@ -5,7 +5,7 @@ EXTRA_PROGRAMS = nbd-client make-integrityhuge
 noinst_LTLIBRARIES = libnbdsrv.la libcliserv.la
 libcliserv_la_SOURCES = cliserv.h cliserv.c
 libcliserv_la_CFLAGS = @CFLAGS@
-client_srcs = nbd-client.c cliserv.h
+client_srcs = nbd-client.c cliserv.h nbd-netlink.h
 nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h nbdsrv.h backend.h \
 	netdb-compat.h
 nbd_trdump_SOURCES = nbd-trdump.c cliserv.h nbd.h

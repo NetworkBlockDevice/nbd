@@ -33,8 +33,6 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 	int masklen;
 	int addrlen = addr->sa_family == AF_INET ? 4 : 16;
 
-	assert(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
-
 	strcpy(privmask, mask);
 
 	memset(&hints, 0, sizeof(hints));
@@ -55,6 +53,7 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 	}
 	aitmp = res;
 	while(res) {
+		assert(addr->sa_family == AF_INET || addr->sa_family == AF_INET6);
 		const uint8_t* byte_s;
 		uint8_t* byte_t;
 		uint8_t mask = 0;

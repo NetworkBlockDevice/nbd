@@ -461,7 +461,20 @@ void parse_sizes(char *buf, uint64_t *size, uint16_t *flags) {
 	printf("\n");
 }
 
-void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls) {
+void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_go, char* name, uint16_t global_flags) {
+	send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
+	char b[sizeof(*flags) + sizeof(*rsize64)];
+	if(readit(sock, b, sizeof(b)) < 0 && can_opt_go) {
+		err("E: server does not support NBD_OPT_GO and dropped connection after sending NBD_OPT_EXPORT_NAME. Try -g.");
+	}
+	parse_sizes(b, rsize64, flags);
+	if(!global_flags & NBD_FLAG_NO_ZEROES) {
+		char buf[125];
+		readit(sock, buf, 124);
+	}
+}
+
+void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls, bool can_opt_go) {
 	u64 magic;
 	uint16_t tmp;
 	uint16_t global_flags;
@@ -594,37 +607,41 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 		exit(EXIT_SUCCESS);
 	}
 
-	send_info_request(sock, NBD_OPT_GO, 0, NULL, name);
-
 	struct reply *rep = NULL;
 	
+	if(!can_opt_go) {
+		send_opt_exportname(sock, rsize64, flags, can_opt_go, name, global_flags);
+		return;
+	}
+
+	send_info_request(sock, NBD_OPT_GO, 0, NULL, name);
+
 	do {
 		if(rep != NULL) free(rep);
 		rep = read_reply(sock);
-		if(rep->reply_type & NBD_REP_FLAG_ERROR) {
+		if(rep && (rep->reply_type & NBD_REP_FLAG_ERROR)) {
 			switch(rep->reply_type) {
 				case NBD_REP_ERR_UNSUP:
 					/* server doesn't support NBD_OPT_GO or NBD_OPT_INFO,
 					 * fall back to NBD_OPT_EXPORT_NAME */
-					send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
-					char b[sizeof(*flags) + sizeof(*rsize64)];
-					readit(sock, b, sizeof(b));
-					parse_sizes(b, rsize64, flags);
-					if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
-						readit(sock, buf, 124);
-					}
+					send_opt_exportname(sock, rsize64, flags, can_opt_go, name, global_flags);
 					free(rep);
 					return;
 				case NBD_REP_ERR_POLICY:
 					if(rep->datasize > 0) {
-						err("Connection not allowed by server policy. Server said: %s", rep->data);
+						char errstr[1024];
+						snprintf(errstr, sizeof errstr, "Connection not allowed by server policy. Server said: %s", rep->data);
+						err(errstr);
 					} else {
 						err("Connection not allowed by server policy.");
 					}
+					free(rep);
 					exit(EXIT_FAILURE);
 				default:
 					if(rep->datasize > 0) {
-						err("Unknown error returned by server. Server said: %s", rep->data);
+						char errstr[1024];
+						snprintf(errstr, sizeof errstr, "Unknown error returned by server. Server said: %s", rep->data);
+						err(errstr);
 					} else {
 						err("Unknown error returned by server.");
 					}
@@ -649,13 +666,13 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 			case NBD_REP_ACK:
 				break;
 			default:
-				err_nonfatal("Unknown reply to NBD_OPT_GO received");
+				err_nonfatal("Unknown reply to NBD_OPT_GO received, ignoring");
 		}
 	} while(rep->reply_type != NBD_REP_ACK);
 	free(rep);
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname) {
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool *can_opt_go) {
 	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
 	bool retval = false;
 	if(fd < 0) {
@@ -762,6 +779,10 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 		}
 		if(!strncmp(loc, "tlshostname=", 9)) {
 			*tlshostname = strndup(loc+9, strcspn(loc+9, ","));
+			goto next;
+		}
+		if(!strncmp(loc, "no_optgo", 8)) {
+			*can_opt_go = false;
 			goto next;
 		}
 		// skip unknown options, with a warning unless they start with a '_'
@@ -874,7 +895,7 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] -L\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n");
 #else
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
 #endif
@@ -913,7 +934,7 @@ void disconnect(char* device) {
 #if HAVE_NETLINK
 static const char *short_opts = "-A:b:c:C:d:H:hK:LlnN:pSst:uVx";
 #else
-static const char *short_opts = "-A:b:c:C:d:H:hK:lnN:pSst:uVx";
+static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pSst:uVx";
 #endif
 
 int main(int argc, char *argv[]) {
@@ -945,36 +966,38 @@ int main(int argc, char *argv[]) {
 	bool tls = false;
 	struct sigaction sa;
 	int num_connections = 1;
-	int netlink = 0;
+	int netlink = HAVE_NETLINK;
 	int need_disconnect = 0;
 	int *sockfds;
 	struct option long_options[] = {
+		{ "cacertfile", required_argument, NULL, 'A' },
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
 		{ "connections", required_argument, NULL, 'C'},
 		{ "disconnect", required_argument, NULL, 'd' },
+		{ "certfile", required_argument, NULL, 'F' },
+		{ "no-optgo", no_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
+		{ "tlshostname", required_argument, NULL, 'H' },
+		{ "keyfile", required_argument, NULL, 'K' },
 		{ "list", no_argument, NULL, 'l' },
-		{ "name", required_argument, NULL, 'N' },
 #if HAVE_NETLINK
-		{ "netlink", no_argument, NULL, 'L' },
+		{ "nonetlink", no_argument, NULL, 'L' },
 #endif
+		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "nofork", no_argument, NULL, 'n' },
+		{ "name", required_argument, NULL, 'N' },
 		{ "persist", no_argument, NULL, 'p' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
-		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ "unix", no_argument, NULL, 'u' },
-		{ "certfile", required_argument, NULL, 'F' },
-		{ "keyfile", required_argument, NULL, 'K' },
-		{ "cacertfile", required_argument, NULL, 'A' },
-		{ "tlshostname", required_argument, NULL, 'H' },
-		{ "enable-tls", no_argument, NULL, 'x' },
 		{ "version", no_argument, NULL, 'V' },
+		{ "enable-tls", no_argument, NULL, 'x' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
+	bool can_opt_go = true;
 
 	logging(MY_NAME);
 
@@ -1038,6 +1061,9 @@ int main(int argc, char *argv[]) {
 			need_disconnect = 1;
 			nbddev = strdup(optarg);
 			break;
+		case 'g':
+			can_opt_go = false;
+			break;
 		case 'h':
 			usage(NULL);
 			exit(EXIT_SUCCESS);
@@ -1048,7 +1074,7 @@ int main(int argc, char *argv[]) {
 			break;
 #if HAVE_NETLINK
 		case 'L':
-			netlink = 1;
+			netlink = 0;
 			break;
 #endif
 		case 'm':
@@ -1123,7 +1149,7 @@ int main(int argc, char *argv[]) {
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &hostname)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &hostname, &can_opt_go)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
 				}
@@ -1174,7 +1200,7 @@ int main(int argc, char *argv[]) {
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
-		negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls);
+		negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
 		if (netlink) {
 			sockfds[i] = sock;
 			continue;
@@ -1264,7 +1290,7 @@ int main(int argc, char *argv[]) {
 
 		if (ioctl(nbd, NBD_DO_IT) < 0) {
 			int error = errno;
-			fprintf(stderr, "nbd,%d: Kernel call returned: %d", main_pid, error);
+			fprintf(stderr, "nbd,%d: Kernel call returned: %s\n", main_pid, strerror(errno));
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
@@ -1288,7 +1314,7 @@ int main(int argc, char *argv[]) {
 					nbd = open(nbddev, O_RDWR);
 					if (nbd < 0)
 						err("Cannot open NBD: %m");
-					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls);
+					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}
@@ -1303,7 +1329,7 @@ int main(int argc, char *argv[]) {
 			/* We're on 2.4. It's not clearly defined what exactly
 			 * happened at this point. Probably best to quit, now
 			 */
-			fprintf(stderr, "Kernel call returned.");
+			fprintf(stderr, "Kernel call returned.\n");
 			cont=0;
 		}
 	} while(cont);

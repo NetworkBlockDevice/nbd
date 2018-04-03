@@ -129,12 +129,43 @@ manpage.1: manpage.sgml
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
+	  <term><option>cacertfile=<replaceable>certificate
+	  file</replaceable></option></term>
+	  <listitem>
+	    <para>The CA certificate file for TLS. Corresponds to the
+	    <option>-A</option> option on the command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>certfile=<replaceable>certificate file</replaceable></option></term>
+	  <listitem>
+	    <para>The certificate file for TLS. Corresponds to the
+	    <option>-F</option> option on the command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
 	  <term><option>conns=<replaceable>number</replaceable></option></term>
 	  <listitem>
 	    <para>The number of connections to use for this device.
 	    Corresponds to the <option>-C</option> option on the command
 	    line; see nbd-client(8) for more details on that
 	    option.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>keyfile=<replaceable>key
+	  file</replaceable></option></term>
+	  <listitem>
+	    <para>The private key file for TLS. Corresponds to the
+	    <option>-K</option> option on the command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>no_optgo</option></term>
+	  <listitem>
+	    <para>Disable the use of NBD_OPT_GO in the conversation.
+	    Corresponds to the <option>-g</option> option on the command
+	    line.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
@@ -171,6 +202,14 @@ manpage.1: manpage.sgml
 	  <term><option>sdp</option></term>
 	  <listitem>
 	    <para>Use the Socket Direct protocol; <option>-S</option>.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>tlshostname=<replaceable>TLS
+	  hostname</replaceable></term>
+	  <listitem>
+	    <para>The hostname for TLS purposes;
+	    <option>-H</option></para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
