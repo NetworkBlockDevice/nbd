@@ -312,6 +312,41 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>-no-optgo</option></term>
+	<term><option>-g</option></term>
+	<listitem>
+	  <para>Disable the use of the NBD_OPT_GO protocol message, and
+	  force the use of NBD_OPT_EXPORT_NAME instead.</para>
+	  <para>
+	    The NBD protocol has two phases: the negotiation phase, and
+	    the transmission phase. To move from negotation to
+	    transmission, older clients sent the NBD_OPT_EXPORT_NAME
+	    message, for which the server could not produce an error
+	    message in case the export name did not exist (or the client
+	    had insufficient permissions to access it). Due to those
+	    limitations, a replacement message NBD_OPT_GO was created
+	    instead, which allows the server to reply with an error in
+	    case of any problems.</para>
+	  <para>
+	    The protocol allows for a server to discard a message which
+	    it does not understand; however, unfortunately some
+	    implementations (including older versions of nbd-server) did
+	    not handle that situation correctly and would get out of
+	    sync with the client when it sent a message which the server
+	    did not understand.</para>
+	  <para>
+	    When sending NBD_OPT_GO, nbd-client will try to do the right
+	    thing and fall back to NBD_OPT_EXPORT_NAME. However, when
+	    the server has the above-described bug, then this does not
+	    work. In such a situation, the client will issue a
+	    diagnostic suggesting the use of this option.
+	  </para>
+	  <para>
+	    Note that there is a corresponding option for nbdtab, too.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
         <term><option>-name</option></term>
 	<term><option>-N</option></term>
 	<listitem>
