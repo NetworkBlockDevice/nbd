@@ -970,30 +970,30 @@ int main(int argc, char *argv[]) {
 	int need_disconnect = 0;
 	int *sockfds;
 	struct option long_options[] = {
+		{ "cacertfile", required_argument, NULL, 'A' },
 		{ "block-size", required_argument, NULL, 'b' },
 		{ "check", required_argument, NULL, 'c' },
 		{ "connections", required_argument, NULL, 'C'},
 		{ "disconnect", required_argument, NULL, 'd' },
+		{ "certfile", required_argument, NULL, 'F' },
 		{ "no-optgo", no_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
+		{ "tlshostname", required_argument, NULL, 'H' },
+		{ "keyfile", required_argument, NULL, 'K' },
 		{ "list", no_argument, NULL, 'l' },
-		{ "name", required_argument, NULL, 'N' },
 #if HAVE_NETLINK
 		{ "nonetlink", no_argument, NULL, 'L' },
 #endif
+		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "nofork", no_argument, NULL, 'n' },
+		{ "name", required_argument, NULL, 'N' },
 		{ "persist", no_argument, NULL, 'p' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
-		{ "systemd-mark", no_argument, NULL, 'm' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ "unix", no_argument, NULL, 'u' },
-		{ "certfile", required_argument, NULL, 'F' },
-		{ "keyfile", required_argument, NULL, 'K' },
-		{ "cacertfile", required_argument, NULL, 'A' },
-		{ "tlshostname", required_argument, NULL, 'H' },
-		{ "enable-tls", no_argument, NULL, 'x' },
 		{ "version", no_argument, NULL, 'V' },
+		{ "enable-tls", no_argument, NULL, 'x' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
