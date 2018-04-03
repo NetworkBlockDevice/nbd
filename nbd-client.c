@@ -672,7 +672,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	free(rep);
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool can_opt_go) {
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool *can_opt_go) {
 	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
 	bool retval = false;
 	if(fd < 0) {
@@ -1149,7 +1149,7 @@ int main(int argc, char *argv[]) {
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &hostname)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &hostname, &can_opt_go)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
 				}
