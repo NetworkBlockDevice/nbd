@@ -8,7 +8,7 @@ case $(uname -s) in
 		sudo sh .travis/add-trusty
 		sudo apt-get update
 		sudo apt-get -t trusty -y install automake
-		sudo apt-get install -y docbook-utils
+		sudo apt-get install -y docbook-utils libnl-genl-3-dev libgnutls28-dev
 	;;
 	*)
 		for i in man/*sgml
