@@ -1777,6 +1777,10 @@ int main(int argc, char **argv)
 			testflags |= TEST_FLUSH;
 			break;
 		case 'I':
+#ifndef ISSERVER
+			err_nonfatal("inetd mode not supported without syslog support");
+			return 77;
+#endif
 			p = -1;
 			break;
 		case 'i':
