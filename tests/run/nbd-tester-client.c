@@ -27,6 +27,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -635,7 +636,7 @@ end:
 
 int setup_inetd_connection(gchar **argv)
 {
-	int sv[2];
+	int sv[2], status;
 	pid_t child;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1) {
@@ -649,6 +650,8 @@ int setup_inetd_connection(gchar **argv)
 		close(sv[0]);
 		close(sv[1]);
 		execvp(argv[0], argv);
+		perror("execvp");
+		_exit(-1);
 	} else if (child == -1) {
 		close(sv[0]);
 		close(sv[1]);
@@ -657,8 +660,12 @@ int setup_inetd_connection(gchar **argv)
 	}
 
 	close(sv[0]);
-	setmysockopt(sv[1]);
+	if (waitpid(child, &status, WNOHANG)) {
+		close(sv[1]);
+		return -1;
+	}
 
+	setmysockopt(sv[1]);
 	return sv[1];
 }
 
