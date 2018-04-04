@@ -5,10 +5,8 @@ set -x
 
 case $(uname -s) in
 	Linux)
-		sudo sh .travis/add-trusty
 		sudo apt-get update
-		sudo apt-get -t trusty -y install automake
-		sudo apt-get install -y docbook-utils libnl-genl-3-dev libgnutls28-dev
+		sudo apt-get install -y docbook-utils libnl-genl-3-dev libgnutls28-dev automake
 	;;
 	*)
 		for i in man/*sgml
