@@ -309,6 +309,9 @@ AM_CPPFLAGS=$AM_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(AM_CPPFLAGS)
 AM_CONDITIONAL(GZNBD, [test "x$ENABLE_GZNBD" = "xyes"])
 AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_LINKS([tests/run/buffer.c:buffer.c
+		 tests/run/crypto-gnutls.c:crypto-gnutls.c
+		 tests/run/cliserv.c:cliserv.c])
 AC_CONFIG_FILES([Makefile
 		 doc/Doxyfile
 		 doc/Makefile
