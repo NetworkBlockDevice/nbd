@@ -10,7 +10,7 @@ conffile=${tmpdir}/nbd.conf
 pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
 mydir=$(dirname $0)
-certdir=$(readlink -f ${mydir}/certs)
+certdir="${mydir}/certs"
 cleanup="$2"
 PID=""
 
