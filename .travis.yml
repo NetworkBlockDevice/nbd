@@ -8,4 +8,4 @@ compiler:
 install: 
   - sh .travis/before_install
 group: travis_latest
-script: ./autogen.sh && ./configure && make && make NBD_TEST_SILENT=1 check
+script: ./autogen.sh && ./configure --enable-syslog && make && make NBD_TEST_SILENT=1 check

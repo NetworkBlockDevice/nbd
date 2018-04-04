@@ -24,8 +24,6 @@ cleanup() {
 		if [ ! -z "$PID" ]
 		then
 			kill $PID || true
-		else
-			echo "E: Could not clean up!"
 		fi
 	fi
 	if [ -z "$cleanup" ]
@@ -292,6 +290,16 @@ EOF
 		PID=$!
 		sleep 1
 		./nbd-tester-client -N export1 -u ${tmpdir}/unix.sock
+		retval=$?
+		;;
+	*/inetd)
+		cat >${conffile} <<EOF
+[generic]
+	port = 0
+[export1]
+	exportname = ${tmpnam}
+EOF
+		./nbd-tester-client -N export1 -I -- ../../nbd-server -d -C ${conffile}
 		retval=$?
 		;;
 	*/handshake)

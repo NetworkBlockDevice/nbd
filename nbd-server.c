@@ -3538,19 +3538,6 @@ int main(int argc, char *argv[]) {
 
 	if(serve) {
 		g_array_append_val(servers, *serve);
-
-		if(strcmp(genconf.modernport, "0")==0) {
-#ifndef ISSERVER
-			err("inetd mode requires syslog");
-#endif
-			CLIENT* client = g_malloc(sizeof(CLIENT));
-			client->net = -1;
-			if(!commit_client(client, serve)) {
-				exit(EXIT_FAILURE);
-			}
-			mainloop_threaded(client);
-			return 0;
-		}
 	}
     
 	if(!servers || !servers->len) {
@@ -3594,5 +3581,18 @@ int main(int argc, char *argv[]) {
 #endif
 					));
 #endif
+
+	if((genconf.modernport != NULL) && strcmp(genconf.modernport, "0")==0) {
+#ifndef ISSERVER
+		err("inetd mode requires syslog");
+#endif
+		CLIENT* client = negotiate(0, servers, &genconf);
+		if(!client) {
+			exit(EXIT_FAILURE);
+		}
+		mainloop_threaded(client);
+		return 0;
+	}
+
 	serveloop(servers, &genconf);
 }
