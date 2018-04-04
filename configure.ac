@@ -247,14 +247,10 @@ AC_CHECK_FUNC([sync_file_range],
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
-case $host_os in
-	linux*) NBD_CLIENT_NAME="nbd-client"
-		AC_MSG_RESULT(yes)
-		;;
-	*)	NBD_CLIENT_NAME=""
-		AC_MSG_RESULT(no)
-		;;
-esac
+AS_CASE([$host_os],
+  [linux*], [NBD_CLIENT_NAME="nbd-client"; AC_MSG_RESULT(yes)],
+  [NBD_CLIENT_NAME=""; AC_MSG_RESULT(no)]
+)
 AC_MSG_CHECKING(whether to expect tlshuge test to fail)
 AS_CASE([$host_os],
   [darwin*], [RUN_XFAIL=tlshuge; AC_MSG_RESULT(yes)],
