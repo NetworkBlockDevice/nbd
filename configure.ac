@@ -255,6 +255,12 @@ case $host_os in
 		AC_MSG_RESULT(no)
 		;;
 esac
+AC_MSG_CHECKING(whether to expect tlshuge test to fail)
+AS_CASE([$host_os],
+  [darwin*], [RUN_XFAIL=tlshuge; AC_MSG_RESULT(yes)],
+  [RUN_XFAIL=""; AC_MSG_RESULT(no)]
+)
+AC_SUBST([RUN_XFAIL])
 AM_CONDITIONAL(CLIENT, [test ! -z "$NBD_CLIENT_NAME"])
 AC_SEARCH_LIBS(bind, socket,, AC_MSG_ERROR([Could not find an implementation of the bind() system call]))
 AC_SEARCH_LIBS(inet_ntoa, nsl,, AC_MSG_ERROR([Could not find an implementation of the inet_ntoa() system call]))

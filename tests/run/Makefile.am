@@ -5,7 +5,8 @@ TLSSRC =
 endif
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
 TESTS = cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig list inetd \
-	rowrite tree rotree unix integrityhuge handshake tls tlswrongcert # tlshuge
+	rowrite tree rotree unix integrityhuge handshake tls tlswrongcert tlshuge
+XFAIL_TESTS=@RUN_XFAIL@
 check_PROGRAMS = nbd-tester-client
 nbd_tester_client_SOURCES = nbd-tester-client.c
 nodist_nbd_tester_client_SOURCES = cliserv.c
