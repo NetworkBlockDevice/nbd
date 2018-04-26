@@ -552,7 +552,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	off_t es;
 	size_t last;
 	char suffix;
-	gboolean do_output=FALSE;
+	bool do_output=false;
 	gchar* section_header="";
 	gchar** addr_port;
 
@@ -623,7 +623,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 			serve->flags |= F_MULTIFILE;
 			break;
 		case 'o':
-			do_output = TRUE;
+			do_output = true;
 			section_header = g_strdup(optarg);
 			break;
 		case 'p':
