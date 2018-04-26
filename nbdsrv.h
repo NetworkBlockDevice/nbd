@@ -68,7 +68,6 @@ typedef struct _client {
 			       make -m and -c mutually exclusive */
 	uint32_t difffilelen;     /**< number of pages in difffile */
 	uint32_t *difmap;	     /**< see comment on the global difmap for this one */
-	gboolean modern;     /**< client was negotiated using modern negotiation protocol */
 	int transactionlogfd;/**< fd for transaction log */
 	int clientfeats;     /**< Features supported by this client */
 	pthread_mutex_t lock; /**< socket lock */

@@ -1989,7 +1989,6 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 
 	client->server = server;
 	client->exportsize = OFFT_MAX;
-	client->modern = TRUE;
 	client->transactionlogfd = -1;
 	if(pthread_mutex_init(&(client->lock), NULL)) {
 		msg(LOG_ERR, "Unable to initialize mutex");
