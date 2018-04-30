@@ -819,6 +819,150 @@ maximum block size is smaller).  For all other commands, where the
 an `EINVAL` error for a client that exceeds the maximum block size,
 rather than initiating a hard disconnect.
 
+## Metadata querying
+
+It is often helpful for the client to be able to query the status
+of a range of blocks. The nature of the status that can be
+queried is in part implementation dependent. For instance,
+the status might represent:
+
+* in a sparse storage format, whether the relevant blocks are
+  actually present on the backing device for the export; or
+
+* whether the relevant blocks are 'dirty'; some storage formats
+  and operations over such formats express a concept of data dirtiness.
+  Whether the operation is block device mirroring, incremental block
+  device backup or any other operation with a concept of data dirtiness,
+  they all share a need to provide a list of ranges that this
+  particular operation treats as dirty.
+
+To provide such classes of information, the NBD protocol has a generic
+framework for querying metadata; however, its use must first be
+negotiated, and one or more metadata contexts must be selected.
+
+The procedure works as follows:
+
+- First, during negotiation, if the client wishes to query metadata
+  during transmission, the client MUST select one or more metadata
+  contexts with the `NBD_OPT_SET_META_CONTEXT` command. If needed, the client
+  can use `NBD_OPT_LIST_META_CONTEXT` to list contexts that the server
+  supports.
+- During transmission, a client can then indicate interest in metadata
+  for a given region by way of the `NBD_CMD_BLOCK_STATUS` command, where
+  *offset* and *length* indicate the area of interest. The server MUST
+  then respond with the requested information, for all contexts which
+  were selected during negotiation. For every metadata context, the
+  server sends one set of extent chunks, where the sizes of the
+  extents MUST be less than or equal to the length as specified in the
+  request. Each extent comes with a *flags* field, the semantics of
+  which are defined by the metadata context.
+- A server MUST reply to `NBD_CMD_BLOCK_STATUS` with a structured reply
+  of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
+
+A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
+nonzero number of metadata contexts during negotiation, and used the
+same export name for the subsequent `NBD_OPT_GO` (or
+`NBD_OPT_EXPORT_NAME`). Servers SHOULD reply with `EINVAL` to clients
+sending `NBD_CMD_BLOCK_STATUS` without selecting at least one metadata
+context.
+
+The reply to the `NBD_CMD_BLOCK_STATUS` request MUST be sent as a
+structured reply; this implies that in order to use metadata querying,
+structured replies MUST be negotiated first.
+
+Metadata contexts are identified by their names. The name MUST
+consist of a namespace, followed by a colon, followed by a leaf-name.
+The namespace must consist entirely of printable non-whitespace
+UTF-8 characters other than colons, and be non-empty. The entire name
+(namespace, colon, and leaf-name) MUST follow the restrictions for
+strings as laid out earlier in this document.
+
+Namespaces MUST be consist of one of the following:
+- `base`, for metadata contexts defined by this document;
+- `nbd-server`, for metadata contexts defined by the
+   implementation that accompanies this document (none
+   currently);
+- `x-*`, where `*` can be replaced by an arbitrary string not
+   containing colons, for local experiments. This SHOULD NOT be
+   used by metadata contexts that are expected to be widely used.
+- A third-party namespace from the list below.
+
+Third-party implementations can register additional namespaces by simple
+request to the mailing-list. The following additional third-party namespaces
+are currently registered:
+* (none)
+
+Save in respect of the `base:` namespace described below, this specification
+requires no specific semantics of metadata contexts, except that all the
+information they provide MUST be representable within the flags field as
+defined for `NBD_REPLY_TYPE_BLOCK_STATUS`. Likewise, save in respect of
+the `base:` namespace, the syntax of query strings is not specified by this
+document, other than the recommendation that the empty leaf-name makes
+sense as a wildcard for a client query during `NBD_OPT_LIST_META_CONTEXT`,
+but SHOULD NOT select any contexts during `NBD_OPT_SET_META_CONTEXT`.
+
+Server implementations SHOULD ensure the syntax for query strings they
+support and semantics for resulting metadata context is documented similarly
+to this document.
+
+### The `base:` metadata namespace
+
+This standard defines exactly one metadata context; it is called
+`base:allocation`, and it provides information on the basic allocation
+status of extents (that is, whether they are allocated at all in a
+sparse file context).
+
+The query string within the `base:` metadata context can take
+one of two forms:
+* `base:` - the server MUST ignore this form during
+  `NBD_OPT_SET_META_CONTEXT`, and MUST support this as a wildcard during
+  `NBD_OPT_LIST_META_CONTEXT`, in which case the server's reply will
+  contain a response for each supported metadata context within the
+  `base:` namespace (currently just `base:allocation`, although a
+  future revision of the standard might return multiple contexts); or
+* `base:[leaf-name]` to select `[leaf-name]` as a context leaf-name
+  that might exist within the `base` namespace.  If a `[leaf-name]`
+  requested by the client is not recognized, the server MUST ignore
+  it rather than report an error.
+
+#### `base:allocation` metadata context
+
+The `base:allocation` metadata context is the basic "allocated at all"
+metadata context. If an extent is marked with `NBD_STATE_HOLE` at that
+context, this means that the given extent is not allocated in the
+backend storage, and that writing to the extent MAY result in the `ENOSPC`
+error. This supports sparse file semantics on the server side.
+If a server supports the `base:allocation` metadata context, then writing
+to an extent which has `NBD_STATE_HOLE` clear MUST NOT fail with `ENOSPC`
+unless for reasons specified in the definition of another context.
+
+It defines the following flags for the flags field:
+
+- `NBD_STATE_HOLE` (bit 0): if set, the block represents a hole (and
+  future writes to that area may cause fragmentation or encounter an
+  `ENOSPC` error); if clear, the block is allocated or the server could
+  not otherwise determine its status. Note that the use of
+  `NBD_CMD_TRIM` is related to this status, but that the server MAY
+  report a hole even where `NBD_CMD_TRIM` has not been requested, and
+  also that a server MAY report that the block is allocated even where
+  `NBD_CMD_TRIM` has been requested.
+- `NBD_STATE_ZERO` (bit 1): if set, the block contents read as all
+  zeroes; if clear, the block contents are not known. Note that the use
+  of `NBD_CMD_WRITE_ZEROES` is related to this status, but that the
+  server MAY report zeroes even where `NBD_CMD_WRITE_ZEROES` has not been
+  requested, and also that a server MAY report unknown content even
+  where `NBD_CMD_WRITE_ZEROES` has been requested.
+
+It is not an error for a server to report that a region of the
+export has both `NBD_STATE_HOLE` set and `NBD_STATE_ZERO` clear. The
+contents of such an area are undefined, and a client
+reading such an area should make no assumption as to its contents
+or stability.
+
+For the `base:allocation` context, the remainder of the flags field is
+reserved. Servers SHOULD set it to all-zero; clients MUST ignore unknown
+flags.
+
 ## Values
 
 This section describes the value and meaning of constants (other than
@@ -1134,11 +1278,136 @@ of the newstyle negotiation.
 
 * `NBD_OPT_LIST_META_CONTEXT` (9)
 
-    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+    Return a list of `NBD_REP_META_CONTEXT` replies, one per context,
+    followed by an `NBD_REP_ACK` or an error.
+
+    This option MUST NOT be requested unless structured replies have
+    been negotiated first. If a client attempts to do so, a server
+    SHOULD send `NBD_REP_ERR_INVALID`.
+
+    Data:
+    - 32 bits, length of export name.
+    - String, name of export for which we wish to list metadata
+      contexts.
+    - 32 bits, number of queries
+    - Zero or more queries, each being:
+       - 32 bits, length of query.
+       - String, query to list a subset of the available metadata
+         contexts.  The syntax of this query is
+         implementation-defined, except that it MUST start with a
+         namespace and a colon.
+
+    For details on the query string, see the "Metadata querying"
+    section; note that a namespace may document that a different set
+    of queries are valid for `NBD_OPT_LIST_META_CONTEXT` than for
+    `NBD_OPT_SET_META_CONTEXT`, such as when using an empty
+    leaf-name for wildcarding.
+
+    If the option request is syntactically invalid (such as a query
+    length that would require reading beyond the original length given
+    in the option header), the server MUST fail the request with
+    `NBD_REP_ERR_INVALID`.  For requests that are semantically invalid
+    (such as lacking the required colon that delimits the namespace,
+    or using a leaf name that is invalid for a known namespace), the
+    server MAY fail the request with `NBD_REP_ERR_INVALID`.  However,
+    the server MUST ignore query strings belonging to an unknown
+    namespace.  If none of the query strings find any metadata
+    contexts, the server MUST send a single reply of type
+    `NBD_REP_ACK`.
+
+    The server MUST reply with a list of zero or more
+    `NBD_REP_META_CONTEXT` replies, followed by either a final
+    `NBD_REP_ACK` on success or by an error (for instance
+    `NBD_REP_ERR_UNSUP` if the option is not supported).  If an error
+    is returned, the client MUST disregard any context replies that
+    may have been sent.
+
+    If zero queries are sent, then the server MUST return all
+    the metadata contexts that are available to the client to select
+    on the given export.  However, this list may include
+    wildcards that require a further `NBD_OPT_LIST_META_CONTEXT` with
+    the wildcard as a query, rather than an actual context that is
+    appropriate as a query to `NBD_OPT_SET_META_CONTEXT`,
+    as set out below.  In this case, the server SHOULD NOT fail with
+    `NBD_REP_ERR_TOO_BIG`.
+
+    If one or more queries are sent, then the server MUST return
+    those metadata contexts that are available to the client to
+    select on the given export with `NBD_OPT_SET_META_CONTEXT`,
+    and which match one or more of the queries given. The
+    support of wildcarding within the leaf-name portion of
+    the query string is dependent upon the namespace.  The
+    server MAY send contexts in a different order
+    than in the client's query.  In this case, the server MAY fail
+    with `NBD_REP_ERR_TOO_BIG` if too many queries are requested.
+
+    In either case, however, for any given namespace the
+    server MAY, instead of exhaustively listing every
+    matching context available to select (or every context
+    available to select where no query is given), send
+    sufficient context records back to allow a client with
+    knowledge of the namespace to select any context.
+     This may be helpful where a client can
+    construct algorithmic queries. For instance, a client might
+    reply simply with the namespace with no leaf-name (e.g.
+    'x-FooBar:') or with a range of values (e.g.
+    'x-ModifiedDate:20160310-20161214'). The semantics of
+    such a reply are a matter for the definition of the
+    namespace. However each namespace returned MUST begin
+    with the relevant namespace, followed by a colon, and then
+    other UTF-8 characters, with the entire string following the
+    restrictions for strings set out earlier in this
+    document.
+
+    The metadata context ID in these replies is reserved and SHOULD be
+    set to zero; clients MUST disregard it.
 
 * `NBD_OPT_SET_META_CONTEXT` (10)
 
-    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+    Change the set of active metadata contexts. Issuing this command
+    replaces all previously-set metadata contexts (including when this
+    command fails); clients must ensure
+    that all metadata contexts they are interested in are selected with
+    the final query that they sent.
+
+    This option MUST NOT be requested unless structured replies have
+    been negotiated first. If a client attempts to do so, a server
+    SHOULD send `NBD_REP_ERR_INVALID`.
+
+    A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless
+    within the negotiation phase it sent `NBD_OPT_SET_META_CONTEXT`
+    at least once, and where the final time it was sent, it referred
+    to the same export name that was ultimately selected for transmission
+    phase, and where the server responded by returning least one
+    metadata context without error.
+
+    Data:
+    - 32 bits, length of export name.
+    - String, name of export for which we wish to list metadata
+      contexts.
+    - 32 bits, number of queries
+    - Zero or more queries, each being:
+       - 32 bits, length of query
+       - String, query to select metadata contexts. The syntax of this
+         query is implementation-defined, except that it MUST start with a
+         namespace and a colon.
+
+    If zero queries are sent, the server MUST select no metadata contexts.
+
+    The server MAY return `NBD_REP_ERR_TOO_BIG` if a request
+    seeks to select too many contexts. Otherwise
+    the server MUST reply with a number of `NBD_REP_META_CONTEXT`
+    replies, one for each selected metadata context, each with a unique
+    metadata context ID, followed by `NBD_REP_ACK`. The server MAY
+    ignore queries that do not select a single metadata context, and
+    MAY return selected contexts in a different order than in the
+    client's request.  The metadata context
+    ID is transient and may vary across calls to `NBD_OPT_SET_META_CONTEXT`;
+    clients MUST therefore treat the ID as an opaque value and not (for
+    instance) cache it between connections. It is not an error if a
+    `NBD_OPT_SET_META_CONTEXT` option does not select any metadata
+    context, provided the client then does not attempt to issue
+    `NBD_CMD_BLOCK_STATUS` commands.
 
 #### Option reply types
 
@@ -1254,7 +1523,11 @@ during option haggling in the fixed newstyle negotiation.
 
 * `NBD_REP_META_CONTEXT` (4)
 
-    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+    A description of a metadata context. Data:
+
+    - 32 bits, NBD metadata context ID.
+    - String, name of the metadata context. This is not required to be
+      a human-readable string, but it MUST be valid UTF-8 data.
 
 There are a number of error reply types, all of which are denoted by
 having bit 31 set. All error replies MAY have some data set, in which
@@ -1312,7 +1585,7 @@ case that data is an error message string suitable for display to the user.
 
 * `NBD_REP_ERR_TOO_BIG` (2^31 + 9)
 
-    Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+    The request or the reply is too large to process.
 
 ### Transmission phase
 
@@ -1355,7 +1628,12 @@ valid may depend on negotiation during the handshake phase.
   unless the transmission flags include `NBD_FLAG_SEND_DF`.  Use of
   this flag MAY trigger an `EOVERFLOW` error chunk, if the request
   length is too large.
-- bit 3, `NBD_CMD_FLAG_REQ_ONE`; defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+- bit 3, `NBD_CMD_FLAG_REQ_ONE`; valid during `NBD_CMD_BLOCK_STATUS`. If
+  set, the client is interested in only one extent per metadata
+  context. If this flag is present, the server MUST NOT send metadata
+  on more than one extent in the reply. Client implementors should note
+  that using this flag on multiple contiguous requests is likely to be
+  inefficient.
 
 ##### Structured reply flags
 
@@ -1427,7 +1705,34 @@ MUST initiate a hard disconnect.
 
 * `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
 
-  Defined by the experimental `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+  *length* MUST be 4 + (a positive integer multiple of 8).  This reply
+  represents a series of consecutive block descriptors where the sum
+  of the length fields within the descriptors MUST not be greater than
+  the length of the original request. This chunk type MUST appear
+  exactly once per metadata ID in a structured reply.
+
+  The payload starts with:
+
+  32 bits, metadata context ID  
+
+  and is followed by a list of one or more descriptors, each with this
+  layout:
+
+  32 bits, length of the extent to which the status below
+     applies (unsigned, MUST be nonzero)  
+  32 bits, status flags  
+
+  If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
+  then every reply chunk MUST NOT contain more than one descriptor.
+
+  Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
+  its request, the server MAY return fewer descriptors in the reply
+  than would be required to fully specify the whole range of requested
+  information to the client, if looking up the information would be
+  too resource-intensive for the server, so long as at least one
+  extent is returned. Servers should however be aware that most
+  clients implementations will then simply ask for the next extent
+  instead.
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
@@ -1463,7 +1768,7 @@ remaining structured fields at the end.
   were sent earlier in the structured reply, the server SHOULD NOT
   send multiple distinct offsets that lie within the bounds of a
   single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-  `NBD_CMD_WRITE`, and `NBD_CMD_TRIM`.
+  `NBD_CMD_WRITE`, `NBD_CMD_TRIM`, and `NBD_CMD_BLOCK_STATUS`.
 
   The payload is structured as:
 
@@ -1674,8 +1979,59 @@ The following request types exist:
 
 * `NBD_CMD_BLOCK_STATUS` (7)
 
-    Defined by the experimental `BLOCK_STATUS`
-    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md).
+    A block status query request. Length and offset define the range of
+    interest.  The client SHOULD NOT request a status length of 0;
+    the behavior of a server on such a request is unspecified although
+    the server SHOULD NOT disconnect.
+
+    A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless
+    within the negotiation phase it sent `NBD_OPT_SET_META_CONTEXT`
+    at least once, and where the final time that was sent, it referred
+    to the same export name used to enter transmission phase, and where
+    the server returned at least one metadata context without an error.
+    This in turn requires the client to
+    first negotiate structured replies. For a successful return, the
+    server MUST use a structured reply, containing exactly one chunk of
+    type `NBD_REPLY_TYPE_BLOCK_STATUS` per selected context id, where the
+    status field of each
+    descriptor is determined by the flags field as defined by the
+    metadata context.  The server MAY send chunks in
+    a different order than the context ids were assigned in reply to
+    `NBD_OPT_SET_META_CONTEXT`.
+
+    The list of block status descriptors within the
+    `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
+    of the file starting from specified *offset*, and the sum of the
+    *length* fields of each descriptor MUST not be greater than the
+    overall *length* of the request. This means that the server MAY
+    return less data than required. However the server MUST return at
+    least one status descriptor (and since each status descriptor has
+    a non-zero length, a client can always make progress on a
+    successful return).  The server SHOULD use different
+    *status* values between consecutive descriptors where feasible, although
+    the client SHOULD be prepared to handle consecutive descriptors
+    with the same *status* value.  The server SHOULD use
+    descriptor lengths that are an integer multiple of 512 bytes where
+    possible (the first and last descriptor of an unaligned query being
+    the most obvious places for an exception), and MUST use descriptor
+    lengths that are an integer multiple of any advertised minimum
+    block size. The status flags are
+    intentionally defined so that a server MAY always safely report a
+    status of 0 for any block, although the server SHOULD return
+    additional status values when they can be easily detected.
+
+    If an error occurs, the server SHOULD set the appropriate error
+    code in the error field of an error chunk. However, if the error
+    does not involve invalid usage (such as a request beyond the bounds
+    of the file), a server MAY reply with a single block status
+    descriptor with *length* matching the requested length, rather than
+    reporting the error; in this case the context MAY mandate the
+    status returned.
+
+    A client MAY initiate a hard disconnect if it detects that the
+    server has sent an invalid chunk. The server SHOULD return `EINVAL`
+    if it receives a `NBD_CMD_BLOCK_STATUS` request including one or
+    more sectors beyond the size of the device.
 
 * `NBD_CMD_RESIZE` (8)
 
