@@ -891,7 +891,7 @@ Namespaces MUST be consist of one of the following:
 Third-party implementations can register additional namespaces by
 simple request to the mailing-list. The following additional
 third-party namespaces are currently registered:
-* (none)
+* `qemu`, maintained by [qemu.org](https://git.qemu.org/?p=qemu.git;a=blob;f=docs/interop/nbd.txt)
 
 Save in respect of the `base:` namespace described below, this specification
 requires no specific semantics of metadata contexts, except that all the
