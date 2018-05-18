@@ -2807,6 +2807,8 @@ spawn_child(int* socket)
         pid = fork();
         if (pid < 0) {
                 msg(LOG_ERR, "Could not fork (%s)", strerror(errno));
+                close(sockets[0]);
+                close(sockets[1]);
                 goto out;
         }
         if (pid > 0) { /* Parent */
