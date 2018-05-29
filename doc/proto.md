@@ -1709,8 +1709,8 @@ MUST initiate a hard disconnect.
 
   *length* MUST be 4 + (a positive integer multiple of 8).  This reply
   represents a series of consecutive block descriptors where the sum
-  of the length fields within the descriptors MUST not be greater than
-  the length of the original request. This chunk type MUST appear
+  of the length fields within the descriptors is subject to further
+  constraints documented below. This chunk type MUST appear
   exactly once per metadata ID in a structured reply.
 
   The payload starts with:
@@ -1725,7 +1725,14 @@ MUST initiate a hard disconnect.
   32 bits, status flags  
 
   If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
-  then every reply chunk MUST NOT contain more than one descriptor.
+  then every reply chunk MUST contain exactly one descriptor, and that
+  descriptor MUST NOT exceed the *length* of the original request.  If
+  the client did not use the flag, and the server replies with N
+  extents, then the sum of the *length* fields of the first N-1
+  extents (if any) MUST be less than the requested length, while the
+  *length* of the final extent MAY result in a sum larger than the
+  original requested length, if the server has that information anyway
+  as a side effect of reporting the status of the requested region.
 
   Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
   its request, the server MAY return fewer descriptors in the reply
@@ -2037,10 +2044,14 @@ The following request types exist:
 
     The list of block status descriptors within the
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
-    of the file starting from specified *offset*, and the sum of the
-    *length* fields of each descriptor MUST not be greater than the
-    overall *length* of the request. This means that the server MAY
-    return less data than required. However the server MUST return at
+    of the file starting from specified *offset*.  If the client used
+    the `NBD_CMD_FLAG_REQ_ONE` flag, each chunk contains exactly one
+    descriptor where the *length* of the descriptor MUST NOT be greater
+    than the *length* of the request; otherwise, a chunk MAY contain
+    multiple descriptors, and the final descriptor MAY extend beyond
+    the original requested size if the server can determine a larger
+    length without additional effort.  On the other hand, the server MAY
+    return less data than requested. However the server MUST return at
     least one status descriptor (and since each status descriptor has
     a non-zero length, a client can always make progress on a
     successful return).  The server SHOULD use different *status*
