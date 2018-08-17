@@ -120,7 +120,8 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 	NLA_PUT_U64(msg, NBD_ATTR_SIZE_BYTES, size64);
 	NLA_PUT_U64(msg, NBD_ATTR_BLOCK_SIZE_BYTES, blocksize);
 	NLA_PUT_U64(msg, NBD_ATTR_SERVER_FLAGS, flags);
-	NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, timeout);
+	if (timeout)
+		NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, timeout);
 
 	sock_attr = nla_nest_start(msg, NBD_ATTR_SOCKETS);
 	if (!sock_attr)
