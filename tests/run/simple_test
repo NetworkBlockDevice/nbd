@@ -5,12 +5,19 @@ if [ -z "$TMPDIR" ]
 then
 	TMPDIR=/tmp
 fi
+
+REALPATH=$(which realpath)
+if [ -z "$REALPATH" ]
+then
+	REALPATH="readlink -f"
+fi
+
 tmpdir=`mktemp -d $TMPDIR/tmp.XXXXXX`
 conffile=${tmpdir}/nbd.conf
 pidfile=${tmpdir}/nbd.pid
 tmpnam=${tmpdir}/nbd.dd
 mydir=$(dirname $0)
-certdir=$(readlink -f ${mydir}/certs)
+certdir=$($REALPATH ${mydir}/certs)
 cleanup="$2"
 PID=""
 
@@ -24,8 +31,6 @@ cleanup() {
 		if [ ! -z "$PID" ]
 		then
 			kill $PID || true
-		else
-			echo "E: Could not clean up!"
 		fi
 	fi
 	if [ -z "$cleanup" ]
@@ -292,6 +297,16 @@ EOF
 		PID=$!
 		sleep 1
 		./nbd-tester-client -N export1 -u ${tmpdir}/unix.sock
+		retval=$?
+		;;
+	*/inetd)
+		cat >${conffile} <<EOF
+[generic]
+	port = 0
+[export1]
+	exportname = ${tmpnam}
+EOF
+		./nbd-tester-client -N export1 -I -- ../../nbd-server -d -C ${conffile}
 		retval=$?
 		;;
 	*/handshake)

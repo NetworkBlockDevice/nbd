@@ -212,10 +212,25 @@ dnl 		;;
 dnl 	esac
 dnl fi
 
-PKG_CHECK_MODULES(GnuTLS, [gnutls >= 2.12.0],[HAVE_GNUTLS=1],[HAVE_GNUTLS=0])
-if test x$HAVE_GNUTLS = x1; then
-	AC_DEFINE(HAVE_GNUTLS, 1, [Define to 1 if you have a GnuTLS version of 2.12 or above])
+AC_ARG_WITH([gnutls],
+	[AS_HELP_STRING([--without-gnutls],
+		[do not use gnutls])],
+	[],
+	[with_gnutls=check]
+)
+if test "x$with_gnutls" != "xno"; then
+	PKG_CHECK_MODULES(GnuTLS, [gnutls >= 2.12.0],
+		[HAVE_GNUTLS=1
+		AC_DEFINE(HAVE_GNUTLS, 1, [Define to 1 if you have a GnuTLS version of 2.12 or above])],
+		[if test "x$with_gnutls" = "xyes"; then
+			AC_MSG_ERROR([--with-gnutls given but cannot find gnutls])
+		else
+			HAVE_GNUTLS=0
+			AC_DEFINE(HAVE_GNUTLS, 0)
+		fi]
+	)
 else
+	HAVE_GNUTLS=0
 	AC_DEFINE(HAVE_GNUTLS, 0)
 fi
 AM_CONDITIONAL([GNUTLS], [test "x$HAVE_GNUTLS" = "x1"])
@@ -247,14 +262,16 @@ AC_CHECK_FUNC([sync_file_range],
 AC_FUNC_FORK
 AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
-case $host_os in
-	linux*) NBD_CLIENT_NAME="nbd-client"
-		AC_MSG_RESULT(yes)
-		;;
-	*)	NBD_CLIENT_NAME=""
-		AC_MSG_RESULT(no)
-		;;
-esac
+AS_CASE([$host_os],
+  [linux*], [NBD_CLIENT_NAME="nbd-client"; AC_MSG_RESULT(yes)],
+  [NBD_CLIENT_NAME=""; AC_MSG_RESULT(no)]
+)
+AC_MSG_CHECKING(whether to expect tlshuge test to fail)
+AS_CASE([$host_os],
+  [darwin*], [RUN_XFAIL=tlshuge; AC_MSG_RESULT(yes)],
+  [RUN_XFAIL=""; AC_MSG_RESULT(no)]
+)
+AC_SUBST([RUN_XFAIL])
 AM_CONDITIONAL(CLIENT, [test ! -z "$NBD_CLIENT_NAME"])
 AC_SEARCH_LIBS(bind, socket,, AC_MSG_ERROR([Could not find an implementation of the bind() system call]))
 AC_SEARCH_LIBS(inet_ntoa, nsl,, AC_MSG_ERROR([Could not find an implementation of the inet_ntoa() system call]))
@@ -292,13 +309,27 @@ AC_PREPROC_IFELSE(
 	[AC_MSG_RESULT([yes]); NEED_BSD_SOURCE=1])
 AC_DEFINE([NEED_BSD_SOURCE], $NEED_BSD_SOURCE, [Define to 1 if _BSD_SOURCE needs to be defined before certain inclusions])
 
-PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1, [have_libnl3=yes], [have_libnl3=no])
-if test "${have_libnl3}" = "yes"
-then
-	AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
-	CFLAGS+=" $LIBNL3_CFLAGS"
-	LIBS+=" $LIBNL3_LIBS"
+AC_ARG_WITH([libnl],
+	[AS_HELP_STRING([--without-libnl],
+		[do not use libnl])],
+	[],
+	[with_libnl=check]
+)
+if test "x$with_libnl" != "xno"; then
+	PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1,
+		[HAVE_NETLINK=1
+		AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
+		CFLAGS+=" $LIBNL3_CFLAGS"
+		LIBS+=" $LIBNL3_LIBS"],
+		[if test "x$with_libnl" = "xyes"; then
+			AC_MSG_ERROR([--with-libnl given but cannot find libnl])
+		else
+			HAVE_NETLINK=0
+			AC_DEFINE(HAVE_NETLINK, 0)
+		fi]
+	)
 else
+	HAVE_NETLINK=0
 	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
 fi
 
@@ -309,6 +340,9 @@ AM_CPPFLAGS=$AM_CPPFLAGS" -DSYSCONFDIR='\"$sysconfdir\"'"
 AC_SUBST(AM_CPPFLAGS)
 AM_CONDITIONAL(GZNBD, [test "x$ENABLE_GZNBD" = "xyes"])
 AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_LINKS([tests/run/buffer.c:buffer.c
+		 tests/run/crypto-gnutls.c:crypto-gnutls.c
+		 tests/run/cliserv.c:cliserv.c])
 AC_CONFIG_FILES([Makefile
 		 doc/Doxyfile
 		 doc/Makefile

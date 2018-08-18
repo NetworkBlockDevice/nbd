@@ -59,7 +59,6 @@ int main(void) {
 	cl.difffile = 0;
 	cl.difffilelen = 0;
 	cl.difmap = NULL;
-	cl.modern = TRUE;
 	cl.transactionlogfd = -1;
 	cl.clientfeats = 0;
 	pthread_mutex_init(&cl.lock, NULL);

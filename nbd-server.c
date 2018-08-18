@@ -552,7 +552,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	off_t es;
 	size_t last;
 	char suffix;
-	gboolean do_output=FALSE;
+	bool do_output=false;
 	gchar* section_header="";
 	gchar** addr_port;
 
@@ -623,7 +623,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 			serve->flags |= F_MULTIFILE;
 			break;
 		case 'o':
-			do_output = TRUE;
+			do_output = true;
 			section_header = g_strdup(optarg);
 			break;
 		case 'p':
@@ -1989,7 +1989,6 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 
 	client->server = server;
 	client->exportsize = OFFT_MAX;
-	client->modern = TRUE;
 	client->transactionlogfd = -1;
 	if(pthread_mutex_init(&(client->lock), NULL)) {
 		msg(LOG_ERR, "Unable to initialize mutex");
@@ -2808,6 +2807,8 @@ spawn_child(int* socket)
         pid = fork();
         if (pid < 0) {
                 msg(LOG_ERR, "Could not fork (%s)", strerror(errno));
+                close(sockets[0]);
+                close(sockets[1]);
                 goto out;
         }
         if (pid > 0) { /* Parent */
@@ -2951,7 +2952,8 @@ static int handle_childname(GArray* servers, int socket)
 				break;
 		}
 	}
-	buf = g_malloc0(len);
+	buf = g_malloc0(len + 1);
+	buf[len] = 0;
 	readit(socket, buf, len);
 	for(i=0; i<servers->len; i++) {
 		SERVER* srv = &g_array_index(servers, SERVER, i);
@@ -3468,6 +3470,7 @@ void dousers(const gchar *const username, const gchar *const groupname) {
 			str = g_strdup_printf("Invalid user name: %s", username);
 			err(str);
 		}
+		setgroups(0, NULL);
 		if(setuid(pw->pw_uid)<0) {
 			err("Could not set UID: %m");
 		}
@@ -3538,19 +3541,6 @@ int main(int argc, char *argv[]) {
 
 	if(serve) {
 		g_array_append_val(servers, *serve);
-
-		if(strcmp(genconf.modernport, "0")==0) {
-#ifndef ISSERVER
-			err("inetd mode requires syslog");
-#endif
-			CLIENT* client = g_malloc(sizeof(CLIENT));
-			client->net = -1;
-			if(!commit_client(client, serve)) {
-				exit(EXIT_FAILURE);
-			}
-			mainloop_threaded(client);
-			return 0;
-		}
 	}
     
 	if(!servers || !servers->len) {
@@ -3594,5 +3584,18 @@ int main(int argc, char *argv[]) {
 #endif
 					));
 #endif
+
+	if((genconf.modernport != NULL) && strcmp(genconf.modernport, "0")==0) {
+#ifndef ISSERVER
+		err("inetd mode requires syslog");
+#endif
+		CLIENT* client = negotiate(0, servers, &genconf);
+		if(!client) {
+			exit(EXIT_FAILURE);
+		}
+		mainloop_threaded(client);
+		return 0;
+	}
+
 	serveloop(servers, &genconf);
 }

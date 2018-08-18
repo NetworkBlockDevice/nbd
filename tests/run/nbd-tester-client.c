@@ -27,6 +27,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -60,8 +61,6 @@ static gchar *cacertfile = NULL;
 static gchar *tlshostname = NULL;
 
 typedef enum {
-	CONNECTION_TYPE_NONE,
-	CONNECTION_TYPE_CONNECT,
 	CONNECTION_TYPE_INIT_PASSWD,
 	CONNECTION_TYPE_CLISERV,
 	CONNECTION_TYPE_FULL,
@@ -574,16 +573,12 @@ end:
 	return sock;
 }
 
-int setup_unix_connection(gchar * unixsock, gchar * name, CONNECTION_TYPE ctype,
-			  int *serverflags, int testflags)
+int setup_unix_connection(gchar * unixsock)
 {
 	struct sockaddr_un addr;
 	int sock;
 
 	sock = 0;
-	if (ctype < CONNECTION_TYPE_CONNECT) {
-		goto end;
-	}
 	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err;
@@ -598,7 +593,6 @@ int setup_unix_connection(gchar * unixsock, gchar * name, CONNECTION_TYPE ctype,
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
 	}
-	sock = setup_connection_common(sock, name, ctype, serverflags, testflags);
 	goto end;
 err_open:
 	close(sock);
@@ -608,16 +602,13 @@ end:
 	return sock;
 }
 
-int setup_inet_connection(gchar * hostname, int port, gchar * name,
-			  CONNECTION_TYPE ctype, int *serverflags, int testflags)
+int setup_inet_connection(gchar * hostname, int port)
 {
 	int sock;
 	struct hostent *host;
 	struct sockaddr_in addr;
 
 	sock = 0;
-	if (ctype < CONNECTION_TYPE_CONNECT)
-		goto end;
 	if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err;
@@ -634,7 +625,6 @@ int setup_inet_connection(gchar * hostname, int port, gchar * name,
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
 	}
-	sock = setup_connection_common(sock, name, ctype, serverflags, testflags);
 	goto end;
 err_open:
 	close(sock);
@@ -644,19 +634,39 @@ end:
 	return sock;
 }
 
-int setup_connection(gchar * hostname, gchar * unixsock, int port, gchar * name,
-		     CONNECTION_TYPE ctype, int *serverflags, int testflags)
+int setup_inetd_connection(gchar **argv)
 {
-	if (hostname != NULL) {
-		return setup_inet_connection(hostname, port, name, ctype,
-					     serverflags, testflags);
-	} else if (unixsock != NULL) {
-		return setup_unix_connection(unixsock, name, ctype,
-					     serverflags, testflags);
-	} else {
-		g_error("need a hostname or a unix domain socket!");
+	int sv[2], status;
+	pid_t child;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1) {
+		strncpy(errstr, strerror(errno), errstr_len);
 		return -1;
 	}
+
+	child = vfork();
+	if (child == 0) {
+		dup2(sv[0], 0);
+		close(sv[0]);
+		close(sv[1]);
+		execvp(argv[0], argv);
+		perror("execvp");
+		_exit(-1);
+	} else if (child == -1) {
+		close(sv[0]);
+		close(sv[1]);
+		strncpy(errstr, strerror(errno), errstr_len);
+		return -1;
+	}
+
+	close(sv[0]);
+	if (waitpid(child, &status, WNOHANG)) {
+		close(sv[1]);
+		return -1;
+	}
+
+	setmysockopt(sv[1]);
+	return sv[1];
 }
 
 int close_connection(int sock, CLOSE_TYPE type)
@@ -731,8 +741,7 @@ end:
 	return retval;
 }
 
-int oversize_test(gchar * hostname, gchar * unixsock, int port, char *name,
-		  int sock, char sock_is_open, char close_sock, int testflags)
+int oversize_test(char *name, int sock, char close_sock, int testflags)
 {
 	int retval = 0;
 	struct nbd_request req;
@@ -744,15 +753,13 @@ int oversize_test(gchar * hostname, gchar * unixsock, int port, char *name,
 	bool got_err;
 
 	/* This should work */
-	if (!sock_is_open) {
-		if ((sock =
-		     setup_connection(hostname, unixsock, port, name,
-				      CONNECTION_TYPE_FULL,
-				      &serverflags, testflags)) < 0) {
-			g_warning("Could not open socket: %s", errstr);
-			retval = -1;
-			goto err;
-		}
+	if ((sock =
+		 setup_connection_common(sock, name,
+				  CONNECTION_TYPE_FULL,
+				  &serverflags, testflags)) < 0) {
+		g_warning("Could not open socket: %s", errstr);
+		retval = -1;
+		goto err;
 	}
 	req.magic = htonl(NBD_REQUEST_MAGIC);
 	req.type = htonl(NBD_CMD_READ);
@@ -816,8 +823,7 @@ err:
 	return retval;
 }
 
-int handshake_test(gchar * hostname, gchar * unixsock, int port, char *name,
-		   int sock, char sock_is_open, char close_sock, int testflags)
+int handshake_test(char *name, int sock, char close_sock, int testflags)
 {
 	int retval = -1;
 	int serverflags = 0;
@@ -825,14 +831,12 @@ int handshake_test(gchar * hostname, gchar * unixsock, int port, char *name,
 	uint32_t tmp32 = 0;
 
 	/* This should work */
-	if (!sock_is_open) {
-		if ((sock =
-		     setup_connection(hostname, unixsock, port, name,
-				      CONNECTION_TYPE_FULL,
-				      &serverflags, testflags)) < 0) {
-			g_warning("Could not open socket: %s", errstr);
-			goto err;
-		}
+	if ((sock =
+		 setup_connection_common(sock, name,
+				  CONNECTION_TYPE_FULL,
+				  &serverflags, testflags)) < 0) {
+		g_warning("Could not open socket: %s", errstr);
+		goto err;
 	}
 
 	/* Intentionally throw an unknown option at the server */
@@ -899,8 +903,7 @@ err:
 	return retval;
 }
 
-int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
-		    int sock, char sock_is_open, char close_sock, int testflags)
+int throughput_test(char *name, int sock, char close_sock, int testflags)
 {
 	long long int i;
 	char writebuf[1024];
@@ -924,20 +927,18 @@ int throughput_test(gchar * hostname, gchar * unixsock, int port, char *name,
 
 	memset(writebuf, 'X', 1024);
 	size = 0;
-	if (!sock_is_open) {
-		if ((sock =
-		     setup_connection(hostname, unixsock, port, name,
-				      CONNECTION_TYPE_FULL,
-				      &serverflags, testflags)) < 0) {
-			g_warning("Could not open socket: %s", errstr);
-			if(testflags & TEST_EXPECT_ERROR) {
-				g_message("Test failed, as expected");
-				retval = 0;
-			} else {
-				retval = -1;
-			}
-			goto err;
+	if ((sock =
+		 setup_connection_common(sock, name,
+				  CONNECTION_TYPE_FULL,
+				  &serverflags, testflags)) < 0) {
+		g_warning("Could not open socket: %s", errstr);
+		if(testflags & TEST_EXPECT_ERROR) {
+			g_message("Test failed, as expected");
+			retval = 0;
+		} else {
+			retval = -1;
 		}
+		goto err;
 	}
 	if ((testflags & TEST_FLUSH)
 	    && ((serverflags & (NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA))
@@ -1170,8 +1171,7 @@ uint64_t getrandomhandle(GHashTable * phash)
 	return handle;
 }
 
-int integrity_test(gchar * hostname, gchar * unixsock, int port, char *name,
-		   int sock, char sock_is_open, char close_sock, int testflags)
+int integrity_test(char *name, int sock, char close_sock, int testflags)
 {
 	struct nbd_reply rep;
 	fd_set rset;
@@ -1203,14 +1203,12 @@ int integrity_test(gchar * hostname, gchar * unixsock, int port, char *name,
 	GHashTable *handlehash = g_hash_table_new(g_int64_hash, g_int64_equal);
 
 	size = 0;
-	if (!sock_is_open) {
-		if ((sock =
-		     setup_connection(hostname, unixsock, port, name,
-				      CONNECTION_TYPE_FULL,
-				      &serverflags, testflags)) < 0) {
-			g_warning("Could not open socket: %s", errstr);
-			goto err;
-		}
+	if ((sock =
+		 setup_connection_common(sock, name,
+				  CONNECTION_TYPE_FULL,
+				  &serverflags, testflags)) < 0) {
+		g_warning("Could not open socket: %s", errstr);
+		goto err;
 	}
 
 	if ((serverflags & (NBD_FLAG_SEND_FLUSH | NBD_FLAG_SEND_FUA))
@@ -1720,14 +1718,14 @@ void handle_nonopt(char *opt, gchar ** hostname, long int *p)
 	}
 }
 
-typedef int (*testfunc) (gchar *, gchar *, int, char *, int, char, char, int);
+typedef int (*testfunc) (char *, int, char, int);
 
 int main(int argc, char **argv)
 {
 	gchar *hostname = NULL, *unixsock = NULL;
-	long int p = 0;
+	long int p = 10809;
 	char *name = NULL;
-	int sock = 0;
+	int sock = -1;
 	int c;
 	int testflags = 0;
 	testfunc test = throughput_test;
@@ -1752,16 +1750,13 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	logging(MY_NAME);
-	while ((c = getopt(argc, argv, "FN:t:owfilu:hC:K:A:H:")) >= 0) {
+	while ((c = getopt(argc, argv, "FN:t:owfilu:hC:K:A:H:I")) >= 0) {
 		switch (c) {
 		case 1:
 			handle_nonopt(optarg, &hostname, &p);
 			break;
 		case 'N':
 			name = g_strdup(optarg);
-			if (!p) {
-				p = 10809;
-			}
 			break;
 		case 'F':
 			testflags |= TEST_EXPECT_ERROR;
@@ -1780,6 +1775,13 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			testflags |= TEST_FLUSH;
+			break;
+		case 'I':
+#ifndef ISSERVER
+			err_nonfatal("inetd mode not supported without syslog support");
+			return 77;
+#endif
+			p = -1;
 			break;
 		case 'i':
 			test = integrity_test;
@@ -1816,8 +1818,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	while (optind < argc) {
-		handle_nonopt(argv[optind++], &hostname, &p);
+	if (p != -1) {
+		while (optind < argc) {
+			handle_nonopt(argv[optind++], &hostname, &p);
+		}
 	}
 
 	if (keyfile && !certfile)
@@ -1826,7 +1830,23 @@ int main(int argc, char **argv)
 	if (!tlshostname && hostname)
 		tlshostname = g_strdup(hostname);
 
-	if (test(hostname, unixsock, (int)p, name, sock, FALSE, TRUE, testflags)
+	if (hostname != NULL) {
+		sock = setup_inet_connection(hostname, p);
+	} else if (unixsock != NULL) {
+		sock = setup_unix_connection(unixsock);
+	} else if (p == -1) {
+		sock = setup_inetd_connection(argv + optind);
+	} else {
+		g_error("need a hostname, a unix domain socket or inetd-mode command line!");
+		return -1;
+	}
+
+	if (sock == -1) {
+		g_warning("Could not establish a connection: %s", errstr);
+		exit(EXIT_FAILURE);
+	}
+
+	if (test(name, sock, TRUE, testflags)
 	    < 0) {
 		g_warning("Could not run test: %s", errstr);
 		exit(EXIT_FAILURE);

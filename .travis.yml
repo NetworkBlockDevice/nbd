@@ -6,4 +6,5 @@ compiler:
   - gcc
 install: 
   - sh .travis/before_install
+group: travis_latest
 script: ./autogen.sh && dpkg-buildpackage -rfakeroot -uc -us -i -I.git

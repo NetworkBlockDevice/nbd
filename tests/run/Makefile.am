@@ -4,20 +4,10 @@ else
 TLSSRC =
 endif
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
-TESTS = cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig list \
-	rowrite tree rotree unix integrityhuge handshake tls tlshuge tlswrongcert
+TESTS = cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig list inetd \
+	rowrite tree rotree unix integrityhuge handshake tls tlswrongcert tlshuge
+XFAIL_TESTS=@RUN_XFAIL@
 check_PROGRAMS = nbd-tester-client
-## Various Automake versions don't play nice with files in parent
-## directories, so instead work with a local copy
-cliserv.c:
-	rm -f cliserv.c
-	ln -s $(top_srcdir)/cliserv.c cliserv.c
-buffer.c:
-	rm -f buffer.c
-	ln -s $(top_srcdir)/buffer.c buffer.c
-crypto-gnutls.c:
-	rm -f crypto-gnutls.c
-	ln -s $(top_srcdir)/crypto-gnutls.c crypto-gnutls.c
 nbd_tester_client_SOURCES = nbd-tester-client.c
 nodist_nbd_tester_client_SOURCES = cliserv.c
 nbd_tester_client_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
@@ -44,6 +34,7 @@ rowrite:
 tree:
 rotree:
 unix:
+inetd:
 handshake:
 tls:
 tlshuge:
