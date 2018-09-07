@@ -6,7 +6,7 @@ set -x
 case $(uname -s) in
 	Linux)
 		sudo apt-get update
-		sudo apt-get install -y docbook-utils libnl-genl-3-dev libgnutls28-dev automake
+		sudo apt-get install -y docbook-utils libnl-genl-3-dev libgnutls28-dev automake fakeroot
 	;;
 	*)
 		for i in man/*sgml
