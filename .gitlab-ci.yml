@@ -1,6 +1,6 @@
 before_script:
-  - apt update
-  - apt install -y devscripts fakeroot build-essential
+  - apt-get update
+  - apt-get install -y devscripts fakeroot build-essential
   - mk-build-deps -i
 build_unstable:
   image: debian:sid
