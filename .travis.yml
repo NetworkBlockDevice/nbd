@@ -1,4 +1,7 @@
 language: c
+branches:
+  except:
+  - debian
 os:
   - linux
 compiler:

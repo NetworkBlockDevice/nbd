@@ -1,0 +1,11 @@
+before_script:
+  - sudo apt install devscripts fakeroot build-essential
+  - sudo mk-build-deps -i
+build_unstable:
+  image: debian:sid
+  script:
+  - dpkg-buildpackage -rfakeroot
+build_testing:
+  image: debian:testing
+  script:
+  - dpkg-buildpackage -rfakeroot
