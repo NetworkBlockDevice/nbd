@@ -1,6 +1,6 @@
 before_script:
-  - sudo apt install devscripts fakeroot build-essential
-  - sudo mk-build-deps -i
+  - apt install devscripts fakeroot build-essential
+  - mk-build-deps -i
 build_unstable:
   image: debian:sid
   script:
