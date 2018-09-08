@@ -319,8 +319,8 @@ if test "x$with_libnl" != "xno"; then
 	PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1,
 		[HAVE_NETLINK=1
 		AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
-		CFLAGS+=" $LIBNL3_CFLAGS"
-		LIBS+=" $LIBNL3_LIBS"],
+		CFLAGS="$CFLAGS $LIBNL3_CFLAGS"
+		LIBS="$LIBS $LIBNL3_LIBS"],
 		[if test "x$with_libnl" = "xyes"; then
 			AC_MSG_ERROR([--with-libnl given but cannot find libnl])
 		else
