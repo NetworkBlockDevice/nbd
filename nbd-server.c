@@ -2595,7 +2595,7 @@ static void handle_write(struct work_package *pkg)
 	if (!pkg->data) {
 		if (expsplice(pkg->pipefd[0], req->from, req->len, client,
 			      SPLICE_OUT, fua)) {
-			DEBUG("Splice failed: %M");
+			DEBUG("Splice failed: %m");
 			rep.error = nbd_errno(errno);
 		}
 	} else
