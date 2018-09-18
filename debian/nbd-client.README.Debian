@@ -85,3 +85,11 @@ you're unlucky).
 To make the above easy, note that you can boot debian-installer with an
 additional command-line option "modules=partman-nbd". After doing so,
 you'll be able to configure nbd from the installer.
+
+Systemd and NBD
+===============
+
+The systemd "nbd" units for nbd-client is a template unit. It needs to
+be provided with a proper instance name, and needs to enabled after
+entering the configuration in nbdtab. For more information, see
+systemd.unit(5) and nbdtab(5).
