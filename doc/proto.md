@@ -330,7 +330,7 @@ specification, the
 [kernel documentation](https://www.kernel.org/doc/Documentation/block/writeback_cache_control.txt)
 may be useful.
 
-#### Request message
+#### Simple request message
 
 The request message, sent by the client, looks as follows:
 
@@ -341,6 +341,60 @@ C: 64 bits, handle
 C: 64 bits, offset (unsigned)  
 C: 32 bits, length (unsigned)  
 C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
+
+#### Structured request message
+
+The structured request message, sent by the client, looks as follows:
+
+C: 32 bits, 0x668e33ef, magic (`NBD_STRUCTURED_REPLY_MAGIC`)  
+C: 64 bits, request length  
+C: 8 bits, header length  
+C: 24 bits, reserved for future use (MUST be zeroed by client, unknown bits
+   MUST be ignored by server)  
+C: 16 bits, command flags  
+C: 16 bits, type  
+C: 64 bits, handle  
+C: 64 bits, offset
+C: 64 bits, affected length
+
+The structured request message can only be used if the following
+conditions are set:
+
+- The client requested block sizes from the server, as set out under
+  `NBD_INFO_BLOCK_SIZE`;
+- The client requested its use during negotiation using the
+  `NBD_OPT_STRUCTURED_REQUEST` option, and the server accepted that
+  request with `NBD_REP_ACK`
+
+If a client negotiated `NBD_OPT_STRUCTURED_REQUEST`, it MUST use
+`NBD_OPT_GO` with `NBD_INFO_BLOCK_SIZE`. The server SHOULD reply to the
+`NBD_OPT_GO` request with `NBD_REP_ERR_BLOCK_SIZE_REQD` in case it does
+not, unless other error conditions are also met in which case it may opt
+to report another error instead.
+
+All fields in the structured request message have the same meaning as
+their counterparts in the simple request message. The three length
+fields have this meaning:
+
+- Affected length: matches the meaning of the length field in the simple
+  request message. Note that the affected length field is 64 bits rather
+  than the 32 of the length field in the simple request message.
+  Regardless of the size of this field, clients MUST abide by the
+  allowed request lengths as provided for by way of the
+  `NBD_INFO_BLOCK_SIZE` datum sent by the server.
+- Header length: the length of the request header. Currently MUST always
+  be 44, although future extensions MAY add extra fields and thus change
+  the header length.
+- Request length: the length of the request as a whole; that is, the
+  length of the header plus any data that was sent by the client along
+  with the request. In the case of `NBD_CMD_WRITE`, this equals header
+  length + affected length; for all other commands, this equals header
+  length (44).
+
+A client MUST use either structured requests or simple requests
+throughout; once structured requests have been negotiated, the use of
+simple requests is not allowed. A server SHOULD reply to a simple
+request with `EINVAL`.
 
 #### Simple reply message
 
