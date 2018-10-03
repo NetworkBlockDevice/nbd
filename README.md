@@ -108,7 +108,7 @@ systems:
 If you're packaging NBD for a different operating system that isn't in
 the above list, I'd like to know about it.
 
-For questions, please use the `nbd-general@lists.sourceforge.net` mailinglist.
+For questions, please use the `[nbd@other.debian.org](mailto:nbd@other.debian.org)` mailinglist.
 
 Badges
 ======

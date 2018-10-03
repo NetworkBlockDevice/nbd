@@ -2157,12 +2157,12 @@ Currently known are:
 * The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
-[mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
+[mailinglist](mailto:nbd@other.debian.org) in order to help
 fine-tune the specifications before committing to a particular
 implementation.
 
 Those proposing further extensions should also contact the
-[mailinglist](mailto:nbd-general@lists.sourceforge.net). It is
+[mailinglist](mailto:nbd@other.debian.org). It is
 possible to reserve command codes etc. within this document
 for such proposed extensions. Aside from that, extensions are
 written as branches which can be merged into master if and
