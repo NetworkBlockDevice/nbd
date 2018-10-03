@@ -333,6 +333,19 @@ else
 	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
 fi
 
+AC_ARG_ENABLE([manpages],
+	AS_HELP_STRING([--disable-manpages], [Do not install man pages]))
+AS_IF([test "x$enable_manpages" != "xno"], [
+	AC_SUBST([MAN_SUBDIR],["man"])
+	AC_SUBST([MAN_CONFIG_FILES],["\
+		man/nbd-client.8.sh \
+		man/nbd-server.5.sh \
+		man/nbd-server.1.sh \
+		man/nbd-trdump.1.sh \
+		man/nbdtab.5.sh \
+		"])
+	])
+
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
 AC_TYPE_PID_T
@@ -351,11 +364,7 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile
-		 man/nbd-client.8.sh
-		 man/nbd-server.5.sh
-		 man/nbd-server.1.sh
-		 man/nbd-trdump.1.sh
-		 man/nbdtab.5.sh
+		 $MAN_CONFIG_FILES
 		 systemd/Makefile
 		 systemd/nbd@.service.sh
 		])
