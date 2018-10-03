@@ -19,7 +19,7 @@ Contributing
 
 If you want to send a patch, please do not open a pull request; instead, send
 it to the
-[mailinglist](https://lists.sourceforge.net/lists/listinfo/nbd-general)
+[mailinglist](https://lists.debian.org/nbd)
 
 Using NBD
 ---------
