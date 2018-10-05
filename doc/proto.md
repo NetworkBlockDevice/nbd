@@ -1049,7 +1049,7 @@ The field has the following format:
   connections to the given device. In particular, if this flag is
   present, then the effects of `NBD_CMD_FLUSH` and `NBD_CMD_FLAG_FUA`
   MUST be visible across all connections when the server sends its reply
-  to that command to the client. In the absense of this flag, clients
+  to that command to the client. In the absence of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
 - bit 9, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
