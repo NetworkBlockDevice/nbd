@@ -3367,18 +3367,19 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
                    const gchar *const modernport, const gchar* unixsock) {
 	struct sigaction sa;
 
-        GError *gerror = NULL;
-        if (open_modern(modernaddr, modernport, &gerror) == -1) {
-                msg(LOG_ERR, "failed to setup servers: %s",
-                    gerror->message);
-                g_clear_error(&gerror);
-                exit(EXIT_FAILURE);
-	}
 	if(unixsock != NULL) {
 		GError* gerror = NULL;
 		if(open_unix(unixsock, &gerror) == -1) {
 			msg(LOG_ERR, "failed to setup servers: %s",
 					gerror->message);
+			g_clear_error(&gerror);
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		GError *gerror = NULL;
+		if (open_modern(modernaddr, modernport, &gerror) == -1) {
+			msg(LOG_ERR, "failed to setup servers: %s",
+				gerror->message);
 			g_clear_error(&gerror);
 			exit(EXIT_FAILURE);
 		}
