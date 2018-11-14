@@ -1942,22 +1942,22 @@ bool copyonwrite_prepare(CLIENT* client) {
 	return true;
 }
 
-void send_export_info(CLIENT* client, bool maybe_zeroes) {
+void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
 	socket_write(client, &size_host, 8);
-	if (client->server->flags & F_READONLY)
+	if (server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
-	if (client->server->flags & F_FLUSH)
+	if (server->flags & F_FLUSH)
 		flags |= NBD_FLAG_SEND_FLUSH;
-	if (client->server->flags & F_FUA)
+	if (server->flags & F_FUA)
 		flags |= NBD_FLAG_SEND_FUA;
-	if (client->server->flags & F_ROTATIONAL)
+	if (server->flags & F_ROTATIONAL)
 		flags |= NBD_FLAG_ROTATIONAL;
-	if (client->server->flags & F_TRIM)
+	if (server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
-	if (!(client->server->flags & F_COPYONWRITE))
+	if (!(server->flags & F_COPYONWRITE))
 		flags |= NBD_FLAG_CAN_MULTI_CONN;
 	flags = htons(flags);
 	socket_write(client, &flags, sizeof(flags));
@@ -2097,7 +2097,7 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			if(!commit_client(client, serve)) {
 				return NULL;
 			}
-			send_export_info(client, true);
+			send_export_info(client, serve, true);
 			return client;
 		}
 	}
@@ -2302,7 +2302,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 			case NBD_INFO_EXPORT:
 				send_reply(client, opt, NBD_REP_INFO, 12, NULL);
 				socket_write(client, &request, 2);
-				send_export_info(client, false);
+				send_export_info(client, server, false);
 				sent_export = true;
 				break;
 			default:
@@ -2314,7 +2314,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		request = htons(NBD_INFO_EXPORT);
 		send_reply(client, opt, NBD_REP_INFO, 12, NULL);
 		socket_write(client, &request, 2);
-		send_export_info(client, false);
+		send_export_info(client, server, false);
 	}
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 
