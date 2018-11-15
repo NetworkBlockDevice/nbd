@@ -356,6 +356,19 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>duallisten</option></term>
+	<listitem>
+	  <para>
+	    Optional; boolean
+	  </para>
+	  <para>
+	    If true, and <option>unixsock</option> is specified, the the
+	    server will listen on both the configured UNIX domain socket
+	    and any configured TCP or SDP socket.  Defaults to false.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
         <term><option>tlsprio</option></term>
 	<listitem>
 	  <para>Optional; string; default NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE</para>
