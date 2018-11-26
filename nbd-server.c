@@ -3378,16 +3378,8 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 			g_clear_error(&gerror);
 			exit(EXIT_FAILURE);
 		}
-		if ((flags & F_DUAL_LISTEN) != 0) {
-			GError *gerror = NULL;
-			if (open_modern(modernaddr, modernport, &gerror) == -1) {
-				msg(LOG_ERR, "failed to setup servers: %s",
-					gerror->message);
-				g_clear_error(&gerror);
-				exit(EXIT_FAILURE);
-			}
-		}
-	} else {
+	}
+	if (((flags & F_DUAL_LISTEN) != 0) || (unixsock == NULL)) {
 		GError *gerror = NULL;
 		if (open_modern(modernaddr, modernport, &gerror) == -1) {
 			msg(LOG_ERR, "failed to setup servers: %s",
