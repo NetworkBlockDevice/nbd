@@ -980,7 +980,7 @@ manpage.1: manpage.sgml
 	    TLS is optional, unless <option>tlsonly</option> is set
             in the generic section. In order for TLS to work at all,
             the <option>keyfile</option> option must be specified in
-            the generic section.</para>
+            the generic section.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -1003,8 +1003,8 @@ manpage.1: manpage.sgml
 	    outstanding writes into it. Once this operation finishes,
 	    the diff file will be removed, and the server will allow
 	    normal use of the export.</para>
-	  </para>This allows the out-of-band live migration of an export
-	    from one server to another.
+	  <para>This allows the out-of-band live migration of an export
+	    from one server to another.</para>
 	  <para>Note that this option cannot be combined with the
 	    copy-on-write option itself.</para>
 	</listitem>
