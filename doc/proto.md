@@ -2169,6 +2169,75 @@ written as branches which can be merged into master if and
 when those extensions are promoted to the normative version
 of the document in the master branch.
 
+## Compatibility and interoperability
+
+Originally, the NBD protocol was a fairly simple protocol with few
+options. While the basic protocol is still reasonably simple, a growing
+number of extensions has been implemented that may make the protocol
+description seem overwhelming at first.
+
+In an effort to not overwhelm first-time implementors with various
+options and features that may or may not be important for their use
+case, while at the same time desiring maximum interoperability, this
+section tries to clarify what is optional and what is expected to be
+available in all implementations.
+
+All protocol options and messages not explicitly mentioned below should
+be considered optional features that MAY be negotiated between client
+and server, but are not required to be available.
+
+### Baseline
+
+The following MUST be implemented by all implementations, and should be
+considered a baseline:
+
+- NOTLS mode
+- The fixed newstyle handshake
+- During the handshake:
+
+    - the `NBD_OPT_INFO` and `NBD_OPT_GO` messages, with the
+      `NBD_INFO_EXPORT` response.
+    - Servers that receive messages which they do not implement MUST
+      reply to them with `NBD_OPT_UNSUP`, and MUST NOT fail to parse
+      the next message received.
+    - the `NBD_OPT_ABORT` message, and its response.
+    - the `NBD_OPT_LIST` message and its response.
+
+- During the transmission phase:
+
+    - Simple replies
+    - the `NBD_CMD_READ` message (and its response)
+    - the `NBD_CMD_WRITE` message (and its response)
+    - the `NBD_CMD_DISC` message (and its response)
+
+### Maximum interoperability
+
+Clients and servers that desire maximum interoperability SHOULD
+implement the following features:
+
+- TLS-encrypted communication, which may be required by some
+  implementations or configurations;
+- Servers that implement block constraints through `NBD_INFO_BLOCK_SIZE`
+  and desire maximum interoperability SHOULD NOT require them.
+  Similarly, clients that desire maximum interoperability SHOULD
+  implement querying for block size constraints. Since some older
+  clients default to a block size of 1024 bytes, implementations
+  desiring maximum interoperability MAY default to that size.
+- Clients or servers that desire interoperability with older
+  implementations SHOULD implement the `NBD_OPT_EXPORT_NAME` message in
+  addition to `NBD_OPT_INFO` and `NBD_OPT_GO`.
+- For data safety, implementing `NBD_CMD_FLUSH` and the
+  `NBD_CMD_FLAG_FUA` flag to `NBD_CMD_WRITE` is strongly recommended.
+
+### Future considerations
+
+The following may be moved to the "Maximum interoperability" or
+"Baseline" sections at some point in the future, but some significant
+implementations are not yet ready to support them:
+
+- Structured replies; the Linux kernel currently does not yet implement
+  them.
+
 ## About this file
 
 This file tries to document the NBD protocol as it is currently
