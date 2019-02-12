@@ -1,5 +1,6 @@
-nbd (1:3.18-2) UNRELEASED; urgency=medium
+nbd (1:3.19-1) UNRELEASED; urgency=medium
 
+  * New upstream release
   * Document the fact that we're using template units. Closes: #908977.
 
  -- Wouter Verhelst <wouter@debian.org>  Tue, 18 Sep 2018 09:43:38 +0200
