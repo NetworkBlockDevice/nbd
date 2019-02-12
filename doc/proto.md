@@ -2232,6 +2232,9 @@ implement the following features:
   addition to `NBD_OPT_INFO` and `NBD_OPT_GO`.
 - For data safety, implementing `NBD_CMD_FLUSH` and the
   `NBD_CMD_FLAG_FUA` flag to `NBD_CMD_WRITE` is strongly recommended.
+  Clients that do not implement querying for block size constraints
+  SHOULD abide by the rules laid out in the section "Block size
+  constraints", above.
 
 ### Future considerations
 
