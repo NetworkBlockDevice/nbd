@@ -19,7 +19,7 @@ Contributing
 
 If you want to send a patch, please do not open a pull request; instead, send
 it to the
-[mailinglist](https://lists.sourceforge.net/lists/listinfo/nbd-general)
+[mailinglist](https://lists.debian.org/nbd)
 
 Using NBD
 ---------
@@ -108,7 +108,7 @@ systems:
 If you're packaging NBD for a different operating system that isn't in
 the above list, I'd like to know about it.
 
-For questions, please use the `nbd-general@lists.sourceforge.net` mailinglist.
+For questions, please use the [nbd@other.debian.org](mailto:nbd@other.debian.org) mailinglist.
 
 Badges
 ======

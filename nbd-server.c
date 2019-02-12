@@ -172,6 +172,7 @@ int dontfork = 0;
 #define F_OLDSTYLE 1	  /**< Allow oldstyle (port-based) exports */
 #define F_LIST 2	  /**< Allow clients to list the exports on a server */
 #define F_NO_ZEROES 4	  /**< Do not send zeros to client */
+#define F_DUAL_LISTEN 8	  /**< Listen on both TCP and unix socket */
 // also accepts F_FORCEDTLS (which is 16384)
 GHashTable *children;
 char pidfname[256]; /**< name of our PID file */
@@ -816,6 +817,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "includedir", FALSE, PARAM_STRING,	&cfdir,                   0 },
 		{ "allowlist",  FALSE, PARAM_BOOL,	&(genconftmp.flags),      F_LIST },
 		{ "unixsock",	FALSE, PARAM_STRING,    &(genconftmp.unixsock),   0 },
+		{ "duallisten",	FALSE, PARAM_BOOL,	&(genconftmp.flags),	  F_DUAL_LISTEN }, // Used to listen on both TCP and unix socket
 		{ "max_threads", FALSE, PARAM_INT,	&(genconftmp.threads),	  0 },
 		{ "force_tls", FALSE, PARAM_BOOL,	&(genconftmp.flags),	  F_FORCEDTLS },
 		{ "certfile",   FALSE, PARAM_STRING,    &(genconftmp.certfile),   0 },
@@ -1942,22 +1944,22 @@ bool copyonwrite_prepare(CLIENT* client) {
 	return true;
 }
 
-void send_export_info(CLIENT* client, bool maybe_zeroes) {
+void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
 	uint64_t size_host = htonll((u64)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
 	socket_write(client, &size_host, 8);
-	if (client->server->flags & F_READONLY)
+	if (server->flags & F_READONLY)
 		flags |= NBD_FLAG_READ_ONLY;
-	if (client->server->flags & F_FLUSH)
+	if (server->flags & F_FLUSH)
 		flags |= NBD_FLAG_SEND_FLUSH;
-	if (client->server->flags & F_FUA)
+	if (server->flags & F_FUA)
 		flags |= NBD_FLAG_SEND_FUA;
-	if (client->server->flags & F_ROTATIONAL)
+	if (server->flags & F_ROTATIONAL)
 		flags |= NBD_FLAG_ROTATIONAL;
-	if (client->server->flags & F_TRIM)
+	if (server->flags & F_TRIM)
 		flags |= NBD_FLAG_SEND_TRIM;
-	if (!(client->server->flags & F_COPYONWRITE))
+	if (!(server->flags & F_COPYONWRITE))
 		flags |= NBD_FLAG_CAN_MULTI_CONN;
 	flags = htons(flags);
 	socket_write(client, &flags, sizeof(flags));
@@ -2097,7 +2099,7 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 			if(!commit_client(client, serve)) {
 				return NULL;
 			}
-			send_export_info(client, true);
+			send_export_info(client, serve, true);
 			return client;
 		}
 	}
@@ -2302,7 +2304,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 			case NBD_INFO_EXPORT:
 				send_reply(client, opt, NBD_REP_INFO, 12, NULL);
 				socket_write(client, &request, 2);
-				send_export_info(client, false);
+				send_export_info(client, server, false);
 				sent_export = true;
 				break;
 			default:
@@ -2314,7 +2316,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		request = htons(NBD_INFO_EXPORT);
 		send_reply(client, opt, NBD_REP_INFO, 12, NULL);
 		socket_write(client, &request, 2);
-		send_export_info(client, false);
+		send_export_info(client, server, false);
 	}
 	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
 
@@ -2595,7 +2597,7 @@ static void handle_write(struct work_package *pkg)
 	if (!pkg->data) {
 		if (expsplice(pkg->pipefd[0], req->from, req->len, client,
 			      SPLICE_OUT, fua)) {
-			DEBUG("Splice failed: %M");
+			DEBUG("Splice failed: %m");
 			rep.error = nbd_errno(errno);
 		}
 	} else
@@ -3364,21 +3366,24 @@ out:
  * Connect our servers.
  **/
 void setup_servers(GArray *const servers, const gchar *const modernaddr,
-                   const gchar *const modernport, const gchar* unixsock) {
+                   const gchar *const modernport, const gchar* unixsock,
+                   const gint flags ) {
 	struct sigaction sa;
 
-        GError *gerror = NULL;
-        if (open_modern(modernaddr, modernport, &gerror) == -1) {
-                msg(LOG_ERR, "failed to setup servers: %s",
-                    gerror->message);
-                g_clear_error(&gerror);
-                exit(EXIT_FAILURE);
-	}
 	if(unixsock != NULL) {
 		GError* gerror = NULL;
 		if(open_unix(unixsock, &gerror) == -1) {
 			msg(LOG_ERR, "failed to setup servers: %s",
 					gerror->message);
+			g_clear_error(&gerror);
+			exit(EXIT_FAILURE);
+		}
+	}
+	if (((flags & F_DUAL_LISTEN) != 0) || (unixsock == NULL)) {
+		GError *gerror = NULL;
+		if (open_modern(modernaddr, modernport, &gerror) == -1) {
+			msg(LOG_ERR, "failed to setup servers: %s",
+				gerror->message);
 			g_clear_error(&gerror);
 			exit(EXIT_FAILURE);
 		}
@@ -3567,7 +3572,7 @@ int main(int argc, char *argv[]) {
 	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
 
 	setup_servers(servers, genconf.modernaddr, genconf.modernport,
-			genconf.unixsock);
+			genconf.unixsock, genconf.flags);
 	dousers(genconf.user, genconf.group);
 
 #if HAVE_GNUTLS

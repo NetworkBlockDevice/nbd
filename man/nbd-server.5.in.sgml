@@ -350,7 +350,21 @@ manpage.1: manpage.sgml
 	  <para>
 	    If specified, the server will listen on a UNIX domain socket
 	    with the specified name. Only newstyle negotiation is
-	    supported on UNIX domain sockets.
+	    supported on UNIX domain sockets. If a UNIX domain socket is,
+	    then the server will not listen for TCP connections.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>duallisten</option></term>
+	<listitem>
+	  <para>
+	    Optional; boolean
+	  </para>
+	  <para>
+	    If true, and <option>unixsock</option> is specified, the the
+	    server will listen on both the configured UNIX domain socket
+	    and any configured TCP or SDP socket.  Defaults to false.
 	  </para>
 	</listitem>
       </varlistentry>

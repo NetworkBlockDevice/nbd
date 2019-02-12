@@ -910,7 +910,7 @@ void usage(char* errmsg, ...) {
 #if HAVE_GNUTLS && !defined(NOTLS)
 	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n");
 #endif
-	fprintf(stderr, "Default value for blocksize is 1024 (recommended for ethernet)\n");
+	fprintf(stderr, "Default value for blocksize is 512\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
 	fprintf(stderr, "Note, that kernel 2.4.2 and older ones do not work correctly with\n");
 	fprintf(stderr, "blocksizes other than 1024 without patches\n");
@@ -941,7 +941,7 @@ static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pSst:uVx";
 int main(int argc, char *argv[]) {
 	char* port=NBD_DEFAULT_PORT;
 	int sock, nbd;
-	int blocksize=1024;
+	int blocksize=512;
 	char *hostname=NULL;
 	char *nbddev=NULL;
 	int swap=0;

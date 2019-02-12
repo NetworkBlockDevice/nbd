@@ -319,8 +319,8 @@ if test "x$with_libnl" != "xno"; then
 	PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1,
 		[HAVE_NETLINK=1
 		AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
-		CFLAGS+=" $LIBNL3_CFLAGS"
-		LIBS+=" $LIBNL3_LIBS"],
+		CFLAGS="$CFLAGS $LIBNL3_CFLAGS"
+		LIBS="$LIBS $LIBNL3_LIBS"],
 		[if test "x$with_libnl" = "xyes"; then
 			AC_MSG_ERROR([--with-libnl given but cannot find libnl])
 		else
@@ -332,6 +332,19 @@ else
 	HAVE_NETLINK=0
 	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
 fi
+
+AC_ARG_ENABLE([manpages],
+	AS_HELP_STRING([--disable-manpages], [Do not install man pages]))
+AM_CONDITIONAL(MANPAGES, test "x$enablemanpages" != "xno")
+AS_IF([test "x$enable_manpages" != "xno"], [
+	AC_SUBST([MAN_CONFIG_FILES],["\
+		man/nbd-client.8.sh \
+		man/nbd-server.5.sh \
+		man/nbd-server.1.sh \
+		man/nbd-trdump.1.sh \
+		man/nbdtab.5.sh \
+		"])
+	])
 
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
@@ -351,11 +364,11 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile
-		 man/nbd-client.8.sh
-		 man/nbd-server.5.sh
-		 man/nbd-server.1.sh
-		 man/nbd-trdump.1.sh
-		 man/nbdtab.5.sh
+                 man/nbd-client.8.sh
+                 man/nbd-server.5.sh
+                 man/nbd-server.1.sh
+                 man/nbd-trdump.1.sh
+                 man/nbdtab.5.sh
 		 systemd/Makefile
 		 systemd/nbd@.service.sh
 		])

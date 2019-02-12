@@ -124,6 +124,7 @@ int readit(int f, void *buf, size_t len) {
 				return -1;
 			}
 		} else {
+			errno = ECONNRESET;
 			return -1;
 		}
 	}

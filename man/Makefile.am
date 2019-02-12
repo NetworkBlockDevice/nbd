@@ -1,3 +1,4 @@
+if MANPAGES
 man_MANS = nbd-server.1 nbd-server.5 nbd-client.8 nbd-trdump.1 nbdtab.5
 CLEANFILES = manpage.links manpage.refs
 DISTCLEANFILES = nbd-server.1 nbd-client.8 nbd-server.5 nbd-trdump.1 nbdtab.5
@@ -44,3 +45,4 @@ nbdtab.5.sh.in: nbdtab.5.in.sgml sh.tmpl
 	cat NBDTAB.5 >> nbdtab.5.sh.in
 	echo "EOF" >> nbdtab.5.sh.in
 	rm NBDTAB.5
+endif

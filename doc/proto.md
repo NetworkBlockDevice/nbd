@@ -1049,7 +1049,7 @@ The field has the following format:
   connections to the given device. In particular, if this flag is
   present, then the effects of `NBD_CMD_FLUSH` and `NBD_CMD_FLAG_FUA`
   MUST be visible across all connections when the server sends its reply
-  to that command to the client. In the absense of this flag, clients
+  to that command to the client. In the absence of this flag, clients
   SHOULD NOT multiplex their commands over more than one connection to
   the export.
 - bit 9, `NBD_FLAG_SEND_RESIZE`: defined by the experimental `RESIZE`
@@ -2157,12 +2157,12 @@ Currently known are:
 * The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
 Implementors of these extensions are strongly suggested to contact the
-[mailinglist](mailto:nbd-general@lists.sourceforge.net) in order to help
+[mailinglist](mailto:nbd@other.debian.org) in order to help
 fine-tune the specifications before committing to a particular
 implementation.
 
 Those proposing further extensions should also contact the
-[mailinglist](mailto:nbd-general@lists.sourceforge.net). It is
+[mailinglist](mailto:nbd@other.debian.org). It is
 possible to reserve command codes etc. within this document
 for such proposed extensions. Aside from that, extensions are
 written as branches which can be merged into master if and
