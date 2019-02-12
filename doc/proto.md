@@ -2220,9 +2220,9 @@ implement the following features:
 - Servers that implement block constraints through `NBD_INFO_BLOCK_SIZE`
   and desire maximum interoperability SHOULD NOT require them.
   Similarly, clients that desire maximum interoperability SHOULD
-  implement querying for block size constraints. Since some older
-  clients default to a block size of 1024 bytes, implementations
-  desiring maximum interoperability MAY default to that size.
+  implement querying for block size constraints. Since some clients
+  default to a block size of 512 bytes, implementations desiring maximum
+  interoperability MAY default to that size.
 - Clients or servers that desire interoperability with older
   implementations SHOULD implement the `NBD_OPT_EXPORT_NAME` message in
   addition to `NBD_OPT_INFO` and `NBD_OPT_GO`.
