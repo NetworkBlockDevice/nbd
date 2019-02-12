@@ -2211,6 +2211,9 @@ considered a baseline:
       implementation is a client that does not wish to write
     - the `NBD_CMD_DISC` message (and its response)
 
+Clients that wish to use more messages MUST negotiate them during the
+handshake phase, first.
+
 ### Maximum interoperability
 
 Clients and servers that desire maximum interoperability SHOULD
