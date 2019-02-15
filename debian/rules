@@ -9,8 +9,7 @@ DEB_HOST_GNU_SYSTEM := $(shell dpkg-architecture -qDEB_HOST_GNU_SYSTEM)
 
 override_dh_auto_configure: debian/po/templates.pot
 	test -f nbd.h
-	if [ -d .git ]; then if [ $$(git status --porcelain | tee gitstatus | wc -l) -ne 1 ]; then echo "GIT STATUS:"; echo "==========="; cat gitstatus; exit 1; fi; fi
-	rm gitstatus
+	if [ -d .git ]; then if [ $$(git status --porcelain | tee gitstatus | wc -l) -ne 1 ]; then echo "GIT STATUS:"; echo "==========="; cat gitstatus; exit 1; fi; rm gitstatus; fi
 	dh_auto_configure -- --enable-lfs --enable-syslog \
 			--prefix=/ --mandir=/usr/share/man
 
