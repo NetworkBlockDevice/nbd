@@ -1,8 +1,8 @@
-nbd (1:3.19-2) UNRELEASED; urgency=medium
+nbd (1:3.19-2) unstable; urgency=medium
 
   * Don't remove nonexisting files...
 
- -- Wouter Verhelst <wouter@debian.org>  Fri, 15 Feb 2019 06:09:11 +0100
+ -- Wouter Verhelst <wouter@debian.org>  Fri, 15 Feb 2019 06:25:31 +0100
 
 nbd (1:3.19-1) unstable; urgency=medium
 
