@@ -1070,6 +1070,18 @@ The field has the following format:
   which support the command without advertising this bit, and
   conversely that this bit does not guarantee that the command will
   succeed or have an impact.
+- bit 11, `NBD_FLAG_SEND_FAST_ZERO`: allow clients to detect whether
+  `NBD_CMD_WRITE_ZEROES` is faster than a corresponding write. The
+  server MUST set this transmission flag to 1 if the
+  `NBD_CMD_WRITE_ZEROES` request supports the `NBD_CMD_FLAG_FAST_ZERO`
+  flag, and MUST set this transmission flag to 0 if
+  `NBD_FLAG_SEND_WRITE_ZEROES` is not set. Servers MAY set this this
+  transmission flag even if it will always use `NBD_ENOTSUP` failures for
+  requests with `NBD_CMD_FLAG_FAST_ZERO` set (such as if the server
+  cannot quickly determine whether a particular write zeroes request
+  will be faster than a regular write). Clients MUST NOT set the
+  `NBD_CMD_FLAG_FAST_ZERO` request flag unless this transmission flag
+  is set.
 
 Clients SHOULD ignore unknown flags.
 
@@ -1647,6 +1659,12 @@ valid may depend on negotiation during the handshake phase.
   MUST NOT send metadata on more than one extent in the reply. Client
   implementors should note that using this flag on multiple contiguous
   requests is likely to be inefficient.
+- bit 4, `NBD_CMD_FLAG_FAST_ZERO`; valid during
+  `NBD_CMD_WRITE_ZEROES`. If set, but the server cannot perform the
+  write zeroes any faster than it would for an equivalent
+  `NBD_CMD_WRITE`, then the server MUST fail quickly with an error of
+  `NBD_ENOTSUP`. The client MUST NOT set this unless the server advertised
+  `NBD_FLAG_SEND_FAST_ZERO`.
 
 ##### Structured reply flags
 
@@ -2015,7 +2033,10 @@ The following request types exist:
     reached permanent storage, unless `NBD_CMD_FLAG_FUA` is in use.
 
     A client MUST NOT send a write zeroes request unless
-    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
+    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags
+    field. Additionally, a client MUST NOT send the
+    `NBD_CMD_FLAG_FAST_ZERO` flag unless `NBD_FLAG_SEND_FAST_ZERO` was
+    set in the transmission flags field.
 
     By default, the server MAY use trimming to zero out the area, even
     if it did not advertise `NBD_FLAG_SEND_TRIM`; but it MUST ensure
@@ -2024,6 +2045,48 @@ The following request types exist:
     area MUST be fully provisioned, ensuring that future writes to the
     same area will not cause fragmentation or cause failure due to
     insufficient space.
+
+    If the server advertised `NBD_FLAG_SEND_FAST_ZERO` but
+    `NBD_CMD_FLAG_FAST_ZERO` is not set, then the server MUST NOT fail
+    with `NBD_ENOTSUP`, even if the operation is no faster than a
+    corresponding `NBD_CMD_WRITE`. Conversely, if
+    `NBD_CMD_FLAG_FAST_ZERO` is set, the server MUST fail quickly with
+    `NBD_ENOTSUP` unless the request can be serviced in less time than
+    a corresponding `NBD_CMD_WRITE`, and SHOULD NOT alter the contents
+    of the export when returning this failure. The server's
+    determination on whether to fail a fast request MAY depend on a
+    number of factors, such as whether the request was suitably
+    aligned, on whether the `NBD_CMD_FLAG_NO_HOLE` flag was present,
+    or even on whether a previous `NBD_CMD_TRIM` had been performed on
+    the region.  If the server did not advertise
+    `NBD_FLAG_SEND_FAST_ZERO`, then it SHOULD NOT fail with
+    `NBD_ENOTSUP`, regardless of the speed of servicing a request, and
+    SHOULD fail with `NBD_EINVAL` if the `NBD_CMD_FLAG_FAST_ZERO` flag
+    was set. A server MAY advertise `NBD_FLAG_SEND_FAST_ZERO` whether
+    or not it will actually succeed on a fast zero request (a fast
+    failure of `NBD_ENOTSUP` still counts as a fast response);
+    similarly, a server SHOULD fail a fast zero request with
+    `NBD_ENOTSUP` if the server cannot quickly determine in advance
+    whether proceeding with the request would be fast, even if it
+    turns out that the same request without the flag would be fast
+    after all.
+
+    One intended use of a fast zero request is optimizing the copying
+    of a sparse image source into the export: a client can request
+    fast zeroing of the entire export, and if it succeeds, follow that
+    with write requests to just the data portions before a single
+    flush of the entire image, for fewer transactions overall.  On the
+    other hand, if the fast zero request fails, the fast failure lets
+    the client know that it must manually write zeroes corresponding
+    to the holes of the source image before a final flush, for more
+    transactions but with no time lost to duplicated I/O to the data
+    portions.  Knowing this usage pattern can help decide whether a
+    server's implementation for writing zeroes counts as fast (for
+    example, a successful fast zero request may start a background
+    operation that would cause the next flush request to take longer,
+    but that is okay as long as intermediate writes before that flush
+    do not further lengthen the time spent on the overall sequence of
+    operations).
 
     If an error occurs, the server MUST set the appropriate error code
     in the error field.
@@ -2125,6 +2188,7 @@ The following error values are defined:
 * `NBD_EINVAL` (22), Invalid argument.
 * `NBD_ENOSPC` (28), No space left on device.
 * `NBD_EOVERFLOW` (75), Value too large.
+* `NBD_ENOTSUP` (95), Operation not supported.
 * `NBD_ESHUTDOWN` (108), Server is in the process of being shut down.
 
 The server SHOULD return `NBD_ENOSPC` if it receives a write request
@@ -2138,6 +2202,10 @@ read-only export.
 
 The server SHOULD NOT return `NBD_EOVERFLOW` except as documented in
 response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported.
+
+The server SHOULD NOT return `NBD_ENOTSUP` except as documented in
+response to `NBD_CMD_WRITE_ZEROES` when `NBD_CMD_FLAG_FAST_ZERO` is
+supported.
 
 The server SHOULD return `NBD_EINVAL` if it receives an unknown command.
 
