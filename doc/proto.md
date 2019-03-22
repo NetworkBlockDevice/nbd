@@ -2209,7 +2209,8 @@ considered a baseline:
     - the `NBD_CMD_READ` message (and its response)
     - the `NBD_CMD_WRITE` message (and its response), unless the
       implementation is a client that does not wish to write
-    - the `NBD_CMD_DISC` message (and its response)
+    - the `NBD_CMD_DISC` message (and its resulting effects, although
+      no response is involved)
 
 Clients that wish to use more messages MUST negotiate them during the
 handshake phase, first.
