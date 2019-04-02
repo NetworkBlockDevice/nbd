@@ -3005,18 +3005,18 @@ static int get_index_by_servename(const gchar *const servename,
  * is unique among all other servers.
  *
  * @param servers an array of servers
+ * @param genconf a pointer to generic configuration
  * @return the number of new servers appended to the array, or -1 in
  *         case of an error
  **/
-static int append_new_servers(GArray *const servers, GError **const gerror) {
+static int append_new_servers(GArray *const servers, struct generic_conf *genconf, GError **const gerror) {
         int i;
         GArray *new_servers;
         const int old_len = servers->len;
         int retval = -1;
-        struct generic_conf genconf;
 
-        new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
-	g_thread_pool_set_max_threads(tpool, genconf.threads, NULL);
+        new_servers = parse_cfile(config_file_pos, genconf, true, gerror);
+        g_thread_pool_set_max_threads(tpool, genconf->threads, NULL);
         if (!new_servers)
                 goto out;
 
@@ -3127,7 +3127,7 @@ void serveloop(GArray* servers, struct generic_conf *genconf) {
                         is_sighup_caught = 0; /* Reset to allow catching
                                                * it again. */
 
-                        n = append_new_servers(servers, &gerror);
+                        n = append_new_servers(servers, genconf, &gerror);
                         if (n == -1)
                                 msg(LOG_ERR, "failed to append new servers: %s",
                                     gerror->message);
