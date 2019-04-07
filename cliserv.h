@@ -76,7 +76,8 @@ int set_nonblocking(int fd, int nb);
 void setmysockopt(int sock);
 void err_nonfatal(const char *s);
 
-void err(const char *s) G_GNUC_NORETURN;
+void nbd_err(const char *s) G_GNUC_NORETURN;
+#define err(S) nbd_err(S)
 
 void logging(const char* name);
 
