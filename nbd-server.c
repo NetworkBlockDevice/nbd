@@ -1583,6 +1583,7 @@ void punch_hole(int fd, off_t off, off_t len) {
 	HANDLE w32handle = (HANDLE)_get_osfhandle(fd);
 	DWORD bytesret;
 	DeviceIoControl(w32handle, FSCTL_SET_ZERO_DATA, &zerodata, sizeof(zerodata), NULL, 0, &bytesret, NULL);
+	return;
 #endif
 	if(errno) {
 		DEBUG("punching holes failed: %s", strerror(errno));
