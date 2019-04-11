@@ -95,6 +95,9 @@
 #if HAVE_FALLOC_PH
 #include <linux/falloc.h>
 #endif
+#if HAVE_BLKDISCARD
+#include <linux/fs.h>
+#endif
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
@@ -1555,19 +1558,37 @@ int expflush(CLIENT *client) {
 }
 
 void punch_hole(int fd, off_t off, off_t len) {
-	DEBUG("punching hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
+	DEBUG("Request to punch a hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
+	errno = 0;
+// fallocate -- files, Linux
 #if HAVE_FALLOC_PH
-	fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len);
-#elif HAVE_FSCTL_SET_ZERO_DATA
+	do {
+		if(fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len) == 0)
+			return;
+	} while(errno == EINTR);
+#endif
+// ioctl(BLKDISCARD) -- block devices, Linux
+#if HAVE_BLKDISCARD
+	uint64_t range[2] = {off, len};
+	do {
+		if(ioctl(fd, BLKDISCARD, range) == 0)
+			return;
+	} while(errno == EINTR);
+#endif
+// Windows
+#if HAVE_FSCTL_SET_ZERO_DATA
 	FILE_ZERO_DATA_INFORMATION zerodata;
 	zerodata.FileOffset.QuadPart = off;
 	zerodata.BeyondFinalZero.QuadPart = off + len;
 	HANDLE w32handle = (HANDLE)_get_osfhandle(fd);
 	DWORD bytesret;
 	DeviceIoControl(w32handle, FSCTL_SET_ZERO_DATA, &zerodata, sizeof(zerodata), NULL, 0, &bytesret, NULL);
-#else
-	DEBUG("punching holes not supported on this platform\n");
 #endif
+	if(errno) {
+		DEBUG("punching holes failed: %s", strerror(errno));
+	} else {
+		DEBUG("punching holes not supported on this platform\n");
+	}
 }
 
 static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, void* data) {

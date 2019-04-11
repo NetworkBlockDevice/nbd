@@ -142,6 +142,8 @@ else
 	AC_MSG_RESULT([no])
 fi
 
+AC_CHECK_DECL([BLKDISCARD], AC_DEFINE(HAVE_BLKDISCARD, 1, [Define to 1 if you have the BLKDISCARD ioctl]), AC_DEFINE(HAVE_BLKDISCARD, 0), [#include <linux/fs.h>])
+
 AC_CHECK_FUNC(splice, [HAVE_SPLICE=yes], [HAVE_SPLICE=no])
 if test "$HAVE_SPLICE" = "yes"
 then
