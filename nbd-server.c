@@ -714,8 +714,9 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 		switch(NBD_D_TYPE) {
 			case DT_UNKNOWN:
 				/* Filesystem doesn't return type of
-				 * file through readdir. Run stat() on
-				 * the file instead */
+				 * file through readdir, or struct dirent
+				 * doesn't have d_type. Run stat() on the file
+				 * instead */
 				if(stat(fname, &stbuf)) {
 					perror("stat");
 					goto err_out;
