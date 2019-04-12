@@ -11,6 +11,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -26,7 +27,6 @@
 
 #define LINELEN 256	  /**< Size of static buffer used to read the
 			       authorization file (yuck) */
-
 #include <cliserv.h>
 
 bool address_matches(const char* mask, const struct sockaddr* addr, GError** err) {
@@ -280,4 +280,23 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	} while(i < client->export->len && cur.startoff < (req->from + req->len));
 	DEBUG("Performed TRIM request from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
 	return 0;
+}
+
+pthread_mutex_t cntmutex = PTHREAD_MUTEX_INITIALIZER;
+
+SERVER* serve_inc_ref(SERVER *s) {
+	pthread_mutex_lock(&cntmutex);
+	s->refcnt++;
+	pthread_mutex_unlock(&cntmutex);
+	return s;
+}
+
+SERVER* serve_dec_ref(SERVER *s) {
+	pthread_mutex_lock(&cntmutex);
+	if(--(s->refcnt) == 0) {
+		g_free(s);
+		s = NULL;
+	}
+	pthread_mutex_unlock(&cntmutex);
+	return s;
 }

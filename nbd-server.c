@@ -447,6 +447,7 @@ static inline void finalize_client(CLIENT* client) {
 	if(client->server->flags & F_COPYONWRITE) {
 		unlink(client->difffilename);
 	}
+	serve_dec_ref(client->server);
 }
 
 static inline void socket_closed_transmission(CLIENT* client) {
@@ -563,7 +564,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	if(argc==1) {
 		return NULL;
 	}
-	serve=g_new0(SERVER, 1);
+	serve=serve_inc_ref((SERVER*)g_new0(SERVER, 1));
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
 	while((c=getopt_long(argc, argv, "-C:cwdl:mo:rp:M:V", long_options, &i))>=0) {
@@ -664,8 +665,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	/* What's left: the port to export, the name of the to be exported
 	 * file, and, optionally, the size of the file, in that order. */
 	if(nonspecial<2) {
-		g_free(serve);
-		serve=NULL;
+		serve=serve_dec_ref(serve);
 	} else {
 		serve->servename = "";
 	}
@@ -735,7 +735,7 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 					goto err_out;
 				}
 				if(!retval)
-					retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
+					retval = g_array_new(FALSE, TRUE, sizeof(SERVER*));
 				retval = g_array_append_vals(retval, tmp->data, tmp->len);
 				g_array_free(tmp, TRUE);
 			default:
@@ -856,7 +856,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
         }
 
 	cfile = g_key_file_new();
-	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
+	retval = g_array_new(FALSE, TRUE, sizeof(SERVER*));
+	if(expect_generic) {
+		g_array_set_clear_func(retval, (GDestroyNotify)serve_dec_ref);
+	}
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s: %s",
@@ -873,6 +876,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	groups = g_key_file_get_groups(cfile, NULL);
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
+		s.refcnt = 1;
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
@@ -1004,7 +1008,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i>0 || !expect_generic) {
 			s.servename = groups[i];
 
-			g_array_append_val(retval, s);
+			SERVER *srv = g_memdup(&s, sizeof(SERVER));
+			g_array_append_val(retval, srv);
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -2012,7 +2017,7 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 	char acl;
 	uint32_t len;
 
-	client->server = server;
+	client->server = serve_inc_ref(server);
 	client->exportsize = OFFT_MAX;
 	client->transactionlogfd = -1;
 	if(pthread_mutex_init(&(client->lock), NULL)) {
@@ -2110,7 +2115,7 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
-		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		SERVER* serve = (g_array_index(servers, SERVER*, i));
 		// hide exports that are TLS-only if we haven't negotiated TLS
 		// yet
 		if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
@@ -2147,7 +2152,7 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		return;
 	}
 	for(i=0; i<servers->len; i++) {
-		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		SERVER* serve = (g_array_index(servers, SERVER*, i));
 		// Hide TLS-only exports if we haven't negotiated TLS yet
 		if(!client->tls_session && (serve->flags & F_FORCEDTLS)) {
 			continue;
@@ -2295,7 +2300,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
-		SERVER *serve = &(g_array_index(servers, SERVER, i));
+		SERVER *serve = (g_array_index(servers, SERVER*, i));
 		if (!strcmp(serve->servename, name)) {
 			if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
 				reptype = NBD_REP_ERR_TLS_REQD;
@@ -2937,13 +2942,7 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 /* Now that we are in the child process after a
                  * succesful negotiation, we do not need the list of
                  * servers anymore, get rid of it.*/
-                /* FALSE does not free the
-                   actual data. This is required,
-                   because the client has a
-                   direct reference into that
-                   data, and otherwise we get a
-                   segfault... */
-                g_array_free(servers, FALSE);
+                g_array_free(servers, TRUE);
         }
 
         msg(LOG_INFO, "Starting to serve");
@@ -2981,7 +2980,7 @@ static int handle_childname(GArray* servers, int socket)
 	buf[len] = 0;
 	readit(socket, buf, len);
 	for(i=0; i<servers->len; i++) {
-		SERVER* srv = &g_array_index(servers, SERVER, i);
+		SERVER* srv = g_array_index(servers, SERVER*, i);
 		if(strcmp(srv->servename, buf) == 0) {
 			if(srv->max_connections == 0 || srv->max_connections > srv->numclients) {
 				writeit(socket, "Y", 1);
@@ -3012,9 +3011,9 @@ static int get_index_by_servename(const gchar *const servename,
         int i;
 
         for (i = 0; i < servers->len; ++i) {
-                const SERVER server = g_array_index(servers, SERVER, i);
+                const SERVER* server = g_array_index(servers, SERVER*, i);
 
-                if (strcmp(servename, server.servename) == 0)
+                if (strcmp(servename, server->servename) == 0)
                         return i;
         }
 
@@ -3044,10 +3043,10 @@ static int append_new_servers(GArray *const servers, struct generic_conf *gencon
                 goto out;
 
         for (i = 0; i < new_servers->len; ++i) {
-                SERVER new_server = g_array_index(new_servers, SERVER, i);
+                SERVER *new_server = g_array_index(new_servers, SERVER*, i);
 
-                if (new_server.servename
-                    && -1 == get_index_by_servename(new_server.servename,
+                if (new_server->servename
+                    && -1 == get_index_by_servename(new_server->servename,
                                                     servers)) {
 			g_array_append_val(servers, new_server);
                 }
@@ -3156,11 +3155,11 @@ void serveloop(GArray* servers, struct generic_conf *genconf) {
                                     gerror->message);
 
                         for (i = servers->len - n; i < servers->len; ++i) {
-                                const SERVER server = g_array_index(servers,
-                                                                    SERVER, i);
+                                const SERVER *server = g_array_index(servers,
+                                                                    SERVER*, i);
 
                                 msg(LOG_INFO, "reconfigured new server: %s",
-                                    server.servename);
+                                    server->servename);
                         }
                 }
 
@@ -3568,7 +3567,7 @@ int main(int argc, char *argv[]) {
         glob_flags   |= genconf.flags;
 
 	if(serve) {
-		g_array_append_val(servers, *serve);
+		g_array_append_val(servers, serve);
 	}
     
 	if(!servers || !servers->len) {
