@@ -1,0 +1,4 @@
+# This mailmap fixes up author names/addresses.
+# Search for mailmap in 'git shortlog --help' for syntax.
+
+Tuomas Jorma Juhani Räsänen <tuomasjjrasanen@tjjr.fi>
