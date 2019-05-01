@@ -2125,6 +2125,9 @@ request is not aligned to advertised minimum block sizes. Finally, it
 SHOULD return `EPERM` if it receives a write or trim request on a
 read-only export.
 
+The server SHOULD NOT return `EOVERFLOW` except as documented in
+response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported.
+
 The server SHOULD return `EINVAL` if it receives an unknown command.
 
 The server SHOULD return `EINVAL` if it receives an unknown command flag. It
