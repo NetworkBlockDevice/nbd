@@ -2130,14 +2130,18 @@ response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported.
 
 The server SHOULD return `NBD_EINVAL` if it receives an unknown command.
 
-The server SHOULD return `NBD_EINVAL` if it receives an unknown command flag. It
-also SHOULD return `NBD_EINVAL` if it receives a request with a flag not explicitly
-documented as applicable to the given request.
+The server SHOULD return `NBD_EINVAL` if it receives an unknown
+command flag. It also SHOULD return `NBD_EINVAL` if it receives a
+request with a flag not explicitly documented as applicable to the
+given request.
 
 Which error to return in any other case is not specified by the NBD
 protocol.
 
 The server SHOULD NOT return `NBD_ENOMEM` if at all possible.
+
+The client SHOULD treat an unexpected error value as if it had been
+`NBD_EINVAL`, rather than disconnecting from the server.
 
 ## Experimental extensions
 
