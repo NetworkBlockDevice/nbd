@@ -490,6 +490,13 @@ manpage.1: manpage.sgml
 	  <para>When specified on the command line, this should be the
 	    second argument.
 	  </para>
+	  <para><emphasis>Note:</emphasis> this is <emphasis>not</emphasis>
+	  the "exportname" as defined in the protocol document, and
+	  which is the name that <command>nbd-client</command> needs to
+	  pass to select the correct export; the section name is used
+	  for that. The name of the file to be exported is called the
+	  exportname in the configuration file for historical reasons,
+	  and cannot easily be changed.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
