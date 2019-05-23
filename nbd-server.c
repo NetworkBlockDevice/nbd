@@ -1730,7 +1730,9 @@ int set_peername(int net, CLIENT *client) {
 			break;
 	}
 
-	freeaddrinfo(ai);
+	if(ai) {
+		freeaddrinfo(ai);
+	}
         msg(LOG_INFO, "connect from %s, assigned file is %s",
             peername, client->exportname);
 	client->clientname=g_strdup(peername);
