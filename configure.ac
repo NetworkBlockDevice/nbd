@@ -13,6 +13,7 @@ m4_define([serial_tests], [
 ])
 AM_INIT_AUTOMAKE(foreign dist-xz serial_tests subdir-objects)
 AM_MAINTAINER_MODE([enable])
+AM_SILENT_RULES([yes])
 AC_CONFIG_MACRO_DIR([support])
 LT_INIT
 
