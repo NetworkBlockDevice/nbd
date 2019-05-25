@@ -876,7 +876,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	groups = g_key_file_get_groups(cfile, NULL);
 	for(i=0;groups[i];i++) {
 		memset(&s, '\0', sizeof(SERVER));
-		s.refcnt = 1;
 
 		/* After the [generic] group or when we're parsing an include
 		 * directory, start parsing exports */
@@ -1008,7 +1007,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i>0 || !expect_generic) {
 			s.servename = groups[i];
 
-			SERVER *srv = g_memdup(&s, sizeof(SERVER));
+			SERVER *srv = serve_inc_ref(g_memdup(&s, sizeof(SERVER)));
 			g_array_append_val(retval, srv);
 		}
 #ifndef WITH_SDP
