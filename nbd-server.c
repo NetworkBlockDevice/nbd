@@ -2943,7 +2943,7 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 /* Now that we are in the child process after a
                  * succesful negotiation, we do not need the list of
                  * servers anymore, get rid of it.*/
-                g_array_free(servers, TRUE);
+                g_array_free(servers, FALSE);
         }
 
         msg(LOG_INFO, "Starting to serve");
