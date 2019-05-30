@@ -64,6 +64,17 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
+When handling the client-side transmission phase with the Linux
+kernel, the socket between the client and server can use either Unix
+or TCP sockets. For other implementations, the client and server can
+use any agreeable communication channel (a socket is typical, but it
+is also possible to implement the NBD protocol over a pair of
+uni-directional pipes). If TCP sockets are used, both the client and
+server SHOULD disable Nagle's algorithm (that is, use `setsockopt` to
+set the `TCP_NODELAY` option to non-zero), to eliminate artificial
+delays caused by waiting for an ACK response when a large message
+payload spans multiple network packets.
+
 ### Handshake
 
 The handshake is the first phase of the protocol. Its main purpose is to
