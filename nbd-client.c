@@ -933,7 +933,7 @@ void disconnect(char* device) {
 }
 
 #if HAVE_NETLINK
-static const char *short_opts = "-A:b:c:C:d:H:hK:LlnN:pSst:uVx";
+static const char *short_opts = "-A:b:c:C:d:gH:hK:LlnN:pSst:uVx";
 #else
 static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pSst:uVx";
 #endif
