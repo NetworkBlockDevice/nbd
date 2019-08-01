@@ -1052,6 +1052,10 @@ int main(int argc, char *argv[]) {
 		case 'b':
 		      blocksize:
 			blocksize=(int)strtol(optarg, NULL, 0);
+			if(blocksize == 0 || (blocksize % 512) != 0) {
+				fprintf(stderr, "E: blocksize is not a multiple of 512! This is not allowed\n");
+				exit(EXIT_FAILURE);
+			}
 			break;
 		case 'c':
 			return check_conn(optarg, 1);
