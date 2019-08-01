@@ -469,7 +469,7 @@ void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_g
 		err("E: server does not support NBD_OPT_GO and dropped connection after sending NBD_OPT_EXPORT_NAME. Try -g.");
 	}
 	parse_sizes(b, rsize64, flags);
-	if(!global_flags & NBD_FLAG_NO_ZEROES) {
+	if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
 		char buf[125];
 		readit(sock, buf, 124);
 	}
