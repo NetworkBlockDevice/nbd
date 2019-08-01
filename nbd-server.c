@@ -2978,8 +2978,8 @@ static int handle_childname(GArray* servers, int socket)
 		}
 	}
 	buf = g_malloc0(len + 1);
-	buf[len] = 0;
 	readit(socket, buf, len);
+	buf[len] = 0;
 	for(i=0; i<servers->len; i++) {
 		SERVER* srv = g_array_index(servers, SERVER*, i);
 		if(strcmp(srv->servename, buf) == 0) {
