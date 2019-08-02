@@ -622,6 +622,7 @@ int setup_inet_connection(gchar * hostname, int port)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = *((int *)host->h_addr);
+	memset(&addr.sin_zero, 0, sizeof(addr.sin_zero));
 	if ((connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
