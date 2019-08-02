@@ -538,7 +538,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 #endif
 	if(testflags & TEST_EXPECT_ERROR) {
 		struct sigaction act;
-		memset(&act, '0', sizeof act);
+		memset(&act, 0, sizeof act);
 		act.sa_handler = SIG_IGN;
 		sigaction(SIGPIPE, &act, NULL);
 	}
