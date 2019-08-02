@@ -930,6 +930,7 @@ void disconnect(char* device) {
 	if (ioctl(nbd, NBD_CLEAR_SOCK)<0)
 		err("Ioctl failed: %m\n");
 	printf("done\n");
+	close(nbd);
 }
 
 #if HAVE_NETLINK
