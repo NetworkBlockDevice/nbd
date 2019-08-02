@@ -8,6 +8,7 @@ int main(void) {
 	int fd = mkstemp(filename);
 	unlink(filename);
 
+	count_assert(fd >= 0);
 	count_assert(lseek(fd, 1023, SEEK_SET) == 1023);
 	count_assert(write(fd, filename, 1) == 1);
 
