@@ -690,6 +690,7 @@ int close_connection(int sock, CLOSE_TYPE type)
 				 strerror(errno));
 			return -1;
 		}
+		/* falls through */
 	case CONNECTION_CLOSE_FAST:
 		if (close(sock) < 0) {
 			snprintf(errstr, errstr_len,
