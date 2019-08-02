@@ -1780,9 +1780,10 @@ int main(int argc, char **argv)
 #ifndef ISSERVER
 			err_nonfatal("inetd mode not supported without syslog support");
 			return 77;
-#endif
+#else
 			p = -1;
 			break;
+#endif
 		case 'i':
 			test = integrity_test;
 			break;
