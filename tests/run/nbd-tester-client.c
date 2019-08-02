@@ -373,6 +373,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		goto end;
 	READ_ALL_ERRCHK(sock, buf, strlen(INIT_PASSWD), err,
 			"Could not read INIT_PASSWD: %s", strerror(errno));
+	buf[strlen(INIT_PASSWD)] = 0;
 	if (strlen(buf) == 0) {
 		snprintf(errstr, errstr_len, "Server closed connection");
 		goto err;
