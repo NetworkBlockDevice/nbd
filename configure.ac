@@ -13,6 +13,7 @@ m4_define([serial_tests], [
 ])
 AM_INIT_AUTOMAKE(foreign dist-xz serial_tests subdir-objects)
 AM_MAINTAINER_MODE([enable])
+AM_SILENT_RULES([yes])
 AC_CONFIG_MACRO_DIR([support])
 LT_INIT
 
@@ -141,6 +142,8 @@ else
 	AC_DEFINE(HAVE_FALLOC_PH, 0, [Define to 1 if you have FALLOC_FL_PUNCH_HOLE])
 	AC_MSG_RESULT([no])
 fi
+
+AC_CHECK_DECL([BLKDISCARD], AC_DEFINE(HAVE_BLKDISCARD, 1, [Define to 1 if you have the BLKDISCARD ioctl]), AC_DEFINE(HAVE_BLKDISCARD, 0), [#include <linux/fs.h>])
 
 AC_CHECK_FUNC(splice, [HAVE_SPLICE=yes], [HAVE_SPLICE=no])
 if test "$HAVE_SPLICE" = "yes"

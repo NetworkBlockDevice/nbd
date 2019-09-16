@@ -46,6 +46,7 @@ typedef struct {
 	int numclients;      /**< number of clients connected to this export */
 	gchar* transactionlog;/**< filename for transaction log */
 	gchar* cowdir;	     /**< directory for copy-on-write diff files. */
+	int refcnt;	     /**< reference counter */
 } SERVER;
 
 /**
@@ -203,6 +204,20 @@ SERVER* dup_serve(const SERVER *const s);
  * impossible.
  **/
 uint64_t size_autodetect(int fhandle);
+
+/**
+ * increase the ref counter for a SERVER
+ *
+ * @param s the server to increase
+ **/
+SERVER* serve_inc_ref(SERVER *s);
+
+/**
+ * decrement the reference counter or a SERVER
+ *
+ * @param s the server to decrement
+ **/
+SERVER* serve_dec_ref(SERVER *s);
 
 /**
  * Punch a hole in the backend file (if supported by the current system).

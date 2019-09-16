@@ -469,7 +469,7 @@ void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_g
 		err("E: server does not support NBD_OPT_GO and dropped connection after sending NBD_OPT_EXPORT_NAME. Try -g.");
 	}
 	parse_sizes(b, rsize64, flags);
-	if(!global_flags & NBD_FLAG_NO_ZEROES) {
+	if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
 		char buf[125];
 		readit(sock, buf, 124);
 	}
@@ -933,7 +933,7 @@ void disconnect(char* device) {
 }
 
 #if HAVE_NETLINK
-static const char *short_opts = "-A:b:c:C:d:H:hK:LlnN:pSst:uVx";
+static const char *short_opts = "-A:b:c:C:d:gH:hK:LlnN:pSst:uVx";
 #else
 static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pSst:uVx";
 #endif
@@ -1052,6 +1052,10 @@ int main(int argc, char *argv[]) {
 		case 'b':
 		      blocksize:
 			blocksize=(int)strtol(optarg, NULL, 0);
+			if(blocksize == 0 || (blocksize % 512) != 0) {
+				fprintf(stderr, "E: blocksize is not a multiple of 512! This is not allowed\n");
+				exit(EXIT_FAILURE);
+			}
 			break;
 		case 'c':
 			return check_conn(optarg, 1);

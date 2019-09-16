@@ -64,6 +64,17 @@ client to communicate the options to the kernel which were negotiated
 with the server during the handshake. This document does not describe
 those.
 
+When handling the client-side transmission phase with the Linux
+kernel, the socket between the client and server can use either Unix
+or TCP sockets. For other implementations, the client and server can
+use any agreeable communication channel (a socket is typical, but it
+is also possible to implement the NBD protocol over a pair of
+uni-directional pipes). If TCP sockets are used, both the client and
+server SHOULD disable Nagle's algorithm (that is, use `setsockopt` to
+set the `TCP_NODELAY` option to non-zero), to eliminate artificial
+delays caused by waiting for an ACK response when a large message
+payload spans multiple network packets.
+
 ### Handshake
 
 The handshake is the first phase of the protocol. Its main purpose is to
@@ -364,7 +375,7 @@ Some of the major downsides of the default simple reply to
 `NBD_CMD_READ` are as follows.  First, it is not possible to support
 partial reads or early errors (the command must succeed or fail as a
 whole, and either *length* bytes of data must be sent or a hard disconnect
-must be initiated, even if the failure is `EINVAL` due to bad flags).
+must be initiated, even if the failure is `NBD_EINVAL` due to bad flags).
 Second, there is no way to efficiently skip over portions of a sparse
 file that are known to contain all zeroes.  Finally, it is not
 possible to reliably decode the server traffic without also having
@@ -378,7 +389,7 @@ structured replies via `NBD_OPT_STRUCTURED_REPLY`.  Conversely, if
 structured replies are negotiated, the server MUST use a
 structured reply for any response with a payload, and MUST NOT use
 a simple reply for `NBD_CMD_READ` (even for the case of an early
-`EINVAL` due to bad flags), but MAY use either a simple reply or a
+`NBD_EINVAL` due to bad flags), but MAY use either a simple reply or a
 structured reply to all other requests.  The server SHOULD prefer
 sending errors via a structured reply, as the error can then be
 accompanied by a string payload to present to a human user.
@@ -436,9 +447,9 @@ On a server shutdown, the server SHOULD wait for inflight
 requests to be serviced prior to initiating a hard disconnect.
 A server MAY speed this process up by issuing error replies.
 The error value issued in respect of these requests and
-any subsequently received requests SHOULD be `ESHUTDOWN`.
+any subsequently received requests SHOULD be `NBD_ESHUTDOWN`.
 
-If the client receives an `ESHUTDOWN` error it MUST initiate
+If the client receives an `NBD_ESHUTDOWN` error it MUST initiate
 a soft disconnect.
 
 The client MAY issue a soft disconnect at any time, but
@@ -806,7 +817,7 @@ multiples of any advertised minimum block size, and SHOULD use integer
 multiples of any advertised preferred block size where possible.  For
 those requests, the client MUST NOT use a *length* larger than any
 advertised maximum block size or which, when added to *offset*, would
-exceed the export size.  The server SHOULD report an `EINVAL` error if
+exceed the export size.  The server SHOULD report an `NBD_EINVAL` error if
 the client's request is not aligned to advertised minimum block size
 boundaries, or is larger than the advertised maximum block size.
 Notwithstanding any maximum block size advertised, either the server
@@ -818,7 +829,7 @@ be considered a denial of service attack (even if the advertised
 maximum block size is smaller).  For all other commands, where the
 *length* is not reflected in the payload (such as `NBD_CMD_TRIM` or
 `NBD_CMD_WRITE_ZEROES`), a server SHOULD merely fail the command with
-an `EINVAL` error for a client that exceeds the maximum block size,
+an `NBD_EINVAL` error for a client that exceeds the maximum block size,
 rather than initiating a hard disconnect.
 
 ## Metadata querying
@@ -864,7 +875,7 @@ The procedure works as follows:
 A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
 nonzero number of metadata contexts during negotiation, and used the
 same export name for the subsequent `NBD_OPT_GO` (or
-`NBD_OPT_EXPORT_NAME`). Servers SHOULD reply with `EINVAL` to clients
+`NBD_OPT_EXPORT_NAME`). Servers SHOULD reply with `NBD_EINVAL` to clients
 sending `NBD_CMD_BLOCK_STATUS` without selecting at least one metadata
 context.
 
@@ -933,17 +944,17 @@ The `base:allocation` metadata context is the basic "allocated at all"
 metadata context. If an extent is marked with `NBD_STATE_HOLE` at that
 context, this means that the given extent is not allocated in the
 backend storage, and that writing to the extent MAY result in the
-`ENOSPC` error. This supports sparse file semantics on the server
+`NBD_ENOSPC` error. This supports sparse file semantics on the server
 side.  If a server supports the `base:allocation` metadata context,
 then writing to an extent which has `NBD_STATE_HOLE` clear MUST NOT
-fail with `ENOSPC` unless for reasons specified in the definition of
+fail with `NBD_ENOSPC` unless for reasons specified in the definition of
 another context.
 
 It defines the following flags for the flags field:
 
 - `NBD_STATE_HOLE` (bit 0): if set, the block represents a hole (and
   future writes to that area may cause fragmentation or encounter an
-  `ENOSPC` error); if clear, the block is allocated or the server
+  `NBD_ENOSPC` error); if clear, the block is allocated or the server
   could not otherwise determine its status. Note that the use of
   `NBD_CMD_TRIM` is related to this status, but that the server MAY
   report a hole even where `NBD_CMD_TRIM` has not been requested, and
@@ -1059,6 +1070,18 @@ The field has the following format:
   which support the command without advertising this bit, and
   conversely that this bit does not guarantee that the command will
   succeed or have an impact.
+- bit 11, `NBD_FLAG_SEND_FAST_ZERO`: allow clients to detect whether
+  `NBD_CMD_WRITE_ZEROES` is faster than a corresponding write. The
+  server MUST set this transmission flag to 1 if the
+  `NBD_CMD_WRITE_ZEROES` request supports the `NBD_CMD_FLAG_FAST_ZERO`
+  flag, and MUST set this transmission flag to 0 if
+  `NBD_FLAG_SEND_WRITE_ZEROES` is not set. Servers MAY set this this
+  transmission flag even if it will always use `NBD_ENOTSUP` failures for
+  requests with `NBD_CMD_FLAG_FAST_ZERO` set (such as if the server
+  cannot quickly determine whether a particular write zeroes request
+  will be faster than a regular write). Clients MUST NOT set the
+  `NBD_CMD_FLAG_FAST_ZERO` request flag unless this transmission flag
+  is set.
 
 Clients SHOULD ignore unknown flags.
 
@@ -1628,7 +1651,7 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_READ`.  SHOULD be set to 1 if the client requires the
   server to send at most one content chunk in reply.  MUST NOT be set
   unless the transmission flags include `NBD_FLAG_SEND_DF`.  Use of
-  this flag MAY trigger an `EOVERFLOW` error chunk, if the request
+  this flag MAY trigger an `NBD_EOVERFLOW` error chunk, if the request
   length is too large.
 - bit 3, `NBD_CMD_FLAG_REQ_ONE`; valid during
   `NBD_CMD_BLOCK_STATUS`. If set, the client is interested in only one
@@ -1636,6 +1659,12 @@ valid may depend on negotiation during the handshake phase.
   MUST NOT send metadata on more than one extent in the reply. Client
   implementors should note that using this flag on multiple contiguous
   requests is likely to be inefficient.
+- bit 4, `NBD_CMD_FLAG_FAST_ZERO`; valid during
+  `NBD_CMD_WRITE_ZEROES`. If set, but the server cannot perform the
+  write zeroes any faster than it would for an equivalent
+  `NBD_CMD_WRITE`, then the server MUST fail quickly with an error of
+  `NBD_ENOTSUP`. The client MUST NOT set this unless the server advertised
+  `NBD_FLAG_SEND_FAST_ZERO`.
 
 ##### Structured reply flags
 
@@ -1892,7 +1921,7 @@ The following request types exist:
     chunks or a final type of `NBD_REPLY_TYPE_NONE`).  If the area
     being read contains both data and a hole, the server MUST use
     `NBD_REPLY_TYPE_OFFSET_DATA` with the zeroes explicitly present.
-    A server MAY reject a client's request with the error `EOVERFLOW`
+    A server MAY reject a client's request with the error `NBD_EOVERFLOW`
     if the length is too large to send without fragmentation, in which
     case it MUST NOT send a content chunk; however, the server MUST
     support unfragmented reads in which the client's request length
@@ -1989,7 +2018,7 @@ The following request types exist:
     transmission flags field, however, these implementations do not
     use any command flags.  A server MAY advertise
     `NBD_FLAG_SEND_CACHE` even if the command has no effect or always
-    fails with `EINVAL`; however, if it advertised the command, the
+    fails with `NBD_EINVAL`; however, if it advertised the command, the
     server MUST reject any command flags it does not recognize.
 
 * `NBD_CMD_WRITE_ZEROES` (6)
@@ -2004,7 +2033,10 @@ The following request types exist:
     reached permanent storage, unless `NBD_CMD_FLAG_FUA` is in use.
 
     A client MUST NOT send a write zeroes request unless
-    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags field.
+    `NBD_FLAG_SEND_WRITE_ZEROES` was set in the transmission flags
+    field. Additionally, a client MUST NOT send the
+    `NBD_CMD_FLAG_FAST_ZERO` flag unless `NBD_FLAG_SEND_FAST_ZERO` was
+    set in the transmission flags field.
 
     By default, the server MAY use trimming to zero out the area, even
     if it did not advertise `NBD_FLAG_SEND_TRIM`; but it MUST ensure
@@ -2014,12 +2046,54 @@ The following request types exist:
     same area will not cause fragmentation or cause failure due to
     insufficient space.
 
+    If the server advertised `NBD_FLAG_SEND_FAST_ZERO` but
+    `NBD_CMD_FLAG_FAST_ZERO` is not set, then the server MUST NOT fail
+    with `NBD_ENOTSUP`, even if the operation is no faster than a
+    corresponding `NBD_CMD_WRITE`. Conversely, if
+    `NBD_CMD_FLAG_FAST_ZERO` is set, the server MUST fail quickly with
+    `NBD_ENOTSUP` unless the request can be serviced in less time than
+    a corresponding `NBD_CMD_WRITE`, and SHOULD NOT alter the contents
+    of the export when returning this failure. The server's
+    determination on whether to fail a fast request MAY depend on a
+    number of factors, such as whether the request was suitably
+    aligned, on whether the `NBD_CMD_FLAG_NO_HOLE` flag was present,
+    or even on whether a previous `NBD_CMD_TRIM` had been performed on
+    the region.  If the server did not advertise
+    `NBD_FLAG_SEND_FAST_ZERO`, then it SHOULD NOT fail with
+    `NBD_ENOTSUP`, regardless of the speed of servicing a request, and
+    SHOULD fail with `NBD_EINVAL` if the `NBD_CMD_FLAG_FAST_ZERO` flag
+    was set. A server MAY advertise `NBD_FLAG_SEND_FAST_ZERO` whether
+    or not it will actually succeed on a fast zero request (a fast
+    failure of `NBD_ENOTSUP` still counts as a fast response);
+    similarly, a server SHOULD fail a fast zero request with
+    `NBD_ENOTSUP` if the server cannot quickly determine in advance
+    whether proceeding with the request would be fast, even if it
+    turns out that the same request without the flag would be fast
+    after all.
+
+    One intended use of a fast zero request is optimizing the copying
+    of a sparse image source into the export: a client can request
+    fast zeroing of the entire export, and if it succeeds, follow that
+    with write requests to just the data portions before a single
+    flush of the entire image, for fewer transactions overall.  On the
+    other hand, if the fast zero request fails, the fast failure lets
+    the client know that it must manually write zeroes corresponding
+    to the holes of the source image before a final flush, for more
+    transactions but with no time lost to duplicated I/O to the data
+    portions.  Knowing this usage pattern can help decide whether a
+    server's implementation for writing zeroes counts as fast (for
+    example, a successful fast zero request may start a background
+    operation that would cause the next flush request to take longer,
+    but that is okay as long as intermediate writes before that flush
+    do not further lengthen the time spent on the overall sequence of
+    operations).
+
     If an error occurs, the server MUST set the appropriate error code
     in the error field.
 
-    The server SHOULD return `ENOSPC` if it receives a write zeroes request
+    The server SHOULD return `NBD_ENOSPC` if it receives a write zeroes request
     including one or more sectors beyond the size of the device. It SHOULD
-    return `EPERM` if it receives a write zeroes request on a read-only export.
+    return `NBD_EPERM` if it receives a write zeroes request on a read-only export.
 
 * `NBD_CMD_BLOCK_STATUS` (7)
 
@@ -2077,7 +2151,7 @@ The following request types exist:
 
     A client MAY initiate a hard disconnect if it detects that the
     server has sent an invalid chunk. The server SHOULD return
-    `EINVAL` if it receives a `NBD_CMD_BLOCK_STATUS` request including
+    `NBD_EINVAL` if it receives a `NBD_CMD_BLOCK_STATUS` request including
     one or more sectors beyond the size of the device.
 
 * `NBD_CMD_RESIZE` (8)
@@ -2108,33 +2182,45 @@ as the value for an error.
 
 The following error values are defined:
 
-* `EPERM` (1), Operation not permitted.
-* `EIO` (5), Input/output error.
-* `ENOMEM` (12), Cannot allocate memory.
-* `EINVAL` (22), Invalid argument.
-* `ENOSPC` (28), No space left on device.
-* `EOVERFLOW` (75), Value too large.
-* `ESHUTDOWN` (108), Server is in the process of being shut down.
+* `NBD_EPERM` (1), Operation not permitted.
+* `NBD_EIO` (5), Input/output error.
+* `NBD_ENOMEM` (12), Cannot allocate memory.
+* `NBD_EINVAL` (22), Invalid argument.
+* `NBD_ENOSPC` (28), No space left on device.
+* `NBD_EOVERFLOW` (75), Value too large.
+* `NBD_ENOTSUP` (95), Operation not supported.
+* `NBD_ESHUTDOWN` (108), Server is in the process of being shut down.
 
-The server SHOULD return `ENOSPC` if it receives a write request
+The server SHOULD return `NBD_ENOSPC` if it receives a write request
 including one or more sectors beyond the size of the device.  It also
-SHOULD map the `EDQUOT` and `EFBIG` errors to `ENOSPC`.  It SHOULD
-return `EINVAL` if it receives a read or trim request including one or
+SHOULD map the `EDQUOT` and `EFBIG` errors to `NBD_ENOSPC`.  It SHOULD
+return `NBD_EINVAL` if it receives a read or trim request including one or
 more sectors beyond the size of the device, or if a read or write
 request is not aligned to advertised minimum block sizes. Finally, it
-SHOULD return `EPERM` if it receives a write or trim request on a
+SHOULD return `NBD_EPERM` if it receives a write or trim request on a
 read-only export.
 
-The server SHOULD return `EINVAL` if it receives an unknown command.
+The server SHOULD NOT return `NBD_EOVERFLOW` except as documented in
+response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported.
 
-The server SHOULD return `EINVAL` if it receives an unknown command flag. It
-also SHOULD return `EINVAL` if it receives a request with a flag not explicitly
-documented as applicable to the given request.
+The server SHOULD NOT return `NBD_ENOTSUP` except as documented in
+response to `NBD_CMD_WRITE_ZEROES` when `NBD_CMD_FLAG_FAST_ZERO` is
+supported.
+
+The server SHOULD return `NBD_EINVAL` if it receives an unknown command.
+
+The server SHOULD return `NBD_EINVAL` if it receives an unknown
+command flag. It also SHOULD return `NBD_EINVAL` if it receives a
+request with a flag not explicitly documented as applicable to the
+given request.
 
 Which error to return in any other case is not specified by the NBD
 protocol.
 
-The server SHOULD NOT return `ENOMEM` if at all possible.
+The server SHOULD NOT return `NBD_ENOMEM` if at all possible.
+
+The client SHOULD treat an unexpected error value as if it had been
+`NBD_EINVAL`, rather than disconnecting from the server.
 
 ## Experimental extensions
 
@@ -2168,6 +2254,83 @@ for such proposed extensions. Aside from that, extensions are
 written as branches which can be merged into master if and
 when those extensions are promoted to the normative version
 of the document in the master branch.
+
+## Compatibility and interoperability
+
+Originally, the NBD protocol was a fairly simple protocol with few
+options. While the basic protocol is still reasonably simple, a growing
+number of extensions has been implemented that may make the protocol
+description seem overwhelming at first.
+
+In an effort to not overwhelm first-time implementors with various
+options and features that may or may not be important for their use
+case, while at the same time desiring maximum interoperability, this
+section tries to clarify what is optional and what is expected to be
+available in all implementations.
+
+All protocol options and messages not explicitly mentioned below should
+be considered optional features that MAY be negotiated between client
+and server, but are not required to be available.
+
+### Baseline
+
+The following MUST be implemented by all implementations, and should be
+considered a baseline:
+
+- NOTLS mode
+- The fixed newstyle handshake
+- During the handshake:
+
+    - the `NBD_OPT_INFO` and `NBD_OPT_GO` messages, with the
+      `NBD_INFO_EXPORT` response.
+    - Servers that receive messages which they do not implement MUST
+      reply to them with `NBD_OPT_UNSUP`, and MUST NOT fail to parse
+      the next message received.
+    - the `NBD_OPT_ABORT` message, and its response.
+    - the `NBD_OPT_LIST` message and its response.
+
+- During the transmission phase:
+
+    - Simple replies
+    - the `NBD_CMD_READ` message (and its response)
+    - the `NBD_CMD_WRITE` message (and its response), unless the
+      implementation is a client that does not wish to write
+    - the `NBD_CMD_DISC` message (and its resulting effects, although
+      no response is involved)
+
+Clients that wish to use more messages MUST negotiate them during the
+handshake phase, first.
+
+### Maximum interoperability
+
+Clients and servers that desire maximum interoperability SHOULD
+implement the following features:
+
+- TLS-encrypted communication, which may be required by some
+  implementations or configurations;
+- Servers that implement block constraints through `NBD_INFO_BLOCK_SIZE`
+  and desire maximum interoperability SHOULD NOT require them.
+  Similarly, clients that desire maximum interoperability SHOULD
+  implement querying for block size constraints. Since some clients
+  default to a block size of 512 bytes, implementations desiring maximum
+  interoperability MAY default to that size.
+- Clients or servers that desire interoperability with older
+  implementations SHOULD implement the `NBD_OPT_EXPORT_NAME` message in
+  addition to `NBD_OPT_INFO` and `NBD_OPT_GO`.
+- For data safety, implementing `NBD_CMD_FLUSH` and the
+  `NBD_CMD_FLAG_FUA` flag to `NBD_CMD_WRITE` is strongly recommended.
+  Clients that do not implement querying for block size constraints
+  SHOULD abide by the rules laid out in the section "Block size
+  constraints", above.
+
+### Future considerations
+
+The following may be moved to the "Maximum interoperability" or
+"Baseline" sections at some point in the future, but some significant
+implementations are not yet ready to support them:
+
+- Structured replies; the Linux kernel currently does not yet implement
+  them.
 
 ## About this file
 

@@ -95,6 +95,9 @@
 #if HAVE_FALLOC_PH
 #include <linux/falloc.h>
 #endif
+#if HAVE_BLKDISCARD
+#include <linux/fs.h>
+#endif
 #include <arpa/inet.h>
 #include <strings.h>
 #include <dirent.h>
@@ -444,6 +447,7 @@ static inline void finalize_client(CLIENT* client) {
 	if(client->server->flags & F_COPYONWRITE) {
 		unlink(client->difffilename);
 	}
+	serve_dec_ref(client->server);
 }
 
 static inline void socket_closed_transmission(CLIENT* client) {
@@ -560,7 +564,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	if(argc==1) {
 		return NULL;
 	}
-	serve=g_new0(SERVER, 1);
+	serve=serve_inc_ref((SERVER*)g_new0(SERVER, 1));
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
 	while((c=getopt_long(argc, argv, "-C:cwdl:mo:rp:M:V", long_options, &i))>=0) {
@@ -661,8 +665,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	/* What's left: the port to export, the name of the to be exported
 	 * file, and, optionally, the size of the file, in that order. */
 	if(nonspecial<2) {
-		g_free(serve);
-		serve=NULL;
+		serve=serve_dec_ref(serve);
 	} else {
 		serve->servename = "";
 	}
@@ -711,8 +714,9 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 		switch(NBD_D_TYPE) {
 			case DT_UNKNOWN:
 				/* Filesystem doesn't return type of
-				 * file through readdir. Run stat() on
-				 * the file instead */
+				 * file through readdir, or struct dirent
+				 * doesn't have d_type. Run stat() on the file
+				 * instead */
 				if(stat(fname, &stbuf)) {
 					perror("stat");
 					goto err_out;
@@ -731,7 +735,7 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 					goto err_out;
 				}
 				if(!retval)
-					retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
+					retval = g_array_new(FALSE, TRUE, sizeof(SERVER*));
 				retval = g_array_append_vals(retval, tmp->data, tmp->len);
 				g_array_free(tmp, TRUE);
 			default:
@@ -852,7 +856,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
         }
 
 	cfile = g_key_file_new();
-	retval = g_array_new(FALSE, TRUE, sizeof(SERVER));
+	retval = g_array_new(FALSE, TRUE, sizeof(SERVER*));
+	if(expect_generic) {
+		g_array_set_clear_func(retval, (GDestroyNotify)serve_dec_ref);
+	}
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s: %s",
@@ -1000,7 +1007,8 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i>0 || !expect_generic) {
 			s.servename = groups[i];
 
-			g_array_append_val(retval, s);
+			SERVER *srv = serve_inc_ref(g_memdup(&s, sizeof(SERVER)));
+			g_array_append_val(retval, srv);
 		}
 #ifndef WITH_SDP
 		if(s.flags & F_SDP) {
@@ -1555,19 +1563,38 @@ int expflush(CLIENT *client) {
 }
 
 void punch_hole(int fd, off_t off, off_t len) {
-	DEBUG("punching hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
+	DEBUG("Request to punch a hole in fd=%d, starting from %llu, length %llu\n", fd, (unsigned long long)off, (unsigned long long)len);
+	errno = 0;
+// fallocate -- files, Linux
 #if HAVE_FALLOC_PH
-	fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len);
-#elif HAVE_FSCTL_SET_ZERO_DATA
+	do {
+		if(fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, off, len) == 0)
+			return;
+	} while(errno == EINTR);
+#endif
+// ioctl(BLKDISCARD) -- block devices, Linux
+#if HAVE_BLKDISCARD
+	uint64_t range[2] = {off, len};
+	do {
+		if(ioctl(fd, BLKDISCARD, range) == 0)
+			return;
+	} while(errno == EINTR);
+#endif
+// Windows
+#if HAVE_FSCTL_SET_ZERO_DATA
 	FILE_ZERO_DATA_INFORMATION zerodata;
 	zerodata.FileOffset.QuadPart = off;
 	zerodata.BeyondFinalZero.QuadPart = off + len;
 	HANDLE w32handle = (HANDLE)_get_osfhandle(fd);
 	DWORD bytesret;
 	DeviceIoControl(w32handle, FSCTL_SET_ZERO_DATA, &zerodata, sizeof(zerodata), NULL, 0, &bytesret, NULL);
-#else
-	DEBUG("punching holes not supported on this platform\n");
+	return;
 #endif
+	if(errno) {
+		DEBUG("punching holes failed: %s", strerror(errno));
+	} else {
+		DEBUG("punching holes not supported on this platform\n");
+	}
 }
 
 static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, void* data) {
@@ -1702,7 +1729,9 @@ int set_peername(int net, CLIENT *client) {
 			break;
 	}
 
-	freeaddrinfo(ai);
+	if(ai) {
+		freeaddrinfo(ai);
+	}
         msg(LOG_INFO, "connect from %s, assigned file is %s",
             peername, client->exportname);
 	client->clientname=g_strdup(peername);
@@ -1989,7 +2018,7 @@ static bool commit_client(CLIENT* client, SERVER* server) {
 	char acl;
 	uint32_t len;
 
-	client->server = server;
+	client->server = serve_inc_ref(server);
 	client->exportsize = OFFT_MAX;
 	client->transactionlogfd = -1;
 	if(pthread_mutex_init(&(client->lock), NULL)) {
@@ -2087,7 +2116,7 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
-		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		SERVER* serve = (g_array_index(servers, SERVER*, i));
 		// hide exports that are TLS-only if we haven't negotiated TLS
 		// yet
 		if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
@@ -2124,7 +2153,7 @@ static void handle_list(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		return;
 	}
 	for(i=0; i<servers->len; i++) {
-		SERVER* serve = &(g_array_index(servers, SERVER, i));
+		SERVER* serve = (g_array_index(servers, SERVER*, i));
 		// Hide TLS-only exports if we haven't negotiated TLS yet
 		if(!client->tls_session && (serve->flags & F_FORCEDTLS)) {
 			continue;
@@ -2272,7 +2301,7 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 		name = strdup("");
 	}
 	for(i=0; i<servers->len; i++) {
-		SERVER *serve = &(g_array_index(servers, SERVER, i));
+		SERVER *serve = (g_array_index(servers, SERVER*, i));
 		if (!strcmp(serve->servename, name)) {
 			if ((serve->flags & F_FORCEDTLS) && !client->tls_session) {
 				reptype = NBD_REP_ERR_TLS_REQD;
@@ -2914,12 +2943,6 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 /* Now that we are in the child process after a
                  * succesful negotiation, we do not need the list of
                  * servers anymore, get rid of it.*/
-                /* FALSE does not free the
-                   actual data. This is required,
-                   because the client has a
-                   direct reference into that
-                   data, and otherwise we get a
-                   segfault... */
                 g_array_free(servers, FALSE);
         }
 
@@ -2955,10 +2978,10 @@ static int handle_childname(GArray* servers, int socket)
 		}
 	}
 	buf = g_malloc0(len + 1);
-	buf[len] = 0;
 	readit(socket, buf, len);
+	buf[len] = 0;
 	for(i=0; i<servers->len; i++) {
-		SERVER* srv = &g_array_index(servers, SERVER, i);
+		SERVER* srv = g_array_index(servers, SERVER*, i);
 		if(strcmp(srv->servename, buf) == 0) {
 			if(srv->max_connections == 0 || srv->max_connections > srv->numclients) {
 				writeit(socket, "Y", 1);
@@ -2989,9 +3012,9 @@ static int get_index_by_servename(const gchar *const servename,
         int i;
 
         for (i = 0; i < servers->len; ++i) {
-                const SERVER server = g_array_index(servers, SERVER, i);
+                const SERVER* server = g_array_index(servers, SERVER*, i);
 
-                if (strcmp(servename, server.servename) == 0)
+                if (strcmp(servename, server->servename) == 0)
                         return i;
         }
 
@@ -3005,26 +3028,26 @@ static int get_index_by_servename(const gchar *const servename,
  * is unique among all other servers.
  *
  * @param servers an array of servers
+ * @param genconf a pointer to generic configuration
  * @return the number of new servers appended to the array, or -1 in
  *         case of an error
  **/
-static int append_new_servers(GArray *const servers, GError **const gerror) {
+static int append_new_servers(GArray *const servers, struct generic_conf *genconf, GError **const gerror) {
         int i;
         GArray *new_servers;
         const int old_len = servers->len;
         int retval = -1;
-        struct generic_conf genconf;
 
-        new_servers = parse_cfile(config_file_pos, &genconf, true, gerror);
-	g_thread_pool_set_max_threads(tpool, genconf.threads, NULL);
+        new_servers = parse_cfile(config_file_pos, genconf, true, gerror);
+        g_thread_pool_set_max_threads(tpool, genconf->threads, NULL);
         if (!new_servers)
                 goto out;
 
         for (i = 0; i < new_servers->len; ++i) {
-                SERVER new_server = g_array_index(new_servers, SERVER, i);
+                SERVER *new_server = g_array_index(new_servers, SERVER*, i);
 
-                if (new_server.servename
-                    && -1 == get_index_by_servename(new_server.servename,
+                if (new_server->servename
+                    && -1 == get_index_by_servename(new_server->servename,
                                                     servers)) {
 			g_array_append_val(servers, new_server);
                 }
@@ -3127,17 +3150,17 @@ void serveloop(GArray* servers, struct generic_conf *genconf) {
                         is_sighup_caught = 0; /* Reset to allow catching
                                                * it again. */
 
-                        n = append_new_servers(servers, &gerror);
+                        n = append_new_servers(servers, genconf, &gerror);
                         if (n == -1)
                                 msg(LOG_ERR, "failed to append new servers: %s",
                                     gerror->message);
 
                         for (i = servers->len - n; i < servers->len; ++i) {
-                                const SERVER server = g_array_index(servers,
-                                                                    SERVER, i);
+                                const SERVER *server = g_array_index(servers,
+                                                                    SERVER*, i);
 
                                 msg(LOG_INFO, "reconfigured new server: %s",
-                                    server.servename);
+                                    server->servename);
                         }
                 }
 
@@ -3545,7 +3568,7 @@ int main(int argc, char *argv[]) {
         glob_flags   |= genconf.flags;
 
 	if(serve) {
-		g_array_append_val(servers, *serve);
+		g_array_append_val(servers, serve);
 	}
     
 	if(!servers || !servers->len) {

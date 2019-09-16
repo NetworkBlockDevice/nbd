@@ -373,6 +373,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		goto end;
 	READ_ALL_ERRCHK(sock, buf, strlen(INIT_PASSWD), err,
 			"Could not read INIT_PASSWD: %s", strerror(errno));
+	buf[strlen(INIT_PASSWD)] = 0;
 	if (strlen(buf) == 0) {
 		snprintf(errstr, errstr_len, "Server closed connection");
 		goto err;
@@ -538,7 +539,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 #endif
 	if(testflags & TEST_EXPECT_ERROR) {
 		struct sigaction act;
-		memset(&act, '0', sizeof act);
+		memset(&act, 0, sizeof act);
 		act.sa_handler = SIG_IGN;
 		sigaction(SIGPIPE, &act, NULL);
 	}
@@ -621,6 +622,7 @@ int setup_inet_connection(gchar * hostname, int port)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = *((int *)host->h_addr);
+	memset(&addr.sin_zero, 0, sizeof(addr.sin_zero));
 	if ((connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)) {
 		strncpy(errstr, strerror(errno), errstr_len);
 		goto err_open;
@@ -688,6 +690,7 @@ int close_connection(int sock, CLOSE_TYPE type)
 				 strerror(errno));
 			return -1;
 		}
+		/* falls through */
 	case CONNECTION_CLOSE_FAST:
 		if (close(sock) < 0) {
 			snprintf(errstr, errstr_len,
@@ -1780,9 +1783,10 @@ int main(int argc, char **argv)
 #ifndef ISSERVER
 			err_nonfatal("inetd mode not supported without syslog support");
 			return 77;
-#endif
+#else
 			p = -1;
 			break;
+#endif
 		case 'i':
 			test = integrity_test;
 			break;

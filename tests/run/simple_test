@@ -20,6 +20,7 @@ mydir=$(dirname $0)
 certdir=$($REALPATH ${mydir}/certs)
 cleanup="$2"
 PID=""
+DELAY=${DELAY:-1}
 
 set -e
 
@@ -67,7 +68,7 @@ EOF
 		# -p only works if nbd-server wasn't compiled with -DNOFORK or
 		# -DNODAEMON, which I sometimes do for testing and debugging.
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -o -N export 127.0.0.1
 		retval=$?
 	;;
@@ -80,7 +81,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export 127.0.0.1
 		retval=$?
 	;;
@@ -100,7 +101,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 localhost
 		retval=$?
 		if [ $retval -ne 0 ]
@@ -129,8 +130,8 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
-		./nbd-tester-client localhost -N export1 
+		sleep $DELAY
+		./nbd-tester-client -N export1 localhost
 		retval=$?
 	;;
 	*/write)
@@ -142,7 +143,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -w localhost
 		retval=$?
 	;;
@@ -157,7 +158,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -w localhost
 		retval=$?
 	;;
@@ -173,7 +174,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -w -F localhost
 		retval=$?
 	;;
@@ -189,7 +190,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -w -f localhost
 		retval=$?
 	;;
@@ -206,7 +207,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 localhost
 		retval=$?
 	;;
@@ -224,7 +225,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -i -t ${mydir}/integrity-test.tr localhost
 		retval=$?
 	;;
@@ -242,7 +243,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -i -t ${mydir}/integrityhuge-test.tr localhost
 		retval=$?
 	;;
@@ -265,7 +266,7 @@ EOF
 EOF
 			../../nbd-server -C ${conffile} -p ${pidfile} &
 			PID=$!
-			sleep 1
+			sleep $DELAY
 			../../nbd-client -l localhost
 			./nbd-tester-client -N export1 localhost
 			retval=$?
@@ -281,7 +282,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -w -F localhost
 		retval=$?
 		;;
@@ -295,7 +296,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -u ${tmpdir}/unix.sock
 		retval=$?
 		;;
@@ -318,7 +319,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -h -N export1 localhost
 		retval=$?
 	;;
@@ -339,7 +340,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -i -t "${mydir}/integrity-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" localhost
 		retval=$?
 	;;
@@ -361,7 +362,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -i -t "${mydir}/integrityhuge-test.tr" -C "${certdir}/client-cert.pem" -K "${certdir}/client-key.pem" -A "${certdir}/ca-cert.pem" -H localhost 127.0.0.1
 		retval=$?
 	;;
@@ -381,7 +382,7 @@ EOF
 EOF
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
-		sleep 1
+		sleep $DELAY
 		./nbd-tester-client -N export1 -t "${mydir}/integrity-test.tr" -C "${certdir}/selfsigned-cert.pem" -K "${certdir}/selfsigned-key.pem" -F localhost
 		retval=$?
 	;;

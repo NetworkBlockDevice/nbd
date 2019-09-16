@@ -206,7 +206,7 @@ manpage.1: manpage.sgml
 	</varlistentry>
 	<varlistentry>
 	  <term><option>tlshostname=<replaceable>TLS
-	  hostname</replaceable></term>
+	  hostname</replaceable></option></term>
 	  <listitem>
 	    <para>The hostname for TLS purposes;
 	    <option>-H</option></para>
