@@ -1585,7 +1585,8 @@ case that data is an error message string suitable for display to the user.
 * `NBD_REP_ERR_PLATFORM` (2^31 + 4)
 
     The option sent by the client is not supported on the platform on
-    which the server is running. Not currently used.
+    which the server is running, or requires compile-time options that
+    were disabled, e.g., upon trying to use TLS.
 
 * `NBD_REP_ERR_TLS_REQD` (2^31 + 5)
 
