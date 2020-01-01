@@ -1,3 +1,9 @@
+nbd (1:3.20-2) UNRELEASED; urgency=medium
+
+  * Trim trailing whitespace.
+
+ -- Debian Janitor <janitor@jelmer.uk>  Wed, 01 Jan 2020 14:43:31 +0000
+
 nbd (1:3.20-1) unstable; urgency=medium
 
   * New upstream release
@@ -567,7 +573,7 @@ nbd (1:2.9.20-3) unstable; urgency=low
     and rename the old. Or something. Closes: 613938.
   * Updated translations:
     - German, by Chris Leick; Closes: #613712.
-    - Spanish, by Camaleón; Closes: #614199. 
+    - Spanish, by Camaleón; Closes: #614199.
   * install modprobe.d file for nbd-client-udeb, too
   * Was never uploaded.
 
@@ -630,7 +636,7 @@ nbd (1:2.9.18-1~1) experimental; urgency=low
     server's IP address from ROOTSERVER, but everything else from the
     kernel command line. This to support inflexible setups where it is
     possible to boot with PXE, but where it is not possible to set
-    random arguments, like, say root-path. Netbooting is a can of worms. 
+    random arguments, like, say root-path. Netbooting is a can of worms.
   * debian/*.lintian-overrides: override
     copyright-without-copyright-notice (we do list all authors, but in a
     format that Lintian doesn't know about).
@@ -938,7 +944,7 @@ nbd (1:2.9.12-1) unstable; urgency=low
   * (Conditionally, compliant with the new DEB_BUILD_OPTIONS' "nocheck"
     option) re-enable the test suite. It did /not/ give false positives,
     ever.  However, it did indeed break at some point...
-  * Update to debhelper compat level 7. 
+  * Update to debhelper compat level 7.
   * nbd-client.postinst: don't use full path to update-initramfs.
   * copyright: refer to common-licenses/GPL-2 rather than the versionless
     variant.
@@ -1363,9 +1369,9 @@ nbd (1:2.7.4-1) unstable; urgency=low
 
 nbd (1:2.7.3-2) unstable; urgency=low
 
-  * Re-add nbd.h to the source package, so that it will (again) build on 
+  * Re-add nbd.h to the source package, so that it will (again) build on
     non-linux ports
-  * As a precaution, modified the build target to barf out if it 
+  * As a precaution, modified the build target to barf out if it
     disappears again.
 
  -- Wouter Verhelst <wouter@debian.org>  Mon,  4 Apr 2005 00:27:27 +0200
