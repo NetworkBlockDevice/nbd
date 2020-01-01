@@ -44,7 +44,7 @@ Package: nbd-client-udeb
 Section: debian-installer
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
-XC-Package-Type: udeb
+Package-Type: udeb
 Architecture: linux-any
 Description: Network Block Device protocol - client for Debian Installer
  Network Block Device (NBD) is a client/server protocol that
