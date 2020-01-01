@@ -1,6 +1,7 @@
 nbd (1:3.20-2) UNRELEASED; urgency=medium
 
   * Trim trailing whitespace.
+  * Add missing ${misc:Depends} to Depends for nbd-client-udeb.
 
  -- Debian Janitor <janitor@jelmer.uk>  Wed, 01 Jan 2020 14:43:31 +0000
 

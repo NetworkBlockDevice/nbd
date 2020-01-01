@@ -43,7 +43,7 @@ Description: Network Block Device protocol - client
 Package: nbd-client-udeb
 Section: debian-installer
 Priority: optional
-Depends: ${shlibs:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}
 XC-Package-Type: udeb
 Architecture: linux-any
 Description: Network Block Device protocol - client for Debian Installer
