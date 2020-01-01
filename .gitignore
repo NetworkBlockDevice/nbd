@@ -58,3 +58,4 @@ tests/run/buffer.c
 *debhelper.log
 min-nbd-client
 support/*.m4
+debian/autoreconf.*
