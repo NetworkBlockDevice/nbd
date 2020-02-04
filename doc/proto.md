@@ -815,9 +815,12 @@ Where a transmission request can have a nonzero *offset* and/or
 the client MUST ensure that *offset* and *length* are integer
 multiples of any advertised minimum block size, and SHOULD use integer
 multiples of any advertised preferred block size where possible.  For
-those requests, the client MUST NOT use a *length* larger than any
-advertised maximum block size or which, when added to *offset*, would
-exceed the export size.  The server SHOULD report an `NBD_EINVAL` error if
+those requests, the client MUST NOT use a *length* which, when added to
+*offset*, would exceed the export size. Also for NBD_CMD_READ,
+NBD_CMD_WRITE, NBD_CMD_CACHE and NBD_CMD_WRITE_ZEROES (except for
+when NBD_CMD_FLAG_FAST_ZERO is set), the client MUST NOT use a *length*
+larger than any advertised maximum block size.
+The server SHOULD report an `NBD_EINVAL` error if
 the client's request is not aligned to advertised minimum block size
 boundaries, or is larger than the advertised maximum block size.
 Notwithstanding any maximum block size advertised, either the server
