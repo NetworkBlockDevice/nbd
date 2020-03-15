@@ -127,6 +127,7 @@ int authorized_client(CLIENT *opts) {
   
 	while (fgets(line,LINELEN,f)!=NULL) {
 		char* pos;
+		char* endpos;
 		/* Drop comments */
 		if((pos = strchr(line, '#'))) {
 			*pos = '\0';
@@ -140,7 +141,12 @@ int authorized_client(CLIENT *opts) {
 		if(!(*pos)) {
 			continue;
 		}
-		if(address_matches(line, (struct sockaddr*)&opts->clientaddr, NULL)) {
+		/* Trim trailing whitespace */
+		endpos = pos;
+		while ((*endpos) && !isspace(*endpos))
+			endpos++;
+		*endpos = '\0';
+		if(address_matches(pos, (struct sockaddr*)&opts->clientaddr, NULL)) {
 			fclose(f);
 			return 1;
 		}
