@@ -896,9 +896,9 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n\t[-readonly|-R]\n");
 #else
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R]\n");
 #endif
 	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
 	fprintf(stderr, "Or   : nbd-client nbdX\n");
@@ -934,9 +934,9 @@ void disconnect(char* device) {
 }
 
 #if HAVE_NETLINK
-static const char *short_opts = "-A:b:c:C:d:gH:hK:LlnN:pSst:uVx";
+static const char *short_opts = "-A:b:c:C:d:gH:hK:LlnN:pRSst:uVx";
 #else
-static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pSst:uVx";
+static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pRSst:uVx";
 #endif
 
 int main(int argc, char *argv[]) {
@@ -953,6 +953,7 @@ int main(int argc, char *argv[]) {
 	pid_t main_pid;
 	u64 size64;
 	uint16_t flags = 0;
+	bool force_read_only = false;
 	int c;
 	int nonspecial=0;
 	int b_unix=0;
@@ -990,6 +991,7 @@ int main(int argc, char *argv[]) {
 		{ "nofork", no_argument, NULL, 'n' },
 		{ "name", required_argument, NULL, 'N' },
 		{ "persist", no_argument, NULL, 'p' },
+		{ "readonly", no_argument, NULL, 'R' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
 		{ "timeout", required_argument, NULL, 't' },
@@ -1094,6 +1096,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'p':
 			cont=1;
+			break;
+		case 'R':
+			force_read_only = true;
 			break;
 		case 's':
 			swap=1;
@@ -1207,6 +1212,8 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 
 		negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
+		if (force_read_only)
+			flags |= NBD_FLAG_READ_ONLY;
 		if (netlink) {
 			sockfds[i] = sock;
 			continue;
