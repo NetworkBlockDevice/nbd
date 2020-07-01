@@ -896,9 +896,9 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n\t[-readonly|-R]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
 #else
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
 #endif
 	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
 	fprintf(stderr, "Or   : nbd-client nbdX\n");
@@ -934,9 +934,9 @@ void disconnect(char* device) {
 }
 
 #if HAVE_NETLINK
-static const char *short_opts = "-A:b:c:C:d:gH:hK:LlnN:pRSst:uVx";
+static const char *short_opts = "-A:B:b:c:C:d:gH:hK:LlnN:PpRSst:uVx";
 #else
-static const char *short_opts = "-A:b:c:C:d:gH:hK:lnN:pRSst:uVx";
+static const char *short_opts = "-A:B:b:c:C:d:gH:hK:lnN:PpRSst:uVx";
 #endif
 
 int main(int argc, char *argv[]) {
@@ -951,9 +951,11 @@ int main(int argc, char *argv[]) {
 	int sdp=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	pid_t main_pid;
-	u64 size64;
+	u64 size64 = 0;
+	u64 force_size64 = 0;
 	uint16_t flags = 0;
 	bool force_read_only = false;
+	bool preinit = false;
 	int c;
 	int nonspecial=0;
 	int b_unix=0;
@@ -975,6 +977,7 @@ int main(int argc, char *argv[]) {
 	struct option long_options[] = {
 		{ "cacertfile", required_argument, NULL, 'A' },
 		{ "block-size", required_argument, NULL, 'b' },
+		{ "size", required_argument, NULL, 'B' },
 		{ "check", required_argument, NULL, 'c' },
 		{ "connections", required_argument, NULL, 'C'},
 		{ "disconnect", required_argument, NULL, 'd' },
@@ -991,6 +994,7 @@ int main(int argc, char *argv[]) {
 		{ "nofork", no_argument, NULL, 'n' },
 		{ "name", required_argument, NULL, 'N' },
 		{ "persist", no_argument, NULL, 'p' },
+		{ "preinit", no_argument, NULL, 'P' },
 		{ "readonly", no_argument, NULL, 'R' },
 		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
@@ -1060,6 +1064,13 @@ int main(int argc, char *argv[]) {
 				exit(EXIT_FAILURE);
 			}
 			break;
+		case 'B':
+			force_size64=(u64)strtoull(optarg, NULL, 0);
+			if(force_size64 == 0) {
+				fprintf(stderr, "E: Invalid size\n");
+				exit(EXIT_FAILURE);
+			}
+			break;
 		case 'c':
 			return check_conn(optarg, 1);
 		case 'C':
@@ -1096,6 +1107,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'p':
 			cont=1;
+			break;
+		case 'P':
+			preinit = true;
 			break;
 		case 'R':
 			force_read_only = true;
@@ -1181,11 +1195,27 @@ int main(int argc, char *argv[]) {
 		tls = true;
 	}
 
+	if (preinit) {
+		if (tls) {
+			fprintf(stderr, "E: preinit connection cannot be used with TLS\n");
+			exit(EXIT_FAILURE);
+		}
+		if (!force_size64) {
+			fprintf(stderr, "E: preinit connection requires specifying size\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+
         if (!tlshostname && hostname)
                 tlshostname = strdup(hostname);
 
 	if (netlink)
 		nofork = 1;
+
+	if((force_size64 % blocksize) != 0) {
+		fprintf(stderr, "E: size (" PRIu64 " bytes) is not a multiple of blocksize (%d)!\n", force_size64, blocksize);
+		exit(EXIT_FAILURE);
+	}
 
 	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
@@ -1211,9 +1241,12 @@ int main(int argc, char *argv[]) {
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
-		negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
+		if (!preinit)
+			negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
 		if (force_read_only)
 			flags |= NBD_FLAG_READ_ONLY;
+		if (force_size64)
+			size64 = force_size64;
 		if (netlink) {
 			sockfds[i] = sock;
 			continue;
