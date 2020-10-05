@@ -91,22 +91,8 @@ will use the second export in the above example (the one that exports
 `nbd-server` runs as; otherwise, you won't get a PID file, though the
 server will keep running).
 
-There are packages (or similar) available for the following operating
-systems:
-
-- Debian (and derivatives, like Ubuntu): `nbd-client` and `nbd-server`,
-  since Debian woody.
-- Gentoo: the `nbd` ebuild in the `sys-block` category, available in
-  Portage since 2002.
-- FreeBSD: `net/nbd-server`, available in the ports tree since 2003.
-  FreeBSD doesn't have kernel support for NBD, so obviously the client
-  isn't built there.
-- SuSE: `nbd`, in SuSE 10.0
-- Fedora: `nbd`, since Fedora 7
-- uClibc's `buildroot` script also seems to have support for NBD.
-
-If you're packaging NBD for a different operating system that isn't in
-the above list, I'd like to know about it.
+There are packages (or similar) available for most current operating
+systems; see the "Packaging status" badge below for details.
 
 For questions, please use the [nbd@other.debian.org](mailto:nbd@other.debian.org) mailinglist.
 
