@@ -65,7 +65,10 @@ manpage.1: manpage.sgml
       <arg>-nofork</arg>
       <arg>-nonetlink</arg>
       <arg>-systemd-mark</arg>
+      <arg>-readonly</arg>
+      <arg>-preinit</arg>
       <arg>-block-size <replaceable>block size</replaceable></arg>
+      <arg>-size <replaceable>bytes</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
       <arg>-name <replaceable>name</replaceable></arg>
       <arg>-certfile <replaceable>certfile</replaceable></arg>
@@ -84,7 +87,10 @@ manpage.1: manpage.sgml
       <arg>-nofork</arg>
       <arg>-nonetlink</arg>
       <arg>-systemd-mark</arg>
+      <arg>-readonly</arg>
+      <arg>-preinit</arg>
       <arg>-block-size <replaceable>block size</replaceable></arg>
+      <arg>-size <replaceable>bytes</replaceable></arg>
       <arg>-timeout <replaceable>seconds</replaceable></arg>
       <arg>-name <replaceable>name</replaceable></arg>
     </cmdsynopsis>
@@ -262,6 +268,37 @@ manpage.1: manpage.sgml
 	    immediately try to reconnect an nbd device if the
 	    connection ever drops unexpectedly due to a lost
 	    server or something similar.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-preinit</option></term>
+        <term><option>-P</option></term>
+        <listitem>
+          <para>When this option is specified, &dhpackage; will skip
+            the usual negotiation with the server, and hand the socket
+            to the kernel immediately after connecting. Only use this
+            when connecting to specialized NBD servers specifically
+            designed for it. This requires specifying the size of the
+            device via the -B option, and does not support TLS.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-readonly</option></term>
+        <term><option>-R</option></term>
+        <listitem>
+          <para>When this option is specified, &dhpackage; will tell the
+            kernel to treat the device as read-only, even if the server
+            would allow writes.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-size <replaceable>bytes</replaceable></option></term>
+	<term><option>-B <replaceable>bytes</replaceable></option></term>
+	<listitem>
+          <para>Force the device size to the specified number of bytes,
+            rather than using the value from server negotiation. Must
+            be a multiple of the block size. If using preinit (-P) to
+            skip negotiation, this option is required.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

@@ -338,7 +338,7 @@ fi
 
 AC_ARG_ENABLE([manpages],
 	AS_HELP_STRING([--disable-manpages], [Do not install man pages]))
-AM_CONDITIONAL(MANPAGES, test "x$enablemanpages" != "xno")
+AM_CONDITIONAL(MANPAGES, test "x$enable_manpages" != "xno")
 AS_IF([test "x$enable_manpages" != "xno"], [
 	AC_SUBST([MAN_CONFIG_FILES],["\
 		man/nbd-client.8.sh \
