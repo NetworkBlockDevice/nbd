@@ -35,6 +35,9 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 	char privmask[strlen(mask)+1];
 	int masklen;
 	int addrlen = addr->sa_family == AF_INET ? 4 : 16;
+#define IPV4_MAP_PREFIX 12
+	uint8_t ipv4_mapped[IPV4_MAP_PREFIX+4] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		255, 255, 0, 0, 0, 0};
 
 	strcpy(privmask, mask);
 
@@ -61,12 +64,9 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 		uint8_t* byte_t;
 		uint8_t mask = 0;
 		int len_left = masklen;
-		if(res->ai_family != addr->sa_family) {
-			msg(LOG_DEBUG, "client address does not match %d/%d: address family mismatch (IPv4 vs IPv6?)",
-			    (int)res->ai_family, (int)addr->sa_family);
-			goto next;
-		}
-		switch(addr->sa_family) {
+		if(res->ai_family == addr->sa_family) {
+			/* Both addresses are the same address family so do a simple comparison */
+			switch(addr->sa_family) {
 			case AF_INET:
 				byte_s = (const uint8_t*)(&(((struct sockaddr_in*)addr)->sin_addr));
 				byte_t = (uint8_t*)(&(((struct sockaddr_in*)(res->ai_addr))->sin_addr));
@@ -75,6 +75,24 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 				byte_s = (const uint8_t*)(&(((struct sockaddr_in6*)addr)->sin6_addr));
 				byte_t = (uint8_t*)(&(((struct sockaddr_in6*)(res->ai_addr))->sin6_addr));
 				break;
+			}
+		} else {
+			/* Addresses are different families, compare IPv4-mapped IPv6 address */
+			switch(addr->sa_family) {
+			case AF_INET:
+				/* Map client address to IPv6 for comparison */
+				memcpy(&ipv4_mapped[IPV4_MAP_PREFIX], &(((struct sockaddr_in*)addr)->sin_addr), 4);
+				byte_s = (const uint8_t*)&ipv4_mapped;
+				byte_t = (uint8_t*)(&(((struct sockaddr_in6*)(res->ai_addr))->sin6_addr));
+				len_left += IPV4_MAP_PREFIX * 8;
+				break;
+			case AF_INET6:
+				byte_s = (const uint8_t*)(&(((struct sockaddr_in6*)addr)->sin6_addr));
+				/* Map res to IPv6 for comparison */
+				memcpy(&ipv4_mapped[IPV4_MAP_PREFIX], &(((struct sockaddr_in*)(res->ai_addr))->sin_addr), 4);
+				byte_t = &ipv4_mapped[0];
+				break;
+			}
 		}
 		while(len_left >= 8) {
 			if(*byte_s != *byte_t) {
