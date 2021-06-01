@@ -748,23 +748,19 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 			goto next;
 		}
 		if(!strncmp(loc, "persist", 7)) {
-			loc += 7;
 			*persist = 1;
 			goto next;
 		}
 		if(!strncmp(loc, "swap", 4)) {
 			*swap = 1;
-			loc += 4;
 			goto next;
 		}
 		if(!strncmp(loc, "sdp", 3)) {
 			*sdp = 1;
-			loc += 3;
 			goto next;
 		}
 		if(!strncmp(loc, "unix", 4)) {
 			*b_unix = 1;
-			loc += 4;
 			goto next;
 		}
 		if(!strncmp(loc, "certfile=", 9)) {
