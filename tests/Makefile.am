@@ -1,1 +1,1 @@
-SUBDIRS = code run
+SUBDIRS = parse code run

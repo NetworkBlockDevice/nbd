@@ -1,0 +1,2 @@
+# This config file has a valid configuration with a single option.
+nbd0	localhost	test	bs=1024

@@ -369,6 +369,7 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile
+		 tests/parse/Makefile
                  man/nbd-client.8.sh
                  man/nbd-server.5.sh
                  man/nbd-server.1.sh

@@ -1,0 +1,7 @@
+
+
+# This config file contains a few empty lines.
+
+# It also contains multiple options on the configuration line.
+
+nbd0	localhost	test	bs=1024,no_optgo
