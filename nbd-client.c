@@ -117,6 +117,7 @@ void nbdtab_commit_line(char *devn, char *hostn, char *exportname) {
 			char *tmp = cur_client->dev;
 			memset(cur_client, 0, sizeof(CLIENT));
 			cur_client->bs = 512;
+			cur_client->nconn = 1;
 			cur_client->dev = tmp;
 		}
 	}
@@ -743,6 +744,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	bool retval = false;
 	cur_client = calloc(sizeof(CLIENT), 1);
 	cur_client->bs = 512;
+	cur_client->nconn = 1;
 	yyin = fopen(SYSCONFDIR "/nbdtab", "r");
 	yyout = fopen("/dev/null", "w");
 	
