@@ -54,3 +54,4 @@ tests/run/buffer.c
 tests/run/crypto-gnutls.c
 min-nbd-client
 support/*.m4
+ylwrap
