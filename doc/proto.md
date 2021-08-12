@@ -1165,6 +1165,14 @@ of the newstyle negotiation.
     permitted by this document (for example, `NBD_REP_ERR_INVALID` if
     the client included data).
 
+    When this command succeeds, the server MUST NOT preserve any
+    per-export state (such as metadata contexts from
+    `NBD_OPT_SET_META_CONTEXT`) issued before this command.  The
+    server MAY preserve global state such as a client request for
+    `NBD_OPT_STRUCTURED_REPLY`; however, a client SHOULD defer
+    stateful option requests until after it determines whether
+    encryption is available.
+
     See the section on TLS above for further details.
 
 * `NBD_OPT_INFO` (6) and `NBD_OPT_GO` (7)
@@ -1406,8 +1414,8 @@ of the newstyle negotiation.
     negotiation phase it sent `NBD_OPT_SET_META_CONTEXT` at least
     once, and where the final time it was sent, it referred to the
     same export name that was ultimately selected for transmission
-    phase, and where the server responded by returning least one
-    metadata context without error.
+    phase with no intervening `NBD_OPT_STARTTLS`, and where the server
+    responded by returning least one metadata context without error.
 
     Data:
     - 32 bits, length of export name.  
