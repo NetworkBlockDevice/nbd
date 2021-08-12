@@ -1166,12 +1166,11 @@ of the newstyle negotiation.
     the client included data).
 
     When this command succeeds, the server MUST NOT preserve any
-    per-export state (such as metadata contexts from
-    `NBD_OPT_SET_META_CONTEXT`) issued before this command.  The
-    server MAY preserve global state such as a client request for
-    `NBD_OPT_STRUCTURED_REPLY`; however, a client SHOULD defer
-    stateful option requests until after it determines whether
-    encryption is available.
+    negotiation state (such as a request for
+    `NBD_OPT_STRUCTURED_REPLY`, or metadata contexts from
+    `NBD_OPT_SET_META_CONTEXT`) issued before this command.  A client
+    SHOULD defer all stateful option requests until after it
+    determines whether encryption is available.
 
     See the section on TLS above for further details.
 
@@ -1316,6 +1315,10 @@ of the newstyle negotiation.
     extensions until the client negotiates structured replies; and a
     client MUST NOT make use of those extensions without first
     enabling the `NBD_OPT_STRUCTURED_REPLY` extension.
+
+    If the client requests `NBD_OPT_STARTTLS` after this option, it
+    MUST renegotiate structured replies and any other dependent
+    extensions that it desires to use.
 
 * `NBD_OPT_LIST_META_CONTEXT` (9)
 
