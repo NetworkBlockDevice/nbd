@@ -1337,9 +1337,9 @@ of the newstyle negotiation.
     Return a list of `NBD_REP_META_CONTEXT` replies, one per context,
     followed by an `NBD_REP_ACK` or an error.
 
-    This option MUST NOT be requested unless structured replies have
+    This option SHOULD NOT be requested unless structured replies have
     been negotiated first. If a client attempts to do so, a server
-    SHOULD send `NBD_REP_ERR_INVALID`.
+    MAY send `NBD_REP_ERR_INVALID`.
 
     Data:
     - 32 bits, length of export name.  
