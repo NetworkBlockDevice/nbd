@@ -663,13 +663,16 @@ or using other exports.
 
 If a client supports TLS, it SHOULD use `NBD_OPT_GO`
 (if the server supports it) in place
-of `NBD_OPT_EXPORT_NAME`. The reason for this is set out in
+of `NBD_OPT_EXPORT_NAME`. One reason for this is set out in
 the final paragraphs of the sections under 'FORCEDTLS'
 and 'SELECTIVETLS': this gives an opportunity for the
 server to transmit that an error going into transmission
 mode is due to the client's failure to initiate TLS,
 and the fact that the client may obtain information about
-which exports are TLS-only through `NBD_OPT_INFO`.
+which exports are TLS-only through `NBD_OPT_INFO`.  Another reason is
+that the handshake flag `NBD_FLAG_C_NO_ZEROES` can be altered by a
+MitM downgrade attack, which can cause a protocol mismatch with
+`NBD_OPT_EXPORT_NAME` but not with `NBD_OPT_GO`.
 
 ### Security considerations
 
@@ -691,18 +694,20 @@ the NBD protocol.
 
 There are two main dangers:
 
-* A Man-in-the-Middle (MitM) hijacks a session and impersonates
-  the server (possibly by proxying it) claiming not to support
-  TLS. In this manner, the client is confused into operating
-  in a plain-text manner with the MitM (with the session possibly
-  being proxied in plain-text to the server using the method
-  below).
+* A Man-in-the-Middle (MitM) hijacks a session and impersonates the
+  server (possibly by proxying it) claiming not to support TLS (for
+  example, by omitting `NBD_FLAG_FIXED_NEWSTYLE` or changing a
+  response to `NBD_OPT_STARTTLS`). In this manner, the client is
+  confused into operating in a plain-text manner with the MitM (with
+  the session possibly being proxied in plain-text to the server using
+  the method below).
 
-* The MitM hijacks a session and impersonates the client
-  (possibly by proxying it) claiming not to support TLS. In
-  this manner the server is confused into operating in a plain-text
-  manner with the MitM (with the session being possibly
-  proxied to the client with the method above).
+* The MitM hijacks a session and impersonates the client (possibly by
+  proxying it) claiming not to support TLS (for example, by omitting
+  `NBD_FLAG_C_FIXED_NEWSTYLE` or eliding a request for
+  `NBD_OPT_STARTTLS`). In this manner the server is confused into
+  operating in a plain-text manner with the MitM (with the session
+  being possibly proxied to the client with the method above).
 
 With regard to the first, any client that does not wish
 to be subject to potential downgrade attack SHOULD ensure
@@ -1000,11 +1005,17 @@ the first magic number.
   support the fixed newstyle protocol
 - bit 1, `NBD_FLAG_NO_ZEROES`; if set, and if the client replies with
   `NBD_FLAG_C_NO_ZEROES` in the client flags field, the server MUST NOT
-  send the 124 bytes of zero at the end of the negotiation.
+  send the 124 bytes of zero when the client ends negotiation with
+  `NBD_OPT_EXPORT_NAME`.
 
 The server MUST NOT set any other flags, and SHOULD NOT change behaviour
 unless the client responds with a corresponding flag.  The server MUST
 NOT set any of these flags during oldstyle negotiation.
+
+It is unlikely that additional capability flags will be defined in the
+NBD protocol since this phase is susceptible to MitM downgrade attacks
+when using TLS.  Rather, additional features are best negotiated using
+protocol options.
 
 ##### Client flags
 
@@ -1017,7 +1028,8 @@ receiving the handshake flags from the server.
   this isn't recommended.
 - bit 1, `NBD_FLAG_C_NO_ZEROES`; MUST NOT be set if the server did not
   set `NBD_FLAG_NO_ZEROES`. If set, the server MUST NOT send the 124
-  bytes of zeroes at the end of the negotiation.
+  bytes of zeroes when the client ends negotiation with
+  `NBD_OPT_EXPORT_NAME`.
 
 Clients MUST NOT set any other flags; the server MUST drop the TCP
 connection if the client sets an unknown flag, or a flag that does
