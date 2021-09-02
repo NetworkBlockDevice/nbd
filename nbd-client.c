@@ -1186,7 +1186,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-        if (!tlshostname && hostname)
+        if (!tlshostname && hostname && !b_unix)
                 tlshostname = strdup(hostname);
 
 	if (netlink)
