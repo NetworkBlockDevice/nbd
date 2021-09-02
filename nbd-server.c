@@ -154,6 +154,11 @@
 #include <gnutls/x509.h>
 #endif
 
+#ifndef HAVE_G_MEMDUP2
+/* Our uses of g_memdup2 below are safe from g_memdup's 32-bit overflow */
+#define g_memdup2 g_memdup
+#endif
+
 /** Where our config file actually is */
 gchar* config_file_pos;
 
@@ -1007,7 +1012,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i>0 || !expect_generic) {
 			s.servename = groups[i];
 
-			SERVER *srv = serve_inc_ref(g_memdup(&s, sizeof(SERVER)));
+			SERVER *srv = serve_inc_ref(g_memdup2(&s, sizeof(SERVER)));
 			g_array_append_val(retval, srv);
 		}
 #ifndef WITH_SDP

@@ -290,7 +290,9 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socke
 PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.26.0 gthread-2.0 >= 2.26.0], [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 
 my_save_cflags="$CFLAGS"
+my_save_libs="$LIBS"
 CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
+LIBS="$GLIB_LIBS"
 AC_MSG_CHECKING([if we are using an old glib 2.0 library])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 	[[#include <glib.h>]],
@@ -304,7 +306,10 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 		AC_DEFINE(HAVE_OLD_GLIB, 0, [Define to 1 if you have an old glib library])
 	]
 )
+dnl g_memdup2 added in glib-2.68
+AC_CHECK_FUNCS([g_memdup2])
 CFLAGS="$my_save_cflags"
+LIBS="$my_save_libs"
 
 AC_MSG_CHECKING([whether _BSD_SOURCE needs to be defined for DT_* macros])
 AC_PREPROC_IFELSE(
