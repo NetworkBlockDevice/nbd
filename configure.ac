@@ -111,6 +111,8 @@ AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
 AM_PROG_LEX
+m4_ifdef([AX_PROG_BISON],,
+ [m4_fatal([The m4 macro AX_PROG_BISON has not been defined. Please install the autoconf-archive package.])])
 AX_PROG_BISON([],AC_MSG_ERROR([bison is required]))
 PKG_PROG_PKG_CONFIG
 AC_CANONICAL_HOST
