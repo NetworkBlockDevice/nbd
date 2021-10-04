@@ -1,4 +1,4 @@
-nbd (1:3.22-1) UNRELEASED; urgency=medium
+nbd (1:3.22-1) unstable; urgency=medium
 
   [ Debian Janitor ]
   * Trim trailing whitespace.
@@ -10,7 +10,7 @@ nbd (1:3.22-1) UNRELEASED; urgency=medium
   [ Wouter Verhelst ]
   * New upstream release
 
- -- Wouter Verhelst <wouter@debian.org>  Mon, 04 Oct 2021 14:33:37 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 04 Oct 2021 14:34:34 +0200
 
 nbd (1:3.21-1) unstable; urgency=medium
 
