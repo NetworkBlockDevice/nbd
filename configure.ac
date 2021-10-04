@@ -19,7 +19,7 @@ LT_INIT
 
 AC_ARG_ENABLE(
   lfs,
-  AC_HELP_STRING(--disable-lfs,Disable Large File Support (default on)),
+  AS_HELP_STRING([--disable-lfs],[Disable Large File Support (default on)]),
   [
     if test "x$enableval" = "xyes" ; then
       NBD_LFS=1
@@ -40,7 +40,7 @@ fi
 
 AC_ARG_ENABLE(
   syslog,
-  AC_HELP_STRING(--enable-syslog,Enable Syslog logging),
+  AS_HELP_STRING([--enable-syslog],[Enable Syslog logging]),
   [
     if test "x$enableval" = "xyes" ; then
       ISSERVER=1
@@ -61,7 +61,7 @@ fi
 
 AC_ARG_ENABLE(
   debug,
-  AC_HELP_STRING(--enable-debug,Build a debugging version of the server),
+  AS_HELP_STRING([--enable-debug],[Build a debugging version of the server]),
   [
     if test "x$enableval" = "xyes"; then
       DODBG=1
@@ -86,7 +86,7 @@ fi
 
 AC_ARG_ENABLE(
   sdp,
-  AC_HELP_STRING(--enable-sdp,Build a version of nbd-server with support for the Socket Direct Protocol (SDP). Requires you to build and install a kernel with the InfiniBand patches (default disabled)),
+  AS_HELP_STRING([--enable-sdp],[Build a version of nbd-server with support for the Socket Direct Protocol (SDP). Requires you to build and install a kernel with the InfiniBand patches (default disabled)]),
   [
     if test "x$enableval" = "xyes"; then
       AC_DEFINE(WITH_SDP, 1, [Define to 1 if you have and want support for the Socket Direct Protocol])
@@ -110,7 +110,7 @@ AC_ARG_ENABLE(
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
-AM_PROG_LEX
+AM_PROG_LEX(noyywrap)
 m4_ifdef([AX_PROG_BISON],,
  [m4_fatal([The m4 macro AX_PROG_BISON has not been defined. Please install the autoconf-archive package.])])
 AX_PROG_BISON([],AC_MSG_ERROR([bison is required]))
