@@ -73,6 +73,12 @@ One of the following scheme names SHOULD be used to indicate an NBD URI:
 Other URI scheme names MAY be used but not all NBD clients will
 understand them or even recognize that they refer to NBD.
 
+Note that using opportunistically encrypted connections (via the `nbd`
+or `nbd+unix` scheme) risks a protocol downgrade attack; whereas
+requests for a secure connection (via the `nbds` or `nbds+unix`
+scheme) MUST use TLS to connect.  For more details, see
+<https://github.com/NetworkBlockDevice/nbd/blob/master/doc/proto.md#security-considerations>
+
 ## NBD URI authority
 
 The authority field SHOULD be used for TCP/IP connections and SHOULD

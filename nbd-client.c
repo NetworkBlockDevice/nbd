@@ -64,6 +64,73 @@
 #include <sdp_inet.h>
 #endif
 
+#include "nbdclt.h"
+#include "nbdtab_parser.tab.h"
+
+CLIENT* cur_client;
+extern FILE *yyin, *yyout;
+bool found_config = false;
+bool parse_error = false;
+
+#define SET_PROP(str, member, rval) if(!strcmp(property, str)) { cur_client->member = (rval); return; }
+void nbdtab_set_property(char *property, char *val) {
+	if(found_config) return;
+	SET_PROP("port", port, val);
+	SET_PROP("certfile", cert, val);
+	SET_PROP("keyfile", key, val);
+	SET_PROP("cacertfile", cacert, val);
+	SET_PROP("tlshostname", tlshostn, val);
+	SET_PROP("bs", bs, strtol(val, NULL, 10));
+	SET_PROP("timeout", timeout, strtol(val, NULL, 10));
+	SET_PROP("conns", nconn, strtol(val, NULL, 10));
+	if(*property != '_') {
+		fprintf(stderr, "Warning: unknown option '%s' found in nbdtab file", property);
+	}
+}
+#undef SET_PROP
+
+#define SET_FLAG(str, member) if(!strcmp(property, str)) { cur_client->member = true; return; }
+void nbdtab_set_flag(char *property) {
+	if(found_config) return;
+	SET_FLAG("no_optgo", no_optgo);
+	SET_FLAG("persist", persist);
+	SET_FLAG("swap", swap);
+	SET_FLAG("sdp", sdp);
+	SET_FLAG("unix", b_unix);
+	SET_FLAG("preinit", preinit);
+	SET_FLAG("tls", tls);
+	if(*property != '_') {
+		fprintf(stderr, "Warning: unknown option '%s' found in nbdtab file", property);
+	}
+}
+
+void nbdtab_commit_line(char *devn, char *hostn, char *exportname) {
+	if(!strncmp(devn, "/dev/", 5)) {
+		devn += 5;
+	}
+	if(!strcmp(cur_client->dev, devn)) {
+		found_config = true;
+		cur_client->hostn = hostn;
+		cur_client->name = exportname;
+	} else {
+		if(!found_config) {
+			char *tmp = cur_client->dev;
+			memset(cur_client, 0, sizeof(CLIENT));
+			cur_client->bs = 512;
+			cur_client->nconn = 1;
+			cur_client->dev = tmp;
+		}
+	}
+	return;
+}
+
+void yyerror(char *msg) {
+	parse_error = true;
+	fprintf(stderr, "parse error parsing " SYSCONFDIR "/nbdtab: %s", msg);
+}
+
+#undef SET_FLAG
+
 #define NBDC_DO_LIST 1
 
 #if HAVE_NETLINK
@@ -674,138 +741,51 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 }
 
 bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool *can_opt_go) {
-	int fd = open(SYSCONFDIR "/nbdtab", O_RDONLY);
 	bool retval = false;
-	if(fd < 0) {
+	cur_client = calloc(sizeof(CLIENT), 1);
+	cur_client->bs = 512;
+	cur_client->nconn = 1;
+	yyin = fopen(SYSCONFDIR "/nbdtab", "r");
+	yyout = fopen("/dev/null", "w");
+	
+	if(!strncmp(cfgname, "/dev/", 5)) {
+		cfgname += 5;
+	}
+	cur_client->dev = cfgname;
+	if(yyin == NULL) {
 		fprintf(stderr, "while opening %s: ", SYSCONFDIR "/nbdtab");
 		perror("could not open config file");
 		goto out;
 	}
-	off_t size = lseek(fd, 0, SEEK_END);
-	lseek(fd, 0, SEEK_SET);
-	void *data = NULL;
-	char *fsep = "\n\t# ";
-	char *lsep = "\n#";
+	yyparse();
 
-	if(size < 0) {
-		perror("E: mmap'ing nbdtab");
-		exit(EXIT_FAILURE);
-	}
-
-	data = mmap(NULL, (size_t)size, PROT_READ, MAP_SHARED, fd, 0);
-	if(!strncmp(cfgname, "/dev/", 5)) {
-		cfgname += 5;
-	}
-	char *loc = strstr((const char*)data, cfgname);
-	if(!loc) {
+	if(!found_config || parse_error) {
 		goto out;
 	}
-	size_t l = strlen(cfgname) + 6;
-	*dev_ptr = malloc(l);
-	snprintf(*dev_ptr, l, "/dev/%s", cfgname);
+	*name_ptr = cur_client->name;
+	*dev_ptr = calloc(strlen(cur_client->dev) + 6, 1);
+	snprintf(*dev_ptr, strlen(cur_client->dev) + 6, "/dev/%s", cur_client->dev);
+	*hostn_ptr = cur_client->hostn;
+	*bs = cur_client->bs;
+	*timeout = cur_client->timeout;
+	*persist = cur_client->persist ? 1 : 0;
+	*swap = cur_client->swap ? 1 : 0;
+	*sdp = cur_client->sdp ? 1 : 0;
+	*b_unix = cur_client->b_unix ? 1 : 0;
+	*num_conns = cur_client->nconn;
+	*certfile = cur_client->cert;
+	*keyfile = cur_client->key;
+	*cacertfile = cur_client->cacert;
+	*tlshostname = cur_client->tlshostn;
+	*can_opt_go = !(cur_client->no_optgo);
 
-	size_t line_len, field_len, ws_len;
-#define CHECK_LEN field_len = strcspn(loc, fsep); ws_len = strspn(loc+field_len, fsep); if(field_len > line_len || line_len <= 0) { goto out; }
-#define MOVE_NEXT line_len -= field_len + ws_len; loc += field_len + ws_len
-	// find length of line
-	line_len = strcspn(loc, lsep);
-	// first field is the device node name, which we already know, so skip it
-	CHECK_LEN;
-	MOVE_NEXT;
-	// next field is the hostname
-	CHECK_LEN;
-	*hostn_ptr = strndup(loc, field_len);
-	MOVE_NEXT;
-	// third field is the export name
-	CHECK_LEN;
-	*name_ptr = strndup(loc, field_len);
-	if(ws_len + field_len > line_len) {
-		// optional last field is not there, so return success
-		retval = true;
-		goto out;
-	}
-	MOVE_NEXT;
-	CHECK_LEN;
-#undef CHECK_LEN
-#undef MOVE_NEXT
-	// fourth field is the options field, a comma-separated field of options
-	do {
-		if(!strncmp(loc, "conns=", 6)) {
-			*num_conns = (int)strtol(loc+6, &loc, 0);
-			goto next;
-		}
-		if(!strncmp(loc, "bs=", 3)) {
-			*bs = (int)strtol(loc+3, &loc, 0);
-			goto next;
-		}
-		if(!strncmp(loc, "timeout=", 8)) {
-			*timeout = (int)strtol(loc+8, &loc, 0);
-			goto next;
-		}
-		if(!strncmp(loc, "port=", 5)) {
-			*port = strndup(loc+5, strcspn(loc+5, ","));
-			goto next;
-		}
-		if(!strncmp(loc, "persist", 7)) {
-			loc += 7;
-			*persist = 1;
-			goto next;
-		}
-		if(!strncmp(loc, "swap", 4)) {
-			*swap = 1;
-			loc += 4;
-			goto next;
-		}
-		if(!strncmp(loc, "sdp", 3)) {
-			*sdp = 1;
-			loc += 3;
-			goto next;
-		}
-		if(!strncmp(loc, "unix", 4)) {
-			*b_unix = 1;
-			loc += 4;
-			goto next;
-		}
-		if(!strncmp(loc, "certfile=", 9)) {
-			*certfile = strndup(loc+9, strcspn(loc+9, ","));
-			goto next;
-		}
-		if(!strncmp(loc, "keyfile=", 8)) {
-			*keyfile = strndup(loc+8, strcspn(loc+8, ","));
-			goto next;
-		}
-		if(!strncmp(loc, "cacertfile=", 11)) {
-			*cacertfile = strndup(loc+11, strcspn(loc+11, ","));
-			goto next;
-		}
-		if(!strncmp(loc, "tlshostname=", 9)) {
-			*tlshostname = strndup(loc+9, strcspn(loc+9, ","));
-			goto next;
-		}
-		if(!strncmp(loc, "no_optgo", 8)) {
-			*can_opt_go = false;
-			goto next;
-		}
-		// skip unknown options, with a warning unless they start with a '_'
-		l = strcspn(loc, ",");
-		if(*loc != '_') {
-			char* s = strndup(loc, l);
-			fprintf(stderr, "Warning: unknown option '%s' found in nbdtab file", s);
-			free(s);
-		}
-		loc += l;
-next:
-		if(*loc == ',') {
-			loc++;
-		}
-	} while(strcspn(loc, lsep) > 0);
 	retval = true;
 out:
-	if(data != NULL) {
-		munmap(data, size);
+	if(yyin != NULL) {
+		fclose(yyin);
 	}
-	if(fd >= 0) {
-		close(fd);
+	if(yyout != NULL) {
+		fclose(yyout);
 	}
 	return retval;
 }
@@ -1206,7 +1186,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-        if (!tlshostname && hostname)
+        if (!tlshostname && hostname && !b_unix)
                 tlshostname = strdup(hostname);
 
 	if (netlink)

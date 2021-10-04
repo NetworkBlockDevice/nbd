@@ -59,3 +59,4 @@ tests/run/buffer.c
 min-nbd-client
 support/*.m4
 debian/autoreconf.*
+ylwrap

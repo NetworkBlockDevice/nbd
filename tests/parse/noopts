@@ -1,0 +1,3 @@
+# This file contains a definition without options. It does not have
+# "/dev" in front of the device name, and has a multiline comment.
+nbd0	localhost	test

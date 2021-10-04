@@ -19,7 +19,7 @@ LT_INIT
 
 AC_ARG_ENABLE(
   lfs,
-  AC_HELP_STRING(--disable-lfs,Disable Large File Support (default on)),
+  AS_HELP_STRING([--disable-lfs],[Disable Large File Support (default on)]),
   [
     if test "x$enableval" = "xyes" ; then
       NBD_LFS=1
@@ -40,7 +40,7 @@ fi
 
 AC_ARG_ENABLE(
   syslog,
-  AC_HELP_STRING(--enable-syslog,Enable Syslog logging),
+  AS_HELP_STRING([--enable-syslog],[Enable Syslog logging]),
   [
     if test "x$enableval" = "xyes" ; then
       ISSERVER=1
@@ -61,7 +61,7 @@ fi
 
 AC_ARG_ENABLE(
   debug,
-  AC_HELP_STRING(--enable-debug,Build a debugging version of the server),
+  AS_HELP_STRING([--enable-debug],[Build a debugging version of the server]),
   [
     if test "x$enableval" = "xyes"; then
       DODBG=1
@@ -86,7 +86,7 @@ fi
 
 AC_ARG_ENABLE(
   sdp,
-  AC_HELP_STRING(--enable-sdp,Build a version of nbd-server with support for the Socket Direct Protocol (SDP). Requires you to build and install a kernel with the InfiniBand patches (default disabled)),
+  AS_HELP_STRING([--enable-sdp],[Build a version of nbd-server with support for the Socket Direct Protocol (SDP). Requires you to build and install a kernel with the InfiniBand patches (default disabled)]),
   [
     if test "x$enableval" = "xyes"; then
       AC_DEFINE(WITH_SDP, 1, [Define to 1 if you have and want support for the Socket Direct Protocol])
@@ -110,6 +110,10 @@ AC_ARG_ENABLE(
 AC_PROG_CC_C99
 AC_PROG_CPP
 AC_PROG_INSTALL
+AM_PROG_LEX(noyywrap)
+m4_ifdef([AX_PROG_BISON],,
+ [m4_fatal([The m4 macro AX_PROG_BISON has not been defined. Please install the autoconf-archive package.])])
+AX_PROG_BISON([],AC_MSG_ERROR([bison is required]))
 PKG_PROG_PKG_CONFIG
 AC_CANONICAL_HOST
 AC_C_BIGENDIAN
@@ -286,7 +290,9 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socke
 PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.26.0 gthread-2.0 >= 2.26.0], [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 
 my_save_cflags="$CFLAGS"
+my_save_libs="$LIBS"
 CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
+LIBS="$GLIB_LIBS"
 AC_MSG_CHECKING([if we are using an old glib 2.0 library])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 	[[#include <glib.h>]],
@@ -300,7 +306,10 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 		AC_DEFINE(HAVE_OLD_GLIB, 0, [Define to 1 if you have an old glib library])
 	]
 )
+dnl g_memdup2 added in glib-2.68
+AC_CHECK_FUNCS([g_memdup2])
 CFLAGS="$my_save_cflags"
+LIBS="$my_save_libs"
 
 AC_MSG_CHECKING([whether _BSD_SOURCE needs to be defined for DT_* macros])
 AC_PREPROC_IFELSE(
@@ -367,6 +376,7 @@ AC_CONFIG_FILES([Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile
+		 tests/parse/Makefile
                  man/nbd-client.8.sh
                  man/nbd-server.5.sh
                  man/nbd-server.1.sh
