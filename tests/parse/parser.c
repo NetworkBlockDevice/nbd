@@ -29,6 +29,12 @@ CLIENT client_multiopt = {
 	.no_optgo = true,
 };
 
+CLIENT client_ipv6 = {
+	.name = "test",
+	.dev = "nbd0",
+	.hostn = "2a01:4f8:200:91e8::2",
+};
+
 CLIENT *cur_client;
 
 void nbdtab_set_property(char *property, char *val) {
@@ -73,6 +79,7 @@ int main(int argc, char**argv) {
 	KNOW_CONF(noopts);
 	KNOW_CONF(singleopt);
 	KNOW_CONF(multiopt);
+	KNOW_CONF(ipv6);
 
 #undef KNOW_CONF
 
