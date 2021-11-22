@@ -1,8 +1,8 @@
 before_script:
   - apt-get update
   - apt-get install -y devscripts fakeroot build-essential git autoconf automake docbook-utils pkg-config
-  - ./autogen.sh
   - mk-build-deps -t "apt-get -y -o Debug::pkgProblemResolver=yes --no-install-recommends" -i -r
+  - ./autogen.sh
 build_unstable:
   image: debian:sid
   script:
