@@ -8,8 +8,10 @@ After=network-online.target
 Conflicts=shutdown.target
 DefaultDependencies=no
 [Service]
-Type=forking
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=@sbindir@/nbd-client %i
+ExecStop=@sbindir@/nbd-client -d /dev/%i
 [Install]
 RequiredBy=dev-%i.device
 RequiredBy=dev-%ip1.device
