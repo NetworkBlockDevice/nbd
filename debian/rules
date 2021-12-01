@@ -26,7 +26,7 @@ override_dh_install:
 	install -m 755 debian/nbd-client.initrd debian/tmp/usr/share/initramfs-tools/scripts/local-top/nbd
 	install -m 755 debian/nbd-client.initramfs-hook debian/tmp/usr/share/initramfs-tools/hooks/nbd
 	install -m 644 debian/nbd-server.conf.tmpl debian/tmp/usr/share/nbd-server/nbd-server.conf.tmpl
-	install -m 755 debian/tmp/sbin/min-nbd-client debian/nbd-client-udeb/sbin/nbd-client
+	if [ -f debian/tmp/sbin/min-nbd-client ]; then install -m 755 debian/tmp/sbin/min-nbd-client debian/nbd-client-udeb/sbin/nbd-client; fi
 	dh_install -a
 
 override_dh_installinit:
