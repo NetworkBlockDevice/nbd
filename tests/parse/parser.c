@@ -35,7 +35,14 @@ CLIENT client_ipv6 = {
 	.hostn = "2a01:4f8:200:91e8::2",
 };
 
+CLIENT client_ipv4 = {
+	.name = "test",
+	.dev = "nbd0",
+	.hostn = "192.168.1.1",
+};
+
 CLIENT *cur_client;
+bool seen_commit = false;
 
 void nbdtab_set_property(char *property, char *val) {
 	printf("property %s set to %s\n", property, val);
@@ -54,6 +61,7 @@ void nbdtab_commit_line(char *devn, char *hostn, char *exportname) {
 	assert(strcmp(cur_client->dev, devn) == 0);
 	assert(strcmp(cur_client->hostn, hostn) == 0);
 	assert(strcmp(cur_client->name, exportname) == 0);
+	seen_commit = true;
 }
 
 void yyerror(char *s) {
@@ -80,10 +88,13 @@ int main(int argc, char**argv) {
 	KNOW_CONF(singleopt);
 	KNOW_CONF(multiopt);
 	KNOW_CONF(ipv6);
+	KNOW_CONF(ipv4);
 
 #undef KNOW_CONF
 
 	assert(cur_client != NULL);
 
 	yyparse();
+
+	assert(cur_client == &client_empty || seen_commit == true);
 }
