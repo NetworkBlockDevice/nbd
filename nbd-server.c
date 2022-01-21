@@ -2616,6 +2616,15 @@ static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
 	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
 }
 
+static void log_reply(CLIENT *client, struct nbd_reply *prply)
+{
+	if (client->transactionlogfd != -1) {
+		lock_logsem(client);
+		writeit(client->transactionlogfd, prply, sizeof(*prply));
+		unlock_logsem(client);
+	}
+}
+
 #ifdef HAVE_SPLICE
 static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 {
@@ -2637,6 +2646,7 @@ static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 
 	DEBUG("handling read request (splice)\n");
 	setup_reply(&rep, req);
+	log_reply(client, &rep);
 	pthread_mutex_lock(&(client->lock));
 	writeit(client->net, &rep, sizeof(rep));
 	spliceit(pipefd[0], NULL, client->net, NULL, req->len);
@@ -2660,6 +2670,7 @@ static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 		DEBUG("Read failed: %m");
 		rep.error = nbd_errno(errno);
 	}
+	log_reply(client, &rep);
 	pthread_mutex_lock(&(client->lock));
 	socket_write(client, &rep, sizeof rep);
 	if(!rep.error) {
@@ -2708,6 +2719,7 @@ static void handle_write(struct work_package *pkg)
 			rep.error = nbd_errno(errno);
 		}
 	}
+	log_reply(client, &rep);
 	pthread_mutex_lock(&(client->lock));
 	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
@@ -2721,6 +2733,7 @@ static void handle_flush(CLIENT* client, struct nbd_request* req) {
 		DEBUG("Flush failed: %m");
 		rep.error = nbd_errno(errno);
 	}
+	log_reply(client, &rep);
 	pthread_mutex_lock(&(client->lock));
 	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
@@ -2734,6 +2747,7 @@ static void handle_trim(CLIENT* client, struct nbd_request* req) {
 		DEBUG("Trim failed: %m");
 		rep.error = nbd_errno(errno);
 	}
+	log_reply(client, &rep);
 	pthread_mutex_lock(&(client->lock));
 	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
@@ -2751,6 +2765,7 @@ static void handle_write_zeroes(CLIENT* client, struct nbd_request* req) {
 	// For now, don't trim
 	// TODO: handle this far more efficiently with reference to the
 	// actual backing driver
+	log_reply(client, &rep);
 	pthread_mutex_lock(&(client->lock));
 	socket_write(client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(client->lock));
@@ -2837,6 +2852,7 @@ static void handle_request(gpointer data, gpointer user_data) {
 error:
 	setup_reply(&rep, package->req);
 	rep.error = nbd_errno(err);
+	log_reply(package->client, &rep);
 	pthread_mutex_lock(&(package->client->lock));
 	socket_write(package->client, &rep, sizeof rep);
 	pthread_mutex_unlock(&(package->client->lock));
