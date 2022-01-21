@@ -129,6 +129,7 @@
 #include "netdb-compat.h"
 #include "backend.h"
 #include "treefiles.h"
+#include "nbd-helper.h"
 
 #ifdef WITH_SDP
 #include <sdp_inet.h>
@@ -284,31 +285,6 @@ struct generic_conf {
         gint flags;             /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
-
-/**
- * Translate a command name into human readable form
- *
- * @param command The command number (after applying NBD_CMD_MASK_COMMAND)
- * @return pointer to the command name
- **/
-static inline const char * getcommandname(uint64_t command) {
-	switch (command) {
-	case NBD_CMD_READ:
-		return "NBD_CMD_READ";
-	case NBD_CMD_WRITE:
-		return "NBD_CMD_WRITE";
-	case NBD_CMD_DISC:
-		return "NBD_CMD_DISC";
-	case NBD_CMD_FLUSH:
-		return "NBD_CMD_FLUSH";
-	case NBD_CMD_TRIM:
-		return "NBD_CMD_TRIM";
-	case NBD_CMD_WRITE_ZEROES:
-		return "NBD_CMD_WRITE_ZEROES";
-	default:
-		return "UNKNOWN";
-	}
-}
 
 #if HAVE_GNUTLS
 static int writeit_tls(gnutls_session_t s, void *buf, size_t len) {

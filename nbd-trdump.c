@@ -17,6 +17,7 @@
 #undef ISSERVER
 #include "cliserv.h"
 #include "nbd.h"
+#include "nbd-helper.h"
 
 static inline void doread(int f, void *buf, size_t len) {
         ssize_t res;
@@ -42,7 +43,7 @@ int main(int argc, char**argv) {
 	uint32_t command;
 	uint32_t len;
 	uint64_t offset;
-	char * ctext;
+	const char * ctext;
 	int readfd = 0; /* stdin */
 
 	if(argc > 1) {
@@ -68,24 +69,9 @@ int main(int argc, char**argv) {
 			len = ntohl(req.len);
 			command = ntohl(req.type);
 			
-			switch (command & NBD_CMD_MASK_COMMAND) {
-			case NBD_CMD_READ:
-				ctext="NBD_CMD_READ";
-				break;
-			case NBD_CMD_WRITE:
-				ctext="NBD_CMD_WRITE";
-				break;
-			case NBD_CMD_DISC:
-				ctext="NBD_CMD_DISC";
-				break;
-			case NBD_CMD_FLUSH:
-				ctext="NBD_CMD_FLUSH";
-				break;
-			default:
-				ctext="UNKNOWN";
-				break;
-			}
-			printf("> H=%016llx C=0x%08x (%13s+%4s) O=%016llx L=%08x\n",
+			ctext = getcommandname(command & NBD_CMD_MASK_COMMAND);
+
+			printf("> H=%016llx C=0x%08x (%20s+%4s) O=%016llx L=%08x\n",
 			       (long long unsigned int) handle,
 			       command,
 			       ctext,
