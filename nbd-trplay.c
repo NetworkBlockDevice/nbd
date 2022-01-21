@@ -26,7 +26,7 @@
 #include "nbd-helper.h"
 
 #define BUFSIZE	131072
-static char tmpbuf[BUFSIZE];
+static char g_tmpbuf[BUFSIZE];
 
 static bool g_with_datalog = false;
 
@@ -38,21 +38,111 @@ static bool g_with_datalog = false;
 int g_verbose = 0;
 
 unsigned long g_blocksize = 512;
+unsigned long long g_cur_blocks = 0;
 unsigned long long g_max_blocks = ULLONG_MAX;
 
-static inline void doread(int f, void *buf, size_t len) {
+static inline void doread(int f, char *buf, size_t len) {
         ssize_t res;
 
         while(len>0) {
                 if((res=read(f, buf, len)) <=0) {
-                        if (!res)
+                        if (!res) {
+				/* normal exit, end of transaction log. */
+				printf("End of transaction log, total %llu blocks written.\n",
+					(unsigned long long) g_cur_blocks);
 				exit(0);
+			}
 			perror ("Error reading transactions");
 			exit(1);
                 }
                 len-=res;
                 buf+=res;
         }
+}
+
+static inline void dowriteimage(int imagefd, const char *buf, size_t len, off_t offset) {
+	ssize_t res;
+
+	if (g_verbose >= VERBOSE_DETAILS) {
+		printf("block %llu (0x%llx): writing to offset %lld (0x%llx), len %lld (0x%llx).\n",
+			g_cur_blocks, g_cur_blocks,
+			(long long)offset, (long long) offset,
+			(long long) len, (long long) len);
+	}
+
+	while(len>0) {
+		if((res=pwrite(imagefd, buf, len, offset)) <=0) {
+			if (!res)
+				exit(0);
+			perror ("Error writing to image file");
+			exit(1);
+		}
+		len-=res;
+		buf+=res;
+		offset+=res;
+	}
+}
+
+
+void process_command(uint32_t command, uint64_t offset, uint32_t len, int logfd, int imagefd)
+{
+	if (offset % g_blocksize != 0) {
+		printf("  Got offset %llu (0x%llx), not a multiple of the block size %ld (0x%lx).\n",
+				(unsigned long long)offset, (unsigned long long)offset, g_blocksize, g_blocksize);
+		exit(1);
+	}
+	if (len % g_blocksize != 0) {
+		printf("  Got len %lu (0x%lx), not a multiple of the block size %ld (0x%lx).\n",
+				(unsigned long) len, (unsigned long) len, g_blocksize, g_blocksize);
+		exit(1);
+	}
+
+	switch (command & NBD_CMD_MASK_COMMAND) {
+	case NBD_CMD_READ:
+	case NBD_CMD_DISC:
+	case NBD_CMD_FLUSH:
+		/* READ, DISCONNECT, FLUSH: nothing to do */
+		break;
+	case NBD_CMD_WRITE:
+		if (!g_with_datalog) {
+			printf("  NBD_CMD_WRITE without data log, replay impossible.\n");
+			exit(1);
+		}
+		while (len > 0) {
+			doread(logfd, g_tmpbuf, g_blocksize);
+			dowriteimage(imagefd, g_tmpbuf, g_blocksize, offset);
+
+			offset+=g_blocksize;
+			len-=g_blocksize;
+			g_cur_blocks++;
+
+			if (g_cur_blocks == g_max_blocks) {
+				printf("g_max_blocks (%llu, 0x%llx) reached!.\n", g_max_blocks, g_max_blocks);
+				exit(0);
+			}
+		}
+		break;
+	case NBD_CMD_TRIM:
+	case NBD_CMD_WRITE_ZEROES:
+		while (len > 0) {
+			memset(g_tmpbuf, 0, g_blocksize);
+			dowriteimage(imagefd, g_tmpbuf, g_blocksize, offset);
+
+			offset+=g_blocksize;
+			len-=g_blocksize;
+			g_cur_blocks++;
+
+			if (g_cur_blocks == g_max_blocks) {
+				printf("g_max_blocks (%llu, 0x%llx) reached!.\n", g_max_blocks, g_max_blocks);
+				exit(0);
+			}
+		}
+		break;
+	default:
+		printf("  Unexpected command %d (0x%x), replay impossible.\n",
+			(unsigned int) command, (unsigned int) command);
+		exit(1);
+	}
 }
 
 int main_loop(int logfd, int imagefd) {
@@ -68,7 +158,7 @@ int main_loop(int logfd, int imagefd) {
 
 	while (1) {
 		/* Read a request or reply from the transaction file */
-		doread(logfd, &magic, sizeof(magic));
+		doread(logfd, (char*) &magic, sizeof(magic));
 		magic = ntohl(magic);
 		switch (magic) {
 		case NBD_REQUEST_MAGIC:
@@ -80,34 +170,29 @@ int main_loop(int logfd, int imagefd) {
 
 			ctext = getcommandname(command & NBD_CMD_MASK_COMMAND);
 
-			printf("> H=%016llx C=0x%08x (%20s+%4s) O=%016llx L=%08x\n",
-			       (long long unsigned int) handle,
-			       command,
-			       ctext,
-			       (command & NBD_CMD_FLAG_FUA)?"FUA":"NONE",
-			       (long long unsigned int) offset,
-			       len);
-			if (((command & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) &&
-					g_with_datalog) {
-				while (len > 0) {
-					uint32_t tmplen = len;
-
-					if (tmplen > BUFSIZE)
-						tmplen = BUFSIZE;
-					doread(logfd, tmpbuf, tmplen);
-					len -= tmplen;
-				}
+			if (g_verbose >= VERBOSE_NORMAL) {
+				printf("> H=%016llx C=0x%08x (%13s+%4s) O=%016llx L=%08x\n",
+				       (long long unsigned int) handle,
+				       command,
+				       ctext,
+				       (command & NBD_CMD_FLAG_FUA)?"FUA":"NONE",
+				       (long long unsigned int) offset,
+				       len);
 			}
+			process_command(command, offset, len, logfd, imagefd);
 
 			break;
+
 		case NBD_REPLY_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
 			handle = ntohll(*((long long int *)(rep.handle)));
 			error = ntohl(rep.error);
 
-			printf("< H=%016llx E=0x%08x\n",
-			       (long long unsigned int) handle,
-			       error);
+			if (g_verbose >= VERBOSE_NORMAL) {
+				printf("< H=%016llx E=0x%08x\n",
+				       (long long unsigned int) handle,
+				       error);
+			}
 			break;
 
 		case NBD_TRACELOG_MAGIC:
@@ -119,17 +204,20 @@ int main_loop(int logfd, int imagefd) {
 
 			ctext = gettracelogname(command);
 
-			printf("TRACE_OPTION C=0x%08x (%23s) O=%016llx L=%08x\n",
-			       command,
-			       ctext,
-			       (long long unsigned int) offset,
-			       len);
+			if (g_verbose >= VERBOSE_NORMAL) {
+				printf("TRACE_OPTION C=0x%08x (%23s) O=%016llx L=%08x\n",
+				       command,
+				       ctext,
+				       (long long unsigned int) offset,
+				       len);
+			}
 			if (offset == NBD_TRACELOG_FROM_MAGIC) {
 
 				switch (command) {
 				case NBD_TRACELOG_SET_DATALOG:
 					g_with_datalog = !!len;
-					printf("TRACE_OPTION DATALOG set to %d.\n", (int)g_with_datalog);
+					if (g_verbose >= VERBOSE_NORMAL)
+						printf("TRACE_OPTION DATALOG set to %d.\n", (int)g_with_datalog);
 					break;
 				default:
 					printf("TRACE_OPTION ? Unknown type\n");
@@ -139,9 +227,10 @@ int main_loop(int logfd, int imagefd) {
 			}
 			break;
 
+
 		default:
-			printf("? Unknown transaction type %08x\n",magic);
-			break;
+			printf("? Unknown transaction type %08x, replay impossible.\n", magic);
+			exit(1);
 		}
 
 	}
@@ -172,6 +261,9 @@ int main(int argc, char **argv) {
 	printf("%s -i <image> -l <log> [-m <max blocks>] [-b <block size]\n", argv[0]);
 
 	while ((opt = getopt(argc, argv, "i:l:m:b:hv")) != -1) {
+		if (g_verbose >= VERBOSE_DEBUG) {
+			printf("getopt: opt %c, optarg %s.\n", (char)opt, optarg);
+		}
 		switch(opt) {
 		case 'v':
 			g_verbose++;
@@ -227,7 +319,7 @@ int main(int argc, char **argv) {
 
 	if (g_verbose >= VERBOSE_NORMAL) {
 		printf(" block size: %ld bytes (0x%lx bytes).\n", g_blocksize, g_blocksize);
-		printf(" max blocks to apply: %llx.\n", g_max_blocks);
+		printf(" max blocks to apply: %llu (0x%llx).\n", g_max_blocks, g_max_blocks);
 	}
 	main_loop(logfd, imagefd);
 
