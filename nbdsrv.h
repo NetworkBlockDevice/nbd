@@ -155,6 +155,7 @@ typedef enum {
 #define F_FORCEDTLS 16384 /**< TLS is required, either for the server as a whole or for a given export */
 #define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
 #define F_WAIT 65536      /**< flag to tell us to wait for file creation */
+#define F_DATALOG 131072  /**< flag to tell us that the transaction log shall contain the written data */
 
 /* Functions */
 

@@ -64,6 +64,10 @@ enum {
 
 #define NBD_REQUEST_MAGIC 0x25609513
 #define NBD_REPLY_MAGIC 0x67446698
+#define NBD_STRUCTURED_REPLY_MAGIC 0x668e33ef
+
+/* for the trace log, not part of the protocol, not sent over the wire */
+#define NBD_TRACELOG_MAGIC 0x25609514
 /* Do *not* use magics: 0x12560953 0x96744668. */
 
 #define NBD_OPT_REPLY_MAGIC 0x3e889045565a9LL

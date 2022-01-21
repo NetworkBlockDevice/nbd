@@ -786,6 +786,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		{ "rotational",	FALSE,  PARAM_BOOL,	&(s.flags),		F_ROTATIONAL },
 		{ "temporary",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TEMPORARY },
 		{ "trim",	FALSE,  PARAM_BOOL,	&(s.flags),		F_TRIM },
+		{ "datalog",	FALSE,  PARAM_BOOL,	&(s.flags),		F_DATALOG },
 		{ "listenaddr", FALSE,  PARAM_STRING,   &(s.listenaddr),	0 },
 		{ "maxconnections", FALSE, PARAM_INT,	&(s.max_connections),	0 },
 		{ "force_tls",	FALSE,	PARAM_BOOL,	&(s.flags),		F_FORCEDTLS },
@@ -977,6 +978,15 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if ((s.flags & F_COPYONWRITE) && (s.flags & F_WAIT)) {
 			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_INVALID_WAIT,
 				    "Cannot mix copyonwrite with waitfile for an export in group %s",
+				    groups[i]);
+			g_array_free(retval, TRUE);
+			g_key_file_free(cfile);
+			return NULL;
+		}
+		/* We can't mix datalog and splice. */
+		if ((s.flags & F_DATALOG) && (s.flags & F_SPLICE)) {
+			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_INVALID_SPLICE,
+				    "Cannot mix datalog with splice for an export in group %s",
 				    groups[i]);
 			g_array_free(retval, TRUE);
 			g_key_file_free(cfile);
@@ -1981,6 +1991,49 @@ void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
 }
 
 /**
+  * Setup the transaction log
+  *
+  * The function does all things required for the transaction log:
+  * - Create a new log file.
+  * - Report if a log file already exists.
+  * - If needed add a header to the log.
+  *
+  * If something goes wrong, logging is disabled.
+  *
+  * @param client the CLIENT structure with .server and .net members set
+  * up correctly
+  */
+static void setup_transactionlog(CLIENT *client) {
+
+	if((client->transactionlogfd =
+				open(client->server->transactionlog,
+					O_WRONLY | O_CREAT,
+					S_IRUSR | S_IWUSR)) ==
+			-1) {
+		msg(LOG_INFO, "Could not open transactionlog %s, moving on without it",
+				client->server->transactionlog);
+	}
+	if (client->server->flags & F_DATALOG) {
+		struct nbd_request req;
+		int ret;
+
+		req.magic = htonl(NBD_TRACELOG_MAGIC);
+		req.type = htonl(NBD_TRACELOG_SET_DATALOG);
+		memset(req.handle, 0, sizeof(req.handle));
+		req.from = htonll(NBD_TRACELOG_FROM_MAGIC);
+		req.len = htonl(TRUE);
+
+		ret = writeit(client->transactionlogfd, &req, sizeof(struct nbd_request));
+		if (ret < 0) {
+			msg(LOG_INFO, "Could not write to transactionlog %s, moving on without it",
+				client->server->transactionlog);
+			close(client->transactionlogfd);
+			client->transactionlogfd = -1;
+		}
+	}
+}
+
+/**
   * Commit to exporting the chosen export
   *
   * When a client sends NBD_OPT_EXPORT_NAME or NBD_OPT_GO, we need to do
@@ -2043,16 +2096,8 @@ static bool commit_client(CLIENT* client, SERVER* server) {
         }
 
 	/* Set up the transactionlog, if we need one */
-	if (client->server->transactionlog && (client->transactionlogfd == -1)) {
-		if((client->transactionlogfd =
-					open(client->server->transactionlog,
-						O_WRONLY | O_CREAT,
-						S_IRUSR | S_IWUSR)) ==
-				-1) {
-			msg(LOG_INFO, "Could not open transactionlog %s, moving on without it",
-					client->server->transactionlog);
-		}
-	}
+	if (client->server->transactionlog && (client->transactionlogfd == -1))
+		setup_transactionlog(client);
 
 	/* Run any pre scripts that we may need */
 	if (do_run(client->server->prerun, client->exportname)) {
@@ -2786,6 +2831,11 @@ static int mainloop_threaded(CLIENT* client) {
 			else
 #endif
 				socket_read(client, pkg->data, req->len);
+
+			if ((client->server->flags & F_DATALOG) &&
+					!(client->server->flags & F_SPLICE)) {
+				writeit(client->transactionlogfd, pkg->data, req->len);
+			}
 		}
 		if(req->type == NBD_CMD_DISC) {
 			finalize_client(client);
