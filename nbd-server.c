@@ -120,8 +120,6 @@
 #include <pthread.h>
 #endif
 
-#include <semaphore.h>
-
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
@@ -399,6 +397,26 @@ static inline void socket_closed_negotiate(CLIENT* client) {
 	err("Negotiation failed: %m");
 }
 
+static void cleanup_transactionlog(CLIENT *client) {
+
+	if (client->transactionlogfd != -1) {
+		close(client->transactionlogfd);
+		client->transactionlogfd = -1;
+	}
+	if (client->logsem != SEM_FAILED) {
+		sem_close(client->logsem);
+		client->logsem = SEM_FAILED;
+		sem_unlink(client->semname);
+	}
+}
+
+static void lock_logsem(CLIENT *client) {
+	sem_wait(client->logsem);
+}
+static void unlock_logsem(CLIENT *client) {
+	sem_post(client->logsem);
+}
+
 /**
  * Run a command. This is used for the ``prerun'' and ``postrun'' config file
  * options
@@ -421,10 +439,9 @@ int do_run(gchar* command, gchar* file) {
 static inline void finalize_client(CLIENT* client) {
 	g_thread_pool_free(tpool, FALSE, TRUE);
 	do_run(client->server->postrun, client->exportname);
-	if(client->transactionlogfd != -1) {
-		close(client->transactionlogfd);
-		client->transactionlogfd = -1;
-	}
+	if(client->transactionlogfd != -1)
+		cleanup_transactionlog(client);
+
 	if(client->server->flags & F_COPYONWRITE) {
 		unlink(client->difffilename);
 	}
@@ -1995,6 +2012,7 @@ void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
   *
   * The function does all things required for the transaction log:
   * - Create a new log file.
+  * - allocate the posix semaphore for synchronization.
   * - Report if a log file already exists.
   * - If needed add a header to the log.
   *
@@ -2004,7 +2022,10 @@ void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
   * up correctly
   */
 static void setup_transactionlog(CLIENT *client) {
+	struct stat fdinfo;
+	int ret;
 
+	/* 1) create the file */
 	if((client->transactionlogfd =
 				open(client->server->transactionlog,
 					O_WRONLY | O_CREAT,
@@ -2013,6 +2034,8 @@ static void setup_transactionlog(CLIENT *client) {
 		msg(LOG_INFO, "Could not open transactionlog %s, moving on without it",
 				client->server->transactionlog);
 	}
+
+	/* 2) If needed, write flags */
 	if (client->server->flags & F_DATALOG) {
 		struct nbd_request req;
 		int ret;
@@ -2030,6 +2053,26 @@ static void setup_transactionlog(CLIENT *client) {
 			close(client->transactionlogfd);
 			client->transactionlogfd = -1;
 		}
+	}
+
+	/* 3) Allocate the semaphore used for locking */
+	ret = fstat(client->transactionlogfd, &fdinfo);
+	if (ret == -1) {
+		msg(LOG_INFO, "Could not stat transactionlog %s, moving on without it",
+			client->server->transactionlog);
+		close(client->transactionlogfd);
+		client->transactionlogfd = -1;
+		return;
+	}
+	snprintf(client->semname, sizeof(client->semname), "/nbd-server-%llx-%llx",
+				(unsigned long long)fdinfo.st_dev,
+				(unsigned long long)fdinfo.st_ino);
+	client->logsem = sem_open(client->semname, O_CREAT, 0600, 1);
+	if (client->logsem == SEM_FAILED) {
+		msg(LOG_INFO, "Could not allocate semaphore for transactionlog %s, moving on without it",
+			client->server->transactionlog);
+		close(client->transactionlogfd);
+		client->transactionlogfd = -1;
 	}
 }
 
@@ -2395,6 +2438,8 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 	client->socket_read = socket_read_notls;
 	client->socket_write = socket_write_notls;
 	client->socket_closed = socket_closed_negotiate;
+	client->transactionlogfd = -1;
+	client->logsem = SEM_FAILED;
 
 	assert(servers != NULL);
 	socket_write(client, INIT_PASSWD, 8);
@@ -2802,19 +2847,31 @@ end:
 static int mainloop_threaded(CLIENT* client) {
 	struct nbd_request* req;
 	struct work_package* pkg;
+	int write_data = false;
 
 	DEBUG("Entering request loop\n");
 	while(1) {
 		req = calloc(sizeof (struct nbd_request), 1);
 
 		socket_read(client, req, sizeof(struct nbd_request));
+
 		if(client->transactionlogfd != -1) {
+			lock_logsem(client);
 			writeit(client->transactionlogfd, req, sizeof(struct nbd_request));
+			if(((ntohl(req->type) & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) &&
+					(client->server->flags & F_DATALOG) &&
+					!(client->server->flags & F_SPLICE)) {
+				write_data = true;
+			} else {
+				write_data = false;
+				unlock_logsem(client);
+			}
 		}
 
 		req->from = ntohll(req->from);
 		req->type = ntohl(req->type);
 		req->len = ntohl(req->len);
+
 
 		if(req->magic != htonl(NBD_REQUEST_MAGIC))
 			err("Protocol error: not enough magic.");
@@ -2832,9 +2889,10 @@ static int mainloop_threaded(CLIENT* client) {
 #endif
 				socket_read(client, pkg->data, req->len);
 
-			if ((client->server->flags & F_DATALOG) &&
-					!(client->server->flags & F_SPLICE)) {
+			if (write_data) {
 				writeit(client->transactionlogfd, pkg->data, req->len);
+				unlock_logsem(client);
+				write_data = false;
 			}
 		}
 		if(req->type == NBD_CMD_DISC) {
