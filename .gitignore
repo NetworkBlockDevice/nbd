@@ -55,3 +55,8 @@ tests/run/crypto-gnutls.c
 min-nbd-client
 support/*.m4
 ylwrap
+nbdtab_lexer.c
+nbdtab_parser.c
+nbdtab_parser.tab.c
+nbdtab_parser.tab.h
+tests/parse/parser
