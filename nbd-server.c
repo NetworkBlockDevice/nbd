@@ -2177,6 +2177,9 @@ static CLIENT* handle_export_name(CLIENT* client, uint32_t opt, GArray* servers,
 
 	socket_read(client, &namelen, sizeof(namelen));
 	namelen = ntohl(namelen);
+	if(namelen > 4096) {
+		return NULL;
+	}
 	if(namelen > 0) {
 		name = malloc(namelen+1);
 		name[namelen]=0;
@@ -2361,6 +2364,10 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	if(namelen > (len - 6)) {
 		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "An OPT_INFO request cannot be smaller than the length of the name + 6");
 		consume(client, len - sizeof(namelen), buf, sizeof(buf));
+	}
+	if(namelen > 4096) {
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "The name for this OPT_INFO request is too long");
+		consume(client, namelen, buf, sizeof(buf));
 	}
 	if(namelen > 0) {
 		name = malloc(namelen + 1);
