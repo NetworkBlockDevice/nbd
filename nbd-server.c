@@ -207,7 +207,7 @@ struct work_package {
 	CLIENT* client;
 	struct nbd_request* req;
 	int pipefd[2];
-	void* data; /**< for read requests */
+	void* data; /**< for write requests */
 };
 
 static volatile sig_atomic_t is_sigchld_caught; /**< Flag set by
