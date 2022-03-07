@@ -1,0 +1,14 @@
+#!/bin/sh
+
+export SOCKET_WRAPPER_DIR=$(mktemp -d)
+export LD_PRELOAD="libsocket_wrapper.so libnss_wrapper.so"
+
+cleanup_sw() {
+	rm -rf $SOCKET_WRAPPER_DIR
+}
+
+trap -- cleanup_sw EXIT
+
+$(dirname $0)/simple_test "$@"
+
+exit $?
