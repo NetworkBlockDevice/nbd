@@ -4,6 +4,8 @@ jobs:
   Build-NBD:
     runs-on: ubuntu-latest
     steps:
+      - name: install dependencies
+        run: apt-get update && apt-get install docbook-utils libglib2.0-dev libgnutls28-dev libnl-genl-3-dev
       - name: Check out repository
         uses: actions/checkout@v2
       - run: ./autogen.sh
