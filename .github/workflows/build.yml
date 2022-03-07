@@ -2,7 +2,7 @@ name: Build NBD
 on: [push]
 jobs:
   Build-NBD:
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
