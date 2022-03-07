@@ -23,7 +23,7 @@ nbd_tester_client_CFLAGS += @GnuTLS_CFLAGS@
 nbd_tester_client_LDADD += @GnuTLS_LIBS@
 endif
 CLEANFILES = buffer.c crypto-gnutls.c cliserv.c
-EXTRA_DIST = integrity-test.tr integrityhuge-test.tr simple_test certs/client-key.pem certs/client-cert.pem certs/server-cert.pem certs/ca-cert.pem certs/ca.info certs/client.info certs/server-key.pem certs/ca-key.pem certs/server.info certs/README.md certs/selfsigned-cert.pem certs/selfsigned-key.pem
+EXTRA_DIST = integrity-test.tr integrityhuge-test.tr simple_test cwrap_test certs/client-key.pem certs/client-cert.pem certs/server-cert.pem certs/ca-cert.pem certs/ca.info certs/client.info certs/server-key.pem certs/ca-key.pem certs/server.info certs/README.md certs/selfsigned-cert.pem certs/selfsigned-key.pem
 cfg1:
 cfgmulti:
 cfgnew:
