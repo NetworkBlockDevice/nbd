@@ -7,7 +7,7 @@ libcliserv_la_SOURCES = cliserv.h cliserv.c
 libcliserv_la_CFLAGS = @CFLAGS@
 client_srcs = nbd-client.c cliserv.h nbd-netlink.h
 nbd_server_SOURCES = nbd-server.c cliserv.h lfs.h nbd.h nbdsrv.h backend.h \
-	netdb-compat.h
+	netdb-compat.h nbd-helper.h
 nbd_trdump_SOURCES = nbd-trdump.c cliserv.h nbd.h
 nbd_trplay_SOURCES = nbd-trplay.c cliserv.h nbd.h
 client_flags = @CFLAGS@
