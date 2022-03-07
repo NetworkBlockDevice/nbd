@@ -25,6 +25,7 @@ nbd-server.config
 nbd-server.5
 nbd-trdump.1
 nbdtab.5
+nbd-trplay.1
 *.o
 nbd-client.8.in
 nbd-server.1.in
