@@ -1,6 +1,8 @@
 bin/nbd-server
 bin/nbd-trdump
+bin/nbd-trplay
 usr/share/man/man1/nbd-server.1
 usr/share/man/man5/nbd-server.5
 usr/share/man/man1/nbd-trdump.1
+usr/share/man/man1/nbd-trplay.1
 usr/share/nbd-server/nbd-server.conf.tmpl
