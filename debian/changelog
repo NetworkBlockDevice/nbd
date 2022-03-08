@@ -4,7 +4,8 @@ nbd (1:3.24-1) unstable; urgency=medium
     - CVE-2022-26495: Disallow name lenghts of (unsigned int)-1, by
       constraining the length to 4096 bytes
     - CVE-2022-26496: Fix buffer overflow in NBD_OPT_INFO/NBD_OPT_GO
-      handling
+      handling.
+    - These security are tracked in the Debian BTS; Closes: #1006915.
     - nbd-server transaction logs can now optionally also log data
     - New binary: nbd-trplay, to replay (to an image) a transaction log.
 
