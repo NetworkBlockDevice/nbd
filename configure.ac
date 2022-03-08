@@ -107,7 +107,7 @@ AC_ARG_ENABLE(
   [ENABLE_GZNBD=no]
 )
 
-AC_PROG_CC_C99
+AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
 AM_PROG_LEX(noyywrap)
@@ -267,7 +267,6 @@ AC_CHECK_FUNC([sync_file_range],
 	[AC_DEFINE([HAVE_SYNC_FILE_RANGE], [sync_file_range(2) is not supported], [sync_file_range(2) is supported])],
         [])
 AC_FUNC_FORK
-AC_FUNC_SETVBUF_REVERSED
 AC_MSG_CHECKING(whether client should be built)
 AS_CASE([$host_os],
   [linux*], [NBD_CLIENT_NAME="nbd-client"; AC_MSG_RESULT(yes)],
@@ -354,6 +353,7 @@ AS_IF([test "x$enable_manpages" != "xno"], [
 		man/nbd-server.5.sh \
 		man/nbd-server.1.sh \
 		man/nbd-trdump.1.sh \
+		man/nbd-trplay.1.sh \
 		man/nbdtab.5.sh \
 		"])
 	])
@@ -381,6 +381,7 @@ AC_CONFIG_FILES([Makefile
                  man/nbd-server.5.sh
                  man/nbd-server.1.sh
                  man/nbd-trdump.1.sh
+                 man/nbd-trplay.1.sh
                  man/nbdtab.5.sh
 		 systemd/Makefile
 		 systemd/nbd@.service.sh

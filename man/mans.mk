@@ -6,6 +6,8 @@ nbd-client.8: nbd-client.8.sh
 	sh nbd-client.8.sh > nbd-client.8
 nbd-trdump.1: nbd-trdump.1.sh
 	sh nbd-trdump.1.sh > nbd-trdump.1
+nbd-trplay.1: nbd-trplay.1.sh
+	sh nbd-trplay.1.sh > nbd-trplay.1
 nbdtab.5: nbdtab.5.sh
 	sh nbdtab.5.sh > nbdtab.5
 nbd-server.1.sh.in: nbd-server.1.in.sgml sh.tmpl
@@ -32,6 +34,12 @@ nbd-trdump.1.sh.in: nbd-trdump.1.in.sgml sh.tmpl
 	cat NBD-TRDUMP.1 >> nbd-trdump.1.sh.in
 	echo "EOF" >> nbd-trdump.1.sh.in
 	rm NBD-TRDUMP.1
+nbd-trplay.1.sh.in: nbd-trplay.1.in.sgml sh.tmpl
+	LC_ALL=C docbook2man nbd-trplay.1.in.sgml
+	cat sh.tmpl > nbd-trplay.1.sh.in
+	cat NBD-TRPLAY.1 >> nbd-trplay.1.sh.in
+	echo "EOF" >> nbd-trplay.1.sh.in
+	rm NBD-TRPLAY.1
 nbdtab.5.sh.in: nbdtab.5.in.sgml sh.tmpl
 	LC_ALL=C docbook2man nbdtab.5.in.sgml
 	cat sh.tmpl > nbdtab.5.sh.in

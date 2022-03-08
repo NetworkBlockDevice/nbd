@@ -458,6 +458,18 @@ SHOULD wait until there are no inflight requests first.
 The client and the server MUST NOT initiate any form
 of disconnect other than in one of the above circumstances.
 
+#### Reserved Magic values
+
+The following magic values are reserved and must not be used
+for future protocol extentions:
+
+0x12560953 - Historic value for NBD_REQUEST_MAGIC, used
+	     until Linux 2.1.116pre2.
+0x96744668 - Historic value for NBD_REPLY_MAGIC, used
+	     until Linux 2.1.116pre2.
+0x25609514 - Used by nbd-server to store data log flags in the
+	     transaction log. Never sent from/to a client.
+
 ## TLS support
 
 The NBD protocol supports Transport Layer Security (TLS) (see

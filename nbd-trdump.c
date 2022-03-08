@@ -11,12 +11,19 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include "config.h"
 /* We don't want to do syslog output in this program */
 #undef ISSERVER
 #include "cliserv.h"
 #include "nbd.h"
+#include "nbd-helper.h"
+
+#define BUFSIZE	131072
+static char tmpbuf[BUFSIZE];
+
+static bool g_with_datalog = false;
 
 static inline void doread(int f, void *buf, size_t len) {
         ssize_t res;
@@ -42,7 +49,7 @@ int main(int argc, char**argv) {
 	uint32_t command;
 	uint32_t len;
 	uint64_t offset;
-	char * ctext;
+	const char * ctext;
 	int readfd = 0; /* stdin */
 
 	if(argc > 1) {
@@ -68,30 +75,26 @@ int main(int argc, char**argv) {
 			len = ntohl(req.len);
 			command = ntohl(req.type);
 			
-			switch (command & NBD_CMD_MASK_COMMAND) {
-			case NBD_CMD_READ:
-				ctext="NBD_CMD_READ";
-				break;
-			case NBD_CMD_WRITE:
-				ctext="NBD_CMD_WRITE";
-				break;
-			case NBD_CMD_DISC:
-				ctext="NBD_CMD_DISC";
-				break;
-			case NBD_CMD_FLUSH:
-				ctext="NBD_CMD_FLUSH";
-				break;
-			default:
-				ctext="UNKNOWN";
-				break;
-			}
-			printf("> H=%016llx C=0x%08x (%13s+%4s) O=%016llx L=%08x\n",
+			ctext = getcommandname(command & NBD_CMD_MASK_COMMAND);
+
+			printf("> H=%016llx C=0x%08x (%20s+%4s) O=%016llx L=%08x\n",
 			       (long long unsigned int) handle,
 			       command,
 			       ctext,
 			       (command & NBD_CMD_FLAG_FUA)?"FUA":"NONE",
 			       (long long unsigned int) offset,
 			       len);
+			if (((command & NBD_CMD_MASK_COMMAND) == NBD_CMD_WRITE) &&
+					g_with_datalog) {
+				while (len > 0) {
+					uint32_t tmplen = len;
+
+					if (tmplen > BUFSIZE)
+						tmplen = BUFSIZE;
+					doread(readfd, tmpbuf, tmplen);
+					len -= tmplen;
+				}
+			}
 			
 			break;
 		case NBD_REPLY_MAGIC:
@@ -104,6 +107,35 @@ int main(int argc, char**argv) {
 			       error);
 			break;
 			
+		case NBD_TRACELOG_MAGIC:
+			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
+			handle = ntohll(*((long long int *)(req.handle)));
+			offset = ntohll(req.from);
+			len = ntohl(req.len);
+			command = ntohl(req.type);
+
+			ctext = gettracelogname(command);
+
+			printf("TRACE_OPTION C=0x%08x (%23s) O=%016llx L=%08x\n",
+			       command,
+			       ctext,
+			       (long long unsigned int) offset,
+			       len);
+			if (offset == NBD_TRACELOG_FROM_MAGIC) {
+
+				switch (command) {
+				case NBD_TRACELOG_SET_DATALOG:
+					g_with_datalog = !!len;
+					printf("TRACE_OPTION DATALOG set to %d.\n", (int)g_with_datalog);
+					break;
+				default:
+					printf("TRACE_OPTION ? Unknown type\n");
+				}
+			} else {
+				printf("TRACE_OPTION ? Unknown FROM_MAGIC\n");
+			}
+			break;
+
 		default:
 			printf("? Unknown transaction type %08x\n",magic);
 			break;

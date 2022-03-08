@@ -9,6 +9,7 @@
 
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <semaphore.h>
 #include "nbd.h"
 
 /* Structures */
@@ -70,6 +71,8 @@ typedef struct _client {
 	uint32_t difffilelen;     /**< number of pages in difffile */
 	uint32_t *difmap;	     /**< see comment on the global difmap for this one */
 	int transactionlogfd;/**< fd for transaction log */
+	char semname[100]; /**< name of the posix sem that protects access to the transaction log */
+	sem_t *logsem;	 /**< posix sem that protects access to the transaction log */
 	int clientfeats;     /**< Features supported by this client */
 	pthread_mutex_t lock; /**< socket lock */
 	void *tls_session; /**< TLS session context. Is NULL unless STARTTLS
@@ -155,6 +158,7 @@ typedef enum {
 #define F_FORCEDTLS 16384 /**< TLS is required, either for the server as a whole or for a given export */
 #define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
 #define F_WAIT 65536      /**< flag to tell us to wait for file creation */
+#define F_DATALOG 131072  /**< flag to tell us that the transaction log shall contain the written data */
 
 /* Functions */
 

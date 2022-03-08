@@ -35,7 +35,10 @@ enum {
 	NBD_CMD_DISC = 2,
 	NBD_CMD_FLUSH = 3,
 	NBD_CMD_TRIM = 4,
-	NBD_CMD_WRITE_ZEROES = 6
+	NBD_CMD_CACHE = 5,
+	NBD_CMD_WRITE_ZEROES = 6,
+	NBD_CMD_BLOCK_STATUS = 7,
+	NBD_CMD_RESIZE = 8
 };
 
 #define NBD_CMD_MASK_COMMAND 0x0000ffff
@@ -61,7 +64,10 @@ enum {
 
 #define NBD_REQUEST_MAGIC 0x25609513
 #define NBD_REPLY_MAGIC 0x67446698
-/* Do *not* use magics: 0x12560953 0x96744668. */
+#define NBD_STRUCTURED_REPLY_MAGIC 0x668e33ef
+
+/* for the trace log, not part of the protocol, not sent over the wire */
+#define NBD_TRACELOG_MAGIC 0x25609514
 
 #define NBD_OPT_REPLY_MAGIC 0x3e889045565a9LL
 

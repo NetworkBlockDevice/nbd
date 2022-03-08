@@ -1,1 +1,5 @@
-nbd0 2a01:4f8:200:91e8::2 test
+# This config file contains a few empty lines.
+
+# It also contains an IPv6 address
+
+nbd0	2a01:4f8:200:91e8::2	test
