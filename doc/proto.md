@@ -1911,13 +1911,14 @@ The following request types exist:
     chunks that describe data outside the offset and length of the
     request, but MAY send the content chunks in any order (the client
     MUST reassemble content chunks into the correct order), and MAY
-    send additional content chunks even after reporting an error chunk.
-    Note that a request for more than 2^32 - 8 bytes MUST be split
-    into at least two chunks, so as not to overflow the length field
-    of a reply while still allowing space for the offset of each
-    chunk.  When no error is detected, the server MUST send enough
-    data chunks to cover the entire region described by the offset and
-    length of the client's request.
+    send additional content chunks even after reporting an error
+    chunk.  Note that a request for more than 2^32 - 8 bytes (if
+    permitted by block size constraints) MUST be split into at least
+    two chunks, so as not to overflow the length field of a reply
+    while still allowing space for the offset of each chunk.  When no
+    error is detected, the server MUST send enough data chunks to
+    cover the entire region described by the offset and length of the
+    client's request.
 
     To minimize traffic, the server MAY use a content or error chunk
     as the final chunk by setting the `NBD_REPLY_FLAG_DONE` flag, but
