@@ -882,15 +882,25 @@ The procedure works as follows:
   server supports.
 - During transmission, a client can then indicate interest in metadata
   for a given region by way of the `NBD_CMD_BLOCK_STATUS` command,
-  where *offset* and *length* indicate the area of interest. The
-  server MUST then respond with the requested information, for all
-  contexts which were selected during negotiation. For every metadata
-  context, the server sends one set of extent chunks, where the sizes
-  of the extents MUST be less than or equal to the length as specified
-  in the request. Each extent comes with a *flags* field, the
-  semantics of which are defined by the metadata context.
-- A server MUST reply to `NBD_CMD_BLOCK_STATUS` with a structured
-  reply of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
+  where *offset* and *length* indicate the area of interest. On
+  success, the server MUST respond with one structured reply chunk of
+  type `NBD_REPLY_TYPE_BLOCK_STATUS` per metadata context selected
+  during negotiation, where each reply chunk is a list of one or more
+  consecutive extents for that context.  Each extent comes with a
+  *flags* field, the semantics of which are defined by the metadata
+  context.
+
+The client's requested *length* is only a hint to the server, so the
+cumulative extent length contained in a chunk of the server's reply
+may be shorter or longer the original request.  When more than one
+metadata context was negotiated, the reply chunks for the different
+contexts of a single block status request need not have the same
+number of extents or cumulative extent length.
+
+In the request, the client may use the `NBD_CMD_FLAG_REQ_ONE` command
+flag to further constrain the server's reply so that each chunk
+contains exactly one extent whose length does not exceed the client's
+original *length*.
 
 A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
 nonzero number of metadata contexts during negotiation, and used the
@@ -1778,8 +1788,8 @@ MUST initiate a hard disconnect.
   *length* MUST be 4 + (a positive integer multiple of 8).  This reply
   represents a series of consecutive block descriptors where the sum
   of the length fields within the descriptors is subject to further
-  constraints documented below. This chunk type MUST appear
-  exactly once per metadata ID in a structured reply.
+  constraints documented below.  A successful block status request MUST
+  have exactly one status chunk per negotiated metadata context ID.
 
   The payload starts with:
 
@@ -1801,15 +1811,19 @@ MUST initiate a hard disconnect.
   *length* of the final extent MAY result in a sum larger than the
   original requested length, if the server has that information anyway
   as a side effect of reporting the status of the requested region.
+  When multiple metadata contexts are negotiated, the reply chunks for
+  the different contexts need not have the same number of extents or
+  cumulative extent length.
 
   Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
   its request, the server MAY return fewer descriptors in the reply
   than would be required to fully specify the whole range of requested
   information to the client, if looking up the information would be
   too resource-intensive for the server, so long as at least one
-  extent is returned. Servers should however be aware that most
-  clients implementations will then simply ask for the next extent
-  instead.
+  extent is returned.  Servers should however be aware that most
+  client implementations will likely follow up with a request for
+  extent information at the first offset not covered by a
+  reduced-length reply.
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
