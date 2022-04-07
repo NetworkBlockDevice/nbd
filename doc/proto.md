@@ -747,8 +747,8 @@ text unless the client insists on TLS.
 
 During transmission phase, several operations are constrained by the
 export size sent by the final `NBD_OPT_EXPORT_NAME` or `NBD_OPT_GO`,
-as well as by three block size constraints defined here (minimum,
-preferred, and maximum).
+as well as by three block size constraints defined here (minimum
+block, preferred block, and maximum payload).
 
 If a client can honour server block size constraints (as set out below
 and under `NBD_INFO_BLOCK_SIZE`), it SHOULD announce this during the
@@ -774,15 +774,15 @@ learn the server's constraints without committing to them.
 
 If block size constraints have not been advertised or agreed on
 externally, then a server SHOULD support a default minimum block size
-of 1, a preferred block size of 2^12 (4,096), and a maximum block size
-that is effectively unlimited (0xffffffff, or the export size if that
-is smaller), while a client desiring maximum interoperability SHOULD
-constrain its requests to a minimum block size of 2^9 (512), and limit
-`NBD_CMD_READ` and `NBD_CMD_WRITE` commands to a maximum block size of
-2^25 (33,554,432).  A server that wants to enforce block sizes other
-than the defaults specified here MAY refuse to go into transmission
-phase with a client that uses `NBD_OPT_EXPORT_NAME` (via a hard
-disconnect) or which uses `NBD_OPT_GO` without requesting
+of 1, a preferred block size of 2^12 (4,096), and a maximum
+payload size that is at least 2^25 (33,554,432) (even if the export
+size is smaller); while a client desiring maximum interoperability
+SHOULD constrain its requests to a minimum block size of 2^9 (512),
+and limit `NBD_CMD_READ` and `NBD_CMD_WRITE` commands to a maximum
+payload size of 2^25 (33,554,432).  A server that wants to enforce block
+sizes other than the defaults specified here MAY refuse to go into
+transmission phase with a client that uses `NBD_OPT_EXPORT_NAME` (via
+a hard disconnect) or which uses `NBD_OPT_GO` without requesting
 `NBD_INFO_BLOCK_SIZE` (via an error reply of
 `NBD_REP_ERR_BLOCK_SIZE_REQD`); but servers SHOULD NOT refuse clients
 that do not request sizing information when the server supports
@@ -820,17 +820,45 @@ the preferred block size for that export.  The server MAY advertise an
 export size that is not an integer multiple of the preferred block
 size.
 
-The maximum block size represents the maximum length that the server
-is willing to handle in one request.  If advertised, it MAY be
-something other than a power of 2, but MUST be either an integer
-multiple of the minimum block size or the value 0xffffffff for no
-inherent limit, MUST be at least as large as the smaller of the
-preferred block size or export size, and SHOULD be at least 2^20
-(1,048,576) if the export is that large.  For convenience, the server
-MAY advertise a maximum block size that is larger than the export
-size, although in that case, the client MUST treat the export size as
-the effective maximum block size (as further constrained by a nonzero
-offset).
+The maximum payload size represents the maximum payload length that
+the server is willing to handle in one request from the client.  If
+advertised, it MAY be something other than a power of 2, but MUST be
+at least as large as the preferred block size, and SHOULD be at least
+2^20 (1,048,576) if the export is that large.  Advertising a maximum
+payload size of 0xffffffff is permitted when the server does not have
+a fixed limit on client request payloads.  Typically, the advertised
+maximum payload length is independent of the export size, even though
+the actual payloads for read and write cannot successfully exceed the
+constraints given by the export size and offset of a request.
+Notwithstanding any maximum payload size advertised, either the server
+or the client MAY initiate a hard disconnect if a payload length of
+either a request or a reply would be large enough to be deemed a
+denial of service attack; however, for maximum portability, any
+payload not exceeding 2^25 (33,554,432) bytes SHOULD NOT be considered
+a denial of service attack, even if that length is larger than the
+advertised maximum payload size.
+
+For commands that require a payload in either direction and where the
+client controls the payload length (`NBD_CMD_WRITE`, or `NBD_CMD_READ`
+with simple replies), the client MUST NOT request a length larger than
+the maximum payload size. For replies where the payload length is
+controlled by the server (`NBD_CMD_BLOCK_STATUS` without the flag
+`NBD_CMD_FLAG_REQ_ONE`, or `NBD_CMD_READ` when structured replies are
+negotiated), the server MAY exceed the maximum payload by the fixed
+amount of overhead required in the structured reply (for example, a
+server that advertises a maximum payload of 2^25 bytes may return
+2^25+8 payload bytes in a single `NBD_REPLY_TYPE_OFFSET_DATA` chunk,
+rather than splitting the reply across two chunks), although it MUST
+honor any additional payload constraints documented for a particular
+command.  For commands that do not require a payload in either
+direction (such as `NBD_CMD_TRIM` or `NBD_CMD_WRITE_ZEROES`), the
+client MAY request an effect length larger than the maximum payload
+size; the server SHOULD NOT disconnect, but MAY reply with an
+`NBD_EOVERFLOW` or `NBD_EINVAL` error if the oversize request would
+require too many server resources when compared to the same command
+with an effect length limited to the maximum payload size (such as an
+implementation of `NBD_CMD_WRITE_ZEROES` that utilizes a scratch
+buffer).
 
 Where a transmission request can have a nonzero *offset* and/or
 *length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
@@ -838,24 +866,9 @@ the client MUST ensure that *offset* and *length* are integer
 multiples of any advertised minimum block size, and SHOULD use integer
 multiples of any advertised preferred block size where possible.  For
 those requests, the client MUST NOT use a *length* which, when added to
-*offset*, would exceed the export size. Also for NBD_CMD_READ,
-NBD_CMD_WRITE, NBD_CMD_CACHE and NBD_CMD_WRITE_ZEROES (except for
-when NBD_CMD_FLAG_FAST_ZERO is set), the client MUST NOT use a *length*
-larger than any advertised maximum block size.
-The server SHOULD report an `NBD_EINVAL` error if
-the client's request is not aligned to advertised minimum block size
-boundaries, or is larger than the advertised maximum block size.
-Notwithstanding any maximum block size advertised, either the server
-or the client MAY initiate a hard disconnect if the payload of an
-`NBD_CMD_WRITE` request or `NBD_CMD_READ` reply would be large enough
-to be deemed a denial of service attack; however, for maximum
-portability, any *length* less than 2^25 (33,554,432) bytes SHOULD NOT
-be considered a denial of service attack (even if the advertised
-maximum block size is smaller).  For all other commands, where the
-*length* is not reflected in the payload (such as `NBD_CMD_TRIM` or
-`NBD_CMD_WRITE_ZEROES`), a server SHOULD merely fail the command with
-an `NBD_EINVAL` error for a client that exceeds the maximum block size,
-rather than initiating a hard disconnect.
+*offset*, would exceed the export size.  The server SHOULD report an
+`NBD_EINVAL` error if the client's request is not aligned to advertised
+minimum block size boundaries or would exceed the export size.
 
 ## Metadata querying
 
@@ -1597,7 +1610,7 @@ during option haggling in the fixed newstyle negotiation.
       - 16 bits, `NBD_INFO_BLOCK_SIZE`  
       - 32 bits, minimum block size  
       - 32 bits, preferred block size  
-      - 32 bits, maximum block size  
+      - 32 bits, maximum payload size  
 
 * `NBD_REP_META_CONTEXT` (4)
 
@@ -1740,12 +1753,15 @@ unrecognized flags.
 
 #### Structured reply types
 
-These values are used in the "type" field of a structured reply.
-Some chunk types can additionally be categorized by role, such as
-*error chunks* or *content chunks*.  Each type determines how to
-interpret the "length" bytes of payload.  If the client receives
-an unknown or unexpected type, other than an *error chunk*, it
-MUST initiate a hard disconnect.
+These values are used in the "type" field of a structured reply.  Some
+chunk types can additionally be categorized by role, such as *error
+chunks* or *content chunks*.  Each type determines how to interpret
+the "length" bytes of payload.  If the client receives an unknown or
+unexpected type, other than an *error chunk*, it MUST initiate a hard
+disconnect.  A server MUST NOT send a chunk where any variable-length
+portion of the chunk is larger than any advertised maximum payload
+size (however, the overall chunk may exceed the maximum payload by the
+small amount of fixed-length overhead inherent in the chunk type).
 
 * `NBD_REPLY_TYPE_NONE` (0)
 
@@ -1908,7 +1924,9 @@ The following request types exist:
     If structured replies were not negotiated, then a read request
     MUST always be answered by a simple reply, as documented above
     (using magic 0x67446698 `NBD_SIMPLE_REPLY_MAGIC`, and containing
-    length bytes of data according to the client's request).
+    length bytes of data according to the client's request), which in
+    turn means any client request with a length larger than the
+    maximum payload size will fail.
 
     If an error occurs, the server SHOULD set the appropriate error code
     in the error field. The server MAY then initiate a hard disconnect.
@@ -1938,13 +1956,18 @@ The following request types exist:
     request, but MAY send the content chunks in any order (the client
     MUST reassemble content chunks into the correct order), and MAY
     send additional content chunks even after reporting an error
-    chunk.  Note that a request for more than 2^32 - 8 bytes (if
-    permitted by block size constraints) MUST be split into at least
-    two chunks, so as not to overflow the length field of a reply
-    while still allowing space for the offset of each chunk.  When no
-    error is detected, the server MUST send enough data chunks to
-    cover the entire region described by the offset and length of the
-    client's request.
+    chunk.  A server MAY support read requests larger than the maximum
+    payload size by splitting the response across multiple chunks (in
+    particular, a request for more than 2^32 - 8 bytes containing data
+    rather than holes MUST be split to avoid overflowing the 32-bit
+    `NBD_REPLY_TYPE_OFFSET_DATA` length field); however, the server is
+    also permitted to reject large read requests up front, so a client
+    should be prepared to retry with smaller requests if a large
+    request fails.
+
+    When no error is detected, the server MUST send enough data chunks
+    to cover the entire region described by the offset and length of
+    the client's request.
 
     To minimize traffic, the server MAY use a content or error chunk
     as the final chunk by setting the `NBD_REPLY_FLAG_DONE` flag, but
@@ -2117,11 +2140,12 @@ The following request types exist:
     If the server advertised `NBD_FLAG_SEND_FAST_ZERO` but
     `NBD_CMD_FLAG_FAST_ZERO` is not set, then the server MUST NOT fail
     with `NBD_ENOTSUP`, even if the operation is no faster than a
-    corresponding `NBD_CMD_WRITE`. Conversely, if
-    `NBD_CMD_FLAG_FAST_ZERO` is set, the server MUST fail quickly with
-    `NBD_ENOTSUP` unless the request can be serviced in less time than
-    a corresponding `NBD_CMD_WRITE`, and SHOULD NOT alter the contents
-    of the export when returning this failure. The server's
+    corresponding `NBD_CMD_WRITE`. Conversely, if `NBD_CMD_FLAG_FAST_ZERO`
+    is set, the server SHOULD NOT fail with `NBD_EOVERFLOW` regardless of
+    the client length, MUST fail quickly with `NBD_ENOTSUP` unless the
+    request can be serviced in less time than a corresponding
+    `NBD_CMD_WRITE`, and SHOULD NOT alter the contents of the export when
+    returning an `NBD_ENOTSUP` failure. The server's
     determination on whether to fail a fast request MAY depend on a
     number of factors, such as whether the request was suitably
     aligned, on whether the `NBD_CMD_FLAG_NO_HOLE` flag was present,
@@ -2274,7 +2298,9 @@ SHOULD return `NBD_EPERM` if it receives a write or trim request on a
 read-only export.
 
 The server SHOULD NOT return `NBD_EOVERFLOW` except as documented in
-response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported.
+response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported, or when
+a command without payload requests a length larger than an advertised
+maximum payload length.
 
 The server SHOULD NOT return `NBD_ENOTSUP` except as documented in
 response to `NBD_CMD_WRITE_ZEROES` when `NBD_CMD_FLAG_FAST_ZERO` is
