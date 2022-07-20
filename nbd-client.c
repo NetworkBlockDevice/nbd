@@ -1193,7 +1193,7 @@ int main(int argc, char *argv[]) {
 		nofork = 1;
 
 	if((force_size64 % blocksize) != 0) {
-		fprintf(stderr, "E: size (" PRIu64 " bytes) is not a multiple of blocksize (%d)!\n", force_size64, blocksize);
+		fprintf(stderr, "E: size (%" PRIu64 " bytes) is not a multiple of blocksize (%d)!\n", force_size64, blocksize);
 		exit(EXIT_FAILURE);
 	}
 
