@@ -374,13 +374,15 @@ S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
 Some of the major downsides of the default simple reply to
 `NBD_CMD_READ` are as follows.  First, it is not possible to support
 partial reads or early errors (the command must succeed or fail as a
-whole, and either *length* bytes of data must be sent or a hard disconnect
-must be initiated, even if the failure is `NBD_EINVAL` due to bad flags).
-Second, there is no way to efficiently skip over portions of a sparse
-file that are known to contain all zeroes.  Finally, it is not
-possible to reliably decode the server traffic without also having
-context of what pending read requests were sent by the client.
-Therefore structured replies are also permitted if negotiated.
+whole; no payload is sent if *error* was set, but if *error* is zero
+and a later error is detected before *length* bytes are returned, the
+server must initiate a hard disconnect).  Second, there is no way to
+efficiently skip over portions of a sparse file that are known to
+contain all zeroes.  Finally, it is not possible to reliably decode
+the server traffic without also having context of what pending read
+requests were sent by the client, to see which *handle* values will
+have accompanying payload on success.  Therefore structured replies
+are also permitted if negotiated.
 
 A structured reply in the transmission phase consists of one or
 more structured reply chunk messages.  The server MUST NOT send
