@@ -2342,7 +2342,7 @@ considered a baseline:
     - the `NBD_OPT_INFO` and `NBD_OPT_GO` messages, with the
       `NBD_INFO_EXPORT` response.
     - Servers that receive messages which they do not implement MUST
-      reply to them with `NBD_OPT_UNSUP`, and MUST NOT fail to parse
+      reply to them with `NBD_REP_ERR_UNSUP`, and MUST NOT fail to parse
       the next message received.
     - the `NBD_OPT_ABORT` message, and its response.
     - the `NBD_OPT_LIST` message and its response.
