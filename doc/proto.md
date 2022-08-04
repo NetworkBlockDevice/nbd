@@ -1863,7 +1863,8 @@ remaining structured fields at the end.
   were sent earlier in the structured reply, the server SHOULD NOT
   send multiple distinct offsets that lie within the bounds of a
   single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-  `NBD_CMD_WRITE`, `NBD_CMD_TRIM`, and `NBD_CMD_BLOCK_STATUS`.
+  `NBD_CMD_WRITE`, `NBD_CMD_TRIM`, `NBD_CMD_CACHE`,
+  `NBD_CMD_WRITE_ZEROES`, and `NBD_CMD_BLOCK_STATUS`.
 
   The payload is structured as:
 
