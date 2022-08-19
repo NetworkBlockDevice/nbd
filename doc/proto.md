@@ -399,17 +399,20 @@ additional bytes of payload are present), or if the flag is absent
 (there is no payload, and *length* instead is an effect length
 describing how much of the export the request operates on).  The
 command `NBD_CMD_WRITE` MUST use the flag `NBD_CMD_FLAG_PAYLOAD_LEN`
-in this mode; while other commands SHOULD avoid the flag if the
-server has not indicated extension suppport for payloads on that
-command.  A server SHOULD initiate hard disconnect if a client sets
-the `NBD_CMD_FLAG_PAYLOAD_LEN` flag and uses a *length* larger than
-a server's advertised or default maximum payload length (capped at
-32 bits by the constraints of `NBD_INFO_BLOCK_SIZE`); in all other
-cases, a server SHOULD gracefully consume *length* bytes of payload
-(even if it then replies with an `NBD_EINVAL` failure because the
-particular command was not expecting a payload), and proceed with
-the next client command.  Thus, only when *length* is used as an
-effective length will it utilize a full 64-bit value.
+in this mode; most other commands omit it, although some like
+`NBD_CMD_BLOCK_STATUS` optionally support the flag in order to allow
+the client to pass additional information in the payload (where the
+command documents what the payload will contain, including the
+possibility of a separate effect length).  A server SHOULD initiate
+hard disconnect if a client sets the `NBD_CMD_FLAG_PAYLOAD_LEN` flag
+and uses a *length* larger than a server's advertised or default
+maximum payload length (capped at 32 bits by the constraints of
+`NBD_INFO_BLOCK_SIZE`); in all other cases, a server SHOULD gracefully
+consume *length* bytes of payload (even if it then replies with an
+`NBD_EINVAL` failure because the particular command was not expecting
+a payload), and proceed with the next client command.  Thus, only when
+*length* is used as an effective length will it utilize a full 64-bit
+value.
 
 #### Simple reply message
 
@@ -1240,6 +1243,19 @@ The field has the following format:
   will be faster than a regular write). Clients MUST NOT set the
   `NBD_CMD_FLAG_FAST_ZERO` request flag unless this transmission flag
   is set.
+- bit 12, `NBD_FLAG_BLOCK_STATUS_PAYLOAD`: Indicates that the server
+  understands the use of the `NBD_CMD_FLAG_PAYLOAD_LEN` flag to
+  `NBD_CMD_BLOCK_STATUS` to allow the client to request that the
+  server filters its response to a specific subset of negotiated
+  metacontext ids passed in via a client payload, rather than the
+  default of replying to all metacontext ids. Servers MUST NOT
+  advertise this bit unless the client successfully negotiates
+  extended headers via `NBD_OPT_EXTENDED_HEADERS`, and SHOULD NOT
+  advertise this bit in response to `NBD_OPT_EXPORT_NAME` or
+  `NBD_OPT_GO` if the client does not negotiate metacontexts with
+  `NBD_OPT_SET_META_CONTEXT`; clients SHOULD NOT set the
+  `NBD_CMD_FLAG_PAYLOAD_LEN` flag for `NBD_CMD_BLOCK_STATUS` unless
+  this transmission flag is set.
 
 Clients SHOULD ignore unknown flags.
 
@@ -1930,8 +1946,11 @@ valid may depend on negotiation during the handshake phase.
   header.  With extended headers, the flag MUST be set for
   `NBD_CMD_WRITE` (as the write command always sends a payload of the
   bytes to be written); for other commands, the flag will trigger an
-  `NBD_EINVAL` error unless the server has advertised support for an
-  extension payload form for the command.
+  `NBD_EINVAL` error unless the command documents an optional payload
+  form for the command and the server has implemented that form (an
+  example being `NBD_CMD_BLOCK_STATUS` providing a payload form for
+  restricting the response to a particular metacontext id, when the
+  server advertises `NBD_FLAG_BLOCK_STATUS_PAYLOAD`).
 
 ##### Structured and extended header reply flags
 
@@ -2477,6 +2496,23 @@ The following request types exist:
     determined by the flags field as defined by the metadata context.
     The server MAY send chunks in a different order than the context
     ids were assigned in reply to `NBD_OPT_SET_META_CONTEXT`.
+
+    If extended headers were negotiated, a server MAY optionally
+    advertise, via the transmission flag
+    `NBD_FLAG_BLOCK_STATUS_PAYLOAD`, that it supports an alternative
+    request form where the client sets `NBD_CMD_FLAG_PAYLOAD_LEN` in
+    order to pass a payload that informs the server to limit its
+    replies to the metacontext id(s) in the client's request payload,
+    rather than giving an answer on all possible metacontext ids.  If
+    the server does not support the payload form, or detects duplicate
+    or unknown metacontext ids in the client's payload, the server
+    MUST gracefully consume the client's payload before failing with
+    `NBD_EINVAL`.  The payload form MUST occupy 8 + n*4 bytes, where n
+    is the number of metacontext ids the client is interested in (as
+    implied by the payload length), laid out as:
+
+    64 bits, effect length  
+    n * 32 bits, list of metacontext ids to use  
 
     The list of block status descriptors within a given status chunk
     represent consecutive portions of the export starting from
