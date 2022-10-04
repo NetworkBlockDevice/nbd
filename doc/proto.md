@@ -18,12 +18,13 @@ an implementation detail of the server.
 
 ## Conventions
 
-In the below protocol descriptions, the label 'C:' is used for messages
-sent by the client, whereas 'S:' is used for messages sent by the
-server).  `monotype text` is for literal character data or (when used in
-comments) constant names, `0xdeadbeef` is used for literal hex numbers
-(which are always sent in network byte order), and (brackets) are used
-for comments. Anything else is a description of the data that is sent.
+In the below protocol descriptions, the label 'C:' is used for
+messages sent by the client, whereas 'S:' is used for messages sent by
+the server).  `monotype text` is for literal character data or (when
+used in comments) constant names, `0xdeadbeef` is used for literal hex
+numbers (which are always sent in big-endian network byte order), and
+(brackets) are used for comments. Anything else is a description of
+the data that is sent.
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
 "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",
