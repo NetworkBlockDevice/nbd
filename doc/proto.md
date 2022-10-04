@@ -995,7 +995,10 @@ The procedure works as follows:
   during transmission, the client MUST select one or more metadata
   contexts with the `NBD_OPT_SET_META_CONTEXT` command. If needed, the
   client can use `NBD_OPT_LIST_META_CONTEXT` to list contexts that the
-  server supports.
+  server supports.  Most metadata contexts expose no more than 32 bits
+  of information, but some metadata contexts have associated data that
+  is 64 bits in length; using such contexts requires the client to
+  first negotiate extended headers with `NBD_OPT_EXTENDED_HEADERS`.
 - During transmission, a client can then indicate interest in metadata
   for a given region by way of the `NBD_CMD_BLOCK_STATUS` command,
   where *offset* and *length* indicate the area of interest. On
@@ -1053,7 +1056,7 @@ third-party namespaces are currently registered:
 Save in respect of the `base:` namespace described below, this specification
 requires no specific semantics of metadata contexts, except that all the
 information they provide MUST be representable within the flags field as
-defined for `NBD_REPLY_TYPE_BLOCK_STATUS`. Likewise, save in respect of
+defined for `NBD_REPLY_TYPE_BLOCK_STATUS_EXT`. Likewise, save in respect of
 the `base:` namespace, the syntax of query strings is not specified by this
 document, other than the recommendation that the empty leaf-name makes
 sense as a wildcard for a client query during `NBD_OPT_LIST_META_CONTEXT`,
@@ -1120,7 +1123,9 @@ should make no assumption as to its contents or stability.
 
 For the `base:allocation` context, the remainder of the flags field is
 reserved. Servers SHOULD set it to all-zero; clients MUST ignore
-unknown flags.
+unknown flags.  Because fewer than 32 flags are defined, this metadata
+context does not require the use of `NBD_OPT_EXTENDED_HEADERS`, and a
+server can use `NBD_REPLY_TYPE_BLOCK_STATUS` to return results.
 
 ## Values
 
@@ -1493,6 +1498,18 @@ of the newstyle negotiation.
     to do so, a server MAY send `NBD_REP_ERR_INVALID` or
     `NBD_REP_ERR_EXT_HEADER_REQD`.
 
+    A server MAY support extension contexts that produce status values
+    that require more than 32 bits.  The server MAY advertise such
+    contexts even if the client has not yet negotiated extended
+    headers, although it SHOULD then conclude the overall response
+    with the `NBD_REP_ERR_EXT_HEADER_REQD` error to inform the client
+    that extended headers are required to make full use of all
+    contexts advertised.  However, since none of the contexts defined
+    in the "base:" namespace provide more than 32 bits of status, a
+    server MUST NOT use this failure mode when the response is limited
+    to the "base:" namespace; nor may the server use this failure mode
+    when the client has already negotiated extended headers.
+
     Data:
     - 32 bits, length of export name.  
     - String, name of export for which we wish to list metadata
@@ -1577,6 +1594,13 @@ of the newstyle negotiation.
     extended headers have been negotiated first. If a client attempts
     to do so, a server SHOULD send `NBD_REP_ERR_INVALID` or
     `NBD_REP_ERR_EXT_HEADER_REQD`.
+
+    If a client requests a metadata context that utilizes 64-bit
+    status, but has not yet negotiated extended headers, the server
+    MUST either omit that context from its successful reply, or else
+    fail the request with `NBD_REP_ERR_EXT_HEADER_REQD`.  The server
+    MUST NOT use this failure for a client request that is limited to
+    contexts in the "base:" namespace.
 
     A client MUST NOT send `NBD_CMD_BLOCK_STATUS` unless within the
     negotiation phase it sent `NBD_OPT_SET_META_CONTEXT` at least
@@ -2043,16 +2067,23 @@ small amount of fixed-length overhead inherent in the chunk type).
   extent information at the first offset not covered by a
   reduced-length reply.
 
+  For an extension metadata context that documents that the status
+  value may potentially occupy 64 bits, a server MUST NOT use this
+  reply type unless the most-significant 32 bits of all *status*
+  values included in this reply are all zeroes.  Note that if the
+  client did not negotiate extended headers, then the server already
+  guaranteed during the handshake phase that no metadata contexts
+  utilizing a 64-bit status value were negotiated.
+
 * `NBD_REPLY_TYPE_BLOCK_STATUS_EXT` (6)
 
   This chunk type is in the status chunk category.  *length* MUST be
   8 + (a positive multiple of 16).  The semantics of this chunk mirror
   those of `NBD_REPLY_TYPE_BLOCK_STATUS`, other than the use of a
-  larger *extent length* field, added padding in each descriptor to
-  ease alignment, and the addition of a *descriptor count* field that
-  can be used for easier client processing.  This chunk type MUST NOT
-  be used unless extended headers were negotiated with
-  `NBD_OPT_EXTENDED_HEADERS`.
+  larger *extent length* field and a 64-bit *status* field, and the
+  addition of a *descriptor count* field that can be used for easier
+  client processing.  This chunk type MUST NOT be used unless extended
+  headers were negotiated with `NBD_OPT_EXTENDED_HEADERS`.
 
   If the *descriptor count* field contains 0, the number of subsequent
   descriptors is determined solely by the *length* field of the reply
@@ -2071,14 +2102,19 @@ small amount of fixed-length overhead inherent in the chunk type).
 
   64 bits, length of the extent to which the status below
      applies (unsigned, MUST be nonzero)  
-  32 bits, padding (MUST be zero)  
-  32 bits, status flags  
+  64 bits, status flags  
 
   Note that when extended headers are in use, the client MUST be
   prepared for the server to use either the compact or extended chunk
-  type, regardless of whether the client's hinted effect length was
-  more or less than 32 bits; but the server MUST use exactly one of
-  the two chunk types per negotiated metacontext ID.
+  type for metadata contexts, regardless of whether the client's
+  hinted effect length was more or less than 32 bits; but the server
+  MUST use exactly one of the two chunk types per negotiated
+  metacontext ID.  However, the server MUST use the extended chunk
+  type when responding to an extension metadata context that utilizes
+  a 64-bit status code where the resulting *status* value is not
+  representable in 32 bits.  For metadata contexts that only return a
+  32-bit status (including all contexts in the "base:" namespace), the
+  most-significant 32 bits of *status* MUST be all zeroes.
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
