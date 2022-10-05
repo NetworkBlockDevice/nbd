@@ -29,8 +29,9 @@ bool do_test(char* address, char* netmask) {
 	while(res) {
 		if((err = getnameinfo((struct sockaddr*)res->ai_addr, res->ai_addrlen, buf,
                                        sizeof (buf), NULL, 0, NI_NUMERICHOST))) {
-                        fprintf(stderr, "E: %s\n", gai_strerror(err));
-                        exit(EXIT_FAILURE);
+			fprintf(stderr, "E: %s\n", gai_strerror(err));
+			exit(EXIT_FAILURE);
+		}
 
 		printf("Found %s\n", buf);
 
