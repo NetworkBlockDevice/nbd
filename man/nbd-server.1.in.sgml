@@ -68,6 +68,7 @@ manpage.1: manpage.sgml
       <arg><option>-C <replaceable>config file</replaceable></option></arg>
       <arg><option>-M <replaceable>max connections</replaceable></option></arg>
       <arg><option>-V</option></arg>
+      <arg><option>-n</option></arg>
       <arg><option>-d</option></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
@@ -231,9 +232,18 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>-n</option></term>
+        <listitem>
+          <para>Do not daemonize the main process. In contrast
+          to <option>-d</option>, this still allows to fork the
+          serving process for a client from the main process.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
         <term><option>-d</option></term>
 	<listitem>
-	  <para>Do not fork. Useful for debugging.</para>
+	  <para>Do not fork. Useful for debugging.
+	  Implies <option>-n</option>.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

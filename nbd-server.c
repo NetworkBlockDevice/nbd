@@ -164,7 +164,10 @@ gchar* config_file_pos;
 /** global flags */
 int glob_flags=0;
 
-/* Whether we should avoid forking */
+/* Whether we should avoid daemonizing the main process */
+int nodaemon = 0;
+
+/* Whether we should avoid forking into child processes */
 int dontfork = 0;
 
 /**
@@ -484,7 +487,7 @@ static inline void spliceit(int fd_in, loff_t *off_in, int fd_out,
  */
 void usage() {
 	printf("This is nbd-server version " VERSION "\n");
-	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections] [-V]\n"
+	printf("Usage: [ip:|ip6@]port file_to_export [size][kKmM] [-l authorize_file] [-r] [-m] [-c] [-C configuration file] [-p PID file name] [-o section name] [-M max connections] [-V] [-n] [-d]\n"
 	       "\t-r|--read-only\t\tread only\n"
 	       "\t-m|--multi-file\t\tmultiple file\n"
 	       "\t-c|--copy-on-write\tcopy on write\n"
@@ -492,8 +495,10 @@ void usage() {
 	       "\t-l|--authorize-file\tfile with list of hosts that are allowed to\n\t\t\t\tconnect.\n"
 	       "\t-p|--pid-file\t\tspecify a filename to write our PID to\n"
 	       "\t-o|--output-config\toutput a config file section for what you\n\t\t\t\tspecified on the command line, with the\n\t\t\t\tspecified section name\n"
-	       "\t-M|--max-connections\tspecify the maximum number of opened connections\n"
-	       "\t-V|--version\toutput the version and exit\n\n"
+	       "\t-M|--max-connection\tspecify the maximum number of opened connections\n"
+	       "\t-V|--version\t\toutput the version and exit\n"
+	       "\t-n|--nodaemon\t\tdo not daemonize main process\n"
+	       "\t-d|--dont-fork\t\tdo not fork (implies --nodaemon)\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
 	       "\t\taddress of the machine trying to connect\n" 
@@ -542,6 +547,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
+		{"nodaemon", no_argument, NULL, 'n'},
 		{"dont-fork", no_argument, NULL, 'd'},
 		{"authorize-file", required_argument, NULL, 'l'},
 		{"config-file", required_argument, NULL, 'C'},
@@ -565,7 +571,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	serve=serve_inc_ref((SERVER*)g_new0(SERVER, 1));
 	serve->authname = g_strdup(default_authname);
 	serve->virtstyle=VIRT_IPLIT;
-	while((c=getopt_long(argc, argv, "-C:cwdl:mo:rp:M:V", long_options, &i))>=0) {
+	while((c=getopt_long(argc, argv, "-C:cwndl:mo:rp:M:V", long_options, &i))>=0) {
 		switch (c) {
 		case 1:
 			/* non-option argument */
@@ -636,8 +642,12 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 		case 'c': 
 			serve->flags |=F_COPYONWRITE;
 		        break;
+		case 'n':
+			nodaemon = 1;
+		        break;
 		case 'd': 
 			dontfork = 1;
+			nodaemon = 1;
 		        break;
 		case 'C':
 			g_free(config_file_pos);
@@ -3699,7 +3709,7 @@ int main(int argc, char *argv[]) {
 			g_message("No configured exports; quitting.");
 		exit(EXIT_FAILURE);
 	}
-	if (!dontfork)
+	if (!nodaemon)
 		daemonize();
 #if HAVE_OLD_GLIB
 	g_thread_init(NULL);
