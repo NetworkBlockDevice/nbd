@@ -44,6 +44,7 @@ endif
 endif
 
 libnbdclt_la_SOURCES = nbdtab_parser.tab.h nbdtab_parser.y nbdtab_lexer.l nbdclt.h
+BUILT_SOURCES = nbdtab_parser.tab.h
 
 nbd-client.c: $(builddir)/nbdtab_parser.tab.h
 nbdtab_parser.tab.h: $(srcdir)/nbdtab_parser.y
