@@ -765,6 +765,14 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 }
 
 /**
+ * To be called by GArray clearing function.
+ * @param server pointer to server element
+ */
+static void serve_clear_element(SERVER **server) {
+	serve_dec_ref(*server);
+}
+
+/**
  * Parse the config file.
  *
  * @param f the name of the config file
@@ -867,7 +875,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	cfile = g_key_file_new();
 	retval = g_array_new(FALSE, TRUE, sizeof(SERVER*));
 	if(expect_generic) {
-		g_array_set_clear_func(retval, (GDestroyNotify)serve_dec_ref);
+		g_array_set_clear_func(retval, (GDestroyNotify)serve_clear_element);
 	}
 	if(!g_key_file_load_from_file(cfile, f, G_KEY_FILE_KEEP_COMMENTS |
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
