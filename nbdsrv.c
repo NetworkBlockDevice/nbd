@@ -325,3 +325,7 @@ SERVER* serve_dec_ref(SERVER *s) {
 	pthread_mutex_unlock(&cntmutex);
 	return s;
 }
+
+void serve_clear_element(SERVER **server) {
+	serve_dec_ref(*server);
+}
