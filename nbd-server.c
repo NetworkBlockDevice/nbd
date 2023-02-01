@@ -3179,6 +3179,7 @@ static int append_new_servers(GArray *const servers, struct generic_conf *gencon
                 if (new_server->servename
                     && -1 == get_index_by_servename(new_server->servename,
                                                     servers)) {
+			serve_inc_ref(new_server);
 			g_array_append_val(servers, new_server);
                 }
         }
