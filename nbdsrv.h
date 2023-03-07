@@ -89,6 +89,14 @@ typedef struct {
 	off_t startoff;   /**< starting offset of this file */
 } FILE_INFO;
 
+typedef struct {
+	struct nbd_request *req;
+	char *buf;
+	size_t buflen;
+	size_t current_offset;
+	uint32_t current_len;
+} READ_CTX;
+
 /* Constants and macros */
 
 /**

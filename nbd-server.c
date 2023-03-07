@@ -1271,6 +1271,50 @@ int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	return (ret < 0 || len != 0);
 }
 
+static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
+	rep->magic = htonl(NBD_REPLY_MAGIC);
+	rep->error = 0;
+	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
+}
+
+static void log_reply(CLIENT *client, struct nbd_reply *prply) {
+	if (client->transactionlogfd != -1) {
+		lock_logsem(client);
+		writeit(client->transactionlogfd, prply, sizeof(*prply));
+		unlock_logsem(client);
+	}
+}
+
+/**
+ * Find the location to write the data for the next chunk to.
+ * Assumes checks on memory sizes etc have already been done.
+ *
+ * @param ctx the context we're working with
+ * @param offset the offset into the request
+ * @param len the length of this chunk.
+ */
+char * find_read_buf(READ_CTX *ctx) {
+	return ctx->buf + ctx->current_offset;
+}
+
+void complete_read(CLIENT *client, READ_CTX *ctx, uint32_t error, char *errmsg, uint16_t msglen, bool with_offset, uint64_t err_offset) {
+	uint16_t type;
+	uint64_t offset = 0;
+	struct nbd_reply rep;
+	setup_reply(&rep, ctx->req);
+	if(error) {
+		rep.error = error;
+	}
+	log_reply(client, &rep);
+	pthread_mutex_lock(&(client->lock));
+	socket_write(client, &rep, sizeof rep);
+	if(!error) {
+		socket_write(client, ctx->buf, ctx->buflen);
+	}
+	pthread_mutex_unlock(&(client->lock));
+	free(ctx->buf);
+}
+
 /**
  * Read an amount of bytes at a given offset from the right file. This
  * abstracts the read-side of the multiple files option.
@@ -1306,15 +1350,20 @@ ssize_t rawexpread(off_t a, char *buf, size_t len, CLIENT *client) {
  * Call rawexpread repeatedly until all data has been read.
  * @return 0 on success, nonzero on failure
  **/
-int rawexpread_fully(off_t a, char *buf, size_t len, CLIENT *client) {
+int rawexpread_fully(READ_CTX *ctx, CLIENT *client) {
 	ssize_t ret=0;
 
-	while(len > 0 && (ret=rawexpread(a, buf, len, client)) > 0 ) {
-		a += ret;
-		buf += ret;
-		len -= ret;
+	char *buf;
+
+	while(ctx->current_len > 0) {
+		buf = find_read_buf(ctx);
+		if((ret = rawexpread((off_t)ctx->req->from + (off_t)ctx->current_offset, buf, ctx->current_len, client)) <= 0) {
+			break;
+		}
+		ctx->current_offset += ret;
+		ctx->current_len -= ret;
 	}
-	return (ret < 0 || len != 0);
+	return (ret < 0 || ctx->current_len != 0);
 }
 
 #ifdef HAVE_SPLICE
@@ -1389,14 +1438,17 @@ int expsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir, int fua)
  * @param client The client we're going to read for
  * @return 0 on success, nonzero on failure
  **/
-int expread(off_t a, char *buf, size_t len, CLIENT *client) {
+int expread(READ_CTX *ctx, CLIENT *client) {
 	off_t rdlen, offset;
 	off_t mapcnt, mapl, maph, pagestart;
+	off_t a = (off_t)ctx->current_offset + (off_t)ctx->req->from;
+	size_t len = (size_t) ctx->req->len;
+	int rv = 0;
 
 	DEBUG("Asked to read %u bytes at %llu.\n", (unsigned int)len, (unsigned long long)a);
 
 	if (!(client->server->flags & F_COPYONWRITE) && !((client->server->flags & F_WAIT) && (client->export == NULL)))
-		return(rawexpread_fully(a, buf, len, client));
+		return(rawexpread_fully(ctx, client));
 
 	mapl=a/DIFFPAGESIZE; maph=(a+len-1)/DIFFPAGESIZE;
 
@@ -1410,7 +1462,10 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
-			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) goto fail;
+			char *buf = find_read_buf(ctx);
+			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) {
+				goto fail;
+			}
 		} else { /* the block is not there */
 			if ((client->server->flags & F_WAIT) && (client->export == NULL)){
 				DEBUG("Page %llu is not here, and waiting for file\n",
@@ -1419,18 +1474,22 @@ int expread(off_t a, char *buf, size_t len, CLIENT *client) {
 			} else {
 				DEBUG("Page %llu is not here, we read the original one\n",
 				       (unsigned long long)mapcnt);
-				if(rawexpread_fully(a, buf, rdlen, client)) goto fail;
+				ctx->current_len = rdlen;
+				if(rawexpread_fully(ctx, client)) goto fail;
 			}
 		}
 		if (!(client->server->flags & F_COPYONWRITE))
 			pthread_rwlock_unlock(&client->export_lock);
-		len-=rdlen; a+=rdlen; buf+=rdlen;
+		len-=rdlen; a+=rdlen;
 	}
-	return 0;
+	rv = 0;
+	goto end;
 fail:
 	if (!(client->server->flags & F_COPYONWRITE))
 		pthread_rwlock_unlock(&client->export_lock);
-	return -1;
+	rv = -1;
+end:
+	return rv;
 }
 
 /**
@@ -1482,9 +1541,16 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 					DEBUG("error: we can write only whole page while waiting for file\n");
 					goto fail;
 				}
-				rdlen=DIFFPAGESIZE ;
-				if (rawexpread_fully(pagestart, pagebuf, rdlen, client))
-					goto fail;
+				rdlen=DIFFPAGESIZE;
+				int ret;
+				char *ptr = pagebuf;
+				while(rdlen > 0 && (ret = rawexpread(pagestart, ptr, rdlen, client)) > 0) {
+					pagestart += ret;
+					ptr += ret;
+					rdlen -= ret;
+				}
+				if(ret < 0 ) goto fail;
+				pagestart -= DIFFPAGESIZE;
 			}
 			memcpy(pagebuf+offset,buf,wrlen) ;
 			if (write(client->difffile, pagebuf, DIFFPAGESIZE) != DIFFPAGESIZE)
@@ -2619,21 +2685,6 @@ struct work_package* package_create(CLIENT* client, struct nbd_request* req) {
 	return rv;
 }
 
-static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
-	rep->magic = htonl(NBD_REPLY_MAGIC);
-	rep->error = 0;
-	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
-}
-
-static void log_reply(CLIENT *client, struct nbd_reply *prply)
-{
-	if (client->transactionlogfd != -1) {
-		lock_logsem(client);
-		writeit(client->transactionlogfd, prply, sizeof(*prply));
-		unlock_logsem(client);
-	}
-}
-
 #ifdef HAVE_SPLICE
 static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 {
@@ -2668,25 +2719,26 @@ static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 
 static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 {
-	struct nbd_reply rep;
-	void* buf = malloc(req->len);
-	if(!buf) {
+	DEBUG("handling read request\n");
+	READ_CTX *ctx = g_new0(READ_CTX, 1);
+	ctx->req = req;
+	ctx->current_len = req->len;
+	uint32_t error = 0;
+	char *errmsg = NULL;
+	uint16_t msglen = 0;
+	ctx->buf = malloc(req->len);
+	if(!(ctx->buf)) {
 		err("Could not allocate memory for request");
 	}
-	DEBUG("handling read request\n");
-	setup_reply(&rep, req);
-	if(expread(req->from, buf, req->len, client)) {
+	ctx->buflen = req->len;
+	if(expread(ctx, client)) {
 		DEBUG("Read failed: %m");
-		rep.error = nbd_errno(errno);
+		char read_failed[] = "Read failed";
+		error = nbd_errno(errno);
+		errmsg = read_failed;
+		msglen = sizeof read_failed;
 	}
-	log_reply(client, &rep);
-	pthread_mutex_lock(&(client->lock));
-	socket_write(client, &rep, sizeof rep);
-	if(!rep.error) {
-		socket_write(client, buf, req->len);
-	}
-	pthread_mutex_unlock(&(client->lock));
-	free(buf);
+	complete_read(client, ctx, error, errmsg, msglen, false, 0);
 }
 
 static void handle_read(CLIENT* client, struct nbd_request* req)
