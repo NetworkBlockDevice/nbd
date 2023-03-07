@@ -91,5 +91,5 @@ struct nbd_reply {
 	uint32_t magic;
 	uint32_t error;		/* 0 = ok, else error	*/
 	char handle[8];		/* handle you got from request	*/
-};
+} __attribute__ ((packed));
 #endif
