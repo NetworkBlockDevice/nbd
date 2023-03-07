@@ -2350,10 +2350,6 @@ exit:
 
 /**
   * Handle an NBD_OPT_INFO or NBD_OPT_GO request.
-  *
-  * XXX this matches the proposal I sent out, rather than the officially
-  * documented version of this command. Need to bring the two in sync
-  * one way or the other.
   */
 static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
 	uint32_t namelen, len;
