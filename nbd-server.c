@@ -1297,6 +1297,9 @@ char * find_read_buf(READ_CTX *ctx) {
 	return ctx->buf + ctx->current_offset;
 }
 
+void confirm_read(CLIENT *client, READ_CTX *ctx, size_t len_read) {
+}
+
 void complete_read(CLIENT *client, READ_CTX *ctx, uint32_t error, char *errmsg, uint16_t msglen, bool with_offset, uint64_t err_offset) {
 	uint16_t type;
 	uint64_t offset = 0;
@@ -1360,6 +1363,7 @@ int rawexpread_fully(READ_CTX *ctx, CLIENT *client) {
 		if((ret = rawexpread((off_t)ctx->req->from + (off_t)ctx->current_offset, buf, ctx->current_len, client)) <= 0) {
 			break;
 		}
+		confirm_read(client, ctx, ret);
 		ctx->current_offset += ret;
 		ctx->current_len -= ret;
 	}
@@ -1466,6 +1470,7 @@ int expread(READ_CTX *ctx, CLIENT *client) {
 			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) {
 				goto fail;
 			}
+			confirm_read(client, ctx, rdlen);
 		} else { /* the block is not there */
 			if ((client->server->flags & F_WAIT) && (client->export == NULL)){
 				DEBUG("Page %llu is not here, and waiting for file\n",
