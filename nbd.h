@@ -55,6 +55,7 @@ enum {
 #define NBD_FLAG_ROTATIONAL	(1 << 4)	/* Use elevator algorithm - rotational media */
 #define NBD_FLAG_SEND_TRIM	(1 << 5)	/* Send TRIM (discard) */
 #define NBD_FLAG_SEND_WRITE_ZEROES (1 << 6) 	/* Send NBD_CMD_WRITE_ZEROES */
+#define NBD_FLAG_SEND_DF	(1 << 7)	/* Send NBD_CMD_FLAG_DF */
 #define NBD_FLAG_CAN_MULTI_CONN	(1 << 8)	/* multiple connections are okay */
 
 #define nbd_cmd(req) ((req)->cmd[0])

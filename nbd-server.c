@@ -2177,6 +2177,8 @@ void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
 		flags |= NBD_FLAG_SEND_TRIM;
 	if (!(server->flags & F_COPYONWRITE))
 		flags |= NBD_FLAG_CAN_MULTI_CONN;
+	if (client->clientflags & F_STRUCTURED)
+		flags |= NBD_FLAG_SEND_DF;
 	flags = htons(flags);
 	socket_write(client, &flags, sizeof(flags));
 	if (!(glob_flags & F_NO_ZEROES) && maybe_zeroes) {
@@ -2518,6 +2520,29 @@ exit:
 #endif
 
 /**
+  * Handle an NBD_OPT_STRUCTURED_REPLY message
+  */
+static void handle_structured_reply(CLIENT *client, uint32_t opt, GArray *servers, uint32_t cflags) {
+	uint32_t len;
+	int i;
+
+	socket_read(client, &len, sizeof(len));
+	len = ntohl(len);
+	if(len) {
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "NBD_OPT_STRUCTURED_REPLY with nonzero data length is not a valid request");
+		char buf[1024];
+		consume(client, len, buf, sizeof buf);
+		return;
+	}
+	if(client->clientflags & F_STRUCTURED) {
+		send_reply(client, opt, NBD_REP_ERR_INVALID, -1, "NBD_OPT_STRUCTURED_REPLY has already been called");
+		return;
+	}
+	client->clientflags |= F_STRUCTURED;
+	send_reply(client, opt, NBD_REP_ACK, 0, NULL);
+}
+
+/**
   * Handle an NBD_OPT_INFO or NBD_OPT_GO request.
   */
 static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t cflags) {
@@ -2696,6 +2721,8 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 				// can't recover from failed TLS negotiation.
 				goto handler_err;
 			}
+			// once TLS has been negotiated, any state must be cleared
+			client->clientflags = 0;
 #endif
 			break;
 		case NBD_OPT_GO:
@@ -2703,6 +2730,9 @@ CLIENT* negotiate(int net, GArray* servers, struct generic_conf *genconf) {
 			if(handle_info(client, opt, servers, cflags) && opt == NBD_OPT_GO) {
 				return client;
 			}
+			break;
+		case NBD_OPT_STRUCTURED_REPLY:
+			handle_structured_reply(client, opt, servers, cflags);
 			break;
 		default:
 			consume_len(client);
