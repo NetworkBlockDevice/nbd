@@ -95,12 +95,13 @@ int writeit(int f, void *buf, size_t len);
 					 * served */
 
 /* Options that the client can select to the server */
-#define NBD_OPT_EXPORT_NAME	(1)	/**< Client wants to select a named export (is followed by name of export) */
-#define NBD_OPT_ABORT		(2)	/**< Client wishes to abort negotiation */
-#define NBD_OPT_LIST		(3)	/**< Client request list of supported exports (not followed by data) */
-#define NBD_OPT_STARTTLS	(5)	/**< Client wishes to initiate TLS */
-#define NBD_OPT_INFO		(6)	/**< Client wants information about the given export */
-#define NBD_OPT_GO		(7)	/**< Client wants to select the given and move to the transmission phase */
+#define NBD_OPT_EXPORT_NAME	 (1)	/**< Client wants to select a named export (is followed by name of export) */
+#define NBD_OPT_ABORT		 (2)	/**< Client wishes to abort negotiation */
+#define NBD_OPT_LIST		 (3)	/**< Client request list of supported exports (not followed by data) */
+#define NBD_OPT_STARTTLS	 (5)	/**< Client wishes to initiate TLS */
+#define NBD_OPT_INFO		 (6)	/**< Client wants information about the given export */
+#define NBD_OPT_GO		 (7)	/**< Client wants to select the given and move to the transmission phase */
+#define NBD_OPT_STRUCTURED_REPLY (8)	/**< Client wants to see structured replies */
 
 /* Replies the server can send during negotiation */
 #define NBD_REP_ACK		(1)	/**< ACK a request. Data: option number to be acked */
