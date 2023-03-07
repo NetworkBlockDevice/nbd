@@ -1285,6 +1285,51 @@ static void log_reply(CLIENT *client, struct nbd_reply *prply) {
 	}
 }
 
+static void log_structured_reply(CLIENT *client, struct nbd_structured_reply *prply) {
+	if (client->transactionlogfd != -1) {
+		lock_logsem(client);
+		writeit(client->transactionlogfd, prply, sizeof(*prply));
+		unlock_logsem(client);
+	}
+}
+
+void send_structured_chunk(CLIENT *client, struct nbd_request *req, uint16_t flags, uint16_t type, uint32_t length, int bufcount, void *buf[], size_t buflen[]) {
+	struct nbd_structured_reply rep;
+	rep.magic = htonl(NBD_STRUCTURED_REPLY_MAGIC);
+	rep.flags = htons(flags);
+	rep.type = htons(type);
+	memcpy(&(rep.handle), req->handle, sizeof(rep.handle));
+	rep.paylen = htonl(length);
+	pthread_mutex_lock(&(client->lock));
+	socket_write(client, &rep, sizeof rep);
+	for(int i=0; i<bufcount; i++) {
+		socket_write(client, buf[i], buflen[i]);
+	}
+	pthread_mutex_unlock(&(client->lock));
+	log_structured_reply(client, &rep);
+}
+
+void send_structured_chunk_v(CLIENT *client, struct nbd_request *req, uint16_t flags, uint16_t type, uint32_t length, int bufcount, ...) {
+	struct nbd_structured_reply rep;
+	va_list ap;
+	rep.magic = htonl(NBD_STRUCTURED_REPLY_MAGIC);
+	rep.flags = htons(flags);
+	rep.type = htons(type);
+	memcpy(&(rep.handle), req->handle, sizeof(rep.handle));
+	rep.paylen = htonl(length);
+	va_start(ap, bufcount);
+	pthread_mutex_lock(&(client->lock));
+	socket_write(client, &rep, sizeof rep);
+	for(int i=0; i<bufcount; i++) {
+		void *buf = va_arg(ap, void*);
+		size_t size = va_arg(ap, size_t);
+		socket_write(client, buf, size);
+	}
+	pthread_mutex_unlock(&(client->lock));
+	log_structured_reply(client, &rep);
+	va_end(ap);
+}
+
 /**
  * Find the location to write the data for the next chunk to.
  * Assumes checks on memory sizes etc have already been done.
@@ -1294,28 +1339,85 @@ static void log_reply(CLIENT *client, struct nbd_reply *prply) {
  * @param len the length of this chunk.
  */
 char * find_read_buf(READ_CTX *ctx) {
-	return ctx->buf + ctx->current_offset;
+	if(!(ctx->is_structured) || ctx->df) {
+		return ctx->buf + ctx->current_offset;
+	}
+	ctx->buf = malloc(ctx->current_len);
+	if(!(ctx->buf)) {
+		err("Could not allocate memory for request");
+	}
+	return ctx->buf;
 }
 
 void confirm_read(CLIENT *client, READ_CTX *ctx, size_t len_read) {
+	if(ctx->is_structured && !(ctx->df)) {
+		uint64_t offset = htonll(ctx->req->from + (uint64_t)(ctx->current_offset));
+		send_structured_chunk_v(client, ctx->req, 0, NBD_REPLY_TYPE_OFFSET_DATA, len_read + 8, 2, &offset, sizeof offset, ctx->buf, (size_t)len_read);
+		free(ctx->buf);
+	}
 }
 
 void complete_read(CLIENT *client, READ_CTX *ctx, uint32_t error, char *errmsg, uint16_t msglen, bool with_offset, uint64_t err_offset) {
 	uint16_t type;
 	uint64_t offset = 0;
-	struct nbd_reply rep;
-	setup_reply(&rep, ctx->req);
-	if(error) {
-		rep.error = error;
+	if(ctx->is_structured) {
+		if(ctx->df) {
+			uint32_t len = ctx->req->len;
+			if(error != 0 && with_offset) {
+				len = err_offset;
+			}
+			if(error == 0 || with_offset) {
+				offset = htonll(ctx->req->from);
+				send_structured_chunk_v(client, ctx->req, 0, NBD_REPLY_TYPE_OFFSET_DATA, len + 8, 2, &offset, sizeof offset, ctx->buf, err_offset);
+			}
+			free(ctx->buf);
+		}
+		if(error != 0) {
+			struct nbd_structured_error_payload pl;
+			void *buf[3];
+			size_t bufsize[3];
+			int payloads = 1;
+			size_t total_size;
+			pl.error = error;
+			pl.msglen = msglen;
+			if(with_offset) {
+				offset += err_offset;
+				type = NBD_REPLY_TYPE_ERROR_OFFSET;
+			} else {
+				type = NBD_REPLY_TYPE_ERROR;
+			}
+			buf[0] = &pl;
+			bufsize[0] = sizeof pl;
+			total_size = bufsize[0];
+			if(msglen > 0) {
+				buf[++payloads] = errmsg;
+				bufsize[payloads] = msglen;
+				total_size += msglen;
+			}
+			if(with_offset) {
+				buf[++payloads] = &offset;
+				bufsize[payloads] = sizeof offset;
+				total_size += sizeof offset;
+			}
+			send_structured_chunk(client, ctx->req, NBD_REPLY_FLAG_DONE, type, total_size, payloads, buf, bufsize);
+			return;
+		}
+		send_structured_chunk_v(client, ctx->req, NBD_REPLY_FLAG_DONE, NBD_REPLY_TYPE_NONE, 0, 0);
+	} else {
+		struct nbd_reply rep;
+		setup_reply(&rep, ctx->req);
+		if(error) {
+			rep.error = error;
+		}
+		log_reply(client, &rep);
+		pthread_mutex_lock(&(client->lock));
+		socket_write(client, &rep, sizeof rep);
+		if(!error) {
+			socket_write(client, ctx->buf, ctx->buflen);
+		}
+		pthread_mutex_unlock(&(client->lock));
+		free(ctx->buf);
 	}
-	log_reply(client, &rep);
-	pthread_mutex_lock(&(client->lock));
-	socket_write(client, &rep, sizeof rep);
-	if(!error) {
-		socket_write(client, ctx->buf, ctx->buflen);
-	}
-	pthread_mutex_unlock(&(client->lock));
-	free(ctx->buf);
 }
 
 /**
@@ -2731,11 +2833,32 @@ static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 	uint32_t error = 0;
 	char *errmsg = NULL;
 	uint16_t msglen = 0;
-	ctx->buf = malloc(req->len);
-	if(!(ctx->buf)) {
-		err("Could not allocate memory for request");
+	if(client->clientflags & F_STRUCTURED) {
+		ctx->is_structured = 1;
+	} else {
+		ctx->is_structured = 0;
 	}
-	ctx->buflen = req->len;
+	if(req->type & NBD_CMD_FLAG_DF != 0) {
+		ctx->df = 1;
+	}
+	if(ctx->is_structured && ctx->df && req->len > (1 << 20)) {
+		/* standard requires a minimum of 64KiB; we are more generous
+		 * by allowing up to 1MiB as our largest unfragmented answer */
+		const char too_long[] = "Request too long for unfragmented reply";
+		struct nbd_structured_error_payload pl;
+		pl.error = NBD_EOVERFLOW;
+		pl.msglen = sizeof too_long;
+		send_structured_chunk_v(client, req, NBD_REPLY_FLAG_DONE, NBD_REPLY_TYPE_ERROR, 6 + pl.msglen, 2, &pl, sizeof pl, too_long, sizeof too_long);
+		free(ctx);
+		return;
+	}
+	if(ctx->df || !(ctx->is_structured)) {
+		ctx->buf = malloc(req->len);
+		if(!(ctx->buf)) {
+			err("Could not allocate memory for request");
+		}
+		ctx->buflen = req->len;
+	}
 	if(expread(ctx, client)) {
 		DEBUG("Read failed: %m");
 		char read_failed[] = "Read failed";

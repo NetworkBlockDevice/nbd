@@ -73,6 +73,7 @@ typedef struct _client {
 	char semname[100];	/**< name of the posix sem that protects access to the transaction log */
 	sem_t *logsem;		/**< posix sem that protects access to the transaction log */
 	int clientfeats;	/**< Client flags specified during negotiation */
+	int clientflags;	/**< Internal flags for this client, as determined by nbd-server */
 	pthread_mutex_t lock;	/**< socket lock */
 	void *tls_session;	/**< TLS session context. Is NULL unless STARTTLS
 				     has been negotiated. */
@@ -95,6 +96,8 @@ typedef struct {
 	size_t buflen;
 	size_t current_offset;
 	uint32_t current_len;
+	unsigned int is_structured : 1;
+	unsigned int df : 1;
 } READ_CTX;
 
 /* Constants and macros */
@@ -166,6 +169,10 @@ typedef enum {
 #define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
 #define F_WAIT 65536      /**< flag to tell us to wait for file creation */
 #define F_DATALOG 131072  /**< flag to tell us that the transaction log shall contain the written data */
+
+/** Internal flags (for clientflags) */
+
+#define F_STRUCTURED 1
 
 /* Functions */
 
