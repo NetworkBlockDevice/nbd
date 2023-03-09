@@ -70,7 +70,7 @@ int main(int argc, char**argv) {
 		switch (magic) {
 		case NBD_REQUEST_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			cookie = ntohll(*((long long int *)(req.cookie)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
@@ -99,7 +99,7 @@ int main(int argc, char**argv) {
 			break;
 		case NBD_REPLY_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
-			cookie = ntohll(*((long long int *)(rep.cookie)));
+			cookie = ntohll(rep.cookie);
 			error = ntohl(rep.error);
 			
 			printf("< H=%016llx E=0x%08x\n",
@@ -109,7 +109,7 @@ int main(int argc, char**argv) {
 			
 		case NBD_TRACELOG_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			cookie = ntohll(*((long long int *)(req.cookie)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);

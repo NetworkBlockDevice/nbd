@@ -163,7 +163,7 @@ int main_loop(int logfd, int imagefd) {
 		switch (magic) {
 		case NBD_REQUEST_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			cookie = ntohll(*((long long int *)(req.cookie)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
@@ -185,7 +185,7 @@ int main_loop(int logfd, int imagefd) {
 
 		case NBD_REPLY_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
-			cookie = ntohll(*((long long int *)(rep.cookie)));
+			cookie = ntohll(rep.cookie);
 			error = ntohl(rep.error);
 
 			if (g_verbose >= VERBOSE_NORMAL) {
@@ -197,7 +197,7 @@ int main_loop(int logfd, int imagefd) {
 
 		case NBD_TRACELOG_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			cookie = ntohll(*((long long int *)(req.cookie)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);

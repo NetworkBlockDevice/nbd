@@ -90,7 +90,7 @@ enum {
 struct nbd_request {
 	uint32_t magic;
 	uint32_t type;	/* == READ || == WRITE 	*/
-	char cookie[8];
+	uint64_t cookie;
 	uint64_t from;
 	uint32_t len;
 } __attribute__ ((packed));
@@ -102,7 +102,7 @@ struct nbd_request {
 struct nbd_reply {
 	uint32_t magic;
 	uint32_t error;		/* 0 = ok, else error	*/
-	char cookie[8];		/* cookie you got from request	*/
+	uint64_t cookie;	/* cookie you got from request	*/
 } __attribute__ ((packed));
 
 /*

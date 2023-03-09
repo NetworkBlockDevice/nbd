@@ -74,7 +74,7 @@ typedef enum {
 
 struct reqcontext {
 	uint64_t seq;
-	char origcookie[8];
+	uint64_t origcookie;
 	struct nbd_request req;
 	struct reqcontext *next;
 	struct reqcontext *prev;
@@ -680,7 +680,7 @@ int close_connection(int sock, CLOSE_TYPE type)
 	case CONNECTION_CLOSE_PROPERLY:
 		req.magic = htonl(NBD_REQUEST_MAGIC);
 		req.type = htonl(NBD_CMD_DISC);
-		memcpy(&(req.cookie), &(counter), sizeof(counter));
+		req.cookie = htonll(counter);
 		counter++;
 		req.from = 0;
 		req.len = 0;
@@ -720,8 +720,8 @@ int read_packet_check_header(int sock, size_t datasize, long long int curcookie)
 			 "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received cookie is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX",
 			 (long long int)curcookie,
 			 (long long unsigned int)curcookie,
-			 (long long int)*((u64 *) rep.cookie),
-			 (long long unsigned int)*((u64 *) rep.cookie),
+			 (long long int)rep.cookie,
+			 (long long unsigned int)rep.cookie,
 			 (long unsigned int)rep.magic,
 			 (long unsigned int)NBD_REPLY_MAGIC);
 		retval = -1;
@@ -731,8 +731,8 @@ int read_packet_check_header(int sock, size_t datasize, long long int curcookie)
 		snprintf(errstr, errstr_len,
 			 "Received error from server: %ld (0x%lX). Cookie is %lld (0x%llX).",
 			 (long int)rep.error, (long unsigned int)rep.error,
-			 (long long int)(*((u64 *) rep.cookie)),
-			 (long long unsigned int)*((u64 *) rep.cookie));
+			 (long long int)rep.cookie,
+			 (long long unsigned int)rep.cookie);
 		retval = -2;
 		goto end;
 	}
@@ -767,7 +767,7 @@ int oversize_test(char *name, int sock, char close_sock, int testflags)
 	req.magic = htonl(NBD_REQUEST_MAGIC);
 	req.type = htonl(NBD_CMD_READ);
 	req.len = htonl(1024 * 1024);
-	memcpy(&(req.cookie), &i, sizeof(i));
+	req.cookie = htonll(i);
 	req.from = htonll(i);
 	WRITE_ALL_ERR_RT(sock, &req, sizeof(req), err, -1,
 			 "Could not write request: %s", strerror(errno));
@@ -971,7 +971,7 @@ int throughput_test(char *name, int sock, char close_sock, int testflags)
 			if (sendfua)
 				req.type =
 				    htonl(NBD_CMD_WRITE | NBD_CMD_FLAG_FUA);
-			memcpy(&(req.cookie), &i, sizeof(i));
+			req.cookie = htonll(i);
 			req.from = htonll(i);
 			if (write_all(sock, &req, sizeof(req)) < 0) {
 				retval = -1;
@@ -987,7 +987,7 @@ int throughput_test(char *name, int sock, char close_sock, int testflags)
 			if (sendflush) {
 				long long int j = i ^ (1LL << 63);
 				req.type = htonl(NBD_CMD_FLUSH);
-				memcpy(&(req.cookie), &j, sizeof(j));
+				req.cookie = htonll(j);
 				req.from = 0;
 				req.len = 0;
 				if (write_all(sock, &req, sizeof(req)) < 0) {
@@ -1334,7 +1334,7 @@ int integrity_test(char *name, int sock, char close_sock, int testflags)
 						"Could not read transaction log: %s",
 						strerror(errno));
 				prc->req.magic = htonl(NBD_REQUEST_MAGIC);
-				memcpy(prc->origcookie, prc->req.cookie, 8);
+				prc->origcookie = htonll(prc->req.cookie);
 				prc->seq = seq++;
 				if ((ntohl(prc->req.type) &
 				     NBD_CMD_MASK_COMMAND) == NBD_CMD_DISC) {
@@ -1439,9 +1439,8 @@ int integrity_test(char *name, int sock, char close_sock, int testflags)
 
 				dumpcommand("Sending command", prc->req.type);
 				/* we rewrite the cookie as they otherwise may not be unique */
-				*((uint64_t *) (prc->req.cookie)) =
-				    getrandomcookie(cookiehash);
-				g_hash_table_insert(cookiehash, prc->req.cookie,
+				prc->req.cookie = getrandomcookie(cookiehash);
+				g_hash_table_insert(cookiehash, &prc->req.cookie,
 						    prc);
 				addbuffer(&txbuf, &(prc->req),
 					  sizeof(struct nbd_request));
@@ -1538,20 +1537,18 @@ skipdequeue:
 			}
 
 			uint64_t cookie;
-			memcpy(&cookie, rep.cookie, 8);
+			cookie = rep.cookie;
 			prc = g_hash_table_lookup(cookiehash, &cookie);
 			if (!prc) {
 				snprintf(errstr, errstr_len,
 					 "Unrecognised cookie in reply: 0x%llX",
-					 *(long long unsigned int *)(rep.
-								     cookie));
+					 (long long unsigned int)rep.cookie);
 				goto err_open;
 			}
 			if (!g_hash_table_remove(cookiehash, &cookie)) {
 				snprintf(errstr, errstr_len,
 					 "Could not remove cookie from hash: 0x%llX",
-					 *(long long unsigned int *)(rep.
-								     cookie));
+					 (long long unsigned int)rep.cookie);
 				goto err_open;
 			}
 
