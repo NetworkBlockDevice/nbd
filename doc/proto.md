@@ -301,13 +301,15 @@ may be handled by the server asynchronously), and structured reply
 chunks from one request may be interleaved with reply messages from
 other requests; however, there may be constraints that prevent
 arbitrary reordering of structured reply chunks within a given reply.
-Clients SHOULD use a handle that is distinct from all other currently
-pending transactions, but MAY reuse handles that are no longer in
-flight; handles need not be consecutive.  In each reply message
+Clients SHOULD use a cookie that is distinct from all other currently
+pending transactions, but MAY reuse cookies that are no longer in
+flight; cookies need not be consecutive.  In each reply message
 (whether simple or structured), the server MUST use the same value for
-handle as was sent by the client in the corresponding request.  In
-this way, the client can correlate which request is receiving a
-response.
+cookie as was sent by the client in the corresponding request,
+treating the cookie as an opaque field.  In this way, the client can
+correlate which request is receiving a response.  Note that earlier
+versions of this specification referred to a client's cookie as a
+handle.
 
 #### Ordering of messages and writes
 
@@ -349,7 +351,7 @@ The request message, sent by the client, looks as follows:
 C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)  
 C: 16 bits, command flags  
 C: 16 bits, type  
-C: 64 bits, handle  
+C: 64 bits, cookie  
 C: 64 bits, offset (unsigned)  
 C: 32 bits, length (unsigned)  
 C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
@@ -366,7 +368,7 @@ follows:
 S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`; used to be
    `NBD_REPLY_MAGIC`)  
 S: 32 bits, error (MAY be zero)  
-S: 64 bits, handle  
+S: 64 bits, cookie  
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
     *error* is zero)  
 
@@ -381,7 +383,7 @@ server must initiate a hard disconnect).  Second, there is no way to
 efficiently skip over portions of a sparse file that are known to
 contain all zeroes.  Finally, it is not possible to reliably decode
 the server traffic without also having context of what pending read
-requests were sent by the client, to see which *handle* values will
+requests were sent by the client, to see which *cookie* values will
 have accompanying payload on success.  Therefore structured replies
 are also permitted if negotiated.
 
@@ -398,7 +400,7 @@ sending errors via a structured reply, as the error can then be
 accompanied by a string payload to present to a human user.
 
 A structured reply MAY occupy multiple structured chunk messages
-(all with the same value for "handle"), and the
+(all with the same value for "cookie"), and the
 `NBD_REPLY_FLAG_DONE` reply flag is used to identify the final
 chunk.  Unless further documented by individual requests below,
 the chunks MAY be sent in any order, except that the chunk with
@@ -418,7 +420,7 @@ A structured reply chunk message looks as follows:
 S: 32 bits, 0x668e33ef, magic (`NBD_STRUCTURED_REPLY_MAGIC`)  
 S: 16 bits, flags  
 S: 16 bits, type  
-S: 64 bits, handle  
+S: 64 bits, cookie  
 S: 32 bits, length of payload (unsigned)  
 S: *length* bytes of payload data (if *length* is nonzero)  
 
