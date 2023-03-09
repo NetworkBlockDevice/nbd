@@ -44,7 +44,7 @@ int main(int argc, char**argv) {
 	struct nbd_request req;
 	struct nbd_reply rep;
 	uint32_t magic;
-	uint64_t handle;
+	uint64_t cookie;
 	uint32_t error;
 	uint32_t command;
 	uint32_t len;
@@ -70,7 +70,7 @@ int main(int argc, char**argv) {
 		switch (magic) {
 		case NBD_REQUEST_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			handle = ntohll(*((long long int *)(req.handle)));
+			cookie = ntohll(*((long long int *)(req.cookie)));
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
@@ -78,7 +78,7 @@ int main(int argc, char**argv) {
 			ctext = getcommandname(command & NBD_CMD_MASK_COMMAND);
 
 			printf("> H=%016llx C=0x%08x (%20s+%4s) O=%016llx L=%08x\n",
-			       (long long unsigned int) handle,
+			       (long long unsigned int) cookie,
 			       command,
 			       ctext,
 			       (command & NBD_CMD_FLAG_FUA)?"FUA":"NONE",
@@ -99,17 +99,17 @@ int main(int argc, char**argv) {
 			break;
 		case NBD_REPLY_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
-			handle = ntohll(*((long long int *)(rep.handle)));
+			cookie = ntohll(*((long long int *)(rep.cookie)));
 			error = ntohl(rep.error);
 			
 			printf("< H=%016llx E=0x%08x\n",
-			       (long long unsigned int) handle,
+			       (long long unsigned int) cookie,
 			       error);
 			break;
 			
 		case NBD_TRACELOG_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			handle = ntohll(*((long long int *)(req.handle)));
+			cookie = ntohll(*((long long int *)(req.cookie)));
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);

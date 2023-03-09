@@ -1274,7 +1274,7 @@ int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 static void setup_reply(struct nbd_reply* rep, struct nbd_request* req) {
 	rep->magic = htonl(NBD_REPLY_MAGIC);
 	rep->error = 0;
-	memcpy(&(rep->handle), &(req->handle), sizeof(req->handle));
+	memcpy(&(rep->cookie), &(req->cookie), sizeof(req->cookie));
 }
 
 static void log_reply(CLIENT *client, struct nbd_reply *prply) {
@@ -1298,7 +1298,7 @@ void send_structured_chunk(CLIENT *client, struct nbd_request *req, uint16_t fla
 	rep.magic = htonl(NBD_STRUCTURED_REPLY_MAGIC);
 	rep.flags = htons(flags);
 	rep.type = htons(type);
-	memcpy(&(rep.handle), req->handle, sizeof(rep.handle));
+	memcpy(&(rep.cookie), req->cookie, sizeof(rep.cookie));
 	rep.paylen = htonl(length);
 	pthread_mutex_lock(&(client->lock));
 	socket_write(client, &rep, sizeof rep);
@@ -1315,7 +1315,7 @@ void send_structured_chunk_v(CLIENT *client, struct nbd_request *req, uint16_t f
 	rep.magic = htonl(NBD_STRUCTURED_REPLY_MAGIC);
 	rep.flags = htons(flags);
 	rep.type = htons(type);
-	memcpy(&(rep.handle), req->handle, sizeof(rep.handle));
+	memcpy(&(rep.cookie), req->cookie, sizeof(rep.cookie));
 	rep.paylen = htonl(length);
 	va_start(ap, bufcount);
 	pthread_mutex_lock(&(client->lock));
@@ -2223,7 +2223,7 @@ static void setup_transactionlog(CLIENT *client) {
 
 		req.magic = htonl(NBD_TRACELOG_MAGIC);
 		req.type = htonl(NBD_TRACELOG_SET_DATALOG);
-		memset(req.handle, 0, sizeof(req.handle));
+		memset(req.cookie, 0, sizeof(req.cookie));
 		req.from = htonll(NBD_TRACELOG_FROM_MAGIC);
 		req.len = htonl(TRUE);
 
