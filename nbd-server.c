@@ -116,10 +116,6 @@
 
 #include <glib.h>
 
-#if HAVE_OLD_GLIB
-#include <pthread.h>
-#endif
-
 /* used in cliserv.h, so must come first */
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
@@ -3708,9 +3704,6 @@ int main(int argc, char *argv[]) {
 	}
 	if (!nodaemon)
 		daemonize();
-#if HAVE_OLD_GLIB
-	g_thread_init(NULL);
-#endif
 	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
 
 	setup_servers(servers, genconf.modernaddr, genconf.modernport,

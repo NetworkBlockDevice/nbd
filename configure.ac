@@ -286,7 +286,7 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 [[#include <sys/param.h>
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h sys/uio.h])
-PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.26.0 gthread-2.0 >= 2.26.0], [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
+PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.32.0 gthread-2.0 >= 2.32.0], [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
 PKG_CHECK_MODULES(SW, [socket_wrapper], [HAVE_SW=yes], [HAVE_SW=no])
 PKG_CHECK_MODULES(NW, [nss_wrapper], [HAVE_NW=yes], [HAVE_NW=no])
 AM_CONDITIONAL(CWRAP, test "$HAVE_SW" = "yes" -a "$HAVE_NW" = "yes")
@@ -295,19 +295,6 @@ my_save_cflags="$CFLAGS"
 my_save_libs="$LIBS"
 CFLAGS="-Wdeprecated-declarations -Werror $GLIB_CFLAGS"
 LIBS="$GLIB_LIBS"
-AC_MSG_CHECKING([if we are using an old glib 2.0 library])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-	[[#include <glib.h>]],
-	[[g_thread_init(NULL);]])],
-	[
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_OLD_GLIB, 1, [Define to 1 if you have an old glib library])
-	],
-	[
-		AC_MSG_RESULT(no)
-		AC_DEFINE(HAVE_OLD_GLIB, 0, [Define to 1 if you have an old glib library])
-	]
-)
 dnl g_memdup2 added in glib-2.68
 AC_CHECK_FUNCS([g_memdup2])
 CFLAGS="$my_save_cflags"
