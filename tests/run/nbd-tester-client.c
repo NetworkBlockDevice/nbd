@@ -63,6 +63,7 @@ static gchar *tlshostname = NULL;
 typedef enum {
 	CONNECTION_TYPE_INIT_PASSWD,
 	CONNECTION_TYPE_CLISERV,
+	CONNECTION_TYPE_HANDSHAKE,
 	CONNECTION_TYPE_FULL,
 } CONNECTION_TYPE;
 
@@ -276,10 +277,9 @@ int writebuffer(int fd, struct chunklist *l)
 	return 0;
 }
 
-#define TEST_WRITE (1<<0)
-#define TEST_FLUSH (1<<1)
-#define TEST_EXPECT_ERROR (1<<2)
-#define TEST_HANDSHAKE (1<<3)
+#define TEST_WRITE              (1<<0)
+#define TEST_FLUSH              (1<<1)
+#define TEST_EXPECT_ERROR       (1<<2)
 
 int timeval_subtract(struct timeval *result, struct timeval *x,
 		     struct timeval *y)
@@ -391,7 +391,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		strncpy(errstr, "mymagic does not match", errstr_len);
 		goto err;
 	}
-	if (ctype < CONNECTION_TYPE_FULL)
+	if (ctype < CONNECTION_TYPE_HANDSHAKE)
 		goto end;
 	if (!name) {
 		READ_ALL_ERRCHK(sock, &size, sizeof(size), err,
@@ -420,7 +420,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 	negotiationflags = htonl(negotiationflags);
 	WRITE_ALL_ERRCHK(sock, &negotiationflags, sizeof(negotiationflags), err,
 			 "Could not write reserved field: %s", strerror(errno));
-	if (testflags & TEST_HANDSHAKE) {
+	if (ctype < CONNECTION_TYPE_FULL) {
 		/* Server must support newstyle for this test */
 		if (!(handshakeflags & NBD_FLAG_FIXED_NEWSTYLE)) {
 			strncpy(errstr, "server does not support handshake", errstr_len);
@@ -835,8 +835,8 @@ int handshake_test(char *name, int sock, char close_sock, int testflags)
 
 	/* This should work */
 	if ((sock =
-		 setup_connection_common(sock, name,
-				  CONNECTION_TYPE_FULL,
+		setup_connection_common(sock, name,
+				  CONNECTION_TYPE_HANDSHAKE,
 				  &serverflags, testflags)) < 0) {
 		g_warning("Could not open socket: %s", errstr);
 		goto err;
@@ -1795,7 +1795,6 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			test = handshake_test;
-			testflags |= TEST_HANDSHAKE;
 			break;
 #if HAVE_GNUTLS
 		case 'C':
