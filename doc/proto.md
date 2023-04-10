@@ -380,7 +380,7 @@ partial reads or early errors (the command must succeed or fail as a
 whole; no payload is sent if *error* was set, but if *error* is zero
 and a later error is detected before *length* bytes are returned, the
 server must initiate a hard disconnect).  Second, there is no way to
-efficiently skip over portions of a sparse file that are known to
+efficiently skip over portions of a sparse export that is known to
 contain all zeroes.  Finally, it is not possible to reliably decode
 the server traffic without also having context of what pending read
 requests were sent by the client, to see which *cookie* values will
@@ -1760,7 +1760,7 @@ MUST initiate a hard disconnect.
 
   This chunk type is in the content chunk category.  *length* MUST be
   at least 9.  It represents the contents of *length - 8* bytes of the
-  file, starting at the absolute *offset* from the start of the
+  export, starting at the absolute *offset* from the start of the
   export.  The data MUST lie within the bounds of the original offset
   and length of the client's request, and MUST NOT overlap with the
   bounds of any earlier content chunk or error chunk in the same
@@ -2180,7 +2180,7 @@ The following request types exist:
 
     The list of block status descriptors within the
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
-    of the file starting from specified *offset*.  If the client used
+    of the export starting from specified *offset*.  If the client used
     the `NBD_CMD_FLAG_REQ_ONE` flag, each chunk contains exactly one
     descriptor where the *length* of the descriptor MUST NOT be greater
     than the *length* of the request; otherwise, a chunk MAY contain
@@ -2206,10 +2206,10 @@ The following request types exist:
     If an error occurs, the server SHOULD set the appropriate error
     code in the error field of an error chunk. However, if the error
     does not involve invalid usage (such as a request beyond the
-    bounds of the file), a server MAY reply with a single block status
-    descriptor with *length* matching the requested length, rather
-    than reporting the error; in this case the context MAY mandate the
-    status returned.
+    bounds of the export), a server MAY reply with a single block
+    status descriptor with *length* matching the requested length,
+    rather than reporting the error; in this case the context MAY
+    mandate the status returned.
 
     A client MAY initiate a hard disconnect if it detects that the
     server has sent an invalid chunk. The server SHOULD return
