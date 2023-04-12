@@ -294,7 +294,7 @@ replies, and that it is impossible to tell by reading the server
 traffic in isolation whether a data field will be present; the simple
 reply is also problematic for error handling of the `NBD_CMD_READ`
 request.  Therefore, structured replies can be used to create a
-a context-free server stream; see below.
+context-free server stream; see below.
 
 Replies need not be sent in the same order as requests (i.e., requests
 may be handled by the server asynchronously), and structured reply
@@ -466,7 +466,7 @@ of disconnect other than in one of the above circumstances.
 #### Reserved Magic values
 
 The following magic values are reserved and must not be used
-for future protocol extentions:
+for future protocol extensions:
 
 0x12560953 - Historic value for NBD_REQUEST_MAGIC, used
 	     until Linux 2.1.116pre2.
@@ -1304,7 +1304,7 @@ of the newstyle negotiation.
 
     Other errors (such as `NBD_REP_ERR_SHUTDOWN`) are also possible,
     as permitted elsewhere in this document, with no constraints on
-    the number of preceeding `NBD_REP_INFO`.
+    the number of preceding `NBD_REP_INFO`.
 
     If there are no intervening option requests between a successful
     `NBD_OPT_INFO` (that is, one where the reply ended with a final
@@ -1711,7 +1711,7 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_BLOCK_STATUS`. If set, the client is interested in only one
   extent per metadata context. If this flag is present, the server
   MUST NOT send metadata on more than one extent in the reply. Client
-  implementors should note that using this flag on multiple contiguous
+  implementers should note that using this flag on multiple contiguous
   requests is likely to be inefficient.
 - bit 4, `NBD_CMD_FLAG_FAST_ZERO`; valid during
   `NBD_CMD_WRITE_ZEROES`. If set, but the server cannot perform the
@@ -2304,7 +2304,7 @@ Currently known are:
 
 * The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
-Implementors of these extensions are strongly suggested to contact the
+Implementers of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd@other.debian.org) in order to help
 fine-tune the specifications before committing to a particular
 implementation.
@@ -2324,7 +2324,7 @@ options. While the basic protocol is still reasonably simple, a growing
 number of extensions has been implemented that may make the protocol
 description seem overwhelming at first.
 
-In an effort to not overwhelm first-time implementors with various
+In an effort to not overwhelm first-time implementers with various
 options and features that may or may not be important for their use
 case, while at the same time desiring maximum interoperability, this
 section tries to clarify what is optional and what is expected to be
