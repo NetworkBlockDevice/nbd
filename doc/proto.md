@@ -2024,18 +2024,27 @@ small amount of fixed-length overhead inherent in the chunk type).
   64 bits: offset (unsigned)  
   32 bits: hole size (unsigned, MUST be nonzero)  
 
-  At this time, although servers that support extended headers are
-  permitted to accept client requests for `NBD_CMD_READ` with an
-  effect length larger than any advertised maximum payload size by
-  splitting the reply into multiple chunks, portable clients SHOULD
-  NOT request a read *length* larger than 32 bits (corresponding to
-  the maximum payload constraint implied by `NBD_INFO_BLOCK_SIZE`),
-  and therefore a 32-bit constraint on the *hole size* does not
-  represent an arbitrary limitation.  Should a future scenario arise
-  where it can be demonstrated that a client and server would benefit
-  from an extension allowing a maximum payload size to be larger than
-  32 bits, that extension would also introduce a counterpart reply
-  type that can express a 64-bit *hole size*.
+* `NBD_REPLY_TYPE_OFFSET_HOLE_EXT` (3)
+
+  This chunk type is in the content chunk category.  *length* MUST be
+  exactly 16.  The semantics of this chunk mirror those of
+  `NBD_REPLY_TYPE_OFFSET_HOLE`, other than the use of a larger *hole
+  size* field.  This chunk type MUST NOT be used unless extended
+  headers were negotiated with `NBD_OPT_EXTENDED_HEADERS`.
+
+  The payload is structured as:
+
+  64 bits: offset (unsigned)  
+  64 bits: hole size (unsigned, MUST be nonzero)  
+
+  Note that even though extended headers are in use, a server may
+  enforce a maximum effect length on `NBD_CMD_READ` comparable to an
+  advertised maximum payload length (rather than having to split a
+  large effect length over multiple chunks); in this case, no valid
+  `NBD_CMD_READ` will have an effect *length* large enough to require
+  the use of this chunk type.  However, a client using extended
+  headers MUST be prepared for the server to use either the compact or
+  extended chunk type.
 
 * `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
 
@@ -2233,25 +2242,27 @@ The following request types exist:
     the following additional constraints.
 
     The server MAY split the reply into any number of content chunks
-    (`NBD_REPLY_TYPE_OFFSET_DATA` and `NBD_REPLY_TYPE_OFFSET_HOLE`);
-    each chunk MUST describe at least one byte, although to minimize
-    overhead, the server SHOULD use chunks with lengths and offsets as
-    an integer multiple of 512 bytes, where possible (the first and
-    last chunk of an unaligned read being the most obvious places for
-    an exception).  The server MUST NOT send content chunks that
-    overlap with any earlier content or error chunk, and MUST NOT send
-    chunks that describe data outside the offset and length of the
-    request, but MAY send the content chunks in any order (the client
-    MUST reassemble content chunks into the correct order), and MAY
-    send additional content chunks even after reporting an error
-    chunk.  A server MAY support read requests larger than the maximum
-    payload size by splitting the response across multiple chunks (in
-    particular, if extended headers are not in use, a request for more
-    than 2^32 - 8 bytes containing data rather than holes MUST be
-    split to avoid overflowing the `NBD_REPLY_TYPE_OFFSET_DATA` length
-    field); however, the server is also permitted to reject large read
-    requests up front, so a client should be prepared to retry with
-    smaller requests if a large request fails.
+    (`NBD_REPLY_TYPE_OFFSET_DATA` and `NBD_REPLY_TYPE_OFFSET_HOLE` for
+    structured replies, additionally `NBD_REPLY_TYPE_OFFSET_HOLE_EXT`
+    for extended headers); each chunk MUST describe at least one byte,
+    although to minimize overhead, the server SHOULD use chunks with
+    lengths and offsets as an integer multiple of 512 bytes, where
+    possible (the first and last chunk of an unaligned read being the
+    most obvious places for an exception).  The server MUST NOT send
+    content chunks that overlap with any earlier content or error
+    chunk, and MUST NOT send chunks that describe data outside the
+    offset and length of the request, but MAY send the content chunks
+    in any order (the client MUST reassemble content chunks into the
+    correct order), and MAY send additional content chunks even after
+    reporting an error chunk.  A server MAY support read requests
+    larger than the maximum payload size by splitting the response
+    across multiple chunks (in particular, if extended headers are not
+    in use, a request for more than 2^32 - 8 bytes containing data
+    rather than holes MUST be split to avoid overflowing the 32-bit
+    `NBD_REPLY_TYPE_OFFSET_DATA` length field); however, the server is
+    also permitted to reject large read requests up front, so a client
+    should be prepared to retry with smaller requests if a large
+    request fails.
 
     When no error is detected, the server MUST send enough data chunks
     to cover the entire region described by the offset and length of
