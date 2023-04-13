@@ -1820,6 +1820,12 @@ MUST initiate a hard disconnect.
   the different contexts need not have the same number of extents or
   cumulative extent length.
 
+  Servers SHOULD NOT send more than 2^20 extents in a single reply
+  chunk; in other words, the size of
+  `NBD_REPLY_TYPE_BLOCK_STATUS` should not be more than 4 + 8*2^20
+  (8,388,612 bytes), even if this requires that the server truncate
+  the response in relation to the *length* requested by the client.
+
   Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
   its request, the server MAY return fewer descriptors in the reply
   than would be required to fully specify the whole range of requested
@@ -2182,26 +2188,31 @@ The following request types exist:
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
     of the export starting from specified *offset*.  If the client used
     the `NBD_CMD_FLAG_REQ_ONE` flag, each chunk contains exactly one
-    descriptor where the *length* of the descriptor MUST NOT be greater
-    than the *length* of the request; otherwise, a chunk MAY contain
-    multiple descriptors, and the final descriptor MAY extend beyond
-    the original requested size if the server can determine a larger
-    length without additional effort.  On the other hand, the server MAY
-    return less data than requested. However the server MUST return at
-    least one status descriptor (and since each status descriptor has
-    a non-zero length, a client can always make progress on a
-    successful return).  The server SHOULD use different *status*
-    values between consecutive descriptors where feasible, although
-    the client SHOULD be prepared to handle consecutive descriptors
-    with the same *status* value.  The server SHOULD use descriptor
-    lengths that are an integer multiple of 512 bytes where possible
-    (the first and last descriptor of an unaligned query being the
-    most obvious places for an exception), and MUST use descriptor
-    lengths that are an integer multiple of any advertised minimum
-    block size. The status flags are intentionally defined so that a
-    server MAY always safely report a status of 0 for any block,
-    although the server SHOULD return additional status values when
-    they can be easily detected.
+    descriptor where the *length* of the descriptor MUST NOT be
+    greater than the *length* of the request; otherwise, a chunk MAY
+    contain multiple descriptors, and the final descriptor MAY extend
+    beyond the original requested size if the server can determine a
+    larger length without additional effort.  On the other hand, the
+    server MAY return less data than requested.  In particular, a
+    server SHOULD NOT send more than 2^20 status descriptors in a
+    single chunk.  However the server MUST return at least one status
+    descriptor, and since each status descriptor has a non-zero
+    length, a client can always make progress on a successful return.
+
+    The server SHOULD use different *status* values between
+    consecutive descriptors where feasible, although the client SHOULD
+    be prepared to handle consecutive descriptors with the same
+    *status* value.  The server SHOULD use descriptor lengths that are
+    an integer multiple of 512 bytes where possible (the first and
+    last descriptor of an unaligned query being the most obvious
+    places for an exception), in part to avoid an amplification effect
+    where a series of smaller descriptors can cause the server's reply
+    to occupy more bytes than the *length* of the client's request.
+    The server MUST use descriptor lengths that are an integer
+    multiple of any advertised minimum block size. The status flags
+    are intentionally defined so that a server MAY always safely
+    report a status of 0 for any block, although the server SHOULD
+    return additional status values when they can be easily detected.
 
     If an error occurs, the server SHOULD set the appropriate error
     code in the error field of an error chunk. However, if the error
