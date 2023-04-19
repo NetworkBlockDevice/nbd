@@ -60,10 +60,6 @@
 #include "crypto-gnutls.h"
 #endif
 
-#ifdef WITH_SDP
-#include <sdp_inet.h>
-#endif
-
 #include "nbdclt.h"
 #include "nbdtab_parser.tab.h"
 
@@ -95,7 +91,6 @@ void nbdtab_set_flag(char *property) {
 	SET_FLAG("no_optgo", no_optgo);
 	SET_FLAG("persist", persist);
 	SET_FLAG("swap", swap);
-	SET_FLAG("sdp", sdp);
 	SET_FLAG("unix", b_unix);
 	SET_FLAG("preinit", preinit);
 	SET_FLAG("tls", tls);
@@ -283,7 +278,7 @@ int check_conn(char* devname, int do_print) {
 	return 0;
 }
 
-int opennet(char *name, char* portstr, int sdp) {
+int opennet(char *name, char* portstr) {
 	int sock;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -302,17 +297,6 @@ int opennet(char *name, char* portstr, int sdp) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		freeaddrinfo(ai);
 		return -1;
-	}
-
-	if(sdp) {
-#ifdef WITH_SDP
-		if (ai->ai_family == AF_INET)
-			ai->ai_family = AF_INET_SDP;
-		else (ai->ai_family == AF_INET6)
-			ai->ai_family = AF_INET6_SDP;
-#else
-		err("Can't do SDP: I was not compiled with SDP support!");
-#endif
 	}
 
 	for(rp = ai; rp != NULL; rp = rp->ai_next) {
@@ -740,7 +724,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	free(rep);
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* sdp, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool *can_opt_go) {
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool *can_opt_go) {
 	bool retval = false;
 	cur_client = calloc(sizeof(CLIENT), 1);
 	cur_client->bs = 512;
@@ -770,7 +754,6 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	*timeout = cur_client->timeout;
 	*persist = cur_client->persist ? 1 : 0;
 	*swap = cur_client->swap ? 1 : 0;
-	*sdp = cur_client->sdp ? 1 : 0;
 	*b_unix = cur_client->b_unix ? 1 : 0;
 	*num_conns = cur_client->nconn;
 	*certfile = cur_client->cert;
@@ -876,9 +859,9 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
 #else
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s] [-sdp|-S]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
 #endif
 	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
 	fprintf(stderr, "Or   : nbd-client nbdX\n");
@@ -928,7 +911,6 @@ int main(int argc, char *argv[]) {
 	int swap=0;
 	int cont=0;
 	int timeout=0;
-	int sdp=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	pid_t main_pid;
 	u64 size64 = 0;
@@ -976,7 +958,6 @@ int main(int argc, char *argv[]) {
 		{ "persist", no_argument, NULL, 'p' },
 		{ "preinit", no_argument, NULL, 'P' },
 		{ "readonly", no_argument, NULL, 'R' },
-		{ "sdp", no_argument, NULL, 'S' },
 		{ "swap", no_argument, NULL, 's' },
 		{ "timeout", required_argument, NULL, 't' },
 		{ "unix", no_argument, NULL, 'u' },
@@ -1097,9 +1078,6 @@ int main(int argc, char *argv[]) {
 		case 's':
 			swap=1;
 			break;
-		case 'S':
-			sdp=1;
-			break;
 		case 't':
 		      timeout:
 			timeout=strtol(optarg, NULL, 0);
@@ -1154,7 +1132,7 @@ int main(int argc, char *argv[]) {
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &sdp, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &tlshostname, &can_opt_go)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &tlshostname, &can_opt_go)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
 				}
@@ -1217,7 +1195,7 @@ int main(int argc, char *argv[]) {
 		if (b_unix)
 			sock = openunix(hostname);
 		else
-			sock = opennet(hostname, port, sdp);
+			sock = opennet(hostname, port);
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
@@ -1332,7 +1310,7 @@ int main(int argc, char *argv[]) {
 						if (b_unix)
 							sock = openunix(hostname);
 						else
-							sock = opennet(hostname, port, sdp);
+							sock = opennet(hostname, port);
 						if (sock >= 0)
 							break;
 						sleep (1);

@@ -85,16 +85,6 @@ else
 fi
 
 AC_ARG_ENABLE(
-  sdp,
-  AS_HELP_STRING([--enable-sdp],[Build a version of nbd-server with support for the Socket Direct Protocol (SDP). Requires you to build and install a kernel with the InfiniBand patches (default disabled)]),
-  [
-    if test "x$enableval" = "xyes"; then
-      AC_DEFINE(WITH_SDP, 1, [Define to 1 if you have and want support for the Socket Direct Protocol])
-    fi
-  ]
-)
-
-AC_ARG_ENABLE(
   [gznbd],
   [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images. NOTE: no support for newstyle protocol.)])],
   [
