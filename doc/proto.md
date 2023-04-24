@@ -1137,6 +1137,9 @@ The field has the following format:
   will be faster than a regular write). Clients MUST NOT set the
   `NBD_CMD_FLAG_FAST_ZERO` request flag unless this transmission flag
   is set.
+- bit 12, `NBD_FLAG_BLOCK_STATUS_PAYLOAD`; defined by the experimental
+  `EXTENDED_HEADERS`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
@@ -1500,6 +1503,11 @@ of the newstyle negotiation.
     option does not select any metadata context, provided the client
     then does not attempt to issue `NBD_CMD_BLOCK_STATUS` commands.
 
+* `NBD_OPT_EXTENDED_HEADERS` (11)
+
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
+
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
@@ -1680,6 +1688,11 @@ case that data is an error message string suitable for display to the user.
 
     The request or the reply is too large to process.
 
+* `NBD_REP_ERR_EXT_HEADER_REQD` (2^31 + 10)
+
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
+
 ### Transmission phase
 
 #### Flag fields
@@ -1733,6 +1746,9 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_WRITE`, then the server MUST fail quickly with an error of
   `NBD_ENOTSUP`. The client MUST NOT set this unless the server advertised
   `NBD_FLAG_SEND_FAST_ZERO`.
+- bit 5, `NBD_CMD_FLAG_PAYLOAD_LEN`; defined by the experimental
+  `EXTENDED_HEADERS`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 ##### Structured reply flags
 
@@ -1852,6 +1868,11 @@ small amount of fixed-length overhead inherent in the chunk type).
   client implementations will likely follow up with a request for
   extent information at the first offset not covered by a
   reduced-length reply.
+
+* `NBD_REPLY_TYPE_BLOCK_STATUS_EXT` (6)
+
+  Defined by the experimental `EXTENDED_HEADERS`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
@@ -2336,9 +2357,7 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
-
-* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md) (based on the `STRUCTURED_REPLY` extension).
+* The `EXTENDED_HEADER` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 * The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
