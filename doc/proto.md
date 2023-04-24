@@ -470,10 +470,23 @@ for future protocol extensions:
 
 0x12560953 - Historic value for NBD_REQUEST_MAGIC, used
 	     until Linux 2.1.116pre2.
+
 0x96744668 - Historic value for NBD_REPLY_MAGIC, used
 	     until Linux 2.1.116pre2.
+
 0x25609514 - Used by nbd-server to store data log flags in the
 	     transaction log. Never sent from/to a client.
+
+The following magic values are reserved and must be used only as
+described in the corresponding protocol extensions:
+
+0x21e41c71 - `NBD_EXTENDED_REQUEST_MAGIC`
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
+
+0x6e8a278c - `NBD_EXTENDED_REPLY_MAGIC`
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 ## TLS support
 
