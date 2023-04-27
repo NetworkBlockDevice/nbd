@@ -199,7 +199,7 @@ char default_authname[] = SYSCONFDIR "/nbd-server/allow"; /**< default name of a
 #include <nbdsrv.h>
 
 /* Our thread pool */
-GThreadPool *tpool;
+GThreadPool *tpool = NULL;
 
 /* A work package for the thread pool functions */
 struct work_package {
@@ -3107,7 +3107,6 @@ static int mainloop_threaded(CLIENT* client) {
 		req->type = ntohl(req->type);
 		req->len = ntohl(req->len);
 
-
 		if(req->magic != htonl(NBD_REQUEST_MAGIC))
 			err("Protocol error: not enough magic.");
 
@@ -3146,9 +3145,7 @@ void destroy_pid_t(gpointer data) {
 	g_free(data);
 }
 
-static pid_t
-spawn_child(int* socket)
-{
+static pid_t spawn_child(int* socket) {
         pid_t pid;
         sigset_t newset;
         sigset_t oldset;
@@ -3231,6 +3228,7 @@ handle_modern_connection(GArray *const servers, const int sock, struct generic_c
                 }
                 /* Child just continues. */
         }
+	tpool = g_thread_pool_new(handle_request, NULL, genconf->threads, FALSE, NULL);
 
         sock_flags_old = fcntl(net, F_GETFL, 0);
         if (sock_flags_old == -1) {
@@ -3363,11 +3361,11 @@ static int append_new_servers(GArray *const servers, struct generic_conf *gencon
         int retval = -1;
 
         new_servers = parse_cfile(config_file_pos, genconf, true, gerror);
-        g_thread_pool_set_max_threads(tpool, genconf->threads, NULL);
-        if (!new_servers)
+        if(tpool) g_thread_pool_set_max_threads(tpool, genconf->threads, NULL);
+        if(!new_servers)
                 goto out;
 
-        for (i = 0; i < new_servers->len; ++i) {
+        for(i = 0; i < new_servers->len; ++i) {
                 SERVER *new_server = g_array_index(new_servers, SERVER*, i);
 
                 if (new_server->servename
@@ -3914,7 +3912,6 @@ int main(int argc, char *argv[]) {
 	}
 	if (!nodaemon)
 		daemonize();
-	tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
 
 	setup_servers(servers, genconf.modernaddr, genconf.modernport,
 			genconf.unixsock, genconf.flags);
