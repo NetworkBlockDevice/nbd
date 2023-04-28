@@ -761,6 +761,14 @@ GArray* do_cfile_dir(gchar* dir, struct generic_conf *const genconf, GError** e)
 }
 
 /**
+ * To be called by GArray clearing function.
+ * @param server pointer to server element
+ */
+static void serve_clear_element(SERVER **server) {
+	serve_dec_ref(*server);
+}
+
+/**
  * Parse the config file.
  *
  * @param f the name of the config file
