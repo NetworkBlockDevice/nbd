@@ -238,13 +238,6 @@ SERVER* serve_inc_ref(SERVER *s);
 SERVER* serve_dec_ref(SERVER *s);
 
 /**
- * call serve_dec_ref on *s
- *
- * @param s a pointer to a pointer to a SERVER to decrement
- **/
-void serve_clear_element(SERVER **s);
-
-/**
  * Punch a hole in the backend file (if supported by the current system).
  *
  * @param req the request for which this is being processed
