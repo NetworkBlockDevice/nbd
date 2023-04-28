@@ -3,11 +3,11 @@ TLSSRC = $(top_srcdir)/crypto-gnutls.c $(top_srcdir)/crypto-gnutls.h $(top_srcdi
 else
 TLSSRC =
 endif
-if CWRAP
-TESTS_ENVIRONMENT=$(srcdir)/cwrap_test
-else
+#if CWRAP
+#TESTS_ENVIRONMENT=$(srcdir)/cwrap_test
+#else
 TESTS_ENVIRONMENT=$(srcdir)/simple_test
-endif
+#endif
 TESTS = cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig list inetd \
 	rowrite tree rotree unix integrityhuge handshake tls tlswrongcert tlshuge
 XFAIL_TESTS=@RUN_XFAIL@
