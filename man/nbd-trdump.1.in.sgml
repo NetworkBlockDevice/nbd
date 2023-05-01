@@ -87,9 +87,17 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
       <varlistentry>
+        <term><option>&lt;S</option></term>
+	<listitem>
+	  <para>A structured reply packet sent from the server to the client.</para>
+	 </listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>H</option></term>
 	<listitem>
-	  <para>The handle of the packet.</para>
+	  <para>The cookie of the packet. Note: previous versions of
+	  this man page (and the NBD spec) referred to the cookie as the
+	  "handle".</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -115,6 +123,18 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>The error returned.</para>
 	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>T</option></term>
+	<listitem>
+	  <para>The type of the structured reply message.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>F</option></term>
+        <listitem>
+          <para>The flags on the structured reply message.</para>
+        </listitem>
       </varlistentry>
     </variablelist>
   </refsect1>
