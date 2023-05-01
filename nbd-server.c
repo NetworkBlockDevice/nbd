@@ -3948,6 +3948,7 @@ int main(int argc, char *argv[]) {
 		if(!client) {
 			exit(EXIT_FAILURE);
 		}
+		tpool = g_thread_pool_new(handle_request, NULL, genconf.threads, FALSE, NULL);
 		mainloop_threaded(client);
 		return 0;
 	}
