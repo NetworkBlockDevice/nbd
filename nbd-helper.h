@@ -58,6 +58,20 @@ static inline const char * gettracelogname(uint32_t type) {
 	}
 }
 
+static inline const char *getstructreplname(uint16_t type) {
+	switch(type) {
+	ENUM2STR(NBD_REPLY_TYPE_NONE);
+	ENUM2STR(NBD_REPLY_TYPE_OFFSET_DATA);
+	ENUM2STR(NBD_REPLY_TYPE_OFFSET_HOLE);
+	ENUM2STR(NBD_REPLY_TYPE_BLOCK_STATUS);
+	
+	ENUM2STR(NBD_REPLY_TYPE_ERROR);
+	ENUM2STR(NBD_REPLY_TYPE_ERROR_OFFSET);
+	default:
+		return "UNKNOWN";
+	}
+}
+
 #undef ENUM2STR
 
 #endif //NBD_HELPER_H

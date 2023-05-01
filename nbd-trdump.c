@@ -43,12 +43,16 @@ static inline void doread(int f, void *buf, size_t len) {
 int main(int argc, char**argv) {
 	struct nbd_request req;
 	struct nbd_reply rep;
+	struct nbd_structured_reply srep;
 	uint32_t magic;
 	uint64_t cookie;
 	uint32_t error;
 	uint32_t command;
 	uint32_t len;
 	uint64_t offset;
+	uint16_t flags;
+	uint16_t type;
+	uint32_t paylen;
 	const char * ctext;
 	int readfd = 0; /* stdin */
 
@@ -135,7 +139,22 @@ int main(int argc, char**argv) {
 				printf("TRACE_OPTION ? Unknown FROM_MAGIC\n");
 			}
 			break;
+		case NBD_STRUCTURED_REPLY_MAGIC:
+			doread(readfd, sizeof(magic)+(char*)(&srep), sizeof(struct nbd_structured_reply)-sizeof(magic));
+			cookie = ntohll(srep.cookie);
+			flags = ntohs(srep.flags);
+			type = ntohs(srep.type);
+			paylen = ntohs(srep.paylen);
+			ctext = getstructreplname(type);
 
+			printf("<S: H=%016llx T=0x%04x (%20s) F=0x%04x L=0x%04x\n",
+				(long long unsigned int) cookie,
+				type,
+				ctext,
+				flags,
+				paylen);
+
+			break;
 		default:
 			printf("? Unknown transaction type %08x\n",magic);
 			break;
