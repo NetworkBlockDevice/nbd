@@ -1,3 +1,13 @@
+nbd (1:3.25-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+    - Adds support for structured replies (in the server, not the
+      client, as the latter needs kernel support that doesn't exist yet)
+    - Better compatibility with GLib >= 2.76.0.
+  * debian/control: bump debhelper compat level to 13
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 21 May 2023 16:42:54 +0200
+
 nbd (1:3.24-1) unstable; urgency=medium
 
   * New upstream release.
