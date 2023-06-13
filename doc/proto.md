@@ -18,12 +18,13 @@ an implementation detail of the server.
 
 ## Conventions
 
-In the below protocol descriptions, the label 'C:' is used for messages
-sent by the client, whereas 'S:' is used for messages sent by the
-server).  `monotype text` is for literal character data or (when used in
-comments) constant names, `0xdeadbeef` is used for literal hex numbers
-(which are always sent in network byte order), and (brackets) are used
-for comments. Anything else is a description of the data that is sent.
+In the below protocol descriptions, the label 'C:' is used for
+messages sent by the client, whereas 'S:' is used for messages sent by
+the server).  `monotype text` is for literal character data or (when
+used in comments) constant names, `0xdeadbeef` is used for literal hex
+numbers (which are always sent in big-endian network byte order), and
+(brackets) are used for comments. Anything else is a description of
+the data that is sent.
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL",
 "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",
@@ -293,20 +294,22 @@ replies, and that it is impossible to tell by reading the server
 traffic in isolation whether a data field will be present; the simple
 reply is also problematic for error handling of the `NBD_CMD_READ`
 request.  Therefore, structured replies can be used to create a
-a context-free server stream; see below.
+context-free server stream; see below.
 
 Replies need not be sent in the same order as requests (i.e., requests
 may be handled by the server asynchronously), and structured reply
 chunks from one request may be interleaved with reply messages from
 other requests; however, there may be constraints that prevent
 arbitrary reordering of structured reply chunks within a given reply.
-Clients SHOULD use a handle that is distinct from all other currently
-pending transactions, but MAY reuse handles that are no longer in
-flight; handles need not be consecutive.  In each reply message
+Clients SHOULD use a cookie that is distinct from all other currently
+pending transactions, but MAY reuse cookies that are no longer in
+flight; cookies need not be consecutive.  In each reply message
 (whether simple or structured), the server MUST use the same value for
-handle as was sent by the client in the corresponding request.  In
-this way, the client can correlate which request is receiving a
-response.
+cookie as was sent by the client in the corresponding request,
+treating the cookie as an opaque field.  In this way, the client can
+correlate which request is receiving a response.  Note that earlier
+versions of this specification referred to a client's cookie as a
+handle.
 
 #### Ordering of messages and writes
 
@@ -348,7 +351,7 @@ The request message, sent by the client, looks as follows:
 C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)  
 C: 16 bits, command flags  
 C: 16 bits, type  
-C: 64 bits, handle  
+C: 64 bits, cookie  
 C: 64 bits, offset (unsigned)  
 C: 32 bits, length (unsigned)  
 C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
@@ -365,7 +368,7 @@ follows:
 S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`; used to be
    `NBD_REPLY_MAGIC`)  
 S: 32 bits, error (MAY be zero)  
-S: 64 bits, handle  
+S: 64 bits, cookie  
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
     *error* is zero)  
 
@@ -374,13 +377,15 @@ S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
 Some of the major downsides of the default simple reply to
 `NBD_CMD_READ` are as follows.  First, it is not possible to support
 partial reads or early errors (the command must succeed or fail as a
-whole, and either *length* bytes of data must be sent or a hard disconnect
-must be initiated, even if the failure is `NBD_EINVAL` due to bad flags).
-Second, there is no way to efficiently skip over portions of a sparse
-file that are known to contain all zeroes.  Finally, it is not
-possible to reliably decode the server traffic without also having
-context of what pending read requests were sent by the client.
-Therefore structured replies are also permitted if negotiated.
+whole; no payload is sent if *error* was set, but if *error* is zero
+and a later error is detected before *length* bytes are returned, the
+server must initiate a hard disconnect).  Second, there is no way to
+efficiently skip over portions of a sparse export that is known to
+contain all zeroes.  Finally, it is not possible to reliably decode
+the server traffic without also having context of what pending read
+requests were sent by the client, to see which *cookie* values will
+have accompanying payload on success.  Therefore structured replies
+are also permitted if negotiated.
 
 A structured reply in the transmission phase consists of one or
 more structured reply chunk messages.  The server MUST NOT send
@@ -395,7 +400,7 @@ sending errors via a structured reply, as the error can then be
 accompanied by a string payload to present to a human user.
 
 A structured reply MAY occupy multiple structured chunk messages
-(all with the same value for "handle"), and the
+(all with the same value for "cookie"), and the
 `NBD_REPLY_FLAG_DONE` reply flag is used to identify the final
 chunk.  Unless further documented by individual requests below,
 the chunks MAY be sent in any order, except that the chunk with
@@ -415,7 +420,7 @@ A structured reply chunk message looks as follows:
 S: 32 bits, 0x668e33ef, magic (`NBD_STRUCTURED_REPLY_MAGIC`)  
 S: 16 bits, flags  
 S: 16 bits, type  
-S: 64 bits, handle  
+S: 64 bits, cookie  
 S: 32 bits, length of payload (unsigned)  
 S: *length* bytes of payload data (if *length* is nonzero)  
 
@@ -461,14 +466,27 @@ of disconnect other than in one of the above circumstances.
 #### Reserved Magic values
 
 The following magic values are reserved and must not be used
-for future protocol extentions:
+for future protocol extensions:
 
 0x12560953 - Historic value for NBD_REQUEST_MAGIC, used
 	     until Linux 2.1.116pre2.
+
 0x96744668 - Historic value for NBD_REPLY_MAGIC, used
 	     until Linux 2.1.116pre2.
+
 0x25609514 - Used by nbd-server to store data log flags in the
 	     transaction log. Never sent from/to a client.
+
+The following magic values are reserved and must be used only as
+described in the corresponding protocol extensions:
+
+0x21e41c71 - `NBD_EXTENDED_REQUEST_MAGIC`
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
+
+0x6e8a278c - `NBD_EXTENDED_REPLY_MAGIC`
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 ## TLS support
 
@@ -738,60 +756,60 @@ exports. It is not possible to avoid downgrade attacks
 on exports which may be served either via TLS or in plain
 text unless the client insists on TLS.
 
-## Block size constraints
+## Size constraints
 
 During transmission phase, several operations are constrained by the
 export size sent by the final `NBD_OPT_EXPORT_NAME` or `NBD_OPT_GO`,
-as well as by three block size constraints defined here (minimum,
-preferred, and maximum).
+as well as by three size constraints defined here (minimum block,
+preferred block, and maximum payload).
 
-If a client can honour server block size constraints (as set out below
-and under `NBD_INFO_BLOCK_SIZE`), it SHOULD announce this during the
-handshake phase by using `NBD_OPT_GO` (and `NBD_OPT_INFO` if used) with
-an `NBD_INFO_BLOCK_SIZE` information request, and MUST use `NBD_OPT_GO`
-rather than `NBD_OPT_EXPORT_NAME` (except in the case of a fallback
-where the server did not support `NBD_OPT_INFO` or `NBD_OPT_GO`).
+If a client can honour server size constraints (as set out below and
+under `NBD_INFO_BLOCK_SIZE`), it SHOULD announce this during the
+handshake phase by using `NBD_OPT_GO` (and `NBD_OPT_INFO` if used)
+with an `NBD_INFO_BLOCK_SIZE` information request, and MUST use
+`NBD_OPT_GO` rather than `NBD_OPT_EXPORT_NAME` (except in the case of
+a fallback where the server did not support `NBD_OPT_INFO` or
+`NBD_OPT_GO`).
 
-A server with block size constraints other than the default SHOULD
-advertise the block size constraints during handshake phase via
-`NBD_INFO_BLOCK_SIZE` in response to `NBD_OPT_INFO` or `NBD_OPT_GO`,
-and MUST do so unless it has agreed on block size constraints via out
-of band means.
+A server with size constraints other than the default SHOULD advertise
+the size constraints during handshake phase via `NBD_INFO_BLOCK_SIZE`
+in response to `NBD_OPT_INFO` or `NBD_OPT_GO`, and MUST do so unless
+it has agreed on size constraints via out of band means.
 
 Some servers are able to make optimizations, such as opening files
 with `O_DIRECT`, if they know that the client will obey a particular
 minimum block size, where it must fall back to safer but slower code
 if the client might send unaligned requests. For that reason, if a
 client issues an `NBD_OPT_GO` including an `NBD_INFO_BLOCK_SIZE`
-information request, it MUST abide by the block size constraints it
-receives. Clients MAY issue `NBD_OPT_INFO` with `NBD_INFO_BLOCK_SIZE` to
-learn the server's constraints without committing to them.
+information request, it MUST abide by the size constraints it
+receives. Clients MAY issue `NBD_OPT_INFO` with `NBD_INFO_BLOCK_SIZE`
+to learn the server's constraints without committing to them.
 
-If block size constraints have not been advertised or agreed on
-externally, then a server SHOULD support a default minimum block size
-of 1, a preferred block size of 2^12 (4,096), and a maximum block size
-that is effectively unlimited (0xffffffff, or the export size if that
-is smaller), while a client desiring maximum interoperability SHOULD
-constrain its requests to a minimum block size of 2^9 (512), and limit
-`NBD_CMD_READ` and `NBD_CMD_WRITE` commands to a maximum block size of
-2^25 (33,554,432).  A server that wants to enforce block sizes other
-than the defaults specified here MAY refuse to go into transmission
-phase with a client that uses `NBD_OPT_EXPORT_NAME` (via a hard
-disconnect) or which uses `NBD_OPT_GO` without requesting
+If size constraints have not been advertised or agreed on externally,
+then a server SHOULD support a default minimum block size of 1, a
+preferred block size of 2^12 (4,096), and a maximum payload size that
+is at least 2^25 (33,554,432) (even if the export size is smaller);
+while a client desiring maximum interoperability SHOULD constrain its
+requests to a minimum block size of 2^9 (512), and limit
+`NBD_CMD_READ` and `NBD_CMD_WRITE` commands to a maximum payload size
+of 2^25 (33,554,432).  A server that wants to enforce size constraints
+other than the defaults specified here MAY refuse to go into
+transmission phase with a client that uses `NBD_OPT_EXPORT_NAME` (via
+a hard disconnect) or which uses `NBD_OPT_GO` without requesting
 `NBD_INFO_BLOCK_SIZE` (via an error reply of
 `NBD_REP_ERR_BLOCK_SIZE_REQD`); but servers SHOULD NOT refuse clients
 that do not request sizing information when the server supports
 default sizing or where sizing constraints can be agreed on
 externally.  When allowing clients that did not negotiate sizing via
-NBD, a server that enforces stricter block size constraints than the
+NBD, a server that enforces stricter size constraints than the
 defaults MUST cleanly error commands that fall outside the constraints
 without corrupting data; even so, enforcing constraints in this manner
 may limit interoperability.
 
-A client MAY choose to operate as if tighter block size constraints
-had been specified (for example, even when the server advertises the
-default minimum block size of 1, a client may safely use a minimum
-block size of 2^9 (512)).
+A client MAY choose to operate as if tighter size constraints had been
+specified (for example, even when the server advertises the default
+minimum block size of 1, a client may safely use a minimum block size
+of 2^9 (512)).
 
 The minimum block size represents the smallest addressable length and
 alignment within the export, although writing to an area that small
@@ -815,17 +833,45 @@ the preferred block size for that export.  The server MAY advertise an
 export size that is not an integer multiple of the preferred block
 size.
 
-The maximum block size represents the maximum length that the server
-is willing to handle in one request.  If advertised, it MAY be
-something other than a power of 2, but MUST be either an integer
-multiple of the minimum block size or the value 0xffffffff for no
-inherent limit, MUST be at least as large as the smaller of the
-preferred block size or export size, and SHOULD be at least 2^20
-(1,048,576) if the export is that large.  For convenience, the server
-MAY advertise a maximum block size that is larger than the export
-size, although in that case, the client MUST treat the export size as
-the effective maximum block size (as further constrained by a nonzero
-offset).
+The maximum payload size represents the maximum payload length that
+the server is willing to handle in one request from the client.  If
+advertised, it MAY be something other than a power of 2, but MUST be
+at least as large as the preferred block size, and SHOULD be at least
+2^20 (1,048,576) if the export is that large.  Advertising a maximum
+payload size of 0xffffffff is permitted when the server does not have
+a fixed limit on client request payloads.  Typically, the advertised
+maximum payload length is independent of the export size, even though
+the actual payloads for read and write cannot successfully exceed the
+constraints given by the export size and offset of a request.
+Notwithstanding any maximum payload size advertised, either the server
+or the client MAY initiate a hard disconnect if a payload length of
+either a request or a reply would be large enough to be deemed a
+denial of service attack; however, for maximum portability, any
+payload not exceeding 2^25 (33,554,432) bytes SHOULD NOT be considered
+a denial of service attack, even if that length is larger than the
+advertised maximum payload size.
+
+For commands that require a payload in either direction and where the
+client controls the payload length (`NBD_CMD_WRITE`, or `NBD_CMD_READ`
+with simple replies), the client MUST NOT request a length larger than
+the maximum payload size. For replies where the payload length is
+controlled by the server (`NBD_CMD_BLOCK_STATUS` without the flag
+`NBD_CMD_FLAG_REQ_ONE`, or `NBD_CMD_READ` when structured replies are
+negotiated), the server MAY exceed the maximum payload by the fixed
+amount of overhead required in the structured reply (for example, a
+server that advertises a maximum payload of 2^25 bytes may return
+2^25+8 payload bytes in a single `NBD_REPLY_TYPE_OFFSET_DATA` chunk,
+rather than splitting the reply across two chunks), although it MUST
+honor any additional payload constraints documented for a particular
+command.  For commands that do not require a payload in either
+direction (such as `NBD_CMD_TRIM` or `NBD_CMD_WRITE_ZEROES`), the
+client MAY request an effect length larger than the maximum payload
+size; the server SHOULD NOT disconnect, but MAY reply with an
+`NBD_EOVERFLOW` or `NBD_EINVAL` error if the oversize request would
+require too many server resources when compared to the same command
+with an effect length limited to the maximum payload size (such as an
+implementation of `NBD_CMD_WRITE_ZEROES` that utilizes a scratch
+buffer).
 
 Where a transmission request can have a nonzero *offset* and/or
 *length* (such as `NBD_CMD_READ`, `NBD_CMD_WRITE`, or `NBD_CMD_TRIM`),
@@ -833,24 +879,9 @@ the client MUST ensure that *offset* and *length* are integer
 multiples of any advertised minimum block size, and SHOULD use integer
 multiples of any advertised preferred block size where possible.  For
 those requests, the client MUST NOT use a *length* which, when added to
-*offset*, would exceed the export size. Also for NBD_CMD_READ,
-NBD_CMD_WRITE, NBD_CMD_CACHE and NBD_CMD_WRITE_ZEROES (except for
-when NBD_CMD_FLAG_FAST_ZERO is set), the client MUST NOT use a *length*
-larger than any advertised maximum block size.
-The server SHOULD report an `NBD_EINVAL` error if
-the client's request is not aligned to advertised minimum block size
-boundaries, or is larger than the advertised maximum block size.
-Notwithstanding any maximum block size advertised, either the server
-or the client MAY initiate a hard disconnect if the payload of an
-`NBD_CMD_WRITE` request or `NBD_CMD_READ` reply would be large enough
-to be deemed a denial of service attack; however, for maximum
-portability, any *length* less than 2^25 (33,554,432) bytes SHOULD NOT
-be considered a denial of service attack (even if the advertised
-maximum block size is smaller).  For all other commands, where the
-*length* is not reflected in the payload (such as `NBD_CMD_TRIM` or
-`NBD_CMD_WRITE_ZEROES`), a server SHOULD merely fail the command with
-an `NBD_EINVAL` error for a client that exceeds the maximum block size,
-rather than initiating a hard disconnect.
+*offset*, would exceed the export size.  The server SHOULD report an
+`NBD_EINVAL` error if the client's request is not aligned to advertised
+minimum block size boundaries or would exceed the export size.
 
 ## Metadata querying
 
@@ -882,15 +913,25 @@ The procedure works as follows:
   server supports.
 - During transmission, a client can then indicate interest in metadata
   for a given region by way of the `NBD_CMD_BLOCK_STATUS` command,
-  where *offset* and *length* indicate the area of interest. The
-  server MUST then respond with the requested information, for all
-  contexts which were selected during negotiation. For every metadata
-  context, the server sends one set of extent chunks, where the sizes
-  of the extents MUST be less than or equal to the length as specified
-  in the request. Each extent comes with a *flags* field, the
-  semantics of which are defined by the metadata context.
-- A server MUST reply to `NBD_CMD_BLOCK_STATUS` with a structured
-  reply of type `NBD_REPLY_TYPE_BLOCK_STATUS`.
+  where *offset* and *length* indicate the area of interest. On
+  success, the server MUST respond with one structured reply chunk of
+  type `NBD_REPLY_TYPE_BLOCK_STATUS` per metadata context selected
+  during negotiation, where each reply chunk is a list of one or more
+  consecutive extents for that context.  Each extent comes with a
+  *flags* field, the semantics of which are defined by the metadata
+  context.
+
+The client's requested *length* is only a hint to the server, so the
+cumulative extent length contained in a chunk of the server's reply
+may be shorter or longer the original request.  When more than one
+metadata context was negotiated, the reply chunks for the different
+contexts of a single block status request need not have the same
+number of extents or cumulative extent length.
+
+In the request, the client may use the `NBD_CMD_FLAG_REQ_ONE` command
+flag to further constrain the server's reply so that each chunk
+contains exactly one extent whose length does not exceed the client's
+original *length*.
 
 A client MUST NOT use `NBD_CMD_BLOCK_STATUS` unless it selected a
 nonzero number of metadata contexts during negotiation, and used the
@@ -922,7 +963,7 @@ Namespaces MUST be consist of one of the following:
 Third-party implementations can register additional namespaces by
 simple request to the mailing-list. The following additional
 third-party namespaces are currently registered:
-* `qemu`, maintained by [qemu.org](https://git.qemu.org/?p=qemu.git;a=blob;f=docs/interop/nbd.txt)
+* `qemu`, maintained by [qemu.org](https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/nbd.txt)
 
 Save in respect of the `base:` namespace described below, this specification
 requires no specific semantics of metadata contexts, except that all the
@@ -1109,6 +1150,9 @@ The field has the following format:
   will be faster than a regular write). Clients MUST NOT set the
   `NBD_CMD_FLAG_FAST_ZERO` request flag unless this transmission flag
   is set.
+- bit 12, `NBD_FLAG_BLOCK_STATUS_PAYLOAD`; defined by the experimental
+  `EXTENDED_HEADERS`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 Clients SHOULD ignore unknown flags.
 
@@ -1264,17 +1308,17 @@ of the newstyle negotiation.
       `NBD_REP_INFO` replies, but a SELECTIVETLS server MAY do so if
       this is a TLS-only export.
     - `NBD_REP_ERR_BLOCK_SIZE_REQD`: The server requires the client to
-      request block size constraints using `NBD_INFO_BLOCK_SIZE` prior
-      to entering transmission phase, because the server will be using
-      non-default block sizes constraints. The server MUST NOT send this
-      error if block size constraints were requested with
+      request size constraints using `NBD_INFO_BLOCK_SIZE` prior to
+      entering transmission phase, because the server will be using
+      non-default size constraints. The server MUST NOT send this
+      error if size constraints were requested with
       `NBD_INFO_BLOCK_SIZE` with the `NBD_OPT_INFO` or `NBD_OPT_GO`
       request. The server SHOULD NOT send this error if it is using
-      default block size constraints or block size constraints
-      negotiated out of band. A server sending an
-      `NBD_REP_ERR_BLOCK_SIZE_REQD` error SHOULD ensure it first
-      sends an `NBD_INFO_BLOCK_SIZE` information reply in order
-      to help avoid a potentially unnecessary round trip.
+      default size constraints or size constraints negotiated out of
+      band. A server sending an `NBD_REP_ERR_BLOCK_SIZE_REQD` error
+      SHOULD ensure it first sends an `NBD_INFO_BLOCK_SIZE`
+      information reply in order to help avoid a potentially
+      unnecessary round trip.
 
     Additionally, if TLS has not been initiated, the server MAY reply
     with `NBD_REP_ERR_TLS_REQD` (instead of `NBD_REP_ERR_UNKNOWN`) to
@@ -1289,7 +1333,7 @@ of the newstyle negotiation.
 
     Other errors (such as `NBD_REP_ERR_SHUTDOWN`) are also possible,
     as permitted elsewhere in this document, with no constraints on
-    the number of preceeding `NBD_REP_INFO`.
+    the number of preceding `NBD_REP_INFO`.
 
     If there are no intervening option requests between a successful
     `NBD_OPT_INFO` (that is, one where the reply ended with a final
@@ -1472,6 +1516,11 @@ of the newstyle negotiation.
     option does not select any metadata context, provided the client
     then does not attempt to issue `NBD_CMD_BLOCK_STATUS` commands.
 
+* `NBD_OPT_EXTENDED_HEADERS` (11)
+
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
+
 #### Option reply types
 
 These values are used in the "reply type" field, sent by the server
@@ -1565,24 +1614,25 @@ during option haggling in the fixed newstyle negotiation.
 
     * `NBD_INFO_BLOCK_SIZE` (3)
 
-      Represents the server's advertised block size constraints; see the
-      "Block size constraints" section for more details on what these
-      values represent, and on constraints on their values.  The server
-      MUST send this info if it is requested and it intends to enforce
-      block size constraints other than the defaults. After
-      sending this information in response to an `NBD_OPT_GO` in which
-      the client specifically requested `NBD_INFO_BLOCK_SIZE`, the server
-      can legitimately assume that any client that continues the session
-      will support the block size constraints supplied (note that this
-      assumption cannot be made solely on the basis of an `NBD_OPT_INFO`
-      with an `NBD_INFO_BLOCK_SIZE` request, or an `NBD_OPT_GO` without
-      an explicit `NBD_INFO_BLOCK_SIZE` request). The *length* MUST be 14,
-      and the reply payload is interpreted as:
+      Represents the server's advertised size constraints; see the
+      "Size constraints" section for more details on what these values
+      represent, and on constraints on their values.  The server MUST
+      send this info if it is requested and it intends to enforce size
+      constraints other than the defaults. After sending this
+      information in response to an `NBD_OPT_GO` in which the client
+      specifically requested `NBD_INFO_BLOCK_SIZE`, the server can
+      legitimately assume that any client that continues the session
+      will support the size constraints supplied (note that this
+      assumption cannot be made solely on the basis of an
+      `NBD_OPT_INFO` with an `NBD_INFO_BLOCK_SIZE` request, or an
+      `NBD_OPT_GO` without an explicit `NBD_INFO_BLOCK_SIZE`
+      request). The *length* MUST be 14, and the reply payload is
+      interpreted as:
 
       - 16 bits, `NBD_INFO_BLOCK_SIZE`  
       - 32 bits, minimum block size  
       - 32 bits, preferred block size  
-      - 32 bits, maximum block size  
+      - 32 bits, maximum payload size  
 
 * `NBD_REP_META_CONTEXT` (4)
 
@@ -1651,6 +1701,11 @@ case that data is an error message string suitable for display to the user.
 
     The request or the reply is too large to process.
 
+* `NBD_REP_ERR_EXT_HEADER_REQD` (2^31 + 10)
+
+    Defined by the experimental `EXTENDED_HEADERS`
+    [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
+
 ### Transmission phase
 
 #### Flag fields
@@ -1696,7 +1751,7 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_BLOCK_STATUS`. If set, the client is interested in only one
   extent per metadata context. If this flag is present, the server
   MUST NOT send metadata on more than one extent in the reply. Client
-  implementors should note that using this flag on multiple contiguous
+  implementers should note that using this flag on multiple contiguous
   requests is likely to be inefficient.
 - bit 4, `NBD_CMD_FLAG_FAST_ZERO`; valid during
   `NBD_CMD_WRITE_ZEROES`. If set, but the server cannot perform the
@@ -1704,6 +1759,9 @@ valid may depend on negotiation during the handshake phase.
   `NBD_CMD_WRITE`, then the server MUST fail quickly with an error of
   `NBD_ENOTSUP`. The client MUST NOT set this unless the server advertised
   `NBD_FLAG_SEND_FAST_ZERO`.
+- bit 5, `NBD_CMD_FLAG_PAYLOAD_LEN`; defined by the experimental
+  `EXTENDED_HEADERS`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 ##### Structured reply flags
 
@@ -1725,12 +1783,15 @@ unrecognized flags.
 
 #### Structured reply types
 
-These values are used in the "type" field of a structured reply.
-Some chunk types can additionally be categorized by role, such as
-*error chunks* or *content chunks*.  Each type determines how to
-interpret the "length" bytes of payload.  If the client receives
-an unknown or unexpected type, other than an *error chunk*, it
-MUST initiate a hard disconnect.
+These values are used in the "type" field of a structured reply.  Some
+chunk types can additionally be categorized by role, such as *error
+chunks* or *content chunks*.  Each type determines how to interpret
+the "length" bytes of payload.  If the client receives an unknown or
+unexpected type, other than an *error chunk*, it MUST initiate a hard
+disconnect.  A server MUST NOT send a chunk where any variable-length
+portion of the chunk is larger than any advertised maximum payload
+size (however, the overall chunk may exceed the maximum payload by the
+small amount of fixed-length overhead inherent in the chunk type).
 
 * `NBD_REPLY_TYPE_NONE` (0)
 
@@ -1745,7 +1806,7 @@ MUST initiate a hard disconnect.
 
   This chunk type is in the content chunk category.  *length* MUST be
   at least 9.  It represents the contents of *length - 8* bytes of the
-  file, starting at the absolute *offset* from the start of the
+  export, starting at the absolute *offset* from the start of the
   export.  The data MUST lie within the bounds of the original offset
   and length of the client's request, and MUST NOT overlap with the
   bounds of any earlier content chunk or error chunk in the same
@@ -1778,8 +1839,8 @@ MUST initiate a hard disconnect.
   *length* MUST be 4 + (a positive integer multiple of 8).  This reply
   represents a series of consecutive block descriptors where the sum
   of the length fields within the descriptors is subject to further
-  constraints documented below. This chunk type MUST appear
-  exactly once per metadata ID in a structured reply.
+  constraints documented below.  A successful block status request MUST
+  have exactly one status chunk per negotiated metadata context ID.
 
   The payload starts with:
 
@@ -1801,15 +1862,30 @@ MUST initiate a hard disconnect.
   *length* of the final extent MAY result in a sum larger than the
   original requested length, if the server has that information anyway
   as a side effect of reporting the status of the requested region.
+  When multiple metadata contexts are negotiated, the reply chunks for
+  the different contexts need not have the same number of extents or
+  cumulative extent length.
+
+  Servers SHOULD NOT send more than 2^20 extents in a single reply
+  chunk; in other words, the size of
+  `NBD_REPLY_TYPE_BLOCK_STATUS` should not be more than 4 + 8*2^20
+  (8,388,612 bytes), even if this requires that the server truncate
+  the response in relation to the *length* requested by the client.
 
   Even if the client did not use the `NBD_CMD_FLAG_REQ_ONE` flag in
   its request, the server MAY return fewer descriptors in the reply
   than would be required to fully specify the whole range of requested
   information to the client, if looking up the information would be
   too resource-intensive for the server, so long as at least one
-  extent is returned. Servers should however be aware that most
-  clients implementations will then simply ask for the next extent
-  instead.
+  extent is returned.  Servers should however be aware that most
+  client implementations will likely follow up with a request for
+  extent information at the first offset not covered by a
+  reduced-length reply.
+
+* `NBD_REPLY_TYPE_BLOCK_STATUS_EXT` (6)
+
+  Defined by the experimental `EXTENDED_HEADERS`
+  [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 All error chunk types have bit 15 set, and begin with the same
 *error*, *message length*, and optional *message* fields as
@@ -1824,7 +1900,9 @@ remaining structured fields at the end.
   be at least 6.  This chunk represents that an error occurred,
   and the client MAY NOT make any assumptions about partial
   success. This type SHOULD NOT be used more than once in a
-  structured reply.  Valid as a reply to any request.
+  structured reply.  Valid as a reply to any request.  Note that
+  *message length* MUST NOT exceed the 4096 bytes string length
+  limit.
 
   The payload is structured as:
 
@@ -1845,7 +1923,8 @@ remaining structured fields at the end.
   were sent earlier in the structured reply, the server SHOULD NOT
   send multiple distinct offsets that lie within the bounds of a
   single content chunk.  Valid as a reply to `NBD_CMD_READ`,
-  `NBD_CMD_WRITE`, `NBD_CMD_TRIM`, and `NBD_CMD_BLOCK_STATUS`.
+  `NBD_CMD_WRITE`, `NBD_CMD_TRIM`, `NBD_CMD_CACHE`,
+  `NBD_CMD_WRITE_ZEROES`, and `NBD_CMD_BLOCK_STATUS`.
 
   The payload is structured as:
 
@@ -1880,7 +1959,9 @@ The following request types exist:
     If structured replies were not negotiated, then a read request
     MUST always be answered by a simple reply, as documented above
     (using magic 0x67446698 `NBD_SIMPLE_REPLY_MAGIC`, and containing
-    length bytes of data according to the client's request).
+    length bytes of data according to the client's request), which in
+    turn means any client request with a length larger than the
+    maximum payload size will fail.
 
     If an error occurs, the server SHOULD set the appropriate error code
     in the error field. The server MAY then initiate a hard disconnect.
@@ -1909,13 +1990,19 @@ The following request types exist:
     chunks that describe data outside the offset and length of the
     request, but MAY send the content chunks in any order (the client
     MUST reassemble content chunks into the correct order), and MAY
-    send additional content chunks even after reporting an error chunk.
-    Note that a request for more than 2^32 - 8 bytes MUST be split
-    into at least two chunks, so as not to overflow the length field
-    of a reply while still allowing space for the offset of each
-    chunk.  When no error is detected, the server MUST send enough
-    data chunks to cover the entire region described by the offset and
-    length of the client's request.
+    send additional content chunks even after reporting an error
+    chunk.  A server MAY support read requests larger than the maximum
+    payload size by splitting the response across multiple chunks (in
+    particular, a request for more than 2^32 - 8 bytes containing data
+    rather than holes MUST be split to avoid overflowing the 32-bit
+    `NBD_REPLY_TYPE_OFFSET_DATA` length field); however, the server is
+    also permitted to reject large read requests up front with
+    `NBD_EOVERFLOW`, so a client should be prepared to retry with
+    smaller requests if a large request fails.
+
+    When no error is detected, the server MUST send enough data chunks
+    to cover the entire region described by the offset and length of
+    the client's request.
 
     To minimize traffic, the server MAY use a content or error chunk
     as the final chunk by setting the `NBD_REPLY_FLAG_DONE` flag, but
@@ -2088,11 +2175,12 @@ The following request types exist:
     If the server advertised `NBD_FLAG_SEND_FAST_ZERO` but
     `NBD_CMD_FLAG_FAST_ZERO` is not set, then the server MUST NOT fail
     with `NBD_ENOTSUP`, even if the operation is no faster than a
-    corresponding `NBD_CMD_WRITE`. Conversely, if
-    `NBD_CMD_FLAG_FAST_ZERO` is set, the server MUST fail quickly with
-    `NBD_ENOTSUP` unless the request can be serviced in less time than
-    a corresponding `NBD_CMD_WRITE`, and SHOULD NOT alter the contents
-    of the export when returning this failure. The server's
+    corresponding `NBD_CMD_WRITE`. Conversely, if `NBD_CMD_FLAG_FAST_ZERO`
+    is set, the server SHOULD NOT fail with `NBD_EOVERFLOW` regardless of
+    the client length, MUST fail quickly with `NBD_ENOTSUP` unless the
+    request can be serviced in less time than a corresponding
+    `NBD_CMD_WRITE`, and SHOULD NOT alter the contents of the export when
+    returning an `NBD_ENOTSUP` failure. The server's
     determination on whether to fail a fast request MAY depend on a
     number of factors, such as whether the request was suitably
     aligned, on whether the `NBD_CMD_FLAG_NO_HOLE` flag was present,
@@ -2157,36 +2245,41 @@ The following request types exist:
 
     The list of block status descriptors within the
     `NBD_REPLY_TYPE_BLOCK_STATUS` chunk represent consecutive portions
-    of the file starting from specified *offset*.  If the client used
+    of the export starting from specified *offset*.  If the client used
     the `NBD_CMD_FLAG_REQ_ONE` flag, each chunk contains exactly one
-    descriptor where the *length* of the descriptor MUST NOT be greater
-    than the *length* of the request; otherwise, a chunk MAY contain
-    multiple descriptors, and the final descriptor MAY extend beyond
-    the original requested size if the server can determine a larger
-    length without additional effort.  On the other hand, the server MAY
-    return less data than requested. However the server MUST return at
-    least one status descriptor (and since each status descriptor has
-    a non-zero length, a client can always make progress on a
-    successful return).  The server SHOULD use different *status*
-    values between consecutive descriptors where feasible, although
-    the client SHOULD be prepared to handle consecutive descriptors
-    with the same *status* value.  The server SHOULD use descriptor
-    lengths that are an integer multiple of 512 bytes where possible
-    (the first and last descriptor of an unaligned query being the
-    most obvious places for an exception), and MUST use descriptor
-    lengths that are an integer multiple of any advertised minimum
-    block size. The status flags are intentionally defined so that a
-    server MAY always safely report a status of 0 for any block,
-    although the server SHOULD return additional status values when
-    they can be easily detected.
+    descriptor where the *length* of the descriptor MUST NOT be
+    greater than the *length* of the request; otherwise, a chunk MAY
+    contain multiple descriptors, and the final descriptor MAY extend
+    beyond the original requested size if the server can determine a
+    larger length without additional effort.  On the other hand, the
+    server MAY return less data than requested.  In particular, a
+    server SHOULD NOT send more than 2^20 status descriptors in a
+    single chunk.  However the server MUST return at least one status
+    descriptor, and since each status descriptor has a non-zero
+    length, a client can always make progress on a successful return.
+
+    The server SHOULD use different *status* values between
+    consecutive descriptors where feasible, although the client SHOULD
+    be prepared to handle consecutive descriptors with the same
+    *status* value.  The server SHOULD use descriptor lengths that are
+    an integer multiple of 512 bytes where possible (the first and
+    last descriptor of an unaligned query being the most obvious
+    places for an exception), in part to avoid an amplification effect
+    where a series of smaller descriptors can cause the server's reply
+    to occupy more bytes than the *length* of the client's request.
+    The server MUST use descriptor lengths that are an integer
+    multiple of any advertised minimum block size. The status flags
+    are intentionally defined so that a server MAY always safely
+    report a status of 0 for any block, although the server SHOULD
+    return additional status values when they can be easily detected.
 
     If an error occurs, the server SHOULD set the appropriate error
     code in the error field of an error chunk. However, if the error
     does not involve invalid usage (such as a request beyond the
-    bounds of the file), a server MAY reply with a single block status
-    descriptor with *length* matching the requested length, rather
-    than reporting the error; in this case the context MAY mandate the
-    status returned.
+    bounds of the export), a server MAY reply with a single block
+    status descriptor with *length* matching the requested length,
+    rather than reporting the error; in this case the context MAY
+    mandate the status returned.
 
     A client MAY initiate a hard disconnect if it detects that the
     server has sent an invalid chunk. The server SHOULD return
@@ -2240,7 +2333,9 @@ SHOULD return `NBD_EPERM` if it receives a write or trim request on a
 read-only export.
 
 The server SHOULD NOT return `NBD_EOVERFLOW` except as documented in
-response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported.
+response to `NBD_CMD_READ` when `NBD_CMD_FLAG_DF` is supported, or when
+a command without payload requests a length larger than an advertised
+maximum payload length.
 
 The server SHOULD NOT return `NBD_ENOTSUP` except as documented in
 response to `NBD_CMD_WRITE_ZEROES` when `NBD_CMD_FLAG_FAST_ZERO` is
@@ -2275,13 +2370,11 @@ with names starting with the word 'extension'.
 
 Currently known are:
 
-* The `STRUCTURED_REPLY` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-structured-reply/doc/proto.md).
-
-* The `BLOCK_STATUS` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-blockstatus/doc/proto.md) (based on the `STRUCTURED_REPLY` extension).
+* The `EXTENDED_HEADER` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-ext-header/doc/proto.md).
 
 * The `RESIZE` [extension](https://github.com/NetworkBlockDevice/nbd/blob/extension-resize/doc/proto.md).
 
-Implementors of these extensions are strongly suggested to contact the
+Implementers of these extensions are strongly suggested to contact the
 [mailinglist](mailto:nbd@other.debian.org) in order to help
 fine-tune the specifications before committing to a particular
 implementation.
@@ -2301,7 +2394,7 @@ options. While the basic protocol is still reasonably simple, a growing
 number of extensions has been implemented that may make the protocol
 description seem overwhelming at first.
 
-In an effort to not overwhelm first-time implementors with various
+In an effort to not overwhelm first-time implementers with various
 options and features that may or may not be important for their use
 case, while at the same time desiring maximum interoperability, this
 section tries to clarify what is optional and what is expected to be
@@ -2323,7 +2416,7 @@ considered a baseline:
     - the `NBD_OPT_INFO` and `NBD_OPT_GO` messages, with the
       `NBD_INFO_EXPORT` response.
     - Servers that receive messages which they do not implement MUST
-      reply to them with `NBD_OPT_UNSUP`, and MUST NOT fail to parse
+      reply to them with `NBD_REP_ERR_UNSUP`, and MUST NOT fail to parse
       the next message received.
     - the `NBD_OPT_ABORT` message, and its response.
     - the `NBD_OPT_LIST` message and its response.
@@ -2347,20 +2440,20 @@ implement the following features:
 
 - TLS-encrypted communication, which may be required by some
   implementations or configurations;
-- Servers that implement block constraints through `NBD_INFO_BLOCK_SIZE`
-  and desire maximum interoperability SHOULD NOT require them.
-  Similarly, clients that desire maximum interoperability SHOULD
-  implement querying for block size constraints. Since some clients
-  default to a block size of 512 bytes, implementations desiring maximum
-  interoperability MAY default to that size.
+- Servers that implement size constraints through
+  `NBD_INFO_BLOCK_SIZE` and desire maximum interoperability SHOULD NOT
+  require them.  Similarly, clients that desire maximum
+  interoperability SHOULD implement querying for size
+  constraints. Since some clients default to a block size of 512
+  bytes, implementations desiring maximum interoperability MAY default
+  to that size.  Clients that do not implement querying for size
+  constraints SHOULD abide by the rules laid out in the section "Size
+  constraints", above.
 - Clients or servers that desire interoperability with older
   implementations SHOULD implement the `NBD_OPT_EXPORT_NAME` message in
   addition to `NBD_OPT_INFO` and `NBD_OPT_GO`.
 - For data safety, implementing `NBD_CMD_FLUSH` and the
   `NBD_CMD_FLAG_FUA` flag to `NBD_CMD_WRITE` is strongly recommended.
-  Clients that do not implement querying for block size constraints
-  SHOULD abide by the rules laid out in the section "Block size
-  constraints", above.
 
 ### Future considerations
 

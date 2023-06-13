@@ -63,6 +63,7 @@ static gchar *tlshostname = NULL;
 typedef enum {
 	CONNECTION_TYPE_INIT_PASSWD,
 	CONNECTION_TYPE_CLISERV,
+	CONNECTION_TYPE_HANDSHAKE,
 	CONNECTION_TYPE_FULL,
 } CONNECTION_TYPE;
 
@@ -73,7 +74,7 @@ typedef enum {
 
 struct reqcontext {
 	uint64_t seq;
-	char orighandle[8];
+	uint64_t origcookie;
 	struct nbd_request req;
 	struct reqcontext *next;
 	struct reqcontext *prev;
@@ -276,10 +277,9 @@ int writebuffer(int fd, struct chunklist *l)
 	return 0;
 }
 
-#define TEST_WRITE (1<<0)
-#define TEST_FLUSH (1<<1)
-#define TEST_EXPECT_ERROR (1<<2)
-#define TEST_HANDSHAKE (1<<3)
+#define TEST_WRITE              (1<<0)
+#define TEST_FLUSH              (1<<1)
+#define TEST_EXPECT_ERROR       (1<<2)
 
 int timeval_subtract(struct timeval *result, struct timeval *x,
 		     struct timeval *y)
@@ -391,7 +391,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 		strncpy(errstr, "mymagic does not match", errstr_len);
 		goto err;
 	}
-	if (ctype < CONNECTION_TYPE_FULL)
+	if (ctype < CONNECTION_TYPE_HANDSHAKE)
 		goto end;
 	if (!name) {
 		READ_ALL_ERRCHK(sock, &size, sizeof(size), err,
@@ -420,7 +420,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 	negotiationflags = htonl(negotiationflags);
 	WRITE_ALL_ERRCHK(sock, &negotiationflags, sizeof(negotiationflags), err,
 			 "Could not write reserved field: %s", strerror(errno));
-	if (testflags & TEST_HANDSHAKE) {
+	if (ctype < CONNECTION_TYPE_FULL) {
 		/* Server must support newstyle for this test */
 		if (!(handshakeflags & NBD_FLAG_FIXED_NEWSTYLE)) {
 			strncpy(errstr, "server does not support handshake", errstr_len);
@@ -680,7 +680,7 @@ int close_connection(int sock, CLOSE_TYPE type)
 	case CONNECTION_CLOSE_PROPERLY:
 		req.magic = htonl(NBD_REQUEST_MAGIC);
 		req.type = htonl(NBD_CMD_DISC);
-		memcpy(&(req.handle), &(counter), sizeof(counter));
+		req.cookie = htonll(counter);
 		counter++;
 		req.from = 0;
 		req.len = 0;
@@ -705,7 +705,7 @@ int close_connection(int sock, CLOSE_TYPE type)
 	return 0;
 }
 
-int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
+int read_packet_check_header(int sock, size_t datasize, long long int curcookie)
 {
 	struct nbd_reply rep;
 	int retval = 0;
@@ -717,11 +717,11 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	rep.error = ntohl(rep.error);
 	if (rep.magic != NBD_REPLY_MAGIC) {
 		snprintf(errstr, errstr_len,
-			 "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received handle is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX",
-			 (long long int)curhandle,
-			 (long long unsigned int)curhandle,
-			 (long long int)*((u64 *) rep.handle),
-			 (long long unsigned int)*((u64 *) rep.handle),
+			 "Received package with incorrect reply_magic. Index of sent packages is %lld (0x%llX), received cookie is %lld (0x%llX). Received magic 0x%lX, expected 0x%lX",
+			 (long long int)curcookie,
+			 (long long unsigned int)curcookie,
+			 (long long int)rep.cookie,
+			 (long long unsigned int)rep.cookie,
 			 (long unsigned int)rep.magic,
 			 (long unsigned int)NBD_REPLY_MAGIC);
 		retval = -1;
@@ -729,10 +729,10 @@ int read_packet_check_header(int sock, size_t datasize, long long int curhandle)
 	}
 	if (rep.error) {
 		snprintf(errstr, errstr_len,
-			 "Received error from server: %ld (0x%lX). Handle is %lld (0x%llX).",
+			 "Received error from server: %ld (0x%lX). Cookie is %lld (0x%llX).",
 			 (long int)rep.error, (long unsigned int)rep.error,
-			 (long long int)(*((u64 *) rep.handle)),
-			 (long long unsigned int)*((u64 *) rep.handle));
+			 (long long int)rep.cookie,
+			 (long long unsigned int)rep.cookie);
 		retval = -2;
 		goto end;
 	}
@@ -767,7 +767,7 @@ int oversize_test(char *name, int sock, char close_sock, int testflags)
 	req.magic = htonl(NBD_REQUEST_MAGIC);
 	req.type = htonl(NBD_CMD_READ);
 	req.len = htonl(1024 * 1024);
-	memcpy(&(req.handle), &i, sizeof(i));
+	req.cookie = htonll(i);
 	req.from = htonll(i);
 	WRITE_ALL_ERR_RT(sock, &req, sizeof(req), err, -1,
 			 "Could not write request: %s", strerror(errno));
@@ -835,8 +835,8 @@ int handshake_test(char *name, int sock, char close_sock, int testflags)
 
 	/* This should work */
 	if ((sock =
-		 setup_connection_common(sock, name,
-				  CONNECTION_TYPE_FULL,
+		setup_connection_common(sock, name,
+				  CONNECTION_TYPE_HANDSHAKE,
 				  &serverflags, testflags)) < 0) {
 		g_warning("Could not open socket: %s", errstr);
 		goto err;
@@ -971,7 +971,7 @@ int throughput_test(char *name, int sock, char close_sock, int testflags)
 			if (sendfua)
 				req.type =
 				    htonl(NBD_CMD_WRITE | NBD_CMD_FLAG_FUA);
-			memcpy(&(req.handle), &i, sizeof(i));
+			req.cookie = htonll(i);
 			req.from = htonll(i);
 			if (write_all(sock, &req, sizeof(req)) < 0) {
 				retval = -1;
@@ -987,7 +987,7 @@ int throughput_test(char *name, int sock, char close_sock, int testflags)
 			if (sendflush) {
 				long long int j = i ^ (1LL << 63);
 				req.type = htonl(NBD_CMD_FLUSH);
-				memcpy(&(req.handle), &j, sizeof(j));
+				req.cookie = htonll(j);
 				req.from = 0;
 				req.len = 0;
 				if (write_all(sock, &req, sizeof(req)) < 0) {
@@ -1104,8 +1104,8 @@ err:
 
 /*
  * fill 512 byte buffer 'buf' with a hashed selection of interesting data based
- * only on handle and blknum. The first word is blknum, and the second handle, for ease
- * of understanding. Things with handle 0 are blank.
+ * only on cookie and blknum. The first word is blknum, and the second cookie, for ease
+ * of understanding. Things with cookie 0 are blank.
  */
 static inline void makebuf(char *buf, uint64_t seq, uint64_t blknum)
 {
@@ -1161,17 +1161,17 @@ static inline void dumpcommand(char *text, uint32_t command)
 #endif
 }
 
-/* return an unused handle */
-uint64_t getrandomhandle(GHashTable * phash)
+/* return an unused cookie */
+uint64_t getrandomcookie(GHashTable * phash)
 {
-	uint64_t handle = 0;
+	uint64_t cookie = 0;
 	int i;
 	do {
 		/* RAND_MAX may be as low as 2^15 */
 		for (i = 1; i <= 5; i++)
-			handle ^= random() ^ (handle << 15);
-	} while (g_hash_table_lookup(phash, &handle));
-	return handle;
+			cookie ^= random() ^ (cookie << 15);
+	} while (g_hash_table_lookup(phash, &cookie));
+	return cookie;
 }
 
 int integrity_test(char *name, int sock, char close_sock, int testflags)
@@ -1203,7 +1203,7 @@ int integrity_test(char *name, int sock, char close_sock, int testflags)
 	struct rclist inflight = { NULL, NULL, 0 };
 	struct chunklist txbuf = { NULL, NULL, 0 };
 
-	GHashTable *handlehash = g_hash_table_new(g_int64_hash, g_int64_equal);
+	GHashTable *cookiehash = g_hash_table_new(g_int64_hash, g_int64_equal);
 
 	size = 0;
 	if ((sock =
@@ -1334,7 +1334,7 @@ int integrity_test(char *name, int sock, char close_sock, int testflags)
 						"Could not read transaction log: %s",
 						strerror(errno));
 				prc->req.magic = htonl(NBD_REQUEST_MAGIC);
-				memcpy(prc->orighandle, prc->req.handle, 8);
+				prc->origcookie = htonll(prc->req.cookie);
 				prc->seq = seq++;
 				if ((ntohl(prc->req.type) &
 				     NBD_CMD_MASK_COMMAND) == NBD_CMD_DISC) {
@@ -1438,10 +1438,9 @@ int integrity_test(char *name, int sock, char close_sock, int testflags)
 				rclist_addtail(&inflight, prc);
 
 				dumpcommand("Sending command", prc->req.type);
-				/* we rewrite the handle as they otherwise may not be unique */
-				*((uint64_t *) (prc->req.handle)) =
-				    getrandomhandle(handlehash);
-				g_hash_table_insert(handlehash, prc->req.handle,
+				/* we rewrite the cookie as they otherwise may not be unique */
+				prc->req.cookie = getrandomcookie(cookiehash);
+				g_hash_table_insert(cookiehash, &prc->req.cookie,
 						    prc);
 				addbuffer(&txbuf, &(prc->req),
 					  sizeof(struct nbd_request));
@@ -1537,21 +1536,19 @@ skipdequeue:
 				goto err_open;
 			}
 
-			uint64_t handle;
-			memcpy(&handle, rep.handle, 8);
-			prc = g_hash_table_lookup(handlehash, &handle);
+			uint64_t cookie;
+			cookie = rep.cookie;
+			prc = g_hash_table_lookup(cookiehash, &cookie);
 			if (!prc) {
 				snprintf(errstr, errstr_len,
-					 "Unrecognised handle in reply: 0x%llX",
-					 *(long long unsigned int *)(rep.
-								     handle));
+					 "Unrecognised cookie in reply: 0x%llX",
+					 (long long unsigned int)rep.cookie);
 				goto err_open;
 			}
-			if (!g_hash_table_remove(handlehash, &handle)) {
+			if (!g_hash_table_remove(cookiehash, &cookie)) {
 				snprintf(errstr, errstr_len,
-					 "Could not remove handle from hash: 0x%llX",
-					 *(long long unsigned int *)(rep.
-								     handle));
+					 "Could not remove cookie from hash: 0x%llX",
+					 (long long unsigned int)rep.cookie);
 				goto err_open;
 			}
 
@@ -1696,7 +1693,7 @@ err:
 	if (*errstr)
 		g_warning("%s", errstr);
 
-	g_hash_table_destroy(handlehash);
+	g_hash_table_destroy(cookiehash);
 
 	return retval;
 }
@@ -1795,7 +1792,6 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			test = handshake_test;
-			testflags |= TEST_HANDSHAKE;
 			break;
 #if HAVE_GNUTLS
 		case 'C':

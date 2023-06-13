@@ -27,10 +27,14 @@ bool do_test(char* address, char* netmask) {
 	}
 	tmp = res;
 	while(res) {
-		printf("Found %s\n", inet_ntop(res->ai_family,
-					   &(((struct sockaddr_in*)res->ai_addr)->sin_addr),
-					       buf,
-					       res->ai_addrlen));
+		if((err = getnameinfo((struct sockaddr*)res->ai_addr, res->ai_addrlen, buf,
+                                       sizeof (buf), NULL, 0, NI_NUMERICHOST))) {
+			fprintf(stderr, "E: %s\n", gai_strerror(err));
+			exit(EXIT_FAILURE);
+		}
+
+		printf("Found %s\n", buf);
+
 		if(address_matches(netmask, (struct sockaddr*)res->ai_addr, NULL)) {
 			printf("Yes!\n");
 			freeaddrinfo(tmp);
@@ -50,6 +54,12 @@ int main(void) {
 	}
 	if(!do_test("192.168.0.1", "192.168.0.1/24")) {
 		return 1;
+	}
+	if(!do_test("::ffff:192.168.200.1", "192.168.200.1/24")) {
+                return 1;
+        }
+        if(do_test("::ffff:192.168.200.1", "192.168.100.1/24")) {
+                return 1;
 	}
 	if(do_test("192.168.200.1", "192.168.0.0/24")) {
 		return 1;

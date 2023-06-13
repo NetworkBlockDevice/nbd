@@ -45,6 +45,7 @@ enum {
 #define NBD_CMD_SHIFT (16)
 #define NBD_CMD_FLAG_FUA ((1 << 0) << NBD_CMD_SHIFT)
 #define NBD_CMD_FLAG_NO_HOLE ((1 << 1) << NBD_CMD_SHIFT)
+#define NBD_CMD_FLAG_DF  ((1 << 2) << NBD_CMD_SHIFT)
 
 /* values for flags field */
 #define NBD_FLAG_HAS_FLAGS	(1 << 0)	/* Flags are there */
@@ -54,6 +55,7 @@ enum {
 #define NBD_FLAG_ROTATIONAL	(1 << 4)	/* Use elevator algorithm - rotational media */
 #define NBD_FLAG_SEND_TRIM	(1 << 5)	/* Send TRIM (discard) */
 #define NBD_FLAG_SEND_WRITE_ZEROES (1 << 6) 	/* Send NBD_CMD_WRITE_ZEROES */
+#define NBD_FLAG_SEND_DF	(1 << 7)	/* Send NBD_CMD_FLAG_DF */
 #define NBD_FLAG_CAN_MULTI_CONN	(1 << 8)	/* multiple connections are okay */
 
 #define nbd_cmd(req) ((req)->cmd[0])
@@ -71,6 +73,16 @@ enum {
 
 #define NBD_OPT_REPLY_MAGIC 0x3e889045565a9LL
 
+#define NBD_REPLY_TYPE_NONE 		(0)
+#define NBD_REPLY_TYPE_OFFSET_DATA	(1)
+#define NBD_REPLY_TYPE_OFFSET_HOLE	(2)
+#define NBD_REPLY_TYPE_BLOCK_STATUS	(3)
+
+#define NBD_REPLY_TYPE_ERROR		((1 << 15) + 1)
+#define NBD_REPLY_TYPE_ERROR_OFFSET	((1 << 15) + 2)
+
+#define NBD_REPLY_FLAG_DONE		(1 << 0)
+
 /*
  * This is the packet used for communication between client and
  * server. All data are in network byte order.
@@ -78,7 +90,7 @@ enum {
 struct nbd_request {
 	uint32_t magic;
 	uint32_t type;	/* == READ || == WRITE 	*/
-	char handle[8];
+	uint64_t cookie;
 	uint64_t from;
 	uint32_t len;
 } __attribute__ ((packed));
@@ -90,6 +102,32 @@ struct nbd_request {
 struct nbd_reply {
 	uint32_t magic;
 	uint32_t error;		/* 0 = ok, else error	*/
-	char handle[8];		/* handle you got from request	*/
-};
+	uint64_t cookie;	/* cookie you got from request	*/
+} __attribute__ ((packed));
+
+/*
+ * The reply packet for structured replies
+ */
+struct nbd_structured_reply {
+	uint32_t magic;
+	uint16_t flags;
+	uint16_t type;
+	uint64_t cookie;
+	uint32_t paylen;
+} __attribute__ ((packed));
+
+struct nbd_structured_error_payload {
+	uint32_t error;
+	uint16_t msglen;
+} __attribute__ ((packed));
+
+#define NBD_EPERM 1
+#define NBD_EIO 5
+#define NBD_ENOMEM 12
+#define NBD_EINVAL 22
+#define NBD_ENOSPC 28
+#define NBD_EOVERFLOW 75
+#define NBD_ENOTSUP 95
+#define NBD_ESHUTDOWN 108
+
 #endif

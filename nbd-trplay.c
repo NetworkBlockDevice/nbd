@@ -149,7 +149,7 @@ int main_loop(int logfd, int imagefd) {
 	struct nbd_request req;
 	struct nbd_reply rep;
 	uint32_t magic;
-	uint64_t handle;
+	uint64_t cookie;
 	uint32_t error;
 	uint32_t command;
 	uint32_t len;
@@ -163,7 +163,7 @@ int main_loop(int logfd, int imagefd) {
 		switch (magic) {
 		case NBD_REQUEST_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			handle = ntohll(*((long long int *)(req.handle)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
@@ -172,7 +172,7 @@ int main_loop(int logfd, int imagefd) {
 
 			if (g_verbose >= VERBOSE_NORMAL) {
 				printf("> H=%016llx C=0x%08x (%13s+%4s) O=%016llx L=%08x\n",
-				       (long long unsigned int) handle,
+				       (long long unsigned int) cookie,
 				       command,
 				       ctext,
 				       (command & NBD_CMD_FLAG_FUA)?"FUA":"NONE",
@@ -185,19 +185,19 @@ int main_loop(int logfd, int imagefd) {
 
 		case NBD_REPLY_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
-			handle = ntohll(*((long long int *)(rep.handle)));
+			cookie = ntohll(rep.cookie);
 			error = ntohl(rep.error);
 
 			if (g_verbose >= VERBOSE_NORMAL) {
 				printf("< H=%016llx E=0x%08x\n",
-				       (long long unsigned int) handle,
+				       (long long unsigned int) cookie,
 				       error);
 			}
 			break;
 
 		case NBD_TRACELOG_MAGIC:
 			doread(logfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			handle = ntohll(*((long long int *)(req.handle)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);

@@ -21,6 +21,15 @@ If you want to send a patch, please do not open a pull request; instead, send
 it to the
 [mailinglist](https://lists.debian.org/nbd)
 
+Security issues
+---------------
+
+If you think you found a security problem in NBD, please contact the
+mailinglist. Do *not* just file an issue for this (although you may do
+so too if you prefer).
+
+For embargoed issues, please contact Wouter Verhelst <wouter@debian.org>
+
 Using NBD
 ---------
 
@@ -95,6 +104,49 @@ There are packages (or similar) available for most current operating
 systems; see the "Packaging status" badge below for details.
 
 For questions, please use the [nbd@other.debian.org](mailto:nbd@other.debian.org) mailinglist.
+
+Alternate implementations
+=========================
+
+Besides this project, the NBD protocol has been implemented by various
+other people. A (probably incomplete) list follows:
+
+* [nbdkit](https://gitlab.com/nbdkit/nbdkit) is a multithreaded NBD
+  server with a plugin architecture.
+* [libnbd](https://gitlab.com/nbdkit/libnbd) is a library to aid in
+  writing NBD clients
+* [qemu](https://www.qemu.org) contains an embedded NBD server, an
+  embedded NBD client, and a standalone NBD server (`qemu-nbd`). They
+  maintain a [status
+  document](https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/nbd.txt)
+  of their NBD implementation.
+* A [GEOM gate-based client implementation for
+  FreeBSD](https://github.com/freqlabs/nbd-client) exists. It has not
+  seen any updates since 2018, and only implements the client side
+  (any server should run on FreeBSD unmodified, however).
+* A Windows client implementation exists as part of the [RBD
+  implementation](https://docs.ceph.com/en/latest/rbd/rbd-windows/) of
+  [Ceph for Windows](https://cloudbase.it/ceph-for-windows/).
+* [lwNBD](https://github.com/bignaux/lwNBD) is a NBD server library, 
+  targetting bare metal or OS embedded system. It has a plugin architecture. 
+
+Additionally, these implementations once existed but are now no longer
+maintained:
+
+* xnbd: This was an NBD implementation with a few extra protocol
+  messages that allowed for live migration. Its code repository has
+  disappeared.
+* enbd: This was an NBD implementation with a few extra protocol
+  messages that allowed extra ioctl calls to be passed on (e.g., the
+  "eject" message for a CD-ROM device that was being exported through
+  NBD). It appears to no longer be maintained.
+* Hurd translator: There was a [proof-of-concept
+  implementation](https://lists.debian.org/debian-hurd/2001/09/msg00174.html)
+  of the NBD protocol once as a translator for The Hurd. We do not know
+  what its current status is.
+* Christoph Lohmann once wrote a client implementation for Plan 9. The
+  link he provided us is now stale; we do not know what its current
+  status is.
 
 Badges
 ======

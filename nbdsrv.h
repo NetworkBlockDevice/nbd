@@ -54,29 +54,29 @@ typedef struct {
   * Variables associated with a client connection
   */
 typedef struct _client {
-	uint64_t exportsize;    /**< size of the file we're exporting */
-	char *clientname;    /**< peer, in human-readable format */
+	uint64_t exportsize;	/**< size of the file we're exporting */
+	char *clientname;	/**< peer, in human-readable format */
 	struct sockaddr_storage clientaddr; /**< peer, in binary format, network byte order */
-	char *exportname;    /**< (processed) filename of the file we're exporting */
-	GArray *export;    /**< array of FILE_INFO of exported files;
-			       array size is always 1 unless we're
-			       doing the multiple file option */
+	char *exportname;	/**< (processed) filename of the file we're exporting */
+	GArray *export;		/**< array of FILE_INFO of exported files;
+				     array size is always 1 unless we're doing
+				     the multiple file option */
 	pthread_rwlock_t export_lock;
-	int net;	     /**< The actual client socket */
-	SERVER *server;	     /**< The server this client is getting data from */
-	char* difffilename;  /**< filename of the copy-on-write file, if any */
-	int difffile;	     /**< filedescriptor of copyonwrite file. @todo
-			       shouldn't this be an array too? (cfr export) Or
-			       make -m and -c mutually exclusive */
-	uint32_t difffilelen;     /**< number of pages in difffile */
-	uint32_t *difmap;	     /**< see comment on the global difmap for this one */
-	int transactionlogfd;/**< fd for transaction log */
-	char semname[100]; /**< name of the posix sem that protects access to the transaction log */
-	sem_t *logsem;	 /**< posix sem that protects access to the transaction log */
-	int clientfeats;     /**< Features supported by this client */
-	pthread_mutex_t lock; /**< socket lock */
-	void *tls_session; /**< TLS session context. Is NULL unless STARTTLS
-				has been negotiated. */
+	int net;		/**< The actual client socket */
+	SERVER *server;		/**< The server this client is getting data from */
+	char* difffilename;	/**< filename of the copy-on-write file, if any */
+	int difffile;		/**< filedescriptor of copyonwrite file. @todo shouldn't this be an array too? (cfr
+				     export) Or make -m and -c mutually exclusive */
+	uint32_t difffilelen;	/**< number of pages in difffile */
+	uint32_t *difmap;	/**< see comment on the global difmap for this one */
+	int transactionlogfd;	/**< fd for transaction log */
+	char semname[100];	/**< name of the posix sem that protects access to the transaction log */
+	sem_t *logsem;		/**< posix sem that protects access to the transaction log */
+	int clientfeats;	/**< Client flags specified during negotiation */
+	int clientflags;	/**< Internal flags for this client, as determined by nbd-server */
+	pthread_mutex_t lock;	/**< socket lock */
+	void *tls_session;	/**< TLS session context. Is NULL unless STARTTLS
+				     has been negotiated. */
 	int (*socket_read)(struct _client*, void* buf, size_t len);
 	int (*socket_write)(struct _client*, void* buf, size_t len);
 	void (*socket_closed)(struct _client*);
@@ -89,6 +89,16 @@ typedef struct {
 	int fhandle;      /**< file descriptor */
 	off_t startoff;   /**< starting offset of this file */
 } FILE_INFO;
+
+typedef struct {
+	struct nbd_request *req;
+	char *buf;
+	size_t buflen;
+	size_t current_offset;
+	uint32_t current_len;
+	unsigned int is_structured : 1;
+	unsigned int df : 1;
+} READ_CTX;
 
 /* Constants and macros */
 
@@ -159,6 +169,10 @@ typedef enum {
 #define F_SPLICE 32768	  /**< flag to tell us to use splice for read/write operations */
 #define F_WAIT 65536      /**< flag to tell us to wait for file creation */
 #define F_DATALOG 131072  /**< flag to tell us that the transaction log shall contain the written data */
+
+/** Internal flags (for clientflags) */
+
+#define F_STRUCTURED 1
 
 /* Functions */
 

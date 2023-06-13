@@ -43,12 +43,16 @@ static inline void doread(int f, void *buf, size_t len) {
 int main(int argc, char**argv) {
 	struct nbd_request req;
 	struct nbd_reply rep;
+	struct nbd_structured_reply srep;
 	uint32_t magic;
-	uint64_t handle;
+	uint64_t cookie;
 	uint32_t error;
 	uint32_t command;
 	uint32_t len;
 	uint64_t offset;
+	uint16_t flags;
+	uint16_t type;
+	uint32_t paylen;
 	const char * ctext;
 	int readfd = 0; /* stdin */
 
@@ -70,7 +74,7 @@ int main(int argc, char**argv) {
 		switch (magic) {
 		case NBD_REQUEST_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			handle = ntohll(*((long long int *)(req.handle)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
@@ -78,7 +82,7 @@ int main(int argc, char**argv) {
 			ctext = getcommandname(command & NBD_CMD_MASK_COMMAND);
 
 			printf("> H=%016llx C=0x%08x (%20s+%4s) O=%016llx L=%08x\n",
-			       (long long unsigned int) handle,
+			       (long long unsigned int) cookie,
 			       command,
 			       ctext,
 			       (command & NBD_CMD_FLAG_FUA)?"FUA":"NONE",
@@ -99,17 +103,17 @@ int main(int argc, char**argv) {
 			break;
 		case NBD_REPLY_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
-			handle = ntohll(*((long long int *)(rep.handle)));
+			cookie = ntohll(rep.cookie);
 			error = ntohl(rep.error);
 			
 			printf("< H=%016llx E=0x%08x\n",
-			       (long long unsigned int) handle,
+			       (long long unsigned int) cookie,
 			       error);
 			break;
 			
 		case NBD_TRACELOG_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
-			handle = ntohll(*((long long int *)(req.handle)));
+			cookie = ntohll(req.cookie);
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
@@ -135,7 +139,22 @@ int main(int argc, char**argv) {
 				printf("TRACE_OPTION ? Unknown FROM_MAGIC\n");
 			}
 			break;
+		case NBD_STRUCTURED_REPLY_MAGIC:
+			doread(readfd, sizeof(magic)+(char*)(&srep), sizeof(struct nbd_structured_reply)-sizeof(magic));
+			cookie = ntohll(srep.cookie);
+			flags = ntohs(srep.flags);
+			type = ntohs(srep.type);
+			paylen = ntohs(srep.paylen);
+			ctext = getstructreplname(type);
 
+			printf("<S: H=%016llx T=0x%04x (%20s) F=0x%04x L=0x%04x\n",
+				(long long unsigned int) cookie,
+				type,
+				ctext,
+				flags,
+				paylen);
+
+			break;
 		default:
 			printf("? Unknown transaction type %08x\n",magic);
 			break;
