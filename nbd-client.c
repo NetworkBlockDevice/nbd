@@ -76,6 +76,7 @@ void nbdtab_set_property(char *property, char *val) {
 	SET_PROP("keyfile", key, val);
 	SET_PROP("cacertfile", cacert, val);
 	SET_PROP("tlshostname", tlshostn, val);
+	SET_PROP("priority", priority, val);
 	SET_PROP("bs", bs, strtol(val, NULL, 10));
 	SET_PROP("timeout", timeout, strtol(val, NULL, 10));
 	SET_PROP("conns", nconn, strtol(val, NULL, 10));
@@ -526,7 +527,7 @@ void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_g
 	}
 }
 
-void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls, bool can_opt_go) {
+void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls, char *priority, bool can_opt_go) {
 	u64 magic;
 	uint16_t tmp;
 	uint16_t global_flags;
@@ -602,6 +603,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 				   certfile,
 				   cacertfile,
 				   tlshostname,
+				   priority,
 				   !cacertfile || !tlshostname, // insecure flag
 #ifdef DODBG
 				   1, // debug
@@ -724,7 +726,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	free(rep);
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, bool *can_opt_go) {
+bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, char **priority, bool *can_opt_go) {
 	bool retval = false;
 	cur_client = calloc(sizeof(CLIENT), 1);
 	cur_client->bs = 512;
@@ -760,6 +762,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	*keyfile = cur_client->key;
 	*cacertfile = cur_client->cacert;
 	*tlshostname = cur_client->tlshostn;
+	*priority = cur_client->priority;
 	*can_opt_go = !(cur_client->no_optgo);
 
 	retval = true;
@@ -871,7 +874,7 @@ void usage(char* errmsg, ...) {
 	fprintf(stderr, "Or   : nbd-client -l|--list host\n");
 	fprintf(stderr, "Or   : nbd-client -V|--version\n");
 #if HAVE_GNUTLS && !defined(NOTLS)
-	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n");
+	fprintf(stderr, "All commands that connect to a host also take:\n\t[-F|-certfile certfile] [-K|-keyfile keyfile]\n\t[-A|-cacertfile cacertfile] [-H|-tlshostname hostname] [-x|-enable-tls]\n\t[-y|-priority gnutls-priority-string]\n");
 #endif
 	fprintf(stderr, "Default value for blocksize is 512\n");
 	fprintf(stderr, "Allowed values for blocksize are 512,1024,2048,4096\n"); /* will be checked in kernel :) */
@@ -896,7 +899,7 @@ void disconnect(char* device) {
 	close(nbd);
 }
 
-static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVx"
+static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:"
 #if HAVE_NETLINK
 	"L"
 #endif
@@ -933,6 +936,7 @@ int main(int argc, char *argv[]) {
 	char *keyfile = NULL;
 	char *cacertfile = NULL;
 	char *tlshostname = NULL;
+	char *priority = NULL;
 	bool tls = false;
 	struct sigaction sa;
 	int num_connections = 1;
@@ -966,6 +970,7 @@ int main(int argc, char *argv[]) {
 		{ "unix", no_argument, NULL, 'u' },
 		{ "version", no_argument, NULL, 'V' },
 		{ "enable-tls", no_argument, NULL, 'x' },
+		{ "priority", required_argument, NULL, 'y' },
 		{ 0, 0, 0, 0 }, 
 	};
 	int i;
@@ -1107,11 +1112,15 @@ int main(int argc, char *argv[]) {
                 case 'H':
                         tlshostname=strdup(optarg);
                         break;
+                case 'y':
+			            priority=strdup(optarg);
+			            break;
 #else
                 case 'F':
                 case 'K':
                 case 'H':
                 case 'A':
+		        case 'y':
 			fprintf(stderr, "E: TLS support not compiled in\n");
                         exit(EXIT_FAILURE);
 #endif
@@ -1135,7 +1144,7 @@ int main(int argc, char *argv[]) {
 	if(hostname) {
 		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &tlshostname, &can_opt_go)) {
+				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &tlshostname, &priority, &can_opt_go)) {
 					usage("no valid configuration for specified device found", hostname);
 					exit(EXIT_FAILURE);
 				}
@@ -1203,7 +1212,7 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 
 		if (!preinit)
-			negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
+			negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, priority, can_opt_go);
 		if (force_read_only)
 			flags |= NBD_FLAG_READ_ONLY;
 		if (force_size64)
@@ -1321,7 +1330,7 @@ int main(int argc, char *argv[]) {
 					nbd = open(nbddev, O_RDWR);
 					if (nbd < 0)
 						err("Cannot open NBD: %m");
-					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, can_opt_go);
+					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, priority, can_opt_go);
 					if (size64 != new_size) {
 						err("Size of the device changed. Bye");
 					}
