@@ -896,11 +896,14 @@ void disconnect(char* device) {
 	close(nbd);
 }
 
+static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVx"
 #if HAVE_NETLINK
-static const char *short_opts = "-A:B:b:c:C:d:gH:hK:LlnN:PpRSst:uVx";
-#else
-static const char *short_opts = "-A:B:b:c:C:d:gH:hK:lnN:PpRSst:uVx";
+	"L"
 #endif
+#if HAVE_GNUTLS
+	"A:C:F:K:"
+#endif
+	;
 
 int main(int argc, char *argv[]) {
 	char* port=NBD_DEFAULT_PORT;
