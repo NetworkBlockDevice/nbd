@@ -23,6 +23,7 @@ typedef struct {
 	bool preinit;
 	bool force_ro;
 	bool tls;
+	char *priority;
 } CLIENT;
 
 extern void nbdtab_set_property(char *property, char *val);

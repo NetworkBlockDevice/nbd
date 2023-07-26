@@ -209,7 +209,7 @@ verify_certificate_callback (gnutls_session_t session)
 tlssession_t *
 tlssession_new (int isserver,
 		char *keyfile, char *certfile, char *cacertfile,
-		char *hostname, int insecure, int debug,
+		char *hostname, char *priority, int insecure, int debug,
 		int (*quitfn) (void *opaque),
 		int (*erroutfn) (void *opaque, const char *format,
 				 va_list ap), void *opaque)
@@ -303,7 +303,8 @@ tlssession_new (int isserver,
     }
 
   const char *errpos = NULL;
-  ret = gnutls_priority_set_direct (s->session, PRIORITY, &errpos);
+  ret = gnutls_priority_set_direct (s->session, priority ? priority : PRIORITY,
+        &errpos);
   if (ret < 0)
     {
       errout (s, "Cannot set GNUTLS session priority: %s\n",

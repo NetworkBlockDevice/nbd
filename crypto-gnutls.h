@@ -32,7 +32,7 @@ int tlssession_init ();
 typedef struct tlssession tlssession_t;
 tlssession_t *tlssession_new (int isserver,
 			      char *keyfile, char *certfile, char *cacertfile,
-			      char *hostname, int insecure, int debug,
+				  char *hostname, char *priority, int insecure, int debug,
 			      int (*quitfn) (void *opaque),
 			      int (*erroutfn) (void *opaque,
 					       const char *format,
