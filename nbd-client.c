@@ -401,7 +401,7 @@ struct reply* read_reply(int sock) {
 		fprintf(stderr, "E: received invalid negotiation magic %" PRIu64 " (expected %" PRIu64 ")", retval->magic, rep_magic);
 		exit(EXIT_FAILURE);
 	}
-	if (retval->datasize > 0) {
+	if (retval->datasize > 0 && retval->datasize < 4096) {
 		retval = realloc(retval, sizeof(struct reply) + retval->datasize);
 		readit(sock, &(retval->data), retval->datasize);
 	}
