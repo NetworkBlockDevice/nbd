@@ -39,8 +39,7 @@ INSTALL
 depcomp
 install-sh
 configure
-man/*.sh
-man/*.sh.in
+man/*.[1-9].sgml
 man/manpage.log
 make-integrityhuge
 nbd-trdump

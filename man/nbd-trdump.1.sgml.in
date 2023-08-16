@@ -19,7 +19,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
   <!ENTITY dhemail     "<email>wouter@debian.org</email>">
   <!ENTITY dhusername  "Wouter Verhelst">
-  <!ENTITY dhucpackage "<refentrytitle>NBD-TRDUMP</refentrytitle>">
+  <!ENTITY dhucpackage "<refentrytitle>nbd-trdump</refentrytitle>">
   <!ENTITY dhpackage   "nbd-trdump">
 
   <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">

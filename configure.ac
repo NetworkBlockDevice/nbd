@@ -329,14 +329,23 @@ AC_ARG_ENABLE([manpages],
 AM_CONDITIONAL(MANPAGES, test "x$enable_manpages" != "xno")
 AS_IF([test "x$enable_manpages" != "xno"], [
 	AC_SUBST([MAN_CONFIG_FILES],["\
-		man/nbd-client.8.sh \
-		man/nbd-server.5.sh \
-		man/nbd-server.1.sh \
-		man/nbd-trdump.1.sh \
-		man/nbd-trplay.1.sh \
-		man/nbdtab.5.sh \
+		man/nbd-client.8.sgml \
+		man/nbd-server.5.sgml \
+		man/nbd-server.1.sgml \
+		man/nbd-trdump.1.sgml \
+		man/nbd-trplay.1.sgml \
+		man/nbdtab.5.sgml \
 		"])
 	])
+MAN_PREFIX="$prefix"
+test "x$MAN_PREFIX" = "xNONE" && MAN_PREFIX="$ac_default_prefix"
+AC_SUBST([MAN_PREFIX])
+MAN_EXEC_PREFIX=$(eval echo "$exec_prefix")
+test "x$MAN_EXEC_PREFIX" = "xNONE" && MAN_EXEC_PREFIX="$MAN_PREFIX"
+AC_SUBST([MAN_EXEC_PREFIX])
+MAN_SYSCONFDIR=$(eval echo "$sysconfdir")
+test "x$MAN_SYSCONFDIR" = "xNONE/etc" && MAN_SYSCONFDIR="$MAN_PREFIX/etc"
+AC_SUBST([MAN_SYSCONFDIR])
 
 AC_HEADER_SYS_WAIT
 AC_TYPE_OFF_T
@@ -357,12 +366,7 @@ AC_CONFIG_FILES([Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile
 		 tests/parse/Makefile
-                 man/nbd-client.8.sh
-                 man/nbd-server.5.sh
-                 man/nbd-server.1.sh
-                 man/nbd-trdump.1.sh
-                 man/nbd-trplay.1.sh
-                 man/nbdtab.5.sh
+		 $MAN_CONFIG_FILES
 		 systemd/Makefile
 		 systemd/nbd@.service.sh
 		])

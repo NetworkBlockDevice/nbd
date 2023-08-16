@@ -19,7 +19,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
   <!ENTITY dhemail     "<email>manfred@de.bosch.com</email>">
   <!ENTITY dhusername  "Manfred Spraul">
-  <!ENTITY dhucpackage "<refentrytitle>NBD-TRPLAY</refentrytitle>">
+  <!ENTITY dhucpackage "<refentrytitle>nbd-trplay</refentrytitle>">
   <!ENTITY dhpackage   "nbd-trplay">
 
   <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">

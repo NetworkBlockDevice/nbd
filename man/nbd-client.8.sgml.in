@@ -19,7 +19,7 @@ manpage.1: manpage.sgml
   <!ENTITY dhsection   "<manvolnum>8</manvolnum>">
   <!ENTITY dhemail     "<email>wouter@debian.org</email>">
   <!ENTITY dhusername  "Wouter Verhelst">
-  <!ENTITY dhucpackage "<refentrytitle>NBD-CLIENT</refentrytitle>">
+  <!ENTITY dhucpackage "<refentrytitle>nbd-client</refentrytitle>">
   <!ENTITY dhpackage   "nbd-client">
 
   <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
