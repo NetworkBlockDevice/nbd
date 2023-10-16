@@ -42,6 +42,9 @@ This package contains nbd-client program.
 %setup -q
 
 %build
+CFLAGS+=" -fPIC"
+LDFLAGS+=" -pie"
+
 cp %{SOURCE1001} .
 cat <<EOF > support/genver.sh
 #!/bin/sh
@@ -51,7 +54,7 @@ EOF
 
 autoreconf -f -i
 %configure --disable-manpages
-%__make
+%__make V=1
 
 %install
 %make_install
