@@ -52,6 +52,11 @@ bool address_matches(const char* mask, const struct sockaddr* addr, GError** err
 		masklen = addrlen * 8;
 	}
 
+	if (masklen > addrlen * 8 || masklen < 0) {
+		g_set_error(err, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "could not parse netmask line: invalid mask length");
+		return false;
+	}
+
 	int e;
 	if((e = getaddrinfo(privmask, NULL, &hints, &res))) {
 		g_set_error(err, NBDS_ERR, NBDS_ERR_GAI, "could not parse netmask line: %s", gai_strerror(e));
