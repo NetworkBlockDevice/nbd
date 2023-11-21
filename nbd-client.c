@@ -393,7 +393,15 @@ struct reply {
 
 struct reply* read_reply(int sock) {
 	struct reply *retval = malloc(sizeof(struct reply));
-	readit(sock, retval, sizeof(*retval));
+
+	if (retval == NULL)
+		return NULL;
+
+	if(readit(sock, retval, sizeof(*retval)) < 0) {
+		free(retval);
+		return NULL;
+	}
+
 	retval->magic = ntohll(retval->magic);
 	retval->opt = ntohl(retval->opt);
 	retval->reply_type = ntohl(retval->reply_type);
@@ -403,7 +411,12 @@ struct reply* read_reply(int sock) {
 		exit(EXIT_FAILURE);
 	}
 	if (retval->datasize > 0 && retval->datasize < 4096) {
-		retval = realloc(retval, sizeof(struct reply) + retval->datasize);
+		struct reply *retval_r = realloc(retval, sizeof(struct reply) + retval->datasize);
+		if (retval_r == NULL) {
+			free(retval);
+			return NULL;
+		}
+		retval = retval_r;
 		readit(sock, &(retval->data), retval->datasize);
 	}
 	return retval;
@@ -673,7 +686,11 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	do {
 		if(rep != NULL) free(rep);
 		rep = read_reply(sock);
-		if(rep && (rep->reply_type & NBD_REP_FLAG_ERROR)) {
+		if(rep == NULL) {
+			err("Unable to read reply.");
+			exit(EXIT_FAILURE);
+		}
+		if(rep->reply_type & NBD_REP_FLAG_ERROR) {
 			switch(rep->reply_type) {
 				case NBD_REP_ERR_UNSUP:
 					/* server doesn't support NBD_OPT_GO or NBD_OPT_INFO,
