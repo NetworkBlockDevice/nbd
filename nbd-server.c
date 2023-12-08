@@ -154,6 +154,22 @@
 #define g_memdup2 g_memdup
 #endif
 
+/*
+ * Shorten error handling and regular function return sequences
+ * automatically freeing dynamically allocated resources
+ */
+#define _cleanup_(x) __attribute__((__cleanup__(x)))
+static inline void g_freep(void *p) {
+        g_free(*(void**) p);
+}
+#define _cleanup_g_free_ _cleanup_(g_freep)
+#define DEFINE_TRIVIAL_CLEANUP_FUNC(type, func)	\
+        static inline void func##p(type *p) {	\
+                if (*p)				\
+                        func(*p);		\
+        }
+DEFINE_TRIVIAL_CLEANUP_FUNC(GKeyFile*, g_key_file_free)
+
 /** Where our config file actually is */
 gchar* config_file_pos;
 
@@ -836,7 +852,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	};
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
-	GKeyFile *cfile;
+	_cleanup_(g_key_file_freep) GKeyFile *cfile = NULL;
 	GError *err = NULL;
 	const char *err_msg=NULL;
 	GArray *retval=NULL;
@@ -845,7 +861,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	gint ival;
 	gint64 i64val;
 	gchar* sval;
-	gchar* startgroup;
+	_cleanup_g_free_ gchar* startgroup = NULL;
 	gint i;
 	gint j;
 
@@ -875,7 +891,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	startgroup = g_key_file_get_start_group(cfile);
 	if((!startgroup || strcmp(startgroup, "generic")) && expect_generic) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_MISSING_GENERIC, "Config file does not contain the [generic] group!");
-		g_key_file_free(cfile);
 		return NULL;
 	}
 	groups = g_key_file_get_groups(cfile, NULL);
@@ -947,7 +962,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
 				g_array_free(retval, TRUE);
 				g_error_free(err);
-				g_key_file_free(cfile);
 				return NULL;
 			}
 		}
@@ -963,14 +977,12 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 				if(strlen(virtstyle)<10) {
 					g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s: missing length", virtstyle, groups[i]);
 					g_array_free(retval, TRUE);
-					g_key_file_free(cfile);
 					return NULL;
 				}
 				s.cidrlen=strtol(virtstyle+8, NULL, 0);
 			} else {
 				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, "Invalid value %s for parameter virtstyle in group %s", virtstyle, groups[i]);
 				g_array_free(retval, TRUE);
-				g_key_file_free(cfile);
 				return NULL;
 			}
 		} else {
@@ -985,7 +997,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if (s.flags & F_SPLICE) {
 			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without splice support, yet group %s uses it", groups[i]);
 			g_array_free(retval, TRUE);
-			g_key_file_free(cfile);
 			return NULL;
 		}
 #endif
@@ -995,7 +1006,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 				    "Cannot mix copyonwrite with splice for an export in group %s",
 				    groups[i]);
 			g_array_free(retval, TRUE);
-			g_key_file_free(cfile);
 			return NULL;
 		}
 		if ((s.flags & F_COPYONWRITE) && (s.flags & F_WAIT)) {
@@ -1003,7 +1013,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 				    "Cannot mix copyonwrite with waitfile for an export in group %s",
 				    groups[i]);
 			g_array_free(retval, TRUE);
-			g_key_file_free(cfile);
 			return NULL;
 		}
 		/* We can't mix datalog and splice. */
@@ -1012,7 +1021,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 				    "Cannot mix datalog with splice for an export in group %s",
 				    groups[i]);
 			g_array_free(retval, TRUE);
-			g_key_file_free(cfile);
 			return NULL;
 		}
 		/* Don't need to free this, it's not our string */
@@ -1028,12 +1036,10 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(s.flags & F_SDP) {
 			g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_UNSUPPORTED, "This nbd-server was built without support for SDP, yet group %s uses it", groups[i]);
 			g_array_free(retval, TRUE);
-			g_key_file_free(cfile);
 			return NULL;
 		}
 #endif
 	}
-	g_key_file_free(cfile);
 	if(cfdir) {
 		GArray* extra = do_cfile_dir(cfdir, &genconftmp, e);
 		if(extra) {
