@@ -3307,6 +3307,10 @@ static int handle_childname(GArray* servers, int socket)
 				break;
 		}
 	}
+	if (len == ULONG_MAX) {
+		err_nonfatal("Value out of range");
+		return -1;
+	}
 	buf = g_malloc0(len + 1);
 	readit(socket, buf, len);
 	buf[len] = 0;
