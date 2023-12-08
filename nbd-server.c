@@ -301,18 +301,16 @@ struct generic_conf {
 
 #if HAVE_GNUTLS
 static int writeit_tls(gnutls_session_t s, void *buf, size_t len) {
+	_cleanup_g_free_ char *m = NULL;
 	ssize_t res;
-	char *m;
 	while(len > 0) {
 		DEBUG("+");
 		if ((res = gnutls_record_send(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
 			m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
-			g_free(m);
 		} else if(res < 0) {
 			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
-			g_free(m);
 			return -1;
 		} else {
 			len -= res;
@@ -323,18 +321,16 @@ static int writeit_tls(gnutls_session_t s, void *buf, size_t len) {
 }
 
 static int readit_tls(gnutls_session_t s, void *buf, size_t len) {
+	_cleanup_g_free_ char *m = NULL;
 	ssize_t res;
-	char *m;
 	while(len > 0) {
 		DEBUG("*");
 		if((res = gnutls_record_recv(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
 			m = g_strdup_printf("issue while receiving data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
-			g_free(m);
 		} else if(res < 0) {
 			m = g_strdup_printf("could not receive data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
-			g_free(m);
 			return -1;
 		} else {
 			len -= res;
@@ -440,13 +436,12 @@ static void unlock_logsem(CLIENT *client) {
  * @param file the file name we're about to export
  **/
 int do_run(gchar* command, gchar* file) {
-	gchar* cmd;
+	_cleanup_g_free_ gchar* cmd = NULL;
 	int retval=0;
 
 	if(command && *command) {
 		cmd = g_strdup_printf(command, file);
 		retval=system(cmd);
-		g_free(cmd);
 	}
 	return retval;
 }
@@ -2138,8 +2133,8 @@ bool setupexport(CLIENT* client) {
 
 bool copyonwrite_prepare(CLIENT* client) {
 	off_t i;
-	gchar* dir;
-	gchar* export_base;
+	_cleanup_g_free_ gchar* dir = NULL;
+	_cleanup_g_free_ gchar* export_base = NULL;
 	if (client->server->cowdir != NULL) {
 		dir = g_strdup(client->server->cowdir);
 	} else {
@@ -2148,8 +2143,6 @@ bool copyonwrite_prepare(CLIENT* client) {
 	export_base = g_strdup(basename(client->exportname));
 	client->difffilename = g_strdup_printf("%s/%s-%s-%d.diff",dir,export_base,client->clientname,
 		(int)getpid());
-	g_free(dir);
-	g_free(export_base);
 	msg(LOG_INFO, "About to create map and diff file %s", client->difffilename) ;
 	client->difffile=open(client->difffilename,O_RDWR | O_CREAT | O_TRUNC,0600) ;
 	if (client->difffile<0) {
@@ -3291,7 +3284,7 @@ handler_err:
 static int handle_childname(GArray* servers, int socket)
 {
 	uint32_t len;
-	char *buf;
+	_cleanup_g_free_ char *buf = NULL;
 	int i, r, rt = 0;
 
 	while(rt < sizeof(len)) {
@@ -3323,7 +3316,6 @@ static int handle_childname(GArray* servers, int socket)
 	}
 	writeit(socket, "X", 1);
 exit:
-	g_free(buf);
 	return 0;
 }
 
