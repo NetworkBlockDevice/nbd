@@ -49,7 +49,7 @@ void nbdtab_set_property(char *property, char *val) {
 	assert(strcmp(property, "bs") == 0);
 	assert(cur_client->bs == strtol(val, NULL, 10));
 }
-	
+
 void nbdtab_set_flag(char *property) {
 	printf("flag %s set\n", property);
 	assert(strcmp(property, "no_optgo") == 0);

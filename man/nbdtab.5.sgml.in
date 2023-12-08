@@ -228,7 +228,7 @@ manpage.1: manpage.sgml
     <title>SEE ALSO</title>
 
     <para>nbd-server (1), nbd-client (8), nbd-trdump (8)</para>
-      
+
 
   </refsect1>
   <refsect1>

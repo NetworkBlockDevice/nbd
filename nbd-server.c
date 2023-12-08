@@ -46,7 +46,7 @@
  *  	(size_t and off_t instead of int).  <vspaceg@sourceforge.net>
  * Version 2.6 - Some code cleanup.
  * Version 2.7 - Better build system.
- * 11/02/2004 - Doxygenified the source, modularized it a bit. Needs a 
+ * 11/02/2004 - Doxygenified the source, modularized it a bit. Needs a
  * 	lot more work, but this is a start. Wouter Verhelst
  * 	<wouter@debian.org>
  * 16/03/2010 - Add IPv6 support.
@@ -497,7 +497,7 @@ void usage() {
 	       "\t-d|--dont-fork\t\tdo not fork (implies --nodaemon)\n\n"
 	       "\tif port is set to 0, stdin is used (for running from inetd).\n"
 	       "\tif file_to_export contains '%%s', it is substituted with the IP\n"
-	       "\t\taddress of the machine trying to connect\n" 
+	       "\t\taddress of the machine trying to connect\n"
 	       "\tif ip is set, it contains the local IP address on which we're listening.\n\tif not, the server will listen on all local IP addresses\n");
 	printf("Using configuration file %s\n", CFILE);
 	printf("For help, or when encountering bugs, please contact %s\n", PACKAGE_BUGREPORT);
@@ -635,13 +635,13 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 			strncpy(pidfname, optarg, 256);
 			pidfname[255]='\0';
 			break;
-		case 'c': 
+		case 'c':
 			serve->flags |=F_COPYONWRITE;
 		        break;
 		case 'n':
 			nodaemon = 1;
 		        break;
-		case 'd': 
+		case 'd':
 			dontfork = 1;
 			nodaemon = 1;
 		        break;
@@ -895,7 +895,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 		if(i==1 || !expect_generic) {
 			p=lp;
 			p_size=lp_size;
-		} 
+		}
 		for(j=0;j<p_size;j++) {
 			assert(p[j].target != NULL);
 			assert(p[j].ptype==PARAM_INT||p[j].ptype==PARAM_STRING||p[j].ptype==PARAM_BOOL||p[j].ptype==PARAM_INT64);
@@ -1218,19 +1218,19 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	   * However, we don't, for the reasons set out below
 	   * by Christoph Hellwig <hch@infradead.org>
 	   *
-	   * [BEGINS] 
+	   * [BEGINS]
 	   * fdatasync is equivalent to fsync except that it does not flush
 	   * non-essential metadata (basically just timestamps in practice), but it
 	   * does flush metadata requried to find the data again, e.g. allocation
 	   * information and extent maps.  sync_file_range does nothing but flush
 	   * out pagecache content - it means you basically won't get your data
 	   * back in case of a crash if you either:
-	   * 
+	   *
 	   *  a) have a volatile write cache in your disk (e.g. any normal SATA disk)
 	   *  b) are using a sparse file on a filesystem
 	   *  c) are using a fallocate-preallocated file on a filesystem
 	   *  d) use any file on a COW filesystem like btrfs
-	   * 
+	   *
 	   * e.g. it only does anything useful for you if you do not have a volatile
 	   * write cache, and either use a raw block device node, or just overwrite
 	   * an already fully allocated (and not preallocated) file on a non-COW
@@ -1622,7 +1622,7 @@ end:
 int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 	char pagebuf[DIFFPAGESIZE];
 	off_t mapcnt,mapl,maph;
-	off_t wrlen,rdlen; 
+	off_t wrlen,rdlen;
 	off_t pagestart;
 	off_t offset;
 
@@ -1630,7 +1630,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 
 	if (!(client->server->flags & F_COPYONWRITE) && !((client->server->flags & F_WAIT) && (client->export == NULL)))
-		return(rawexpwrite_fully(a, buf, len, client, fua)); 
+		return(rawexpwrite_fully(a, buf, len, client, fua));
 
 	mapl=a/DIFFPAGESIZE ; maph=(a+len-1)/DIFFPAGESIZE ;
 
@@ -1670,7 +1670,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 			memcpy(pagebuf+offset,buf,wrlen) ;
 			if (write(client->difffile, pagebuf, DIFFPAGESIZE) != DIFFPAGESIZE)
 				goto fail;
-		}						    
+		}
 		if (!(client->server->flags & F_COPYONWRITE))
 			pthread_rwlock_unlock(&client->export_lock);
 		len-=wrlen ; a+=wrlen ; buf+=wrlen ;
@@ -1688,7 +1688,6 @@ fail:
 	if (!(client->server->flags & F_COPYONWRITE))
 		pthread_rwlock_unlock(&client->export_lock);
 	return -1;
-	
 }
 
 
@@ -1747,13 +1746,13 @@ int expflush(CLIENT *client) {
 		sync();
 		return 0;
 	}
-	
+
 	for (i = 0; i < client->export->len; i++) {
 		FILE_INFO fi = g_array_index(client->export, FILE_INFO, i);
 		if (fsync(fi.fhandle) < 0)
 			return -1;
 	}
-	
+
 	return 0;
 }
 
@@ -1992,7 +1991,7 @@ void* wait_file(void *void_ptr) {
 	do {
 		dirtycount = commit_diff(client, true, fi.fhandle);
 	} while (dirtycount > 0);
-	
+
 	//last time we lock export for the whole time until we switch write destination
 	pthread_rwlock_wrlock(&client->export_lock);
 	do {
@@ -3405,7 +3404,7 @@ void serveloop(GArray* servers, struct generic_conf *genconf) {
 	sigset_t blocking_mask;
 	sigset_t original_mask;
 
-	/* 
+	/*
 	 * Set up the master fd_set. The set of descriptors we need
 	 * to select() for never changes anyway and it buys us a *lot*
 	 * of time to only build this once. However, if we ever choose
@@ -3822,7 +3821,7 @@ void dousers(const gchar *const username, const gchar *const groupname) {
 			err(str);
 		}
 		if(setgid(gr->gr_gid)<0) {
-			err("Could not set GID: %m"); 
+			err("Could not set GID: %m");
 		}
 	}
 	if (username) {
@@ -3845,13 +3844,13 @@ void glib_message_syslog_redirect(const gchar *log_domain,
                                   gpointer user_data)
 {
     int level=LOG_DEBUG;
-    
+
     switch( log_level )
     {
       case G_LOG_FLAG_FATAL:
       case G_LOG_LEVEL_CRITICAL:
-      case G_LOG_LEVEL_ERROR:    
-        level=LOG_ERR; 
+      case G_LOG_LEVEL_ERROR:
+        level=LOG_ERR;
         break;
       case G_LOG_LEVEL_WARNING:
         level=LOG_WARNING;
@@ -3903,11 +3902,11 @@ int main(int argc, char *argv[]) {
 	if(serve) {
 		g_array_append_val(servers, serve);
 	}
-    
+
 	if(!servers || !servers->len) {
                 if(gerr && !(gerr->domain == NBDS_ERR
                             && gerr->code == NBDS_ERR_CFILE_NOTFOUND)) {
-			g_warning("Could not parse config file: %s", 
+			g_warning("Could not parse config file: %s",
 					gerr ? gerr->message : "Unknown error");
 		}
 	}

@@ -36,7 +36,7 @@ static inline uint64_t getrandomuint64() {
         int i;
 	/* RAND_MAX may be as low as 2^15 */
 	for (i= 1 ; i<=5; i++)
-		r ^= random() ^ (r << 15); 
+		r ^= random() ^ (r << 15);
 	return r;
 }
 
@@ -89,6 +89,6 @@ int main(int argc, char**argv) {
 	req.from = 0;
 	req.len = 0;
 	dowrite(writefd, &req, sizeof(req));
-	
+
 	return 0;
 }
