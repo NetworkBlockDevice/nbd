@@ -107,7 +107,7 @@ manpage.1: manpage.sgml
   <refsect1>
     <title>OPTIONS FOR SECTION [generic]</title>
 
-    <!-- These are in alphabetical order, please keep it that way -->    
+    <!-- These are in alphabetical order, please keep it that way -->
     <variablelist>
       <varlistentry>
         <term><option>allowlist</option></term>
@@ -722,7 +722,7 @@ manpage.1: manpage.sgml
 	<listitem>
 	  <para>Optional; boolean.</para>
 	  <para>When this option is enabled,
-	    <command>nbd-server</command> will inform the client that 
+	    <command>nbd-server</command> will inform the client that
 	    it would prefer it to send requests in elevator (i.e., optimized) order, perhaps
 	    because it has a backing store and no local elevator. By
 	    default, the client uses QUEUE_FLAG_NONROT, which effectively
@@ -1017,13 +1017,13 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
     </variablelist>
-    
+
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
 
     <para>nbd-server (1), nbd-client (8), nbd-trdump (8)</para>
-      
+
 
   </refsect1>
   <refsect1>

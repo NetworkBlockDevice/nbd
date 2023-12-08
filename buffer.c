@@ -43,7 +43,7 @@ struct buffer
  * * There are b->size bytes in the buffer.
  *
  * * Bytes are at offsets 0 to b->size-1
- * 
+ *
  * * b->ridx points to the first readable byte
  *
  * * b->widx points to the first empty space

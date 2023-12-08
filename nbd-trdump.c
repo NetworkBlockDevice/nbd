@@ -78,7 +78,7 @@ int main(int argc, char**argv) {
 			offset = ntohll(req.from);
 			len = ntohl(req.len);
 			command = ntohl(req.type);
-			
+
 			ctext = getcommandname(command & NBD_CMD_MASK_COMMAND);
 
 			printf("> H=%016llx C=0x%08x (%20s+%4s) O=%016llx L=%08x\n",
@@ -99,18 +99,18 @@ int main(int argc, char**argv) {
 					len -= tmplen;
 				}
 			}
-			
+
 			break;
 		case NBD_REPLY_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&rep), sizeof(struct nbd_reply)-sizeof(magic));
 			cookie = ntohll(rep.cookie);
 			error = ntohl(rep.error);
-			
+
 			printf("< H=%016llx E=0x%08x\n",
 			       (long long unsigned int) cookie,
 			       error);
 			break;
-			
+
 		case NBD_TRACELOG_MAGIC:
 			doread(readfd, sizeof(magic)+(char *)(&req), sizeof(struct nbd_request)-sizeof(magic));
 			cookie = ntohll(req.cookie);
@@ -159,7 +159,7 @@ int main(int argc, char**argv) {
 			printf("? Unknown transaction type %08x\n",magic);
 			break;
 		}
-		
+
 	}
 	/* never reached */
 	return 0;

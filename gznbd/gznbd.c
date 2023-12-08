@@ -1,12 +1,12 @@
-/* 
+/*
    (c) Marc Welz 2000, released under GPL, tested under Linux 2.2.17
 
    Most of the stuff cribbed from the nbd package written by Pavel Machek
 
    Unfortunately quite slow since zlib has to decompress all the stuff between
    seeks, so only suited to smaller files
-   
-   Could be a neat way to do userland encryption/steganography if you have 
+
+   Could be a neat way to do userland encryption/steganography if you have
    a crypto library which has a stdiolike interface to replace zlib
 
    Usage
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
       ioctl(nbd, NBD_CLEAR_SOCK);
 
       exit(0);
-      
+
       break;
   }
 

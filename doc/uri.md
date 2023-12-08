@@ -45,7 +45,7 @@ An NBD URI consists of the following components:
      |            |           |
      v            v           v
     nbd://example.com:10809/export
-    
+
     nbd+unix:///export?socket=nbd.sock
                            ^
                            |

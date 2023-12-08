@@ -307,7 +307,7 @@ int opennet(char *name, char* portstr) {
 
 		if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
 			break;		/* success */
-			
+
 		close(sock);
 	}
 
@@ -673,7 +673,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	}
 
 	struct reply *rep = NULL;
-	
+
 	if(!can_opt_go) {
 		send_opt_exportname(sock, rsize64, flags, can_opt_go, name, global_flags);
 		return;
@@ -748,7 +748,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	cur_client->nconn = 1;
 	yyin = fopen(SYSCONFDIR "/nbdtab", "r");
 	yyout = fopen("/dev/null", "w");
-	
+
 	if(!strncmp(cfgname, "/dev/", 5)) {
 		cfgname += 5;
 	}
@@ -980,7 +980,7 @@ int main(int argc, char *argv[]) {
 		{ "unix", no_argument, NULL, 'u' },
 		{ "version", no_argument, NULL, 'V' },
 		{ "enable-tls", no_argument, NULL, 'x' },
-		{ 0, 0, 0, 0 }, 
+		{ 0, 0, 0, 0 },
 	};
 	int i;
 	bool can_opt_go = true;
@@ -1254,7 +1254,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 	/* Go daemon */
-	
+
 #ifndef NOFORK
 	if(!nofork) {
 		if (daemon(0,0) < 0)

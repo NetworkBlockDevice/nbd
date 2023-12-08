@@ -127,8 +127,8 @@ other people. A (probably incomplete) list follows:
 * A Windows client implementation exists as part of the [RBD
   implementation](https://docs.ceph.com/en/latest/rbd/rbd-windows/) of
   [Ceph for Windows](https://cloudbase.it/ceph-for-windows/).
-* [lwNBD](https://github.com/bignaux/lwNBD) is a NBD server library, 
-  targetting bare metal or OS embedded system. It has a plugin architecture. 
+* [lwNBD](https://github.com/bignaux/lwNBD) is a NBD server library,
+  targetting bare metal or OS embedded system. It has a plugin architecture.
 
 Additionally, these implementations once existed but are now no longer
 maintained:

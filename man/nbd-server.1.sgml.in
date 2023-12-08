@@ -107,7 +107,7 @@ manpage.1: manpage.sgml
   </refsect1>
   <refsect1>
     <title>OPTIONS</title>
-    
+
     <variablelist>
       <varlistentry>
 	<term>ip</term>
@@ -272,7 +272,7 @@ manpage.1: manpage.sgml
 	</listitem>
       </varlistentry>
     </variablelist>
-    
+
   </refsect1>
   <refsect1>
     <title>EXAMPLES</title>
@@ -297,15 +297,15 @@ manpage.1: manpage.sgml
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
-    
+
     <para>nbd-client (8), nbd-server (5), nbd-trdump (8)</para>
-    
+
   </refsect1>
   <refsect1>
     <title>AUTHOR</title>
     <para>The NBD kernel module and the NBD tools were originally
       written by Pavel Machek (pavel@ucw.cz)</para>
-    
+
     <para>The Linux kernel module is now maintained by Paul Clements
       (Paul.Clements@steeleye.com), while the userland tools are
       maintained by &dhusername; (&dhemail;)</para>
