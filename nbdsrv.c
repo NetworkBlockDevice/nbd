@@ -136,7 +136,7 @@ uint8_t getmaskbyte(int masklen) {
 
 int authorized_client(CLIENT *opts) {
 	FILE *f ;
-	char line[LINELEN]; 
+	char line[LINELEN];
 
 	if (opts->server->authname == NULL) {
 		msg(LOG_INFO, "No authorization file, granting access.");
@@ -146,9 +146,9 @@ int authorized_client(CLIENT *opts) {
 	if ((f=fopen(opts->server->authname,"r"))==NULL) {
                 msg(LOG_INFO, "Can't open authorization file %s (%s).",
                     opts->server->authname, strerror(errno));
-		return 1 ; 
+		return 1 ;
 	}
-  
+
 	while (fgets(line,LINELEN,f)!=NULL) {
 		char* pos;
 		char* endpos;
@@ -214,7 +214,7 @@ SERVER* dup_serve(const SERVER *const s) {
 
 	if(s->transactionlog)
 		serve->transactionlog = g_strdup(s->transactionlog);
-	
+
 	if(s->servename)
 		serve->servename = g_strdup(s->servename);
 
