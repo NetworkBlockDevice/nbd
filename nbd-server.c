@@ -1399,13 +1399,13 @@ void complete_read(CLIENT *client, READ_CTX *ctx, uint32_t error, char *errmsg, 
 			bufsize[0] = sizeof pl;
 			total_size = bufsize[0];
 			if(msglen > 0) {
-				buf[++payloads] = errmsg;
-				bufsize[payloads] = msglen;
+				buf[payloads] = errmsg;
+				bufsize[payloads++] = msglen;
 				total_size += msglen;
 			}
 			if(with_offset) {
-				buf[++payloads] = &offset;
-				bufsize[payloads] = sizeof offset;
+				buf[payloads] = &offset;
+				bufsize[payloads++] = sizeof offset;
 				total_size += sizeof offset;
 			}
 			send_structured_chunk(client, ctx->req, NBD_REPLY_FLAG_DONE, type, total_size, payloads, buf, bufsize);
