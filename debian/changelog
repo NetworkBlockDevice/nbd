@@ -1,3 +1,9 @@
+nbd (1:3.25-2) UNRELEASED; urgency=medium
+
+  * Updated swedish debconf translations; Closes: #1057774.
+
+ -- Wouter Verhelst <wouter@debian.org>  Mon, 11 Dec 2023 12:55:08 +0200
+
 nbd (1:3.25-1) unstable; urgency=medium
 
   * New upstream release
