@@ -2857,7 +2857,7 @@ static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 {
 	DEBUG("handling read request\n");
-	READ_CTX *ctx = g_new0(READ_CTX, 1);
+	_cleanup_g_free_ READ_CTX *ctx = g_new0(READ_CTX, 1);
 	ctx->req = req;
 	ctx->current_len = req->len;
 	uint32_t error = 0;
@@ -2879,7 +2879,6 @@ static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 		pl.error = NBD_EOVERFLOW;
 		pl.msglen = sizeof too_long;
 		send_structured_chunk_v(client, req, NBD_REPLY_FLAG_DONE, NBD_REPLY_TYPE_ERROR, 6 + pl.msglen, 2, &pl, sizeof pl, too_long, sizeof too_long);
-		free(ctx);
 		return;
 	}
 	if(ctx->df || !(ctx->is_structured)) {
