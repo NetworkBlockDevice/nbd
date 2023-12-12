@@ -3138,6 +3138,7 @@ static int mainloop_threaded(CLIENT* client) {
 		}
 		if(req->type == NBD_CMD_DISC) {
 			finalize_client(client);
+			package_dispose(pkg);
 			return 0;
 		}
 		g_thread_pool_push(tpool, pkg, NULL);
