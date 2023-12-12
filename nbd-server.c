@@ -2220,6 +2220,7 @@ static void setup_transactionlog(CLIENT *client) {
 			-1) {
 		msg(LOG_INFO, "Could not open transactionlog %s, moving on without it",
 				client->server->transactionlog);
+		return;
 	}
 
 	/* 2) If needed, write flags */
@@ -2239,6 +2240,7 @@ static void setup_transactionlog(CLIENT *client) {
 				client->server->transactionlog);
 			close(client->transactionlogfd);
 			client->transactionlogfd = -1;
+			return;
 		}
 	}
 
