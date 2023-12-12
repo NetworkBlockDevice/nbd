@@ -35,10 +35,12 @@ void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
 }
 
 void delete_treefile(char* name,off_t size,off_t pos) {
-	char filename[256+strlen(name)];
-	strcpy(filename,name);
+	char filename[PATH_MAX];
 	off_t ppos;
-	construct_path(filename+strlen(name),256,size,pos,&ppos);
+
+	strncpy(filename,name,PATH_MAX-1);
+	filename[PATH_MAX-1] = '\0';
+	construct_path(filename+strlen(name),PATH_MAX-strlen(name)-1,size,pos,&ppos);
 
 	DEBUG("Deleting treefile: %s",filename);
 
@@ -60,10 +62,12 @@ void mkdir_path(char * path) {
 }
 
 int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *mutex) {
-	char filename[256+strlen(name)];
-	strcpy(filename,name);
+	char filename[PATH_MAX];
 	off_t ppos;
-	construct_path(filename+strlen(name),256,size,pos,&ppos);
+
+	strncpy(filename,name,PATH_MAX-1);
+	filename[PATH_MAX - 1] = '\0';
+	construct_path(filename+strlen(name),PATH_MAX-strlen(name)-1,size,pos,&ppos);
 
 	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 
