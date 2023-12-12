@@ -2035,7 +2035,7 @@ bool setupexport(CLIENT* client) {
 		for(i=0; ; i++) {
 			FILE_INFO fi;
 			gchar *tmpname;
-			gchar* error_string;
+			_cleanup_g_free_ gchar* error_string = NULL;
 
 			if (i)
 				cancreate = 0;
