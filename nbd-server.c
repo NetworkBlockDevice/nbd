@@ -169,6 +169,7 @@ static inline void g_freep(void *p) {
                         func(*p);		\
         }
 DEFINE_TRIVIAL_CLEANUP_FUNC(GKeyFile*, g_key_file_free)
+DEFINE_TRIVIAL_CLEANUP_FUNC(gchar **, g_strfreev)
 
 /** Where our config file actually is */
 gchar* config_file_pos;
@@ -3618,7 +3619,7 @@ int open_modern(const gchar *const addr, const gchar *const port,
 	int e;
         int retval = -1;
 	int sock = -1;
-	gchar** addrs;
+	_cleanup_(g_strfreevp) gchar** addrs;
 	gchar const* l_addr = addr;
 
 	if(!addr || strlen(addr) == 0) {
