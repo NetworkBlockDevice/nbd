@@ -3902,8 +3902,7 @@ int main(int argc, char *argv[]) {
 	if(!servers || !servers->len) {
                 if(gerr && !(gerr->domain == NBDS_ERR
                             && gerr->code == NBDS_ERR_CFILE_NOTFOUND)) {
-			g_warning("Could not parse config file: %s",
-					gerr ? gerr->message : "Unknown error");
+			g_warning("Could not parse config file: %s", gerr->message);
 		}
 	}
 	if(serve) {
