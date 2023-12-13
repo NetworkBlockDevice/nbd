@@ -849,7 +849,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	PARAM* p=gp;
 	int p_size=sizeof(gp)/sizeof(PARAM);
 	_cleanup_(g_key_file_freep) GKeyFile *cfile = NULL;
-	GError *err = NULL;
+	g_autoptr(GError) err = NULL;
 	const char *err_msg=NULL;
 	GArray *retval=NULL;
 	gchar **groups;
@@ -957,7 +957,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 				}
 				g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_VALUE_INVALID, err_msg, p[j].paramname, groups[i], err->message);
 				g_array_free(retval, TRUE);
-				g_error_free(err);
 				return NULL;
 			}
 		}
