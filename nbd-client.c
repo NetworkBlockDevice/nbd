@@ -757,6 +757,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	*persist = cur_client->persist ? 1 : 0;
 	*swap = cur_client->swap ? 1 : 0;
 	*b_unix = cur_client->b_unix ? 1 : 0;
+	*port = cur_client->port;
 	*num_conns = cur_client->nconn;
 	*certfile = cur_client->cert;
 	*keyfile = cur_client->key;
