@@ -1666,7 +1666,6 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 					rdlen -= ret;
 				}
 				if(ret < 0 ) goto fail;
-				pagestart -= DIFFPAGESIZE;
 			}
 			memcpy(pagebuf+offset,buf,wrlen) ;
 			if (write(client->difffile, pagebuf, DIFFPAGESIZE) != DIFFPAGESIZE)
