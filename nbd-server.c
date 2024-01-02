@@ -3834,7 +3834,9 @@ void dousers(const gchar *const username, const gchar *const groupname) {
 			str = g_strdup_printf("Invalid user name: %s", username);
 			err(str);
 		}
-		setgroups(0, NULL);
+		if (setgroups(0, NULL)<0) {
+			err("Could not set groups: %m");
+		}
 		if(setuid(pw->pw_uid)<0) {
 			err("Could not set UID: %m");
 		}
