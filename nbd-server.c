@@ -2041,7 +2041,7 @@ bool setupexport(CLIENT* client) {
 		 * Calculate file sizes as we go to get total size. */
 		for(i=0; ; i++) {
 			FILE_INFO fi;
-			gchar *tmpname;
+		        _cleanup_g_free_ gchar *tmpname = NULL;
 			_cleanup_g_free_ gchar* error_string = NULL;
 
 			if (i)
@@ -2091,7 +2091,6 @@ bool setupexport(CLIENT* client) {
 
 			fi.startoff = laststartoff + lastsize;
 			g_array_append_val(client->export, fi);
-			g_free(tmpname);
 
 			/* Starting offset and size of this file will be used to
 			 * calculate starting offset of next file */
