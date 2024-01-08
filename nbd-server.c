@@ -860,7 +860,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 	g_autoptr(GError) err = NULL;
 	const char *err_msg=NULL;
 	GArray *retval=NULL;
-	gchar **groups;
+	_cleanup_(g_strfreevp) gchar **groups = NULL;
 	gboolean bval;
 	gint ival;
 	gint64 i64val;
