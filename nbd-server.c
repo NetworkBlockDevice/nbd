@@ -2865,6 +2865,7 @@ static int handle_splice_read(CLIENT *client, struct nbd_request *req)
 static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 {
 	DEBUG("handling read request\n");
+	char read_failed[] = "Read failed";
 	_cleanup_g_free_ READ_CTX *ctx = g_new0(READ_CTX, 1);
 	ctx->req = req;
 	ctx->current_len = req->len;
@@ -2898,7 +2899,6 @@ static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 	}
 	if(expread(ctx, client)) {
 		DEBUG("Read failed: %m");
-		char read_failed[] = "Read failed";
 		error = nbd_errno(errno);
 		errmsg = read_failed;
 		msglen = sizeof read_failed;
