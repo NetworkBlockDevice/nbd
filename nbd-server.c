@@ -3645,9 +3645,8 @@ int open_modern(const gchar *const addr, const gchar *const port,
 		}
 
 		while(ai != NULL) {
-			sock = -1;
-
-			if((sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))<0) {
+			sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+			if(sock<0) {
 				g_set_error(gerror, NBDS_ERR, NBDS_ERR_SOCKET,
 					    "failed to open a modern socket: "
 					    "failed to create a socket: %s",
