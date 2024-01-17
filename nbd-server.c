@@ -1532,7 +1532,7 @@ int rawexpsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir,
  */
 int expsplice(int pipe, off_t a, size_t len, CLIENT *client, int dir, int fua)
 {
-	ssize_t ret;
+	ssize_t ret = 0;
 
 	while (len > 0 &&
 	       (ret = rawexpsplice(pipe, a, len, client, dir, fua)) > 0) {
