@@ -1,6 +1,6 @@
 #!/bin/sh
 set -ex
-if [ -z "$(type -p docbook2man)" ]; then
+if [ -z "$(which docbook2man)" ]; then
 	if [ -z "$NO_MANPAGES" ]; then
 		echo "E: docbook2man not found. Set NO_MANPAGES to a nonzero value to build without man pages"
 		exit 1
