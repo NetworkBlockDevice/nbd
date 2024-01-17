@@ -169,11 +169,24 @@ manpage.1: manpage.sgml
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
+	  <term><option>persist</option></term>
+	  <listitem>
+	    <para>Persist the connection, using the semantics of the
+	    <option>-p</option> command-line option.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
 	  <term><option>port=<replaceable>port number</replaceable></option></term>
 	  <listitem>
 	    <para>The port on which to communicate with the
 	    <command>nbd-server</command>. Defaults to the
 	    IANA-assigned port for NBD, 10809.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><option>swap</option></term>
+	  <listitem>
+	    <para>Optimize for swap; <option>-s</option>.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
@@ -183,19 +196,6 @@ manpage.1: manpage.sgml
 	    timeout is configured.</para>
 	    <para>Corresponds to the <option>-t</option> option on the
 	    command line.</para>
-	  </listitem>
-	</varlistentry>
-	<varlistentry>
-	  <term><option>persist</option></term>
-	  <listitem>
-	    <para>Persist the connection, using the semantics of the
-	    <option>-p</option> command-line option.</para>
-	  </listitem>
-	</varlistentry>
-	<varlistentry>
-	  <term><option>swap</option></term>
-	  <listitem>
-	    <para>Optimize for swap; <option>-s</option>.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
