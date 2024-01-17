@@ -1875,6 +1875,7 @@ int set_peername(int net, CLIENT *client) {
 					peername[i]='/';
 				}
 			}
+			break;
 		case VIRT_IPLIT:
 			msg(LOG_DEBUG, "virtstyle ipliteral");
 			client->exportname=g_strdup_printf(client->server->exportname, peername);
