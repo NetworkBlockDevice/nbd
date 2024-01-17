@@ -2577,6 +2577,10 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	}
 	if(namelen > 0) {
 		name = malloc(namelen + 1);
+		if (!name) {
+			send_reply(client, opt, reptype, -1, "nbd server out of memory");
+			return false;
+		}
 		name[namelen] = 0;
 		socket_read(client, name, namelen);
 	} else {
