@@ -496,6 +496,10 @@ void ask_list(int sock) {
 				len -= lenn;
 				len -= sizeof(lenn);
 				if(len > 0) {
+					if(len > BUF_SIZE) {
+						fprintf(stderr, "\nE: export description read buffer overflow\n");
+						exit(EXIT_FAILURE);
+					}
 					if(read(sock, buf, len) < 0) {
 						fprintf(stderr, "\nE: could not read export description from server\n");
 						exit(EXIT_FAILURE);
