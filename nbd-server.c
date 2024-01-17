@@ -3303,7 +3303,7 @@ static int handle_childname(GArray* servers, int socket)
 				break;
 		}
 	}
-	if (len == ULONG_MAX) {
+	if (len >= ULONG_MAX - 1) {
 		err_nonfatal("Value out of range");
 		return -1;
 	}
