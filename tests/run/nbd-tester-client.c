@@ -486,6 +486,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 				   certfile,
 				   cacertfile,
 				   tlshostname,
+				   NULL, // use default priority string
 				   !cacertfile || !tlshostname, // insecure flag
 #ifdef DODBG
 				   1, // debug
