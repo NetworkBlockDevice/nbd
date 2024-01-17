@@ -75,6 +75,7 @@ manpage.1: manpage.sgml
       <arg>-keyfile <replaceable>keyfile</replaceable></arg>
       <arg>-cacertfile <replaceable>cacertfile</replaceable></arg>
       <arg>-tlshostname <replaceable>hostname</replaceable></arg>
+      <arg>-priority <replaceable>gnutls-priority-string</replaceable></arg>
     </cmdsynopsis>
     <cmdsynopsis>
       <command>&dhpackage;</command>
@@ -446,6 +447,20 @@ manpage.1: manpage.sgml
 	      be used.</para>
 	  </listitem>
 	</varlistentry>
+	<varlistentry>
+	  <term><option>-priority <replaceable>gnutls priority string</replaceable></option></term>
+	  <term><option>-y</option></term>
+	  <listitem>
+	    <para>
+              Pass the specified priority string to GnuTLS. This can
+              be used to configure the TLS connection; see the GnuTLS
+              documentation for details.
+            </para>
+            <para>The default value for this option is
+              <code>NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2</code>.
+            </para>
+          </listitem>
+        </varlistentry>
       </variablelist>
     <refsect2>
       <title>TLS support</title>
