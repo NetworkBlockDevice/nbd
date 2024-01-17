@@ -184,6 +184,14 @@ manpage.1: manpage.sgml
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
+	  <term><option>priority=<replaceable>GnuTLS priority string</replaceable></option>
+	  <listitem>
+	    <para>The GnuTLS priority string to use.</para>
+	    <para>Corresponds to the <option>-y</option> option on the
+	    command line.</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
 	  <term><option>swap</option></term>
 	  <listitem>
 	    <para>Optimize for swap; <option>-s</option>.</para>
