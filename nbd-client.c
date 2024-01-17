@@ -769,6 +769,9 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	}
 	*name_ptr = cur_client->name;
 	*dev_ptr = calloc(strlen(cur_client->dev) + 6, 1);
+	if (!*dev_ptr) {
+		goto out;
+	}
 	snprintf(*dev_ptr, strlen(cur_client->dev) + 6, "/dev/%s", cur_client->dev);
 	*hostn_ptr = cur_client->hostn;
 	*bs = cur_client->bs;
