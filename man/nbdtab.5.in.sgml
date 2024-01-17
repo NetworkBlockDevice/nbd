@@ -199,12 +199,6 @@ manpage.1: manpage.sgml
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>sdp</option></term>
-	  <listitem>
-	    <para>Use the Socket Direct protocol; <option>-S</option>.</para>
-	  </listitem>
-	</varlistentry>
-	<varlistentry>
 	  <term><option>tlshostname=<replaceable>TLS
 	  hostname</replaceable></option></term>
 	  <listitem>
