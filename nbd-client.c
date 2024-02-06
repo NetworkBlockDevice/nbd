@@ -496,7 +496,7 @@ void ask_list(int sock) {
 				len -= lenn;
 				len -= sizeof(lenn);
 				if(len > 0) {
-					if(len > BUF_SIZE) {
+					if(len >= BUF_SIZE) {
 						fprintf(stderr, "\nE: export description read buffer overflow\n");
 						exit(EXIT_FAILURE);
 					}
