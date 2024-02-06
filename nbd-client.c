@@ -705,7 +705,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 				case NBD_REP_ERR_POLICY:
 					if(rep->datasize > 0) {
 						char errstr[1024];
-						rep->data[rep->datasize] = '\0';
+						rep->data[rep->datasize - 1] = '\0';
 						snprintf(errstr, sizeof errstr, "Connection not allowed by server policy. Server said: %s", rep->data);
 						err(errstr);
 					} else {
@@ -716,7 +716,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 				default:
 					if(rep->datasize > 0) {
 						char errstr[1024];
-						rep->data[rep->datasize] = '\0';
+						rep->data[rep->datasize - 1] = '\0';
 						snprintf(errstr, sizeof errstr, "Unknown error returned by server. Server said: %s", rep->data);
 						err(errstr);
 					} else {
