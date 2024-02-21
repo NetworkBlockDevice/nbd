@@ -2599,6 +2599,8 @@ static bool handle_info(CLIENT* client, uint32_t opt, GArray* servers, uint32_t 
 	if (opt == NBD_OPT_GO) {
 		client->clientfeats = cflags;
 		if(!commit_client(client, server)) {
+			consume(client, n_requests * sizeof(request), buf,
+				sizeof(buf));
 			send_reply(client, opt, NBD_REP_ERR_POLICY, -1, "Access denied by server configuration");
 			return false;
 		}
