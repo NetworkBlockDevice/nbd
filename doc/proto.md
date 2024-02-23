@@ -95,11 +95,11 @@ newstyle negotiation.
 #### Oldstyle negotiation
 
 S: 64 bits, `0x4e42444d41474943` (ASCII '`NBDMAGIC`') (also known as
-   the `INIT_PASSWD`)
-S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)
-S: 64 bits, size of the export in bytes (unsigned)
-S: 32 bits, flags
-S: 124 bytes, zeroes (reserved).
+   the `INIT_PASSWD`)  
+S: 64 bits, `0x00420281861253` (`cliserv_magic`, a magic number)  
+S: 64 bits, size of the export in bytes (unsigned)  
+S: 32 bits, flags  
+S: 124 bytes, zeroes (reserved).  
 
 As can be seen, this isn't exactly a negotiation; it's just a matter of
 the server sending a bunch of data to the client. If the client is
@@ -125,11 +125,11 @@ production purposes.
 The initial few exchanges in newstyle negotiation look as follows:
 
 S: 64 bits, `0x4e42444d41474943` (ASCII '`NBDMAGIC`') (as in the old
-   style handshake)
+   style handshake)  
 S: 64 bits, `0x49484156454F5054` (ASCII '`IHAVEOPT`') (note different
-   magic number)
-S: 16 bits, handshake flags
-C: 32 bits, client flags
+   magic number)  
+S: 16 bits, handshake flags  
+C: 32 bits, client flags  
 
 This completes the initial phase of negotiation; the client and server
 now both know they understand the first version of the newstyle
@@ -144,10 +144,10 @@ client can send one or (in fixed newstyle) more options to the server.
 The generic format of setting an option is as follows:
 
 C: 64 bits, `0x49484156454F5054` (ASCII '`IHAVEOPT`') (note same
-   newstyle handshake's magic number)
-C: 32 bits, option
-C: 32 bits, length of option data (unsigned)
-C: any data needed for the chosen option, of length as specified above.
+   newstyle handshake's magic number)  
+C: 32 bits, option  
+C: 32 bits, length of option data (unsigned)  
+C: any data needed for the chosen option, of length as specified above.  
 
 The presence of the option length in every option allows the server
 to skip any options presented by the client that it does not
@@ -157,10 +157,10 @@ If the value of the option field is `NBD_OPT_EXPORT_NAME` and the server
 is willing to allow the export, the server replies with information
 about the used export:
 
-S: 64 bits, size of the export in bytes (unsigned)
-S: 16 bits, transmission flags
+S: 64 bits, size of the export in bytes (unsigned)  
+S: 16 bits, transmission flags  
 S: 124 bytes, zeroes (reserved) (unless `NBD_FLAG_C_NO_ZEROES` was
-   negotiated by the client)
+   negotiated by the client)  
 
 If the server is unwilling to allow the export, it MUST terminate
 the session.
@@ -194,15 +194,15 @@ To fix these two issues, the following changes were implemented:
 - The server will reply to any option apart from `NBD_OPT_EXPORT_NAME`
   with reply packets in the following format:
 
-S: 64 bits, `0x3e889045565a9` (magic number for replies)
-S: 32 bits, the option as sent by the client to which this is a reply
+S: 64 bits, `0x3e889045565a9` (magic number for replies)  
+S: 32 bits, the option as sent by the client to which this is a reply  
 S: 32 bits, reply type (e.g., `NBD_REP_ACK` for successful completion,
    or `NBD_REP_ERR_UNSUP` to mark use of an option not known by this
-   server
+   server  
 S: 32 bits, length of the reply. This MAY be zero for some replies, in
-   which case the next field is not sent
+   which case the next field is not sent  
 S: any data as required by the reply (e.g., an export name in the case
-   of `NBD_REP_SERVER`)
+   of `NBD_REP_SERVER`)  
 
 The client MUST NOT send any option until it has received a final
 reply to any option it has sent (note that some options e.g.
@@ -348,13 +348,13 @@ may be useful.
 
 The request message, sent by the client, looks as follows:
 
-C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)
-C: 16 bits, command flags
-C: 16 bits, type
-C: 64 bits, cookie
-C: 64 bits, offset (unsigned)
-C: 32 bits, length (unsigned)
-C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)
+C: 32 bits, 0x25609513, magic (`NBD_REQUEST_MAGIC`)  
+C: 16 bits, command flags  
+C: 16 bits, type  
+C: 64 bits, cookie  
+C: 64 bits, offset (unsigned)  
+C: 32 bits, length (unsigned)  
+C: (*length* bytes of data if the request is of type `NBD_CMD_WRITE`)  
 
 #### Simple reply message
 
@@ -366,11 +366,11 @@ but only if the reply has no data payload.  The message looks as
 follows:
 
 S: 32 bits, 0x67446698, magic (`NBD_SIMPLE_REPLY_MAGIC`; used to be
-   `NBD_REPLY_MAGIC`)
-S: 32 bits, error (MAY be zero)
-S: 64 bits, cookie
+   `NBD_REPLY_MAGIC`)  
+S: 32 bits, error (MAY be zero)  
+S: 64 bits, cookie  
 S: (*length* bytes of data if the request is of type `NBD_CMD_READ` and
-    *error* is zero)
+    *error* is zero)  
 
 #### Structured reply chunk message
 
@@ -417,12 +417,12 @@ on the chunks received.
 
 A structured reply chunk message looks as follows:
 
-S: 32 bits, 0x668e33ef, magic (`NBD_STRUCTURED_REPLY_MAGIC`)
-S: 16 bits, flags
-S: 16 bits, type
-S: 64 bits, cookie
-S: 32 bits, length of payload (unsigned)
-S: *length* bytes of payload data (if *length* is nonzero)
+S: 32 bits, 0x668e33ef, magic (`NBD_STRUCTURED_REPLY_MAGIC`)  
+S: 16 bits, flags  
+S: 16 bits, type  
+S: 64 bits, cookie  
+S: 32 bits, length of payload (unsigned)  
+S: *length* bytes of payload data (if *length* is nonzero)  
 
 The use of *length* in the reply allows context-free division of
 the overall server traffic into individual reply messages; the
@@ -1398,16 +1398,16 @@ of the newstyle negotiation.
     MAY send `NBD_REP_ERR_INVALID`.
 
     Data:
-    - 32 bits, length of export name.
+    - 32 bits, length of export name.  
     - String, name of export for which we wish to list metadata
-      contexts.
-    - 32 bits, number of queries
-    - Zero or more queries, each being:
-       - 32 bits, length of query.
+      contexts.  
+    - 32 bits, number of queries  
+    - Zero or more queries, each being:  
+       - 32 bits, length of query.  
        - String, query to list a subset of the available metadata
          contexts.  The syntax of this query is
          implementation-defined, except that it MUST start with a
-         namespace and a colon.
+         namespace and a colon.  
 
     For details on the query string, see the "Metadata querying"
     section; note that a namespace may document that a different set
@@ -1489,15 +1489,15 @@ of the newstyle negotiation.
     responded by returning least one metadata context without error.
 
     Data:
-    - 32 bits, length of export name.
+    - 32 bits, length of export name.  
     - String, name of export for which we wish to list metadata
-      contexts.
-    - 32 bits, number of queries
-    - Zero or more queries, each being:
-       - 32 bits, length of query
+      contexts.  
+    - 32 bits, number of queries  
+    - Zero or more queries, each being:  
+       - 32 bits, length of query  
        - String, query to select metadata contexts. The syntax of this
          query is implementation-defined, except that it MUST start with a
-         namespace and a colon.
+         namespace and a colon.  
 
     If zero queries are sent, the server MUST select no metadata
     contexts.
@@ -1569,8 +1569,8 @@ during option haggling in the fixed newstyle negotiation.
     by the information type, and includes the 2 bytes for the type
     designator, in the following general layout:
 
-    - 16 bits, information type (e.g. `NBD_INFO_EXPORT`)
-    - *length - 2* bytes, information payload
+    - 16 bits, information type (e.g. `NBD_INFO_EXPORT`)  
+    - *length - 2* bytes, information payload  
 
     The following information types are defined:
 
@@ -1583,9 +1583,9 @@ during option haggling in the fixed newstyle negotiation.
       `NBD_FLAG_C_NO_ZEROES` was negotiated.  *length* MUST be 12, and
       the reply payload is interpreted as follows:
 
-      - 16 bits, `NBD_INFO_EXPORT`
-      - 64 bits, size of the export in bytes (unsigned)
-      - 16 bits, transmission flags
+      - 16 bits, `NBD_INFO_EXPORT`  
+      - 64 bits, size of the export in bytes (unsigned)  
+      - 16 bits, transmission flags  
 
     * `NBD_INFO_NAME` (1)
 
@@ -1598,8 +1598,8 @@ during option haggling in the fixed newstyle negotiation.
       `NBD_OPT_LIST`. The *length* MUST be at least 2, and the reply
       payload is interpreted as:
 
-      - 16 bits, `NBD_INFO_NAME`
-      - String: name of the export, *length - 2* bytes
+      - 16 bits, `NBD_INFO_NAME`  
+      - String: name of the export, *length - 2* bytes  
 
     * `NBD_INFO_DESCRIPTION` (2)
 
@@ -1609,8 +1609,8 @@ during option haggling in the fixed newstyle negotiation.
       `NBD_REP_SERVER` in response to `NBD_OPT_LIST`. The *length*
       MUST be at least 2, and the reply payload is interpreted as:
 
-      - 16 bits, `NBD_INFO_DESCRIPTION`
-      - String: description of the export, *length - 2* bytes
+      - 16 bits, `NBD_INFO_DESCRIPTION`  
+      - String: description of the export, *length - 2* bytes  
 
     * `NBD_INFO_BLOCK_SIZE` (3)
 
@@ -1629,10 +1629,10 @@ during option haggling in the fixed newstyle negotiation.
       request). The *length* MUST be 14, and the reply payload is
       interpreted as:
 
-      - 16 bits, `NBD_INFO_BLOCK_SIZE`
-      - 32 bits, minimum block size
-      - 32 bits, preferred block size
-      - 32 bits, maximum payload size
+      - 16 bits, `NBD_INFO_BLOCK_SIZE`  
+      - 32 bits, minimum block size  
+      - 32 bits, preferred block size  
+      - 32 bits, maximum payload size  
 
 * `NBD_REP_META_CONTEXT` (4)
 
@@ -1815,8 +1815,8 @@ small amount of fixed-length overhead inherent in the chunk type).
 
   The payload is structured as:
 
-  64 bits: offset (unsigned)
-  *length - 8* bytes: data
+  64 bits: offset (unsigned)  
+  *length - 8* bytes: data  
 
 * `NBD_REPLY_TYPE_OFFSET_HOLE` (2)
 
@@ -1831,8 +1831,8 @@ small amount of fixed-length overhead inherent in the chunk type).
 
   The payload is structured as:
 
-  64 bits: offset (unsigned)
-  32 bits: hole size (unsigned, MUST be nonzero)
+  64 bits: offset (unsigned)  
+  32 bits: hole size (unsigned, MUST be nonzero)  
 
 * `NBD_REPLY_TYPE_BLOCK_STATUS` (5)
 
@@ -1844,14 +1844,14 @@ small amount of fixed-length overhead inherent in the chunk type).
 
   The payload starts with:
 
-  32 bits, metadata context ID
+  32 bits, metadata context ID  
 
   and is followed by a list of one or more descriptors, each with this
   layout:
 
   32 bits, length of the extent to which the status below
-     applies (unsigned, MUST be nonzero)
-  32 bits, status flags
+     applies (unsigned, MUST be nonzero)  
+  32 bits, status flags  
 
   If the client used the `NBD_CMD_FLAG_REQ_ONE` flag in the request,
   then every reply chunk MUST contain exactly one descriptor, and that
@@ -1906,10 +1906,10 @@ remaining structured fields at the end.
 
   The payload is structured as:
 
-  32 bits: error (MUST be nonzero)
-  16 bits: message length (no more than header *length* - 6)
+  32 bits: error (MUST be nonzero)  
+  16 bits: message length (no more than header *length* - 6)  
   *message length* bytes: optional string suitable for
-    direct display to a human being
+    direct display to a human being  
 
 * `NBD_REPLY_TYPE_ERROR_OFFSET` (2^15 + 2)
 
@@ -1928,11 +1928,11 @@ remaining structured fields at the end.
 
   The payload is structured as:
 
-  32 bits: error (MUST be nonzero)
-  16 bits: message length (no more than header *length* - 14)
+  32 bits: error (MUST be nonzero)  
+  16 bits: message length (no more than header *length* - 14)  
   *message length* bytes: optional string suitable for
-     direct display to a human being
-  64 bits: offset (unsigned)
+     direct display to a human being  
+  64 bits: offset (unsigned)  
 
 If the client receives an unknown or unexpected type with bit 15
 set, it MUST consider the current reply as errored, but MAY
