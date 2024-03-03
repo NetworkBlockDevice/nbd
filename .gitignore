@@ -67,3 +67,5 @@ nbdtab_parser.c
 nbdtab_parser.tab.c
 nbdtab_parser.tab.h
 tests/parse/parser
+.pc
+debian/patches
