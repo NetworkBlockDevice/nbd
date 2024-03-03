@@ -1,5 +1,6 @@
-nbd (1:3.25-2) UNRELEASED; urgency=medium
+nbd (1:3.26-1) UNRELEASED; urgency=medium
 
+  * New upstream release
   * Updated swedish debconf translations; Closes: #1057774.
   * debian/source/format: migrate to "3.0 (quilt)", with single-debian-patch in
     local-options
