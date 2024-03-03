@@ -2,7 +2,7 @@ dnl Configure script for NBD system
 dnl (c) 1998 Martin Mares <mj@ucw.cz>, (c) 2000 Pavel Machek <pavel@ucw.cz>,
 dnl (c) 2003-2024 Wouter Verhelst <wouter@debian.org>
 AC_INIT([nbd],
-  [3.24],
+  [3.26],
   [nbd@other.debian.org],,
   [http://nbd.sourceforge.net/])
 m4_define([serial_tests], [
