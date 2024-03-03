@@ -325,8 +325,20 @@ else
 fi
 
 AC_ARG_ENABLE([manpages],
-	AS_HELP_STRING([--disable-manpages], [Do not install man pages]))
-AM_CONDITIONAL(MANPAGES, test "x$enable_manpages" != "xno")
+	AS_HELP_STRING([--disable-manpages], [Do not install man pages]),
+	[],
+	[: m4_divert_text([DEFAULTS], [enable_manpages=check])]
+)
+
+AS_IF([test "x$enable_manpages" != "xno"], [
+       AC_CHECK_PROG([DB2M], docbook2man, [docbook2man])
+	],
+      [test "x$enable_manpages" = "xyes" -a "x$DB2M" = "x"], [
+       AC_MSG_ERROR([docbook2man not found, but is required to build manpages])
+	]
+      [test "x$DB2M" != "x"], [enable_manpages=yes])
+
+AM_CONDITIONAL(MANPAGES, test "x$enable_manpages" = "xyes"])
 AS_IF([test "x$enable_manpages" != "xno"], [
 	AC_SUBST([MAN_CONFIG_FILES],["\
 		man/nbd-client.8.sgml \
