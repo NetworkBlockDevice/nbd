@@ -7,7 +7,7 @@ jobs:
       - name: install dependencies
         run: sudo apt-get update && sudo apt-get -y install docbook-utils libglib2.0-dev libgnutls28-dev libnl-genl-3-dev autoconf-archive
       - name: Check out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - run: ./autogen.sh
       - run: ./configure --enable-syslog
       - run: make distcheck
