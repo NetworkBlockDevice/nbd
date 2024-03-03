@@ -4,6 +4,8 @@ nbd (1:3.26-1) UNRELEASED; urgency=medium
   * Updated swedish debconf translations; Closes: #1057774.
   * debian/source/format: migrate to "3.0 (quilt)", with single-debian-patch in
     local-options
+  * Add initial (very basic) DEP8 test. Thanks,
+    Mitchell Dzurick <mitchell.dzurick@canonical.com>.
 
  -- Wouter Verhelst <wouter@debian.org>  Mon, 11 Dec 2023 12:55:08 +0200
 
