@@ -2,3 +2,7 @@
 nbd-client binary: init.d-script-possible-missing-stop /etc/init.d/nbd-client 1
 # The format is different, but still policy-compliant.
 nbd-client: copyright-without-copyright-notice
+
+# The nbd-client debconf template is essentially redundant; the lack of a
+# corresponding config script is not an error
+nbd-client: no-debconf-config
