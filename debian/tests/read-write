@@ -1,0 +1,48 @@
+#!/bin/bash
+
+set -exu
+
+# Make a file-system with some test contents to read
+TMPDIR=${AUTOPKGTEST_TMP:-/tmp}
+cd "$TMPDIR"
+fallocate -l 100M myvol.img
+mkfs -t ext2 myvol.img
+mkdir mnt
+mount -o loop -t ext2 myvol.img mnt/
+cp /usr/share/doc/nbd-client/copyright mnt/
+cp /usr/share/doc/nbd-client/changelog.Debian.gz mnt/
+umount mnt/
+chown nbd:nbd myvol.img
+
+# Configure and start up the nbd server
+cat > /etc/nbd-server/conf.d/myvol.conf << EOF
+[myvol]
+exportname = $TMPDIR/myvol.img
+EOF
+
+systemctl restart nbd-server.service
+
+# Configure and start up the nbd client
+cat >> /etc/nbdtab << EOF
+nbd0 ::1 myvol
+EOF
+
+modprobe nbd
+systemctl enable nbd@nbd0 --now || true
+
+# Check the stuff we placed in there above is readable over NBD
+mount -t ext2 /dev/nbd0 mnt/
+cmp mnt/copyright /usr/share/doc/nbd-client/copyright
+cmp mnt/changelog.Debian.gz /usr/share/doc/nbd-client/changelog.Debian.gz
+
+# Make some changes to the stuff we placed the volume
+echo foo > mnt/foo
+rm mnt/changelog.Debian.gz
+umount mnt/
+
+# And check the changes we made were performed accurately
+mount -o loop -t ext2 myvol.img mnt/
+[ -f mnt/copyright ]
+[ ! -f mnt/changelog.Debian.gz ]
+[ "$(cat mnt/foo)" = "foo" ]
+umount mnt/

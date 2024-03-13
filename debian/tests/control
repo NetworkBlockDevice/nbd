@@ -3,3 +3,9 @@ Depends:
  nbd-client,
  nbd-server,
 Restrictions: needs-root, allow-stderr, isolation-machine
+
+Tests: read-write
+Depends:
+ nbd-client,
+ nbd-server,
+Restrictions: needs-root, allow-stderr, isolation-machine
