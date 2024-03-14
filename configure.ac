@@ -328,7 +328,7 @@ AC_MSG_CHECKING([whether man pages are requested])
 AC_ARG_ENABLE([manpages],
 	AS_HELP_STRING([--disable-manpages], [Do not install man pages]),
 	[],
-	[: m4_divert_text([DEFAULTS], [enable_manpages=check])]
+	[enable_manpages=check]
 )
 AC_MSG_RESULT([$enable_manpages])
 
@@ -337,9 +337,14 @@ AS_IF([test "x$enable_manpages" != "xno"], [
 	])
 AS_IF([test "x$enable_manpages" = "xyes" -a "x$DB2M" = "x"], [
        AC_MSG_ERROR([docbook2man not found, but is required to build manpages])
-	],
-      [test "x$DB2M" != "x"], [enable_manpages=yes],
-       [AC_MSG_ERROR([don't know what to do here])])
+	])
+if test "x$enable_manpages" = "xcheck"; then
+	if test "x$DB2M" = "x"; then
+		enable_manpages=no
+	else
+		enable_manpages=yes
+	fi
+fi
 AC_MSG_CHECKING([whether to build manpages])
 AC_MSG_RESULT([$enable_manpages])
 
