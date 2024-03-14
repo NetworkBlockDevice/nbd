@@ -1,0 +1,14 @@
+[Unit]
+Description=Network Block Device server
+Documentation=man:nbd-server(1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+ExecStart=nbd-server
+ExecReload=kill -HUP $MAINPID
+PIDFile=nbd-server.pid
+
+[Install]
+WantedBy=multi-user.target
