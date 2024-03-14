@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2016-06-30 21:30+0200\n"
+"POT-Creation-Date: 2024-03-14 18:11+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -141,37 +141,4 @@ msgstr ""
 msgid ""
 "Note that it is possible to tune the way in which the IP address will be "
 "substituted in the file name. See \"man 5 nbd-server\" for details."
-msgstr ""
-
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr ""
-
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
 msgstr ""
