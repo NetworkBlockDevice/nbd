@@ -5,6 +5,11 @@
 %:
 	dh $@
 
+clean:
+	debconf-updatepo
+	dh_clean
+
+
 override_dh_autoreconf:
 	./autogen.sh
 
