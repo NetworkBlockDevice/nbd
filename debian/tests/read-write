@@ -22,13 +22,14 @@ EOF
 
 systemctl restart nbd-server.service
 
-# Configure and start up the nbd client
+# Configure and start up the nbd client; this deliberately uses an IPv4 style
+# localhost address as a regression test for LP: #2054470
 cat >> /etc/nbdtab << EOF
-nbd0 ::1 myvol
+nbd0 127.0.0.1 myvol
 EOF
 
 modprobe nbd
-systemctl enable nbd@nbd0 --now || true
+systemctl enable nbd@nbd0 --now
 
 # Check the stuff we placed in there above is readable over NBD
 mount -t ext2 /dev/nbd0 mnt/

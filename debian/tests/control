@@ -1,9 +1,3 @@
-Tests: nbdtab-ipv4-address
-Depends:
- nbd-client,
- nbd-server,
-Restrictions: needs-root, allow-stderr, isolation-machine
-
 Tests: read-write
 Depends:
  nbd-client,
