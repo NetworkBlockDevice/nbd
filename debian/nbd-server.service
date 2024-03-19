@@ -9,6 +9,8 @@ Type=forking
 ExecStart=nbd-server
 ExecReload=kill -HUP $MAINPID
 PIDFile=nbd-server.pid
+NoNewPrivileges=true
+ProtectSystem=full
 
 [Install]
 WantedBy=multi-user.target
