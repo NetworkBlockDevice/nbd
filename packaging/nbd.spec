@@ -3,7 +3,6 @@ Summary:        Network Block Device userland support files
 Version:        3.25
 Release:        0
 License:        GPL-2.0-only
-ExclusiveArch:  %{arm} aarch64 riscv64
 Group:          System/Utilities
 Source:         %{name}-%{version}.tar.gz
 Source1001:     %{name}.manifest
