@@ -3,6 +3,7 @@
 set -exu
 
 TMPDIR="${AUTOPKGTEST_TMP:-/tmp}"
+OUTDIR="${AUTOPKGTEST_ARTIFACTS:-/tmp}"
 # We need TMPDIR to be world-readable for unshare to read it (used in creation
 # of our VM image below)
 chmod a+rx "$TMPDIR"
@@ -61,10 +62,10 @@ timeout -k 300s 240s debvm-run \
     --sshport=8022 \
     --skip=root \
     --append="nbdroot=10.0.2.2/myvm root=/dev/nbd0" \
-    </dev/null >"$TMPDIR"/debvm.log 2>&1 &
+    </dev/null >"$OUTDIR"/debvm.log 2>&1 &
 
 # show the log and kill qemu in case the script exits first
-trap 'cat --show-nonprinting "$TMPDIR/debvm.log"' EXIT
+trap 'cat --show-nonprinting "$OUTDIR/debvm.log"' EXIT
 
 # the default of 60 seconds can be too slow for salsaci
 debvm-waitssh -t 120 8022
@@ -76,9 +77,9 @@ debvm-waitssh -t 120 8022
 ssh="ssh -o ConnectTimeout=20 -o NoHostAuthenticationForLocalhost=yes -i $TMPDIR/id_rsa -T -p 8022"
 
 # Check (and show!) the root device is /dev/nbd0
-$ssh root@localhost -- "cat /proc/mounts" > "$TMPDIR"/mounts
-cat "$TMPDIR"/mounts
-awk '$1=="/dev/nbd0" && $2=="/" { print; }' "$TMPDIR"/mounts | grep "/"
+$ssh root@localhost -- "cat /proc/mounts" > "$OUTDIR"/mounts
+cat "$OUTDIR"/mounts
+awk '$1=="/dev/nbd0" && $2=="/" { print; }' "$OUTDIR"/mounts | grep "/"
 
 # shut the system off
 trap - EXIT
