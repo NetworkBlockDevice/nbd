@@ -19,6 +19,8 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=@sbindir@/nbd-client %i
 ExecStop=@sbindir@/nbd-client -d /dev/%i
+NoNewPrivileges=true
+ProtectSystem=full
 [Install]
 RequiredBy=dev-%i.device
 RequiredBy=dev-%ip1.device
