@@ -2882,7 +2882,7 @@ static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 	} else {
 		ctx->is_structured = 0;
 	}
-	if(req->type & NBD_CMD_FLAG_DF != 0) {
+	if((req->type & NBD_CMD_FLAG_DF) != 0) {
 		ctx->df = 1;
 	}
 	if(ctx->is_structured && ctx->df && req->len > (1 << 20)) {
@@ -3312,7 +3312,7 @@ static int handle_childname(GArray* servers, int socket)
 				break;
 		}
 	}
-	if (len >= ULONG_MAX - 1) {
+	if (len >= UINT32_MAX - 1) {
 		err_nonfatal("Value out of range");
 		return -1;
 	}
