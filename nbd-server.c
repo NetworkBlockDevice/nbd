@@ -881,7 +881,6 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 			G_KEY_FILE_KEEP_TRANSLATIONS, &err)) {
 		g_set_error(e, NBDS_ERR, NBDS_ERR_CFILE_NOTFOUND, "Could not open config file %s: %s",
 				f, err->message);
-		g_key_file_free(cfile);
 		return retval;
 	}
 	startgroup = g_key_file_get_start_group(cfile);
