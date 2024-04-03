@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:2.9.16-3\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2016-06-30 21:30+0200\n"
+"POT-Creation-Date: 2024-03-14 18:11+0000\n"
 "PO-Revision-Date: 2010-09-30 16:13+0930\n"
 "Last-Translator: Clytie Siddall <clytie@riverland.net.au>\n"
 "Language-Team: Vietnamese <vi-VN@googlegroups.com>\n"
@@ -165,48 +165,37 @@ msgstr ""
 "Ghi chú rằng cũng có thể điều chỉnh phương pháp thay thế địa chỉ IP trong "
 "tên tập tin. Xem trang hướng dẫn « man 5 nbd-server » để tìm chi tiết."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "« AUTO_GEN » được đặt thành « n » trong « /etc/nbd-server »"
+#~ msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+#~ msgstr "« AUTO_GEN » được đặt thành « n » trong « /etc/nbd-server »"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-"Tập tin trình phục vụ « /etc/nbd-server » chứa một dòng mà đặt biến tự động "
-"tạo « AUTO_GEN » thành « n » (không). Tập tin này thì không được tự động tạo "
-"lại."
+#~ msgid ""
+#~ "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable "
+#~ "to \"n\". The file will therefore not be regenerated automatically."
+#~ msgstr ""
+#~ "Tập tin trình phục vụ « /etc/nbd-server » chứa một dòng mà đặt biến tự "
+#~ "động tạo « AUTO_GEN » thành « n » (không). Tập tin này thì không được tự "
+#~ "động tạo lại."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-"Ghi chú rằng phiên bản hiện thời của gói trình phục vụ nbd-server không còn "
-"sử dụng lại « etc/nbd-server ». Để thay thế, nó sử dụng một tập tin cấu hình "
-"mới, được đọc bởi nbd-server chính nó (hơn là văn lệnh khởi động) mà hỗ trợ "
-"nhiều tùy chọn hơn. Xem « man 5 nbd-server » để tìm chi tiết."
+#~ msgid ""
+#~ "Note that the current version of the nbd-server package no longer uses /"
+#~ "etc/nbd-server. Instead it uses a new configuration file, read by nbd-"
+#~ "server itself (rather than the init script), which supports more options. "
+#~ "See \"man 5 nbd-server\" for details."
+#~ msgstr ""
+#~ "Ghi chú rằng phiên bản hiện thời của gói trình phục vụ nbd-server không "
+#~ "còn sử dụng lại « etc/nbd-server ». Để thay thế, nó sử dụng một tập tin "
+#~ "cấu hình mới, được đọc bởi nbd-server chính nó (hơn là văn lệnh khởi "
+#~ "động) mà hỗ trợ nhiều tùy chọn hơn. Xem « man 5 nbd-server » để tìm chi "
+#~ "tiết."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
-msgstr ""
-"Nếu bạn gỡ bỏ hay hủy ghi chú dòng « AUTO_GEN », một tập tin « /etc/nbd-"
-"server/config » theo định dạng mới có thể được tạo ra dựa vào cấu hình hiện "
-"thời. Đến lúc đó, bản cài đặt trình phục vụ nbd-server bị hỏng."
+#~ msgid ""
+#~ "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+#~ "config in the new format may be generated based on the current "
+#~ "configuration. Until then, the nbd-server installation will be broken."
+#~ msgstr ""
+#~ "Nếu bạn gỡ bỏ hay hủy ghi chú dòng « AUTO_GEN », một tập tin « /etc/nbd-"
+#~ "server/config » theo định dạng mới có thể được tạo ra dựa vào cấu hình "
+#~ "hiện thời. Đến lúc đó, bản cài đặt trình phục vụ nbd-server bị hỏng."
 
 #~ msgid ""
 #~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2016-06-30 21:30+0200\n"
+"POT-Creation-Date: 2024-03-14 18:11+0000\n"
 "PO-Revision-Date: 2016-02-26 12:05+0900\n"
 "Last-Translator: Takuma Yamada <tyamada@takumayamada.com>\n"
 "Language-Team: Japanese <debian-japanese@lists.debian.org>\n"
@@ -163,47 +163,35 @@ msgstr ""
 "IP アドレスを調整してファイル名に使うことが可能であることに注意してください。"
 "詳細については「man 5 nbd-server」を見てください。"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "/etc/nbd-server で AUTO_GEN に「n」がセットされています。"
+#~ msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+#~ msgstr "/etc/nbd-server で AUTO_GEN に「n」がセットされています。"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-"/etc/nbd-server ファイルに AUTO_GEN 変数に「n」をセットする行があります。した"
-"がってファイルは自動的に再生成されません。"
+#~ msgid ""
+#~ "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable "
+#~ "to \"n\". The file will therefore not be regenerated automatically."
+#~ msgstr ""
+#~ "/etc/nbd-server ファイルに AUTO_GEN 変数に「n」をセットする行があります。"
+#~ "したがってファイルは自動的に再生成されません。"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-"現行バージョンの nbd-server パッケージでは /etc/nbd-server を使わなくなってい"
-"ることに注意してください。代わりに新しい設定ファイルを使って (init スクリプト"
-"ではなく) nbd-server 自体が読み込むようになり、より多くのオプションサポートし"
-"ます。詳細については「man 5 nbd-server」を見てください。"
+#~ msgid ""
+#~ "Note that the current version of the nbd-server package no longer uses /"
+#~ "etc/nbd-server. Instead it uses a new configuration file, read by nbd-"
+#~ "server itself (rather than the init script), which supports more options. "
+#~ "See \"man 5 nbd-server\" for details."
+#~ msgstr ""
+#~ "現行バージョンの nbd-server パッケージでは /etc/nbd-server を使わなくなっ"
+#~ "ていることに注意してください。代わりに新しい設定ファイルを使って (init ス"
+#~ "クリプトではなく) nbd-server 自体が読み込むようになり、より多くのオプショ"
+#~ "ンサポートします。詳細については「man 5 nbd-server」を見てください。"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
-msgstr ""
-"AUTO_GEN の行を削除またはコメントアウトすると現在の設定を基にファイル /etc/"
-"nbd-server/config が新しい形式で生成されます。それまでは、nbd-server のインス"
-"トール状態は中途半端になります。"
+#~ msgid ""
+#~ "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+#~ "config in the new format may be generated based on the current "
+#~ "configuration. Until then, the nbd-server installation will be broken."
+#~ msgstr ""
+#~ "AUTO_GEN の行を削除またはコメントアウトすると現在の設定を基にファイル /"
+#~ "etc/nbd-server/config が新しい形式で生成されます。それまでは、nbd-server "
+#~ "のインストール状態は中途半端になります。"
 
 #~ msgid ""
 #~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd_2.4-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2015-10-17 09:40+0200\n"
+"POT-Creation-Date: 2024-03-14 18:11+0000\n"
 "PO-Revision-Date: 2016-05-14 13:17-0300\n"
 "Last-Translator: Adriano Rafael Gomes <adrianorg@arg.eti.br>\n"
 "Language-Team: Brazilian Portuguese <debian-l10n-portuguese@lists.debian."
@@ -30,262 +30,66 @@ msgstr "AUTO_GEN está definido como \"n\" em /etc/nbd-client"
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
+#, fuzzy
+#| msgid ""
+#| "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable "
+#| "to \"n\". The file will therefore not be regenerated automatically."
 msgid ""
 "The /etc/nbd-client file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
+"\"n\". This indicates that you prefer that the nbd configuration is not "
+"automatically generated."
 msgstr ""
 "O arquivo /etc/nbd-client contém uma linha que define a variável AUTO_GEN "
 "como \"n\". Por esse motivo, o arquivo não será regerado automaticamente."
 
-#
 #. Type: error
 #. Description
 #: ../nbd-client.templates:2001
 msgid ""
-"If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
-"afterwards."
+"Since nbd-client 1:3.14-1, the file /etc/nbd-client is no longer used for "
+"boot-time configuration; instead, a file /etc/nbdtab is used, with a "
+"different format. The debconf configuration options have been removed, and "
+"this file is therefore never automatically generated, except that this "
+"upgrade would have generated a /etc/nbdtab file from your /etc/nbd-client if "
+"AUTO_GEN had not been set to \"n\". As such, you'll need to either disable "
+"the AUTO_GEN line in /etc/nbd-client and call `dpkg-reconfigure nbd-client' "
+"to allow the configuration to be migrated, or write the nbdtab file yourself "
+"manually."
 msgstr ""
-"Caso isso esteja errado, remova a linha e execute \"dpkg-reconfigure nbd-"
-"client\" posteriormente."
-
-#  Template: nbd-client/host
-#  ddtp-prioritize: 42
-#
-#. Type: error
-#. Description
-#: ../nbd-client.templates:3001
-msgid "A port has been selected for export ${number}"
-msgstr "Uma porta foi selecionada para exportação ${number}"
 
 #. Type: error
 #. Description
-#: ../nbd-client.templates:3001
+#: ../nbd-client.templates:2001
 msgid ""
-"The file /etc/nbd-client configures an NBD export by way of a port number. "
-"This method of connecting to an NBD export is no longer supported as of NBD "
-"3.10."
+"If you do not take either of those steps, your nbd-client boot-time "
+"configuration will not be functional."
 msgstr ""
-"O arquivo /etc/nbd-client configura uma exportação NBD por meio de um número "
-"de porta. Esse método de conectar a uma exportação NBD não tem mais suporte "
-"no NBD 3.10."
 
-#. Type: error
+#. Type: note
 #. Description
 #: ../nbd-client.templates:3001
-msgid ""
-"Please migrate the configuration so it uses name-based exports, rather than "
-"port-based ones."
+msgid "KILLALL is no longer supported"
 msgstr ""
-"Por favor, migre a configuração para usar exportações baseadas em nomes, ao "
-"invés de baseadas em portas."
 
-#. Type: string
+#. Type: note
 #. Description
-#: ../nbd-client.templates:4001
-msgid "Number of nbd-client connections to use:"
-msgstr "Número de conexões nbd-client para usar:"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:3001
 msgid ""
-"nbd-client can handle multiple concurrent connections. Please specify the "
-"number of connections you'd like this configuration script to set up."
+"You have a file /etc/nbd-client which does not set the shell variable "
+"KILLALL to false. Since nbd-client 1:3.14-1, the boot sequence has been "
+"changed to use /etc/nbdtab instead of /etc/nbd-client, and this mode of "
+"operation no longer supports killing devices that are not specified in "
+"nbdtab."
 msgstr ""
-"O nbd-client pode gerenciar múltiplas conexões concorrentes. Por favor, "
-"especifique o número de conexões que você gostaria que esse script de "
-"configuração configurasse."
 
-#. Type: string
+#. Type: note
 #. Description
-#: ../nbd-client.templates:4001
+#: ../nbd-client.templates:3001
 msgid ""
-"Note that if something has already been specified in /etc/nbd-client, the "
-"current configuration will be used as defaults in these dialogs."
+"Your configuration has been migrated to /etc/nbdtab and the /etc/nbd-client "
+"file moved to /etc/nbd-client.old, but please note that you must bring down "
+"any devices not specified in /etc/nbdtab manually from now on."
 msgstr ""
-"Note que caso um valor já tenha sido especificado em /etc/nbd-client, a "
-"configuração atual será usada como padrão nesses diálogos."
-
-#. Type: select
-#. Choices
-#: ../nbd-client.templates:5001
-msgid "swap, filesystem, raw"
-msgstr "swap, filesystem, raw"
-
-#  Template: nbd-client/type
-#  ddtp-prioritize: 42
-#
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid "Intended use of the network block device number ${number}:"
-msgstr "Uso pretendido para o dispositivo de bloco de rede número ${number}:"
-
-#
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"The network block device can serve multiple purposes. One of the most "
-"interesting is to provide swap space over the network for diskless clients, "
-"but you can store a filesystem on it, or do other things with it for which a "
-"block device is interesting."
-msgstr ""
-"O dispositivo de bloco de rede pode servir a múltiplos propósitos. Um dos "
-"mais interessantes é fornecer espaço de swap pela rede para clientes sem "
-"disco, mas você pode armazenar um sistema de arquivos nele, ou fazer outras "
-"coisas com ele para as quais um dispositivo de bloco seja interessante."
-
-#
-#. Type: select
-#. Description
-#: ../nbd-client.templates:5002
-msgid ""
-"If you intend to use the network block device as a swap device, choose \"swap"
-"\". If you intend to use it as a filesystem, add a line to /etc/fstab, give "
-"it the option \"_netdev\" (else init will try to mount it before it's "
-"usable), and choose \"filesystem\". For all other purposes, choose \"raw\". "
-"The only thing the nbd-client boot script will do then is start an nbd-"
-"client process; you will have to set it up manually."
-msgstr ""
-"Se você pretende utilizar o dispositivo de bloco de rede como um dispositivo "
-"de swap, escolha \"swap\". Se você pretende usá-lo como um sistema de "
-"arquivos, adicione uma linha ao /etc/fstab, dê a essa linha a opção \"_netdev"
-"\" (de outra forma o init tentará montá-lo antes que esteja usável), e "
-"escolha \"filesystem\". Para todos os outros propósitos, escolha \"raw\". A "
-"única coisa que o script de inicialização do nbd-client fará então é iniciar "
-"um processo nbd-client; você terá de configurá-lo manualmente."
-
-#  Template: nbd-client/host
-#  ddtp-prioritize: 42
-#
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid "Hostname of the server (number: ${number})?"
-msgstr "Nome de máquina do servidor (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:6001
-msgid ""
-"Please enter the network name or IP address of the machine on which the nbd-"
-"server process is running."
-msgstr ""
-"Por favor, informe o nome de rede ou o endereço IP da máquina na qual o "
-"processo nbd-client está executando."
-
-#  Template: nbd-client/host
-#  ddtp-prioritize: 42
-#
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid "Name for NBD export (number: ${number})?"
-msgstr "Nome para a exportação NBD (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Please enter the NBD export name needed to access nbd-server. The name "
-"entered here should match an existing export on the server."
-msgstr ""
-"Por favor, informe o nome de exportação NBD necessário para acessar o nbd-"
-"server. O nome informado aqui deve combinar com uma exportação já existente "
-"no servidor."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:7001
-msgid ""
-"Note that as of NBD 3.10, connecting to an NBD export using the older port-"
-"based negotiation protocol is no longer supported."
-msgstr ""
-"Note que o NBD 3.10 não oferece mais suporte a conectar a uma exportação NBD "
-"usando o antigo protocolo de negociação baseado em porta."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid "/dev entry for this nbd-client (number: ${number})?"
-msgstr "Entrada /dev para esse nbd-client (número: ${number})?"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"Every nbd-client process needs to be associated with a /dev entry with major "
-"number 43. Please enter the name of the /dev entry you want to use for this "
-"nbd-client. Note that this needs to be the full path to that entry, not just "
-"the last part."
-msgstr ""
-"Cada processo nbd-client precisa estar associado com uma entrada /dev com o "
-"número \"major\" 43. Por favor, informe o nome da entrada /dev que você "
-"deseja usar para esse nbd-client. Note que o valor informado precisa ser o "
-"caminho completo para essa entrada, não somente a última parte do caminho."
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:8001
-msgid ""
-"If the /dev entry specified does not exist, it will be created with minor "
-"number ${number}."
-msgstr ""
-"Caso a entrada /dev especificada não exista, ela será criada com o número "
-"\"minor\" ${number}."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid "Disconnect all NBD devices on \"stop\"?"
-msgstr "Desconectar todos os dispositivos NBD no \"stop\"?"
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"When the nbd-client init script is called to stop the nbd-client service, "
-"there are two things that can be done: either it can disconnect all nbd-"
-"client devices (which are assumed not to be in use), or it can disconnect "
-"only those nbd-client devices that it knows about in its config file."
-msgstr ""
-"Quando o \"init script\" do nbd-client é chamado para parar o serviço nbd-"
-"client, há duas coisas que podem ser feitas: ou ele pode desconectar todos "
-"os dispositivos nbd-client (os quais assume-se não estarem em uso), ou ele "
-"pode desconectar somente aqueles dispositivos nbd-client que ele saiba a "
-"respeito no seu arquivo de configuração."
-
-#. Type: boolean
-#. Description
-#: ../nbd-client.templates:9001
-msgid ""
-"The default (and the traditional behavior) is to disconnect all nbd-client "
-"devices. If the root device or other critical file systems are on NBD this "
-"will cause data loss and should not be accepted."
-msgstr ""
-"O comportamento padrão (e tradicional) é desconectar todos os dispositivos "
-"nbd-client. Se o dispositivo raiz ou outro sistema de arquivos crítico "
-"estiver sobre NBD, isso causará perda de dados e não deverá ser aceito."
-
-#  Template: nbd-client/host
-#  ddtp-prioritize: 42
-#
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid "Extra parameters (number: ${number})"
-msgstr "Parâmetros extra (número: ${number})"
-
-#. Type: string
-#. Description
-#: ../nbd-client.templates:10001
-msgid ""
-"If you wish to add any extra parameters to nbd-client, then please enter "
-"them here."
-msgstr ""
-"Se você quer adicionar parâmetros extra ao nbd-client, então informe-os "
-"aqui, por favor."
 
 #. Type: string
 #. Description
@@ -313,8 +117,8 @@ msgid ""
 "config, or by running \"dpkg-reconfigure nbd-server\"."
 msgstr ""
 "Note que você sempre poderá adicionar servidores extra incluindo-os na "
-"configuração em /etc/nbd-server/, ou executando \"dpkg-reconfigure nbd-server"
-"\"."
+"configuração em /etc/nbd-server/, ou executando \"dpkg-reconfigure nbd-"
+"server\"."
 
 #  Template: nbd-client/host
 #  ddtp-prioritize: 42
@@ -371,50 +175,221 @@ msgstr ""
 "Note que é possível ajustar o modo no qual o endereço IP será substituído no "
 "nome do arquivo. Veja \"man 5 nbd-server\" para detalhes."
 
+#
+#~ msgid ""
+#~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
+#~ "afterwards."
+#~ msgstr ""
+#~ "Caso isso esteja errado, remova a linha e execute \"dpkg-reconfigure nbd-"
+#~ "client\" posteriormente."
+
+#  Template: nbd-client/host
+#  ddtp-prioritize: 42
+#
+#~ msgid "A port has been selected for export ${number}"
+#~ msgstr "Uma porta foi selecionada para exportação ${number}"
+
+#~ msgid ""
+#~ "The file /etc/nbd-client configures an NBD export by way of a port "
+#~ "number. This method of connecting to an NBD export is no longer supported "
+#~ "as of NBD 3.10."
+#~ msgstr ""
+#~ "O arquivo /etc/nbd-client configura uma exportação NBD por meio de um "
+#~ "número de porta. Esse método de conectar a uma exportação NBD não tem "
+#~ "mais suporte no NBD 3.10."
+
+#~ msgid ""
+#~ "Please migrate the configuration so it uses name-based exports, rather "
+#~ "than port-based ones."
+#~ msgstr ""
+#~ "Por favor, migre a configuração para usar exportações baseadas em nomes, "
+#~ "ao invés de baseadas em portas."
+
+#~ msgid "Number of nbd-client connections to use:"
+#~ msgstr "Número de conexões nbd-client para usar:"
+
+#~ msgid ""
+#~ "nbd-client can handle multiple concurrent connections. Please specify the "
+#~ "number of connections you'd like this configuration script to set up."
+#~ msgstr ""
+#~ "O nbd-client pode gerenciar múltiplas conexões concorrentes. Por favor, "
+#~ "especifique o número de conexões que você gostaria que esse script de "
+#~ "configuração configurasse."
+
+#~ msgid ""
+#~ "Note that if something has already been specified in /etc/nbd-client, the "
+#~ "current configuration will be used as defaults in these dialogs."
+#~ msgstr ""
+#~ "Note que caso um valor já tenha sido especificado em /etc/nbd-client, a "
+#~ "configuração atual será usada como padrão nesses diálogos."
+
+#~ msgid "swap, filesystem, raw"
+#~ msgstr "swap, filesystem, raw"
+
+#  Template: nbd-client/type
+#  ddtp-prioritize: 42
+#
+#~ msgid "Intended use of the network block device number ${number}:"
+#~ msgstr ""
+#~ "Uso pretendido para o dispositivo de bloco de rede número ${number}:"
+
+#
+#~ msgid ""
+#~ "The network block device can serve multiple purposes. One of the most "
+#~ "interesting is to provide swap space over the network for diskless "
+#~ "clients, but you can store a filesystem on it, or do other things with it "
+#~ "for which a block device is interesting."
+#~ msgstr ""
+#~ "O dispositivo de bloco de rede pode servir a múltiplos propósitos. Um dos "
+#~ "mais interessantes é fornecer espaço de swap pela rede para clientes sem "
+#~ "disco, mas você pode armazenar um sistema de arquivos nele, ou fazer "
+#~ "outras coisas com ele para as quais um dispositivo de bloco seja "
+#~ "interessante."
+
+#
+#~ msgid ""
+#~ "If you intend to use the network block device as a swap device, choose "
+#~ "\"swap\". If you intend to use it as a filesystem, add a line to /etc/"
+#~ "fstab, give it the option \"_netdev\" (else init will try to mount it "
+#~ "before it's usable), and choose \"filesystem\". For all other purposes, "
+#~ "choose \"raw\". The only thing the nbd-client boot script will do then is "
+#~ "start an nbd-client process; you will have to set it up manually."
+#~ msgstr ""
+#~ "Se você pretende utilizar o dispositivo de bloco de rede como um "
+#~ "dispositivo de swap, escolha \"swap\". Se você pretende usá-lo como um "
+#~ "sistema de arquivos, adicione uma linha ao /etc/fstab, dê a essa linha a "
+#~ "opção \"_netdev\" (de outra forma o init tentará montá-lo antes que "
+#~ "esteja usável), e escolha \"filesystem\". Para todos os outros "
+#~ "propósitos, escolha \"raw\". A única coisa que o script de inicialização "
+#~ "do nbd-client fará então é iniciar um processo nbd-client; você terá de "
+#~ "configurá-lo manualmente."
+
+#  Template: nbd-client/host
+#  ddtp-prioritize: 42
+#
+#~ msgid "Hostname of the server (number: ${number})?"
+#~ msgstr "Nome de máquina do servidor (número: ${number})?"
+
+#~ msgid ""
+#~ "Please enter the network name or IP address of the machine on which the "
+#~ "nbd-server process is running."
+#~ msgstr ""
+#~ "Por favor, informe o nome de rede ou o endereço IP da máquina na qual o "
+#~ "processo nbd-client está executando."
+
+#  Template: nbd-client/host
+#  ddtp-prioritize: 42
+#
+#~ msgid "Name for NBD export (number: ${number})?"
+#~ msgstr "Nome para a exportação NBD (número: ${number})?"
+
+#~ msgid ""
+#~ "Please enter the NBD export name needed to access nbd-server. The name "
+#~ "entered here should match an existing export on the server."
+#~ msgstr ""
+#~ "Por favor, informe o nome de exportação NBD necessário para acessar o nbd-"
+#~ "server. O nome informado aqui deve combinar com uma exportação já "
+#~ "existente no servidor."
+
+#~ msgid ""
+#~ "Note that as of NBD 3.10, connecting to an NBD export using the older "
+#~ "port-based negotiation protocol is no longer supported."
+#~ msgstr ""
+#~ "Note que o NBD 3.10 não oferece mais suporte a conectar a uma exportação "
+#~ "NBD usando o antigo protocolo de negociação baseado em porta."
+
+#~ msgid "/dev entry for this nbd-client (number: ${number})?"
+#~ msgstr "Entrada /dev para esse nbd-client (número: ${number})?"
+
+#~ msgid ""
+#~ "Every nbd-client process needs to be associated with a /dev entry with "
+#~ "major number 43. Please enter the name of the /dev entry you want to use "
+#~ "for this nbd-client. Note that this needs to be the full path to that "
+#~ "entry, not just the last part."
+#~ msgstr ""
+#~ "Cada processo nbd-client precisa estar associado com uma entrada /dev com "
+#~ "o número \"major\" 43. Por favor, informe o nome da entrada /dev que você "
+#~ "deseja usar para esse nbd-client. Note que o valor informado precisa ser "
+#~ "o caminho completo para essa entrada, não somente a última parte do "
+#~ "caminho."
+
+#~ msgid ""
+#~ "If the /dev entry specified does not exist, it will be created with minor "
+#~ "number ${number}."
+#~ msgstr ""
+#~ "Caso a entrada /dev especificada não exista, ela será criada com o número "
+#~ "\"minor\" ${number}."
+
+#~ msgid "Disconnect all NBD devices on \"stop\"?"
+#~ msgstr "Desconectar todos os dispositivos NBD no \"stop\"?"
+
+#~ msgid ""
+#~ "When the nbd-client init script is called to stop the nbd-client service, "
+#~ "there are two things that can be done: either it can disconnect all nbd-"
+#~ "client devices (which are assumed not to be in use), or it can disconnect "
+#~ "only those nbd-client devices that it knows about in its config file."
+#~ msgstr ""
+#~ "Quando o \"init script\" do nbd-client é chamado para parar o serviço nbd-"
+#~ "client, há duas coisas que podem ser feitas: ou ele pode desconectar "
+#~ "todos os dispositivos nbd-client (os quais assume-se não estarem em uso), "
+#~ "ou ele pode desconectar somente aqueles dispositivos nbd-client que ele "
+#~ "saiba a respeito no seu arquivo de configuração."
+
+#~ msgid ""
+#~ "The default (and the traditional behavior) is to disconnect all nbd-"
+#~ "client devices. If the root device or other critical file systems are on "
+#~ "NBD this will cause data loss and should not be accepted."
+#~ msgstr ""
+#~ "O comportamento padrão (e tradicional) é desconectar todos os "
+#~ "dispositivos nbd-client. Se o dispositivo raiz ou outro sistema de "
+#~ "arquivos crítico estiver sobre NBD, isso causará perda de dados e não "
+#~ "deverá ser aceito."
+
+#  Template: nbd-client/host
+#  ddtp-prioritize: 42
+#
+#~ msgid "Extra parameters (number: ${number})"
+#~ msgstr "Parâmetros extra (número: ${number})"
+
+#~ msgid ""
+#~ "If you wish to add any extra parameters to nbd-client, then please enter "
+#~ "them here."
+#~ msgstr ""
+#~ "Se você quer adicionar parâmetros extra ao nbd-client, então informe-os "
+#~ "aqui, por favor."
+
 #  Template: nbd-client/no-auto-config
 #  ddtp-prioritize: 42
 #
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "AUTO_GEN está definido como \"n\" em /etc/nbd-server"
+#~ msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+#~ msgstr "AUTO_GEN está definido como \"n\" em /etc/nbd-server"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-"O arquivo /etc/nbd-server contém uma linha que define a variável AUTO_GEN "
-"como \"n\". Por esse motivo, o arquivo não será regerado automaticamente."
+#~ msgid ""
+#~ "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable "
+#~ "to \"n\". The file will therefore not be regenerated automatically."
+#~ msgstr ""
+#~ "O arquivo /etc/nbd-server contém uma linha que define a variável AUTO_GEN "
+#~ "como \"n\". Por esse motivo, o arquivo não será regerado automaticamente."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-"Note que a versão atual do pacote nbd-server não usa mais /etc/nbd-server. "
-"Ao invés disso, ele usa um novo arquivo de configuração, lido pelo próprio "
-"nbd-server (e não pelo \"init script\"), que tem suporte a mais opções. Veja "
-"\"man 5 nbd-server\" para detalhes."
+#~ msgid ""
+#~ "Note that the current version of the nbd-server package no longer uses /"
+#~ "etc/nbd-server. Instead it uses a new configuration file, read by nbd-"
+#~ "server itself (rather than the init script), which supports more options. "
+#~ "See \"man 5 nbd-server\" for details."
+#~ msgstr ""
+#~ "Note que a versão atual do pacote nbd-server não usa mais /etc/nbd-"
+#~ "server. Ao invés disso, ele usa um novo arquivo de configuração, lido "
+#~ "pelo próprio nbd-server (e não pelo \"init script\"), que tem suporte a "
+#~ "mais opções. Veja \"man 5 nbd-server\" para detalhes."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
-msgstr ""
-"Se você remover ou comentar a linha AUTO_GEN, um arquivo /etc/nbd-server/"
-"config no novo formato pode ser gerado baseado na configuração atual. "
-"Enquanto isso, a instalação do nbd-server ficará quebrada."
+#~ msgid ""
+#~ "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+#~ "config in the new format may be generated based on the current "
+#~ "configuration. Until then, the nbd-server installation will be broken."
+#~ msgstr ""
+#~ "Se você remover ou comentar a linha AUTO_GEN, um arquivo /etc/nbd-server/"
+#~ "config no novo formato pode ser gerado baseado na configuração atual. "
+#~ "Enquanto isso, a instalação do nbd-server ficará quebrada."
 
 #  Template: nbd-client/host
 #  ddtp-prioritize: 42

@@ -15,7 +15,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2016-06-30 21:30+0200\n"
+"POT-Creation-Date: 2024-03-14 18:11+0000\n"
 "PO-Revision-Date: 2015-10-28 08:52+0100\n"
 "Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
 "Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
@@ -157,8 +157,8 @@ msgstr ""
 "síť. Můžete exportovat buď skutečné blokové zařízení (např. „/dev/hda1“), "
 "běžný soubor (např. „/export/nbd/bl1“), nebo dokonce skupinu souborů "
 "najednou. U poslední možnosti můžete ve jméně souboru použít „%s“, což se "
-"expanduje na IP adresu připojujícího se klienta, například „/export/swaps/swp"
-"%s“."
+"expanduje na IP adresu připojujícího se klienta, například „/export/swaps/"
+"swp%s“."
 
 #. Type: string
 #. Description
@@ -170,48 +170,36 @@ msgstr ""
 "Způsob, jakým bude v názvu souboru nahrazena IP adresa, se dá měnit. Více "
 "naleznete v manuálové stránce „man 5 nbd-server“."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "Volba AUTO_GEN je v /etc/nbd-server nastavena na „n“"
+#~ msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+#~ msgstr "Volba AUTO_GEN je v /etc/nbd-server nastavena na „n“"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-"V souboru /etc/nbd-server se nachází řádek, který nastavuje proměnnou "
-"AUTO_GEN na hodnotu „n“. To znamená, že nechcete, aby se soubor obnovoval "
-"automaticky."
+#~ msgid ""
+#~ "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable "
+#~ "to \"n\". The file will therefore not be regenerated automatically."
+#~ msgstr ""
+#~ "V souboru /etc/nbd-server se nachází řádek, který nastavuje proměnnou "
+#~ "AUTO_GEN na hodnotu „n“. To znamená, že nechcete, aby se soubor obnovoval "
+#~ "automaticky."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-"Aktuální verze balíku nbd-server již nepoužívá konfigurační soubor /etc/nbd-"
-"server, který byl načítán spouštěcím skriptem nbd. Nový konfigurační soubor "
-"je čten samotným nbd-serverem a umožňuje nastavit více voleb. Podrobnosti "
-"naleznete v manuálové stránce nbd-server(5)."
+#~ msgid ""
+#~ "Note that the current version of the nbd-server package no longer uses /"
+#~ "etc/nbd-server. Instead it uses a new configuration file, read by nbd-"
+#~ "server itself (rather than the init script), which supports more options. "
+#~ "See \"man 5 nbd-server\" for details."
+#~ msgstr ""
+#~ "Aktuální verze balíku nbd-server již nepoužívá konfigurační soubor /etc/"
+#~ "nbd-server, který byl načítán spouštěcím skriptem nbd. Nový konfigurační "
+#~ "soubor je čten samotným nbd-serverem a umožňuje nastavit více voleb. "
+#~ "Podrobnosti naleznete v manuálové stránce nbd-server(5)."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
-msgstr ""
-"Pokud odstraníte nebo zakomentujete řádek AUTO_GEN, vytvoří se nový soubor /"
-"etc/nbd-server/config na základě stávající konfigurace. Do té doby bude "
-"instalace nbd-serveru porušená."
+#~ msgid ""
+#~ "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+#~ "config in the new format may be generated based on the current "
+#~ "configuration. Until then, the nbd-server installation will be broken."
+#~ msgstr ""
+#~ "Pokud odstraníte nebo zakomentujete řádek AUTO_GEN, vytvoří se nový "
+#~ "soubor /etc/nbd-server/config na základě stávající konfigurace. Do té "
+#~ "doby bude instalace nbd-serveru porušená."
 
 #~ msgid ""
 #~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "

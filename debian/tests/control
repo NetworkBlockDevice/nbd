@@ -1,5 +1,15 @@
-Tests: nbdtab-ipv4-address
+Tests: read-write
 Depends:
  nbd-client,
  nbd-server,
 Restrictions: needs-root, allow-stderr, isolation-machine
+
+Tests: initrd-boot
+Depends:
+ debvm,
+ openssh-client,
+ nbd-server,
+ e2fsprogs,
+ uidmap,
+ awk,
+Restrictions: needs-sudo, allow-stderr

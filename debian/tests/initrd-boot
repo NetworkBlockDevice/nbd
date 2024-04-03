@@ -1,0 +1,86 @@
+#!/bin/bash
+
+set -exu
+
+TMPDIR="${AUTOPKGTEST_TMP:-/tmp}"
+OUTDIR="${AUTOPKGTEST_ARTIFACTS:-/tmp}"
+# We need TMPDIR to be world-readable for unshare to read it (used in creation
+# of our VM image below)
+chmod a+rx "$TMPDIR"
+
+# Figure out what we're running
+eval "$(grep "^VERSION_CODENAME=" /etc/os-release)"
+RELEASE="${VERSION_CODENAME:-unstable}"
+eval "$(grep "^ID=" /etc/os-release)"
+if [ "$ID" = "ubuntu" ]; then
+    COMPONENTS=main,universe
+    INCLUDES=e2fsprogs,zstd
+    EXTRAS=--keyring=/usr/share/keyrings/ubuntu-archive-keyring.gpg
+else
+    COMPONENTS=main
+    INCLUDES=
+    EXTRAS=
+fi
+
+# Generate an SSH key which we'll use to access the VM remotely
+ssh-keygen -q -t rsa -f "$TMPDIR"/id_rsa -N ""
+
+# Construct a VM image of the "current" (i.e. this chroot's) release, including
+# the SSH key we generated, and include the nbd-client package. We use a hook
+# to ensure our apt sources-and-preferences match the new VM's
+IMAGE="$TMPDIR"/nbd.img
+debvm-create \
+    --output="$IMAGE" \
+    --release="$RELEASE" \
+    --size=4G \
+    --sshkey="$TMPDIR"/id_rsa.pub \
+    --skip=usrmerge \
+    -- \
+    --mode=unshare \
+    --hook-dir=/usr/share/mmdebstrap/hooks/copy-host-apt-sources-and-preferences \
+    --hook-dir=/usr/share/mmdebstrap/hooks/file-mirror-automount \
+    --hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr \
+    --include="$INCLUDES${INCLUDES+,}nbd-client" \
+    --components="$COMPONENTS" \
+    $EXTRAS
+
+# Configure and start up the nbd-server pointing at the new VM image
+cat > "$TMPDIR"/myvm.conf << EOF
+[myvm]
+exportname = $IMAGE
+EOF
+sudo cp "$TMPDIR"/myvm.conf /etc/nbd-server/conf.d/
+sudo chown nbd:nbd "$IMAGE"
+sudo systemctl restart nbd-server.service
+
+# Start a VM from the template, skipping the root device and cmdline
+# definitions. This will use the kernel and initrd from the template (extracted
+# via debugfs), but not the image itself. The rootfs will come from the nbd
+# server (at least, that's what we hope!)
+timeout -k 300s 240s debvm-run \
+    --image="$IMAGE" \
+    --sshport=8022 \
+    --skip=root \
+    --append="nbdroot=10.0.2.2/myvm root=/dev/nbd0" \
+    </dev/null >"$OUTDIR"/debvm.log 2>&1 &
+
+# show the log and kill qemu in case the script exits first
+trap 'cat --show-nonprinting "$OUTDIR/debvm.log"' EXIT
+
+# the default of 60 seconds can be too slow for salsaci
+debvm-waitssh -t 120 8022
+
+# the default ssh command does not store known hosts and even ignores host keys
+# it identifies itself with the rsa key generated above
+# pseudo terminal allocation is disabled or otherwise, programs executed via
+# ssh might wait for input on stdin of the ssh process
+ssh="ssh -o ConnectTimeout=20 -o NoHostAuthenticationForLocalhost=yes -i $TMPDIR/id_rsa -T -p 8022"
+
+# Check (and show!) the root device is /dev/nbd0
+$ssh root@localhost -- "cat /proc/mounts" > "$OUTDIR"/mounts
+cat "$OUTDIR"/mounts
+awk '$1=="/dev/nbd0" && $2=="/" { print; }' "$OUTDIR"/mounts | grep "/"
+
+# shut the system off
+trap - EXIT
+$ssh root@localhost -- systemctl poweroff || :

@@ -754,6 +754,7 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	cur_client = calloc(sizeof(CLIENT), 1);
 	cur_client->bs = 512;
 	cur_client->nconn = 1;
+	cur_client->port = NBD_DEFAULT_PORT;
 	yyin = fopen(SYSCONFDIR "/nbdtab", "r");
 	yyout = fopen("/dev/null", "w");
 

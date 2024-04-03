@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nbd 1:3.11-1\n"
 "Report-Msgid-Bugs-To: nbd@packages.debian.org\n"
-"POT-Creation-Date: 2016-06-30 21:30+0200\n"
+"POT-Creation-Date: 2024-03-14 18:11+0000\n"
 "PO-Revision-Date: 2015-10-15 19:19+0300\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
@@ -16,8 +16,8 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Lokalize 1.5\n"
-"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
-"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #. Type: error
 #. Description
@@ -165,48 +165,36 @@ msgstr ""
 "Заметим, что возможно подстроить каким образом IP-адрес будет подменяться "
 "именем файла. См. «man 5 nbd-server»."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
-msgstr "Значение переменной AUTO_GEN равно «n» в /etc/nbd-server"
+#~ msgid "AUTO_GEN is set to \"n\" in /etc/nbd-server"
+#~ msgstr "Значение переменной AUTO_GEN равно «n» в /etc/nbd-server"
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"The /etc/nbd-server file contains a line that sets the AUTO_GEN variable to "
-"\"n\". The file will therefore not be regenerated automatically."
-msgstr ""
-"Файл /etc/nbd-server содержит строку, которая устанавливает переменную "
-"AUTO_GEN в значение «n». Из-за этого регенерация файла не будет выполнена "
-"автоматически."
+#~ msgid ""
+#~ "The /etc/nbd-server file contains a line that sets the AUTO_GEN variable "
+#~ "to \"n\". The file will therefore not be regenerated automatically."
+#~ msgstr ""
+#~ "Файл /etc/nbd-server содержит строку, которая устанавливает переменную "
+#~ "AUTO_GEN в значение «n». Из-за этого регенерация файла не будет выполнена "
+#~ "автоматически."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"Note that the current version of the nbd-server package no longer uses /etc/"
-"nbd-server. Instead it uses a new configuration file, read by nbd-server "
-"itself (rather than the init script), which supports more options. See \"man "
-"5 nbd-server\" for details."
-msgstr ""
-"Заметим, что в текущей версии пакета nbd-server больше не используется /etc/"
-"nbd-server. Вместо него используется новый файл настройки, который читается "
-"самим сервером nbd-server (а не сценарием начального запуска) и используется "
-"больше параметров. См. «man 5 nbd-server»."
+#~ msgid ""
+#~ "Note that the current version of the nbd-server package no longer uses /"
+#~ "etc/nbd-server. Instead it uses a new configuration file, read by nbd-"
+#~ "server itself (rather than the init script), which supports more options. "
+#~ "See \"man 5 nbd-server\" for details."
+#~ msgstr ""
+#~ "Заметим, что в текущей версии пакета nbd-server больше не используется /"
+#~ "etc/nbd-server. Вместо него используется новый файл настройки, который "
+#~ "читается самим сервером nbd-server (а не сценарием начального запуска) и "
+#~ "используется больше параметров. См. «man 5 nbd-server»."
 
-#. Type: error
-#. Description
-#: ../nbd-server.templates:5001
-msgid ""
-"If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
-"config in the new format may be generated based on the current "
-"configuration. Until then, the nbd-server installation will be broken."
-msgstr ""
-"Если вы удалите или закомментируете строку AUTO_GEN, будет создан файл /etc/"
-"nbd-server/config в новом формате на основе имеющихся настроек. Пока этого "
-"не будет сделано настройка nbd-server будет нерабочей."
+#~ msgid ""
+#~ "If you remove or comment out the AUTO_GEN line, a file /etc/nbd-server/"
+#~ "config in the new format may be generated based on the current "
+#~ "configuration. Until then, the nbd-server installation will be broken."
+#~ msgstr ""
+#~ "Если вы удалите или закомментируете строку AUTO_GEN, будет создан файл /"
+#~ "etc/nbd-server/config в новом формате на основе имеющихся настроек. Пока "
+#~ "этого не будет сделано настройка nbd-server будет нерабочей."
 
 #~ msgid ""
 #~ "If that's wrong, remove the line and call \"dpkg-reconfigure nbd-client\" "
