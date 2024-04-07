@@ -1,3 +1,28 @@
+nbd (1:3.26.1-2) unstable; urgency=medium
+
+  [ Dave Jones ]
+  * Add docbook build-dep, re-arrange build-deps
+  * Fix lintian pedantic: silent-on-rules-requiring-root
+  * Fix lintian warning: debian-rules-sets-dpkg-architecture-variable
+  * Fix lintian error: alien tag init.d-script-missing-dependency-on-remote_fs
+  * Fix lintian error: no-debconf-config
+  * Fix lintian warning: maintainer-script-ignores-errors
+  * Fix lintian warning: newer-debconf-templates
+  * Fix lintian warning: newer-debconf-templates
+  * Fix lintian warning: missing-systemd-service-for-init.d-script
+  * Set sensible default for port
+  * Fix the check & no cases of enable_manpages
+  * Add a slightly more complicated read-write test
+  * Add an initrd test
+  * Tighten restrictions on server
+  * Tighten restrictions on the nbd-client service
+  * Fix lintian warning: systemd-service-file-shutdown-problems
+
+  [ Wouter Verhelst ]
+  * Drop now-superfluous g_key_file_free()
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 07 Apr 2024 11:54:59 +0200
+
 nbd (1:3.26.1-1) unstable; urgency=medium
 
   * New upstream release
