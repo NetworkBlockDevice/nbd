@@ -1,4 +1,4 @@
-nbd (1:3.26.1-2) unstable; urgency=medium
+nbd (1:3.26.1-0) experimental; urgency=medium
 
   [ Dave Jones ]
   * Add docbook build-dep, re-arrange build-deps
