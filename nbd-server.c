@@ -871,7 +871,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 
         memset(&genconftmp, 0, sizeof(struct generic_conf));
 
-	genconftmp.tlsprio = "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:+VERS-TLS1.3:%SERVER_PRECEDENCE";
+	genconftmp.tlsprio = "NORMAL:+VERS-TLS-ALL:-VERS-TLS1.0:+VERS-TLS1.1:%SERVER_PRECEDENCE";
 
         if (genconf) {
                 /* Use the passed configuration values as defaults. The

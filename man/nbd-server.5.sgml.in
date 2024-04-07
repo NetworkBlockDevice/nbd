@@ -371,7 +371,7 @@ manpage.1: manpage.sgml
       <varlistentry>
         <term><option>tlsprio</option></term>
 	<listitem>
-	  <para>Optional; string; default NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:+VERS-TLS1.3:%SERVER_PRECEDENCE</para>
+	  <para>Optional; string; default NORMAL:+VERS-TLS-ALL:-VERS-TLS1.0:-VERS-TLS1.1:%SERVER_PRECEDENCE</para>
 	  <para>This option allows to configure the GnuTLS priority
 	    string, which is used to select the algorithms which GnuTLS
 	    will allow to be negotiated with the client. The NBD
