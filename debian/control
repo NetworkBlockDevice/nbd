@@ -9,6 +9,7 @@ Build-Depends:
  libnl-genl-3-dev [linux-any],
  docbook-utils,
  docbook,
+ po-debconf,
  autoconf-archive,
  bison,
  flex,

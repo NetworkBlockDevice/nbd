@@ -1,3 +1,9 @@
+nbd (1:3.26.1-1~exp1) experimental; urgency=medium
+
+  * Add missing po-debconf build-dep
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 07 Apr 2024 14:55:35 +0200
+
 nbd (1:3.26.1-0) experimental; urgency=medium
 
   [ Dave Jones ]
