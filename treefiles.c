@@ -84,7 +84,7 @@ int open_treefile(char* name, mode_t mode, off_t size, off_t pos, pthread_mutex_
 
 			DEBUG("Creating a dummy tempfile for reading");
 			char tmpname[] = "dummy-XXXXXX";
-			mode_t oldmode = umask(77);
+			mode_t oldmode = umask(077);
 			handle = mkstemp(tmpname);
 			umask(oldmode);
 			if (handle>0) {
