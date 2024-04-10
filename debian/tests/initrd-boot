@@ -10,7 +10,12 @@ chmod a+rx "$TMPDIR"
 
 # Figure out what we're running
 eval "$(grep "^VERSION_CODENAME=" /etc/os-release)"
-RELEASE="${VERSION_CODENAME:-unstable}"
+eval "$(grep "^VERSION_ID=" /etc/os-release)"
+if [ -z "$VERSION_ID" ]; then
+    RELEASE=$(perl debian/tests/get-deb-codename.pl)
+else
+    RELEASE="${VERSION_CODENAME:-unstable}"
+fi
 eval "$(grep "^ID=" /etc/os-release)"
 if [ "$ID" = "ubuntu" ]; then
     COMPONENTS=main,universe
