@@ -1,23 +1,20 @@
-#include "lfs.h"
 #include <fcntl.h>
+#include <limits.h> // for PATH_MAX
 #include <inttypes.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <glib.h>
+#include "config.h"
+#include "cliserv.h"
+#include "treefiles.h"
+#include "nbd-debug.h"
 
-#include <backend.h>
-#include <config.h>
-#include <cliserv.h>
-#include <treefiles.h>
-#include <nbd-debug.h>
-#include <nbdsrv.h>
 /**
  * Tree structure helper functions
  */
-void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
+void construct_path(char* name, int lenmax, off_t size, off_t pos, off_t* ppos) {
 	if (lenmax<10)
 		err("Char buffer overflow. This is likely a bug.");
 
@@ -34,7 +31,7 @@ void construct_path(char* name,int lenmax,off_t size, off_t pos, off_t * ppos) {
 	}
 }
 
-void delete_treefile(char* name,off_t size,off_t pos) {
+void delete_treefile(char* name, off_t size, off_t pos) {
 	char filename[PATH_MAX];
 	off_t ppos;
 
@@ -48,7 +45,7 @@ void delete_treefile(char* name,off_t size,off_t pos) {
 		DEBUG("Deleting failed : %s",strerror(errno));
 }
 
-void mkdir_path(char * path) {
+void mkdir_path(char* path) {
 	char *subpath=path+1;
 	while ((subpath=strchr(subpath,'/'))) {
 		*subpath='\0'; // path is modified in place with terminating null char instead of slash
@@ -61,7 +58,7 @@ void mkdir_path(char * path) {
 	}
 }
 
-int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *mutex) {
+int open_treefile(char* name, mode_t mode, off_t size, off_t pos, pthread_mutex_t* mutex) {
 	char filename[PATH_MAX];
 	off_t ppos;
 
@@ -69,7 +66,7 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *
 	filename[PATH_MAX - 1] = '\0';
 	construct_path(filename+strlen(name),PATH_MAX-strlen(name)-1,size,pos,&ppos);
 
-	DEBUG("Accessing treefile %s ( offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
+	DEBUG("Accessing treefile %s (offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 
 	pthread_mutex_lock(mutex);
 	int handle=open(filename, mode, 0600);
@@ -86,8 +83,7 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *
 		} else {
 
 			DEBUG("Creating a dummy tempfile for reading");
-			gchar * tmpname;
-			tmpname = g_strdup_printf("dummy-XXXXXX");
+			char tmpname[] = "dummy-XXXXXX";
 			mode_t oldmode = umask(77);
 			handle = mkstemp(tmpname);
 			umask(oldmode);
@@ -96,9 +92,8 @@ int open_treefile(char* name,mode_t mode,off_t size,off_t pos, pthread_mutex_t *
 			} else {
 				err("Error opening tree block file %m");
 			}
-			g_free(tmpname);
 		}
-		char *n = "\0";
+		char* n = "\0";
 		if(lseek(handle,TREEPAGESIZE-1, SEEK_SET) < 0) {
 			err("Could not create tree file!\n");
 		}
