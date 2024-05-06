@@ -139,7 +139,7 @@ int readit(int f, void *buf, size_t len) {
  * @param len the number of bytes to be written
  * @return 0 on success, or -1 if the socket was closed
  **/
-int writeit(int f, void *buf, size_t len) {
+int writeit(int f, const void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");

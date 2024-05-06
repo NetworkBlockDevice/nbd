@@ -301,7 +301,7 @@ struct generic_conf {
 };
 
 #if HAVE_GNUTLS
-static int writeit_tls(gnutls_session_t s, void *buf, size_t len) {
+static int writeit_tls(gnutls_session_t s, const void *buf, size_t len) {
 	_cleanup_g_free_ char *m = NULL;
 	ssize_t res;
 	while(len > 0) {
@@ -345,7 +345,7 @@ static int socket_read_tls(CLIENT* client, void *buf, size_t len) {
 	return readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
 
-static int socket_write_tls(CLIENT* client, void *buf, size_t len) {
+static int socket_write_tls(CLIENT* client, const void *buf, size_t len) {
 	return writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
 #endif // HAVE_GNUTLS
@@ -354,7 +354,7 @@ static int socket_read_notls(CLIENT* client, void *buf, size_t len) {
 	return readit(client->net, buf, len);
 }
 
-static int socket_write_notls(CLIENT* client, void *buf, size_t len) {
+static int socket_write_notls(CLIENT* client, const void *buf, size_t len) {
 	return writeit(client->net, buf, len);
 }
 
@@ -397,7 +397,7 @@ static inline void consume_len(CLIENT* c) {
 	consume(c, len, buf, sizeof(buf));
 }
 
-static void socket_write(CLIENT* client, void *buf, size_t len) {
+static void socket_write(CLIENT* client, const void *buf, size_t len) {
 	g_assert(client->socket_write != NULL);
 	if(client->socket_write(client, buf, len)<0) {
 		g_assert(client->socket_closed != NULL);
@@ -1790,7 +1790,7 @@ void punch_hole(int fd, off_t off, off_t len) {
 	}
 }
 
-static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, void* data) {
+static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, const void* data) {
 	struct {
 		uint64_t magic;
 		uint32_t opt;
