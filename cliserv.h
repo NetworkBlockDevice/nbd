@@ -89,7 +89,7 @@ uint64_t ntohll(uint64_t a);
 #endif
 
 int readit(int f, void *buf, size_t len);
-int writeit(int f, void *buf, size_t len);
+int writeit(int f, const void *buf, size_t len);
 
 #define NBD_DEFAULT_PORT	"10809"	/* Port on which named exports are
 					 * served */
