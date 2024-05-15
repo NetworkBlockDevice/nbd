@@ -4,7 +4,9 @@ Documentation=man:nbd-client
 PartOf=nbd.service
 Before=dev-%i.device
 Before=remote-fs-pre.target
+Requirs=modprobe@nbd.service
 After=network-online.target
+After=modprobe@nbd.service
 Conflicts=shutdown.target
 DefaultDependencies=no
 [Service]
