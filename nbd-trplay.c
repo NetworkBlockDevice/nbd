@@ -8,6 +8,7 @@
  * (C) Robert Bosch GmbH, 2021
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <stdio.h>

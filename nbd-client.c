@@ -29,6 +29,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include "nbd.h"
 #include "netdb-compat.h"
 #include <inttypes.h>
 #include <stdio.h>
@@ -163,7 +164,7 @@ static struct nl_sock *get_nbd_socket(int *driver_id) {
 }
 
 static void netlink_configure(int index, int *sockfds, int num_connects,
-			      u64 size64, int blocksize, uint16_t flags,
+			      uint64_t size64, int blocksize, uint16_t flags,
 			      int timeout) {
 	struct nl_sock *socket;
 	struct nlattr *sock_attr;
@@ -180,6 +181,7 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 		    NBD_CMD_CONNECT, 0);
 	if (index >= 0)
 		NLA_PUT_U32(msg, NBD_ATTR_INDEX, index);
+
 	NLA_PUT_U64(msg, NBD_ATTR_SIZE_BYTES, size64);
 	NLA_PUT_U64(msg, NBD_ATTR_BLOCK_SIZE_BYTES, blocksize);
 	NLA_PUT_U64(msg, NBD_ATTR_SERVER_FLAGS, flags);
@@ -236,7 +238,7 @@ nla_put_failure:
 }
 #else
 static void netlink_configure(int index, int *sockfds, int num_connects,
-			      u64 size64, int blocksize, uint16_t flags,
+			      uint64_t size64, int blocksize, uint16_t flags,
 			      int timeout)
 {
 }
@@ -531,7 +533,7 @@ void parse_sizes(char *buf, uint64_t *size, uint16_t *flags) {
 	printf("\n");
 }
 
-void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_go, char* name, uint16_t global_flags) {
+void send_opt_exportname(int sock, uint64_t *rsize64, uint16_t *flags, bool can_opt_go, char* name, uint16_t global_flags) {
 	send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
 	char b[sizeof(*flags) + sizeof(*rsize64)];
 	if(readit(sock, b, sizeof(b)) < 0 && can_opt_go) {
@@ -544,8 +546,8 @@ void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_g
 	}
 }
 
-void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls, char *priority, bool can_opt_go) {
-	u64 magic;
+void negotiate(int *sockp, uint64_t *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls, char *priority, bool can_opt_go) {
+	uint64_t magic;
 	uint16_t tmp;
 	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
@@ -804,7 +806,7 @@ out:
 	return retval;
 }
 
-void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
+void setsizes(int nbd, uint64_t size64, int blocksize, uint32_t flags) {
 	unsigned long size;
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
@@ -812,14 +814,14 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 		err("Device too large.\n");
 	else {
 		int tmp_blocksize = 4096;
-		if (size64 / (u64)blocksize <= (uint64_t)~0UL)
+		if (size64 / (uint64_t)blocksize <= (uint64_t)~0UL)
 			tmp_blocksize = blocksize;
 		if (ioctl(nbd, NBD_SET_BLKSIZE, tmp_blocksize) < 0) {
 			fprintf(stderr, "Failed to set blocksize %d\n",
 				tmp_blocksize);
 			err("Ioctl/1.1a failed: %m\n");
 		}
-		size = (unsigned long)(size64 / (u64)tmp_blocksize);
+		size = (unsigned long)(size64 / (uint64_t)tmp_blocksize);
 		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
 		if (tmp_blocksize != blocksize) {
@@ -829,7 +831,7 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 				err("Ioctl/1.1c failed: %m\n");
 			}
 		}
-		fprintf(stderr, "bs=%d, sz=%" PRIu64 " bytes\n", blocksize, (u64)tmp_blocksize * size);
+		fprintf(stderr, "bs=%d, sz=%" PRIu64 " bytes\n", blocksize, (uint64_t)tmp_blocksize * size);
 	}
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
@@ -947,8 +949,8 @@ int main(int argc, char *argv[]) {
 	int timeout=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	pid_t main_pid;
-	u64 size64 = 0;
-	u64 force_size64 = 0;
+	uint64_t size64 = 0;
+	uint64_t force_size64 = 0;
 	uint16_t flags = 0;
 	bool force_read_only = false;
 	bool preinit = false;
@@ -1062,7 +1064,7 @@ int main(int argc, char *argv[]) {
 			}
 			break;
 		case 'B':
-			force_size64=(u64)strtoull(optarg, NULL, 0);
+			force_size64=(uint64_t)strtoull(optarg, NULL, 0);
 			if(force_size64 == 0) {
 				fprintf(stderr, "E: Invalid size\n");
 				exit(EXIT_FAILURE);
@@ -1341,7 +1343,7 @@ int main(int argc, char *argv[]) {
 				cont=0;
 			} else {
 				if(cont) {
-					u64 new_size;
+					uint64_t new_size;
 					uint16_t new_flags;
 
 					close(sock); close(nbd);
