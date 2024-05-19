@@ -8,9 +8,13 @@ OUTDIR="${AUTOPKGTEST_ARTIFACTS:-/tmp}"
 # of our VM image below)
 chmod a+rx "$TMPDIR"
 
+VERSION_ID=
+VERSION_CODENAME=
+
 # Figure out what we're running
 eval "$(grep "^VERSION_CODENAME=" /etc/os-release)"
 eval "$(grep "^VERSION_ID=" /etc/os-release)"
+
 if [ -z "$VERSION_ID" ]; then
     RELEASE=$(perl debian/tests/get-deb-codename.pl)
 else
