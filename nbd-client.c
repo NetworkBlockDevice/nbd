@@ -342,7 +342,7 @@ int openunix(const char *path) {
 		return -1;
 	};
 
-	if (connect(sock, &un_addr, sizeof(un_addr)) == -1) {
+	if (connect(sock, (struct sockaddr*)&un_addr, sizeof(un_addr)) == -1) {
 		err_nonfatal("CONNECT failed");
 		close(sock);
 		return -1;
