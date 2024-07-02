@@ -17,7 +17,7 @@ override_dh_auto_configure: debian/po/templates.pot
 	test -f nbd.h
 	if [ -d .git ]; then if [ $$(git status --porcelain | tee gitstatus | wc -l) -ne 1 ]; then echo "GIT STATUS:"; echo "==========="; cat gitstatus; exit 1; fi; rm gitstatus; fi
 	dh_auto_configure -- --enable-lfs --enable-syslog \
-			--prefix=/ --mandir=/usr/share/man
+			--mandir=/usr/share/man
 
 override_dh_install:
 	install -d debian/tmp/usr/share/initramfs-tools/scripts/local-top

@@ -4,6 +4,8 @@ nbd (1:3.26.1-2) unstable; urgency=medium
     on the nbd module being loaded. Closes: #1070964.
   * debian/tests/initrd-boot: account for "set -u" in variables that we're
     validating.
+  * debian/rules, debian/nbd-client.install, debian/nbd-server.install:
+    Perform /usr move. Closes: 1073693.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 15 May 2024 11:23:04 +0200
 

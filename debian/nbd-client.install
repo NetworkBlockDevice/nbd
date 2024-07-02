@@ -1,6 +1,6 @@
 etc/nbdtab
-sbin/nbd-client
+usr/sbin/nbd-client
 usr/share/man/man8/nbd-client.8
 usr/share/man/man5/nbdtab.5
 usr/share/initramfs-tools
-systemd/nbd@.service /lib/systemd/system
+systemd/nbd@.service usr/lib/systemd/system
