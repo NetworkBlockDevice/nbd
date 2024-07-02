@@ -2,6 +2,8 @@ nbd (1:3.26.1-2) unstable; urgency=medium
 
   * systemd/nbd@.service.tmpl: cherry-pick patch from master to add dependency
     on the nbd module being loaded. Closes: #1070964.
+  * debian/tests/initrd-boot: account for "set -u" in variables that we're
+    validating.
 
  -- Wouter Verhelst <wouter@debian.org>  Wed, 15 May 2024 11:23:04 +0200
 
