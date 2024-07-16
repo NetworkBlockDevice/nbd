@@ -1,3 +1,9 @@
+nbd (1:3.26.1-4) unstable; urgency=medium
+
+  * debian/not-installed: usrmerge this as well
+
+ -- Wouter Verhelst <wouter@debian.org>  Wed, 17 Jul 2024 00:40:54 +0200
+
 nbd (1:3.26.1-3) unstable; urgency=medium
 
   * debian/tests/initrd-boot: just source the whole os-release file,
