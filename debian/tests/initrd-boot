@@ -8,6 +8,9 @@ OUTDIR="${AUTOPKGTEST_ARTIFACTS:-/tmp}"
 # of our VM image below)
 chmod a+rx "$TMPDIR"
 
+VERSION_ID=
+VERSION_CODENAME=
+
 source /etc/os-release
 
 if [ -z "$VERSION_ID" ]; then
