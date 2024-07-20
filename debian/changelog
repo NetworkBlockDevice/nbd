@@ -1,7 +1,9 @@
 nbd (1:3.26.1-5) UNRELEASED; urgency=medium
 
-  * debian/nbd-client.links: more usrmerge
-  * debian/tests/initrd-boot: still -u
+  * debian/nbd-client.links: more usrmerge. Closes: #1073693, hopefully for
+    real this time
+  * debian/tests/initrd-boot: still need variables defined before sourcing
+    os-release, because of -u
 
  -- Wouter Verhelst <wouter@debian.org>  Sat, 20 Jul 2024 13:37:10 +0200
 
