@@ -199,8 +199,13 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 	}
 	nla_nest_end(msg, sock_attr);
 
-	if (nl_send_sync(socket, msg) < 0)
-		err("Failed to setup device, check dmesg\n");
+	if (nl_send_sync(socket, msg) < 0) {
+                if(geteuid() != 0) {
+                        err("Failed to setup device. Are you root?\n");
+                } else {
+		        err("Failed to setup device, check dmesg\n");
+                }
+        }
 	return;
 nla_put_failure:
 	err("Failed to create netlink message\n");
