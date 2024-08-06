@@ -3779,22 +3779,45 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 
 /**
  * Go daemon (unless we specified at compile time that we didn't want this)
- * @param serve the first server of our configuration. If its port is zero,
- * 	then do not daemonize, because we're doing inetd then. This parameter
- * 	is only used to create a PID file of the form
- * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
  **/
 #if !defined(NODAEMON)
 void daemonize() {
-	FILE*pidf;
-
-	if(daemon(0,0)<0) {
-		err("daemon");
-	}
+        pid_t child=fork();
+        if(child < 0) {
+		err("fork");
+	} else if(child > 0) {
+                exit(EXIT_SUCCESS);
+	} else {
+                if(setsid() < 0) {
+                        err("setsid");
+                }
+        }
+        if(chdir("/")<0) {
+                err("chdir");
+        }
 	if(!*pidfname) {
 		strncpy(pidfname, "/var/run/nbd-server.pid", 255);
 	}
-	pidf=fopen(pidfname, "w");
+        int newfd;
+        if((newfd = open("/dev/null", O_RDWR)) < 0) {
+                err("open");
+        }
+        if(dup2(0, newfd) < 0) {
+                err("dup2 stdin");
+        }
+        if(dup2(1, newfd) < 0) {
+                err("dup2 stdout");
+        }
+        if(dup2(2, newfd) < 0) {
+                err("dup2 stderr");
+        }
+        child=fork();
+        if(child < 0) {
+                err("fork");
+        } else if(child > 0) {
+                exit(EXIT_SUCCESS);
+        }
+	FILE*pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
 		fclose(pidf);
@@ -3804,7 +3827,7 @@ void daemonize() {
 	}
 }
 #else
-#define daemonize(serve)
+#define daemonize()
 #endif /* !defined(NODAEMON) */
 
 /*
