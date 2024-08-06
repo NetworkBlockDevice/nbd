@@ -84,19 +84,6 @@ else
   AC_MSG_RESULT([no])
 fi
 
-AC_ARG_ENABLE(
-  [gznbd],
-  [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images. NOTE: no support for newstyle protocol.)])],
-  [
-    AS_IF(
-      [test "x$enableval" = "xyes"],
-      [ENABLE_GZNBD=yes],
-      [ENABLE_GZNBD=no]
-    )
-  ],
-  [ENABLE_GZNBD=no]
-)
-
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -383,7 +370,6 @@ AC_CONFIG_FILES([Makefile
 		 doc/Doxyfile
 		 doc/Makefile
 		 man/Makefile
-		 gznbd/Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile

@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS = -I support
-SUBDIRS = . man doc tests systemd gznbd
+SUBDIRS = . man doc tests systemd
 bin_PROGRAMS = nbd-server nbd-trdump nbd-trplay
 EXTRA_PROGRAMS = nbd-client make-integrityhuge
 noinst_LTLIBRARIES = libnbdsrv.la libcliserv.la libnbdclt.la
