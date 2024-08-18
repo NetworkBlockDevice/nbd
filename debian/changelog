@@ -7,6 +7,13 @@ nbd (1:3.26.1-5) UNRELEASED; urgency=medium
 
  -- Wouter Verhelst <wouter@debian.org>  Sat, 20 Jul 2024 13:37:10 +0200
 
+nbd (1:3.26.1-4.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * debian/nbd-client.links: move the symlink to /usr. Closes: #1073693.
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 15 Aug 2024 09:22:24 +0200
+
 nbd (1:3.26.1-4) unstable; urgency=medium
 
   * debian/not-installed: usrmerge this as well
