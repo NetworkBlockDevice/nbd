@@ -7,8 +7,7 @@ This package contains nbd-server and nbd-client.
 
 To install the package, download the source and do the normal
 `configure`/`make`/`make install` dance. You'll need to install it on both the
-client and the server. Note that released nbd tarballs are found on
-[sourceforge](http://sourceforge.net/projects/nbd/files/nbd/).
+client and the server.
 
 For compiling from git, do a checkout, install the SGML tools
 (docbook2man), and then run './autogen.sh' while inside your checkout.
