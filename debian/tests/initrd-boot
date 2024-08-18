@@ -8,16 +8,6 @@ OUTDIR="${AUTOPKGTEST_ARTIFACTS:-/tmp}"
 # of our VM image below)
 chmod a+rx "$TMPDIR"
 
-VERSION_ID=
-VERSION_CODENAME=
-
-source /etc/os-release
-
-if [ -z "$VERSION_ID" ]; then
-    RELEASE=$(perl debian/tests/get-deb-codename.pl)
-else
-    RELEASE="${VERSION_CODENAME:-unstable}"
-fi
 eval "$(grep "^ID=" /etc/os-release)"
 if [ "$ID" = "ubuntu" ]; then
     COMPONENTS=main,universe
@@ -38,7 +28,7 @@ ssh-keygen -q -t rsa -f "$TMPDIR"/id_rsa -N ""
 IMAGE="$TMPDIR"/nbd.img
 debvm-create \
     --output="$IMAGE" \
-    --release="$RELEASE" \
+    --release="" \
     --size=4G \
     --sshkey="$TMPDIR"/id_rsa.pub \
     --skip=usrmerge \
@@ -47,9 +37,10 @@ debvm-create \
     --hook-dir=/usr/share/mmdebstrap/hooks/copy-host-apt-sources-and-preferences \
     --hook-dir=/usr/share/mmdebstrap/hooks/file-mirror-automount \
     --hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr \
-    --include="$INCLUDES${INCLUDES+,}nbd-client" \
+    --include="$INCLUDES${INCLUDES:+,}nbd-client" \
     --components="$COMPONENTS" \
-    $EXTRAS
+    $EXTRAS \
+    ""
 
 # Configure and start up the nbd-server pointing at the new VM image
 cat > "$TMPDIR"/myvm.conf << EOF
