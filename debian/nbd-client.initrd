@@ -116,10 +116,3 @@ fi
 NBDCLIENT=${NBDCLIENT:-/sbin/nbd-client}
 $NBDCLIENT $nbdsrv -N $nbdpath $nbdport $nbdrootdev -swap -persist -systemd-mark -b 512
 blockdev --rereadpt $nbdrootdev/
-
-# This should be removed once the cfq scheduler no longer deadlocks nbd
-# devices
-if grep -q '\[cfq\]' /sys/block/$nbdbasedev/queue/scheduler
-then
-	echo deadline > /sys/block/$nbdbasedev/queue/scheduler
-fi
