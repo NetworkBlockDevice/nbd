@@ -7,7 +7,7 @@
 
 clean:
 	debconf-updatepo
-	dh_clean
+	dh clean
 
 
 override_dh_autoreconf:
