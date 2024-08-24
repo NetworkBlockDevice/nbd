@@ -1,11 +1,15 @@
-nbd (1:3.26.1-5) UNRELEASED; urgency=medium
+nbd (1:3.26.1-5) unstable; urgency=medium
 
-  * debian/nbd-client.links: more usrmerge. Closes: #1073693, hopefully for
-    real this time
-  * debian/tests/initrd-boot: still need variables defined before sourcing
-    os-release, because of -u
+  * Ack NMU.
+  * debian/tests/initrd-boot: Skip parsing os-release, as suggested by Helmut
+    Grohne, to improve similarity between host and guest systems; not passing
+    a distribution causes debvm-build to generate a VM with the same apt
+    configuration as the host, so that should help.
+  * debian/nbd-client.initrd: Drop cfq handling. CFQ has not been the default
+    in the Linux kernel for ages now, and the handling requires grep, which is
+    not in some initrd images.
 
- -- Wouter Verhelst <wouter@debian.org>  Sat, 20 Jul 2024 13:37:10 +0200
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 24 Aug 2024 15:45:40 +0200
 
 nbd (1:3.26.1-4.1) unstable; urgency=medium
 
