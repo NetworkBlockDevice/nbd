@@ -11,11 +11,11 @@ chmod a+rx "$TMPDIR"
 eval "$(grep "^ID=" /etc/os-release)"
 if [ "$ID" = "ubuntu" ]; then
     COMPONENTS=main,universe
-    INCLUDES=e2fsprogs,zstd
+    INCLUDES=e2fsprogs,zstd,openssh-server
     EXTRAS=--keyring=/usr/share/keyrings/ubuntu-archive-keyring.gpg
 else
     COMPONENTS=main
-    INCLUDES=
+    INCLUDES=openssh-server
     EXTRAS=
 fi
 
@@ -55,7 +55,7 @@ sudo systemctl restart nbd-server.service
 # definitions. This will use the kernel and initrd from the template (extracted
 # via debugfs), but not the image itself. The rootfs will come from the nbd
 # server (at least, that's what we hope!)
-timeout -k 300s 240s debvm-run \
+timeout -k 300s 300s debvm-run \
     --image="$IMAGE" \
     --sshport=8022 \
     --skip=root \
@@ -66,7 +66,7 @@ timeout -k 300s 240s debvm-run \
 trap 'cat --show-nonprinting "$OUTDIR/debvm.log"' EXIT
 
 # the default of 60 seconds can be too slow for salsaci
-debvm-waitssh -t 120 8022
+debvm-waitssh -t 240 8022
 
 # the default ssh command does not store known hosts and even ignores host keys
 # it identifies itself with the rsa key generated above
