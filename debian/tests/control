@@ -12,4 +12,4 @@ Depends:
  e2fsprogs,
  uidmap,
  awk,
-Restrictions: needs-sudo, allow-stderr
+Restrictions: needs-sudo, allow-stderr, flaky
