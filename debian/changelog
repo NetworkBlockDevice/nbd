@@ -1,3 +1,16 @@
+nbd (1:3.26.1-6) unstable; urgency=medium
+
+  [ Michael Biebl ]
+  * debian/tests/get-deb-codename.pl: drop, no longer required.
+  * Mark initrd-boot autopkgtest as flaky; it doesn't pass on debci yet and
+    thus blocks migration.
+
+  [ Wouter Verhelst ]
+  * debian/tests/initrd-boot: increase timeouts to (hopefully) allow for it to
+    not fail.
+
+ -- Wouter Verhelst <wouter@debian.org>  Sat, 31 Aug 2024 14:25:59 +0200
+
 nbd (1:3.26.1-5) unstable; urgency=medium
 
   * Ack NMU.
