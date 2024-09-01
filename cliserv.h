@@ -9,36 +9,14 @@
    Send 128 bytes of zeros (reserved for future use)
  */
 
-#include <errno.h>
 #include <string.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <stdlib.h>
 
-#if SIZEOF_UNSIGNED_SHORT_INT==4
-typedef unsigned short u32;
-#elif SIZEOF_UNSIGNED_INT==4
-typedef unsigned int u32;
-#elif SIZEOF_UNSIGNED_LONG_INT==4
-typedef unsigned long u32;
-#else
-#error I need at least some 32-bit type
-#endif
+#include "config.h"
 
-#if SIZEOF_UNSIGNED_INT==8
-typedef unsigned int u64;
-#elif SIZEOF_UNSIGNED_LONG_INT==8
-typedef unsigned long u64;
-#elif SIZEOF_UNSIGNED_LONG_LONG_INT==8
-typedef unsigned long long u64;
-#else
-#error I need at least some 64-bit type
-#endif
-
-#define __be32 u32
-#define __be64 u64
-#include "nbd.h"
 
 #ifndef HAVE_FDATASYNC
 #define fdatasync(arg) fsync(arg)
@@ -64,9 +42,9 @@ typedef unsigned long long u64;
 #endif
 #endif
 
-extern const u64 cliserv_magic;
-extern const u64 opts_magic;
-extern const u64 rep_magic;
+extern const uint64_t cliserv_magic;
+extern const uint64_t opts_magic;
+extern const uint64_t rep_magic;
 
 #define INIT_PASSWD "NBDMAGIC"
 

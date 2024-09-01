@@ -1573,7 +1573,7 @@ int expread(READ_CTX *ctx, CLIENT *client) {
 			len : (size_t)DIFFPAGESIZE-offset;
 		if (!(client->server->flags & F_COPYONWRITE))
 			pthread_rwlock_rdlock(&client->export_lock);
-		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
+		if (client->difmap[mapcnt]!=(uint32_t)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			char *buf = find_read_buf(ctx);
@@ -1642,7 +1642,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 		if (!(client->server->flags & F_COPYONWRITE))
 			pthread_rwlock_rdlock(&client->export_lock);
-		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
+		if (client->difmap[mapcnt]!=(uint32_t)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
 			if (pwrite(client->difffile, buf, wrlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != wrlen) goto fail;
@@ -1942,7 +1942,7 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 		offset = DIFFPAGESIZE*i;
 		if (lock)
 			pthread_rwlock_wrlock(&client->export_lock);
-		if (client->difmap[i] != (u32)-1){
+		if (client->difmap[i] != (uint32_t)-1){
 			dirtycount += 1;
 			DEBUG("flushing dirty page %d, offset %ld\n", i, offset);
 			if (pread(client->difffile, buf, DIFFPAGESIZE, client->difmap[i]*DIFFPAGESIZE) != DIFFPAGESIZE) {
@@ -1959,7 +1959,7 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 				}
 				break;
 			}
-			client->difmap[i] = (u32)-1;
+			client->difmap[i] = (uint32_t)-1;
 		}
 		if (lock)
 			pthread_rwlock_unlock(&client->export_lock);
@@ -2155,17 +2155,17 @@ bool copyonwrite_prepare(CLIENT* client) {
 		err("Could not create diff file (%m)");
 		return false;
 	}
-	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL) {
+	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(uint32_t)))==NULL) {
 		err("Could not allocate memory");
 		return false;
 	}
-	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1;
+	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(uint32_t)-1;
 
 	return true;
 }
 
 void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
-	uint64_t size_host = htonll((u64)(client->exportsize));
+	const uint64_t size_host = htonll((uint64_t)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
 	socket_write(client, &size_host, 8);

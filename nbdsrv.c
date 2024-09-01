@@ -228,7 +228,7 @@ SERVER* dup_serve(const SERVER *const s) {
 
 uint64_t size_autodetect(int fhandle) {
 	off_t es;
-	u64 bytes __attribute__((unused));
+	uint64_t bytes __attribute__((unused));
 	struct stat stat_buf;
 	int error;
 
