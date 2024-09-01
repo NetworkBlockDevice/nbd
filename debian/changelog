@@ -9,7 +9,10 @@ nbd (1:3.26.1-6) unstable; urgency=medium
   * debian/tests/initrd-boot: increase timeouts to (hopefully) allow for it to
     not fail.
 
- -- Wouter Verhelst <wouter@debian.org>  Sat, 31 Aug 2024 14:25:59 +0200
+  [ Helmut Grohne ]
+  * Drop /sbin from nbd-client. (Closes: #1080063).
+
+ -- Wouter Verhelst <wouter@debian.org>  Sun, 01 Sep 2024 20:14:32 +0200
 
 nbd (1:3.26.1-5) unstable; urgency=medium
 
