@@ -284,7 +284,7 @@ int check_conn(char* devname, int do_print) {
 	return 0;
 }
 
-int opennet(char *name, char* portstr) {
+int opennet() {
 	int sock;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
@@ -297,7 +297,7 @@ int opennet(char *name, char* portstr) {
 	hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	e = getaddrinfo(name, portstr, &hints, &ai);
+	e = getaddrinfo(cur_client->hostn, cur_client->port, &hints, &ai);
 
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
@@ -329,8 +329,9 @@ err:
 	return sock;
 }
 
-int openunix(const char *path) {
+int openunix() {
 	int sock;
+        char *path = cur_client->hostn;
 	struct sockaddr_un un_addr;
 	memset(&un_addr, 0, sizeof(un_addr));
 
@@ -536,20 +537,20 @@ void parse_sizes(char *buf, uint64_t *size, uint16_t *flags) {
 	printf("\n");
 }
 
-void send_opt_exportname(int sock, u64 *rsize64, uint16_t *flags, bool can_opt_go, char* name, uint16_t global_flags) {
+void send_opt_exportname(int sock, uint16_t *flags, char* name, uint16_t global_flags) {
 	send_request(sock, NBD_OPT_EXPORT_NAME, -1, name);
-	char b[sizeof(*flags) + sizeof(*rsize64)];
-	if(readit(sock, b, sizeof(b)) < 0 && can_opt_go) {
+	char b[sizeof(*flags) + sizeof(cur_client->size64)];
+	if(readit(sock, b, sizeof(b)) < 0 && !cur_client->no_optgo) {
 		err("E: server does not support NBD_OPT_GO and dropped connection after sending NBD_OPT_EXPORT_NAME. Try -g.");
 	}
-	parse_sizes(b, rsize64, flags);
+	parse_sizes(b, &(cur_client->size64), flags);
 	if(!(global_flags & NBD_FLAG_NO_ZEROES)) {
 		char buf[125];
 		readit(sock, buf, 124);
 	}
 }
 
-void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts, char *certfile, char *keyfile, char *cacertfile, char *tlshostname, bool tls, char *priority, bool can_opt_go) {
+void negotiate(int *sockp, uint16_t *flags, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
 	u64 magic;
 	uint16_t tmp;
 	uint16_t global_flags;
@@ -588,7 +589,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 
 #if HAVE_GNUTLS && !defined(NOTLS)
         /* TLS */
-        if (tls) {
+        if (cur_client->tls) {
 		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
 		tlssession_t *s = NULL;
 		int ret;
@@ -621,12 +622,12 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 			err("Option reply data length != 0");
 		}
 		s = tlssession_new(0,
-				   keyfile,
-				   certfile,
-				   cacertfile,
-				   tlshostname,
-				   priority,
-				   !cacertfile || !tlshostname, // insecure flag
+				   cur_client->key,
+				   cur_client->cert,
+				   cur_client->cacert,
+				   cur_client->tlshostn,
+				   cur_client->priority,
+				   !(cur_client->cacert) || !(cur_client->tlshostn), // insecure flag
 #ifdef DODBG
 				   1, // debug
 #else
@@ -673,7 +674,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 		*sockp = sock;
 	}
 #else
-	if (keyfile) {
+	if (cur_client->tls) {
 		err("TLS requested but support not compiled in");
 	}
 #endif
@@ -685,12 +686,12 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 
 	struct reply *rep = NULL;
 
-	if(!can_opt_go) {
-		send_opt_exportname(sock, rsize64, flags, can_opt_go, name, global_flags);
+	if(cur_client->no_optgo) {
+		send_opt_exportname(sock, flags, cur_client->name, global_flags);
 		return;
 	}
 
-	send_info_request(sock, NBD_OPT_GO, 0, NULL, name);
+	send_info_request(sock, NBD_OPT_GO, 0, NULL, cur_client->name);
 
 	do {
 		if(rep != NULL) free(rep);
@@ -704,7 +705,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 				case NBD_REP_ERR_UNSUP:
 					/* server doesn't support NBD_OPT_GO or NBD_OPT_INFO,
 					 * fall back to NBD_OPT_EXPORT_NAME */
-					send_opt_exportname(sock, rsize64, flags, can_opt_go, name, global_flags);
+					send_opt_exportname(sock, flags, cur_client->name, global_flags);
 					free(rep);
 					return;
 				case NBD_REP_ERR_POLICY:
@@ -738,7 +739,7 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 				info_type = htons(info_type);
 				switch(info_type) {
 					case NBD_INFO_EXPORT:
-						parse_sizes(rep->data + 2, rsize64, flags);
+						parse_sizes(rep->data + 2, &(cur_client->size64), flags);
 						break;
 					default:
 						// ignore these, don't need them
@@ -754,19 +755,14 @@ void negotiate(int *sockp, u64 *rsize64, uint16_t *flags, char* name, uint32_t n
 	free(rep);
 }
 
-bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** hostn_ptr, int* bs, int* timeout, int* persist, int* swap, int* b_unix, char**port, int* num_conns, char **certfile, char **keyfile, char **cacertfile, char **tlshostname, char **priority, bool *can_opt_go) {
+bool get_from_config() {
 	bool retval = false;
-	cur_client = calloc(sizeof(CLIENT), 1);
-	cur_client->bs = 512;
-	cur_client->nconn = 1;
-	cur_client->port = NBD_DEFAULT_PORT;
 	yyin = fopen(SYSCONFDIR "/nbdtab", "r");
 	yyout = fopen("/dev/null", "w");
 
-	if(!strncmp(cfgname, "/dev/", 5)) {
-		cfgname += 5;
+	if(!strncmp(cur_client->dev, "/dev/", 5)) {
+		cur_client->dev += 5;
 	}
-	cur_client->dev = cfgname;
 	if(yyin == NULL) {
 		fprintf(stderr, "while opening %s: ", SYSCONFDIR "/nbdtab");
 		perror("could not open config file");
@@ -777,28 +773,8 @@ bool get_from_config(char* cfgname, char** name_ptr, char** dev_ptr, char** host
 	if(!found_config || parse_error) {
 		goto out;
 	}
-	*name_ptr = cur_client->name;
-	*dev_ptr = calloc(strlen(cur_client->dev) + 6, 1);
-	if (!*dev_ptr) {
-		goto out;
-	}
-	snprintf(*dev_ptr, strlen(cur_client->dev) + 6, "/dev/%s", cur_client->dev);
-	*hostn_ptr = cur_client->hostn;
-	*bs = cur_client->bs;
-	*timeout = cur_client->timeout;
-	*persist = cur_client->persist ? 1 : 0;
-	*swap = cur_client->swap ? 1 : 0;
-	*b_unix = cur_client->b_unix ? 1 : 0;
-	*port = cur_client->port;
-	*num_conns = cur_client->nconn;
-	*certfile = cur_client->cert;
-	*keyfile = cur_client->key;
-	*cacertfile = cur_client->cacert;
-	*tlshostname = cur_client->tlshostn;
-	*priority = cur_client->priority;
-	*can_opt_go = !(cur_client->no_optgo);
 
-	retval = true;
+        retval = true;
 out:
 	if(yyin != NULL) {
 		fclose(yyin);
@@ -944,35 +920,17 @@ static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:"
 int main(int argc, char *argv[]) {
 	char* port=NBD_DEFAULT_PORT;
 	int sock, nbd;
-	int blocksize=512;
-	char *hostname=NULL;
-	char *nbddev=NULL;
-	int swap=0;
 	int cont=0;
-	int timeout=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	pid_t main_pid;
-	u64 size64 = 0;
-	u64 force_size64 = 0;
 	uint16_t flags = 0;
-	bool force_read_only = false;
-	bool preinit = false;
 	int c;
 	int nonspecial=0;
-	int b_unix=0;
-	char* name="";
 	uint16_t needed_flags=0;
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
 	sigset_t block, old;
-	char *certfile = NULL;
-	char *keyfile = NULL;
-	char *cacertfile = NULL;
-	char *tlshostname = NULL;
-	char *priority = NULL;
-	bool tls = false;
 	struct sigaction sa;
-	int num_connections = 1;
 	int netlink = HAVE_NETLINK;
 	int need_disconnect = 0;
 	int *sockfds;
@@ -1007,13 +965,16 @@ int main(int argc, char *argv[]) {
 		{ 0, 0, 0, 0 },
 	};
 	int i;
-	bool can_opt_go = true;
 
 	logging(MY_NAME);
 
 #if HAVE_GNUTLS && !defined(NOTLS)
         tlssession_init();
 #endif
+        cur_client = calloc(sizeof(CLIENT), 1);
+        cur_client->bs = 512;
+        cur_client->nconn = 1;
+        cur_client->port = NBD_DEFAULT_PORT;
 
 	while((c=getopt_long_only(argc, argv, short_opts, long_options, NULL))>=0) {
 		switch(c) {
@@ -1037,13 +998,13 @@ int main(int argc, char *argv[]) {
 			switch(nonspecial++) {
 				case 0:
 					// host
-					hostname=optarg;
+					cur_client->hostn=optarg;
 					break;
 				case 1:
 					// port
 					if(!strtol(optarg, NULL, 0)) {
 						// not parseable as a number, assume it's the device
-						nbddev = optarg;
+						cur_client->dev = optarg;
 						nonspecial++;
 					} else {
 						port = optarg;
@@ -1051,7 +1012,7 @@ int main(int argc, char *argv[]) {
 					break;
 				case 2:
 					// device
-					nbddev = optarg;
+					cur_client->dev = optarg;
 					break;
 				default:
 					usage("too many non-option arguments specified");
@@ -1060,15 +1021,15 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'b':
 		      blocksize:
-			blocksize=(int)strtol(optarg, NULL, 0);
-			if(blocksize == 0 || (blocksize % 512) != 0) {
+			cur_client->bs=(int)strtol(optarg, NULL, 0);
+			if(cur_client->bs == 0 || (cur_client->bs % 512) != 0) {
 				fprintf(stderr, "E: blocksize is not a multiple of 512! This is not allowed\n");
 				exit(EXIT_FAILURE);
 			}
 			break;
 		case 'B':
-			force_size64=(u64)strtoull(optarg, NULL, 0);
-			if(force_size64 == 0) {
+			cur_client->force_size64=(uint64_t)strtoull(optarg, NULL, 0);
+			if(cur_client->force_size64 == 0) {
 				fprintf(stderr, "E: Invalid size\n");
 				exit(EXIT_FAILURE);
 			}
@@ -1076,14 +1037,14 @@ int main(int argc, char *argv[]) {
 		case 'c':
 			return check_conn(optarg, 1);
 		case 'C':
-			num_connections = (int)strtol(optarg, NULL, 0);
+			cur_client->nconn = (int)strtol(optarg, NULL, 0);
 			break;
 		case 'd':
 			need_disconnect = 1;
-			nbddev = strdup(optarg);
+			cur_client->dev = strdup(optarg);
 			break;
 		case 'g':
-			can_opt_go = false;
+			cur_client->no_optgo = true;
 			break;
 		case 'h':
 			usage(NULL);
@@ -1091,7 +1052,7 @@ int main(int argc, char *argv[]) {
 		case 'l':
 			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
 			opts |= NBDC_DO_LIST;
-			nbddev="";
+			cur_client->dev="";
 			break;
 #if HAVE_NETLINK
 		case 'L':
@@ -1105,49 +1066,49 @@ int main(int argc, char *argv[]) {
 			nofork=1;
 			break;
 		case 'N':
-			name=optarg;
+			cur_client->name = optarg;
 			break;
 		case 'p':
 			cont=1;
 			break;
 		case 'P':
-			preinit = true;
+			cur_client->preinit = true;
 			break;
 		case 'R':
-			force_read_only = true;
+			cur_client->force_ro = true;
 			break;
 		case 's':
-			swap=1;
+			cur_client->swap = true;
 			break;
 		case 't':
 		      timeout:
-			timeout=strtol(optarg, NULL, 0);
+			cur_client->timeout = strtol(optarg, NULL, 0);
 			break;
 		case 'u':
-			b_unix = 1;
+			cur_client->b_unix = 1;
 			break;
 		case 'V':
 			printf("This is %s, from %s\n", PROG_NAME, PACKAGE_STRING);
 			return 0;
 #if HAVE_GNUTLS && !defined(NOTLS)
 		case 'x':
-			tls = true;
+			cur_client->tls = true;
 			break;
                 case 'F':
-                        certfile=strdup(optarg);
+                        cur_client->cert=strdup(optarg);
                         break;
                 case 'K':
-                        keyfile=strdup(optarg);
+                        cur_client->key=strdup(optarg);
                         break;
                 case 'A':
-                        cacertfile=strdup(optarg);
+                        cur_client->cacert=strdup(optarg);
                         break;
                 case 'H':
-                        tlshostname=strdup(optarg);
+                        cur_client->tlshostn=strdup(optarg);
                         break;
                 case 'y':
-			            priority=strdup(optarg);
-			            break;
+                        cur_client->priority=strdup(optarg);
+                        break;
 #else
                 case 'F':
                 case 'K':
@@ -1165,20 +1126,21 @@ int main(int argc, char *argv[]) {
 
 	if (need_disconnect) {
 		if (netlink)
-			netlink_disconnect(nbddev);
+			netlink_disconnect(cur_client->dev);
 		else
-			disconnect(nbddev);
+			disconnect(cur_client->dev);
 		exit(EXIT_SUCCESS);
 	}
 #ifdef __ANDROID__
   if (swap)
     err("swap option unsupported on Android because mlockall is unsupported.");
 #endif
-	if(hostname) {
-		if((!name || !nbddev) && !(opts & NBDC_DO_LIST)) {
-			if(!strncmp(hostname, "nbd", 3) || !strncmp(hostname, "/dev/nbd", 8)) {
-				if(!get_from_config(hostname, &name, &nbddev, &hostname, &blocksize, &timeout, &cont, &swap, &b_unix, &port, &num_connections, &certfile, &keyfile, &cacertfile, &tlshostname, &priority, &can_opt_go)) {
-					usage("no valid configuration for specified device found", hostname);
+	if(cur_client->hostn) {
+		if((!cur_client->name || !cur_client->dev) && !(opts & NBDC_DO_LIST)) {
+			if(!strncmp(cur_client->hostn, "nbd", 3) || !strncmp(cur_client->hostn, "/dev/nbd", 8)) {
+                                cur_client->dev = cur_client->hostn;
+				if(!get_from_config()) {
+					usage("no valid configuration for specified device found", cur_client->hostn);
 					exit(EXIT_FAILURE);
 				}
 			} else if (!netlink) {
@@ -1191,77 +1153,77 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-        if (keyfile && !certfile)
-		certfile = strdup(keyfile);
+        if (cur_client->key && !cur_client->cert)
+		cur_client->cert = strdup(cur_client->key);
 
-	if (certfile != NULL || keyfile != NULL || cacertfile != NULL || tlshostname != NULL) {
-		tls = true;
+	if (cur_client->cert != NULL || cur_client->key != NULL || cur_client->cacert != NULL || cur_client->tlshostn != NULL) {
+		cur_client->tls = true;
 	}
 
-	if (preinit) {
-		if (tls) {
+	if (cur_client->preinit) {
+		if (cur_client->tls) {
 			fprintf(stderr, "E: preinit connection cannot be used with TLS\n");
 			exit(EXIT_FAILURE);
 		}
-		if (!force_size64) {
+		if (!cur_client->force_size64) {
 			fprintf(stderr, "E: preinit connection requires specifying size\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-        if (!tlshostname && hostname && !b_unix)
-                tlshostname = strdup(hostname);
+        if (!cur_client->tlshostn && cur_client->hostn && !cur_client->b_unix)
+                cur_client->tlshostn = strdup(cur_client->hostn);
 
 	if (netlink)
 		nofork = 1;
 
-	if((force_size64 % blocksize) != 0) {
-		fprintf(stderr, "E: size (%" PRIu64 " bytes) is not a multiple of blocksize (%d)!\n", force_size64, blocksize);
+	if((cur_client->force_size64 % cur_client->bs) != 0) {
+		fprintf(stderr, "E: size (%" PRIu64 " bytes) is not a multiple of blocksize (%d)!\n", cur_client->force_size64, cur_client->bs);
 		exit(EXIT_FAILURE);
 	}
 
-	if(strlen(name)==0 && !(opts & NBDC_DO_LIST)) {
+	if((!cur_client->name || strlen(cur_client->name)==0) && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
 	if(!(opts & NBDC_DO_LIST) && !netlink) {
-		nbd = open(nbddev, O_RDWR);
+		nbd = open(cur_client->dev, O_RDWR);
 		if (nbd < 0)
 			err("Cannot open NBD: %m\nPlease ensure the 'nbd' module is loaded.");
 	}
 
 	if (netlink) {
-		sockfds = malloc(sizeof(int) * num_connections);
+		sockfds = malloc(sizeof(int) * cur_client->nconn);
 		if (!sockfds)
 			err("Cannot allocate the socket fd's array");
 	}
 
-	for (i = 0; i < num_connections; i++) {
-		if (b_unix)
-			sock = openunix(hostname);
+	for (i = 0; i < cur_client->nconn; i++) {
+		if (cur_client->b_unix)
+			sock = openunix(cur_client->hostn);
 		else
-			sock = opennet(hostname, port);
+			sock = opennet(cur_client->hostn, cur_client->port);
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
-		if (!preinit)
-			negotiate(&sock, &size64, &flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, priority, can_opt_go);
-		if (force_read_only)
+		if (!cur_client->preinit)
+			negotiate(&sock, &flags, needed_flags, cflags, opts);
+		if (cur_client->force_ro)
 			flags |= NBD_FLAG_READ_ONLY;
-		if (force_size64)
-			size64 = force_size64;
+		if (cur_client->force_size64)
+			cur_client->size64 = cur_client->force_size64;
 		if (netlink) {
 			sockfds[i] = sock;
 			continue;
 		}
 
 		if (i == 0) {
-			setsizes(nbd, size64, blocksize, flags);
-			set_timeout(nbd, timeout);
+			setsizes(nbd, cur_client->size64, cur_client->bs, flags);
+			set_timeout(nbd, cur_client->timeout);
 		}
-		finish_sock(sock, nbd, swap);
-		if (swap) {
-			if (keyfile)
+		finish_sock(sock, nbd, cur_client->swap);
+		if (cur_client->swap) {
+			if (cur_client->tls)
 				fprintf(stderr, "Warning: using swap and TLS is prone to deadlock\n");
 			/* try linux >= 2.6.36 interface first */
 			if (oom_adjust("/proc/self/oom_score_adj", "-1000")) {
@@ -1273,12 +1235,12 @@ int main(int argc, char *argv[]) {
 
 	if (netlink) {
 		int index = -1;
-		if (nbddev) {
-			if (sscanf(nbddev, "/dev/nbd%d", &index) != 1)
+		if (cur_client->dev) {
+			if (sscanf(cur_client->dev, "/dev/nbd%d", &index) != 1)
 				err("Invalid nbd device target\n");
 		}
-		netlink_configure(index, sockfds, num_connections,
-				  size64, blocksize, flags, timeout);
+		netlink_configure(index, sockfds, cur_client->nconn,
+				  cur_client->size64, cur_client->bs, flags, cur_client->timeout);
 		return 0;
 	}
 	/* Go daemon */
@@ -1320,7 +1282,7 @@ int main(int argc, char *argv[]) {
 				.tv_sec = 0,
 				.tv_nsec = 100000000,
 			};
-			while(check_conn(nbddev, 0)) {
+			while(check_conn(cur_client->dev, 0)) {
 				if (main_pid != getppid()) {
 					/* check_conn() will not return 0 when nbd disconnected
 					 * and parent exited during this loop. So the child has to
@@ -1330,7 +1292,7 @@ int main(int argc, char *argv[]) {
 				}
 				nanosleep(&req, NULL);
 			}
-			if(open(nbddev, O_RDONLY) < 0) {
+			if(open(cur_client->dev, O_RDONLY) < 0) {
 				perror("could not open device for updating partition table");
 			}
 			exit(0);
@@ -1346,32 +1308,32 @@ int main(int argc, char *argv[]) {
 				cont=0;
 			} else {
 				if(cont) {
-					u64 new_size;
+					uint64_t old_size = cur_client->size64;
 					uint16_t new_flags;
 
 					close(sock); close(nbd);
 					for (;;) {
 						fprintf(stderr, " Reconnecting\n");
-						if (b_unix)
-							sock = openunix(hostname);
+						if (cur_client->b_unix)
+							sock = openunix();
 						else
-							sock = opennet(hostname, port);
+							sock = opennet();
 						if (sock >= 0)
 							break;
 						sleep (1);
 					}
-					nbd = open(nbddev, O_RDWR);
+					nbd = open(cur_client->dev, O_RDWR);
 					if (nbd < 0)
 						err("Cannot open NBD: %m");
-					negotiate(&sock, &new_size, &new_flags, name, needed_flags, cflags, opts, certfile, keyfile, cacertfile, tlshostname, tls, priority, can_opt_go);
-					if (size64 != new_size) {
+					negotiate(&sock, &new_flags, needed_flags, cflags, opts);
+					if (old_size != cur_client->size64) {
 						err("Size of the device changed. Bye");
 					}
-					setsizes(nbd, size64, blocksize,
+					setsizes(nbd, cur_client->size64, cur_client->bs,
 								new_flags);
 
-					set_timeout(nbd, timeout);
-					finish_sock(sock,nbd,swap);
+					set_timeout(nbd, cur_client->timeout);
+					finish_sock(sock,nbd,cur_client->swap);
 				}
 			}
 		} else {
