@@ -169,6 +169,7 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 	struct nlattr *sock_attr;
 	struct nl_msg *msg;
 	int driver_id, i;
+	int ret;
 
 	socket = get_nbd_socket(&driver_id);
 	nl_socket_modify_cb(socket, NL_CB_VALID, NL_CB_CUSTOM, callback, NULL);
@@ -199,11 +200,12 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 	}
 	nla_nest_end(msg, sock_attr);
 
-	if (nl_send_sync(socket, msg) < 0) {
+	ret = nl_send_sync(socket, msg);
+	if (ret < 0) {
                 if(geteuid() != 0) {
-                        err("Failed to setup device. Are you root?\n");
+                        err_code("Failed to setup device. Are you root?\n", ret);
                 } else {
-		        err("Failed to setup device, check dmesg\n");
+		        err_code("Failed to setup device, check dmesg\n", ret);
                 }
         }
 	return;
@@ -215,6 +217,7 @@ static void netlink_disconnect(char *nbddev) {
 	struct nl_sock *socket;
 	struct nl_msg *msg;
 	int driver_id;
+	int ret;
 
 	int index = -1;
 	if (nbddev) {
@@ -232,8 +235,9 @@ static void netlink_disconnect(char *nbddev) {
 	genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, driver_id, 0, 0,
 		    NBD_CMD_DISCONNECT, 0);
 	NLA_PUT_U32(msg, NBD_ATTR_INDEX, index);
-	if (nl_send_sync(socket, msg) < 0)
-		err("Failed to disconnect device, check dmsg\n");
+	ret = nl_send_sync(socket, msg);
+	if (ret < 0)
+		err_code("Failed to disconnect device, check dmsg\n", ret);
 	nl_socket_free(socket);
 	return;
 nla_put_failure:

@@ -78,6 +78,12 @@ void nbd_err(const char *s) {
 	exit(EXIT_FAILURE);
 }
 
+void nbd_err_code(const char *s, int code) {
+	err_nonfatal(s);
+	fprintf(stderr, "Exiting.\n");
+	exit(abs(code));
+}
+
 void logging(const char* name) {
 #ifdef ISSERVER
 	openlog(name, LOG_PID, LOG_DAEMON);
