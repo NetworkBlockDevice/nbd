@@ -77,7 +77,9 @@ void setmysockopt(int sock);
 void err_nonfatal(const char *s);
 
 void nbd_err(const char *s) G_GNUC_NORETURN;
+void nbd_err_code(const char *s, int code) G_GNUC_NORETURN;
 #define err(S) nbd_err(S)
+#define err_code(S, C) nbd_err_code(S, C)
 
 void logging(const char* name);
 
