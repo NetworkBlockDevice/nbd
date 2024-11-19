@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * Copyright (C) 2017 Facebook.  All rights reserved.
  *
@@ -18,8 +19,9 @@
 #ifndef _UAPILINUX_NBD_NETLINK_H
 #define _UAPILINUX_NBD_NETLINK_H
 
-#define NBD_GENL_FAMILY_NAME	"nbd"
-#define NBD_GENL_VERSION	0x1
+#define NBD_GENL_FAMILY_NAME		"nbd"
+#define NBD_GENL_VERSION		0x1
+#define NBD_GENL_MCAST_GROUP_NAME	"nbd_mc_group"
 
 /* Configuration policy attributes, used for CONNECT */
 enum {
@@ -33,6 +35,7 @@ enum {
 	NBD_ATTR_SOCKETS,
 	NBD_ATTR_DEAD_CONN_TIMEOUT,
 	NBD_ATTR_DEVICE_LIST,
+	NBD_ATTR_BACKEND_IDENTIFIER,
 	__NBD_ATTR_MAX,
 };
 #define NBD_ATTR_MAX (__NBD_ATTR_MAX - 1)

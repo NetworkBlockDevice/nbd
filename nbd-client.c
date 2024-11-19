@@ -164,7 +164,7 @@ static struct nl_sock *get_nbd_socket(int *driver_id) {
 
 static void netlink_configure(int index, int *sockfds, int num_connects,
 			      u64 size64, int blocksize, uint16_t flags,
-			      int timeout) {
+			      int timeout, const char *identifier) {
 	struct nl_sock *socket;
 	struct nlattr *sock_attr;
 	struct nl_msg *msg;
@@ -186,6 +186,8 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 	NLA_PUT_U64(msg, NBD_ATTR_SERVER_FLAGS, flags);
 	if (timeout)
 		NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, timeout);
+	if (identifier)
+		NLA_PUT_STRING(msg, NBD_ATTR_BACKEND_IDENTIFIER, identifier);
 
 	sock_attr = nla_nest_start(msg, NBD_ATTR_SOCKETS);
 	if (!sock_attr)
@@ -246,7 +248,7 @@ nla_put_failure:
 #else
 static void netlink_configure(int index, int *sockfds, int num_connects,
 			      u64 size64, int blocksize, uint16_t flags,
-			      int timeout)
+			      int timeout, const char *identifier)
 {
 }
 
@@ -875,7 +877,7 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-i ident|-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
 #else
 	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
 #endif
@@ -914,7 +916,7 @@ void disconnect(char* device) {
 
 static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:"
 #if HAVE_NETLINK
-	"L"
+	"i:L"
 #endif
 #if HAVE_GNUTLS
 	"A:C:F:K:"
@@ -935,6 +937,7 @@ int main(int argc, char *argv[]) {
 	uint32_t opts=0;
 	sigset_t block, old;
 	struct sigaction sa;
+	char *identifier = NULL;
 	int netlink = HAVE_NETLINK;
 	int need_disconnect = 0;
 	int *sockfds;
@@ -949,6 +952,9 @@ int main(int argc, char *argv[]) {
 		{ "no-optgo", no_argument, NULL, 'g' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "tlshostname", required_argument, NULL, 'H' },
+#if HAVE_NETLINK
+		{ "identifier", required_argument, NULL, 'i' },
+#endif
 		{ "keyfile", required_argument, NULL, 'K' },
 		{ "list", no_argument, NULL, 'l' },
 #if HAVE_NETLINK
@@ -1053,6 +1059,11 @@ int main(int argc, char *argv[]) {
 		case 'h':
 			usage(NULL);
 			exit(EXIT_SUCCESS);
+#if HAVE_NETLINK
+		case 'i':
+			identifier = optarg;
+			break;
+#endif
 		case 'l':
 			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
 			opts |= NBDC_DO_LIST;
@@ -1180,6 +1191,10 @@ int main(int argc, char *argv[]) {
 
 	if (netlink)
 		nofork = 1;
+	else if (identifier) {
+		fprintf(stderr, "E: identifier is only useful with netlink\n");
+		exit(EXIT_FAILURE);
+	}
 
 	if((cur_client->force_size64 % cur_client->bs) != 0) {
 		fprintf(stderr, "E: size (%" PRIu64 " bytes) is not a multiple of blocksize (%d)!\n", cur_client->force_size64, cur_client->bs);
@@ -1246,7 +1261,8 @@ int main(int argc, char *argv[]) {
 				err("Invalid nbd device target\n");
 		}
 		netlink_configure(index, sockfds, cur_client->nconn,
-				  cur_client->size64, cur_client->bs, flags, cur_client->timeout);
+				  cur_client->size64, cur_client->bs, flags, cur_client->timeout,
+				  identifier);
 		return 0;
 	}
 	/* Go daemon */
