@@ -18,6 +18,7 @@ manpage.links
 mkinstalldirs
 nbd-tester-client
 nbd-client
+nbd-get-status
 nbd-server
 nbd-trplay
 doc/doxygen-output

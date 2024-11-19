@@ -1186,7 +1186,9 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	if((!cur_client->name || strlen(cur_client->name)==0) && !(opts & NBDC_DO_LIST)) {
+	if(!cur_client->name)
+		cur_client->name = "";
+	if((strlen(cur_client->name)==0) && !(opts & NBDC_DO_LIST)) {
 		printf("Warning: the oldstyle protocol is no longer supported.\nThis method now uses the newstyle protocol with a default export\n");
 	}
 
