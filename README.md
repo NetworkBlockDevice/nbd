@@ -117,7 +117,7 @@ other people. A (probably incomplete) list follows:
 * [qemu](https://www.qemu.org) contains an embedded NBD server, an
   embedded NBD client, and a standalone NBD server (`qemu-nbd`). They
   maintain a [status
-  document](https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/nbd.txt)
+  document](https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/nbd.rst)
   of their NBD implementation.
 * A [GEOM gate-based client implementation for
   FreeBSD](https://github.com/freqlabs/nbd-client) exists. It has not

@@ -2267,8 +2267,10 @@ The following request types exist:
     places for an exception), in part to avoid an amplification effect
     where a series of smaller descriptors can cause the server's reply
     to occupy more bytes than the *length* of the client's request.
-    The server MUST use descriptor lengths that are an integer
-    multiple of any advertised minimum block size. The status flags
+    The server SHOULD use descriptor lengths that are an integer
+    multiple of any advertised minimum block size, with an obvious
+    exception at the end of the image if the image size itself is
+    unaligned. The status flags
     are intentionally defined so that a server MAY always safely
     report a status of 0 for any block, although the server SHOULD
     return additional status values when they can be easily detected.
