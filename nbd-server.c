@@ -1582,6 +1582,7 @@ int expread(READ_CTX *ctx, CLIENT *client) {
 			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) {
 				goto fail;
 			}
+			ctx->current_offset += rdlen;
 			confirm_read(client, ctx, rdlen);
 		} else { /* the block is not there */
 			if ((client->server->flags & F_WAIT) && (client->export == NULL)){
@@ -1669,7 +1670,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 				if(ret < 0 ) goto fail;
 			}
 			memcpy(pagebuf+offset,buf,wrlen) ;
-			if (write(client->difffile, pagebuf, DIFFPAGESIZE) != DIFFPAGESIZE)
+			if (pwrite(client->difffile, pagebuf, DIFFPAGESIZE, client->difmap[mapcnt]*DIFFPAGESIZE) != DIFFPAGESIZE)
 				goto fail;
 		}
 		if (!(client->server->flags & F_COPYONWRITE))
