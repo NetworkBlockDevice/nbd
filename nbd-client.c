@@ -1221,9 +1221,9 @@ int main(int argc, char *argv[]) {
 
 	for (i = 0; i < cur_client->nconn; i++) {
 		if (cur_client->b_unix)
-			sock = openunix(cur_client->hostn);
+			sock = openunix();
 		else
-			sock = opennet(cur_client->hostn, cur_client->port);
+			sock = opennet();
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
