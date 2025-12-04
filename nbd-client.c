@@ -163,7 +163,7 @@ static struct nl_sock *get_nbd_socket(int *driver_id) {
 }
 
 static void netlink_configure(int index, int *sockfds, int num_connects,
-			      u64 size64, int blocksize, uint16_t flags,
+			      uint64_t size64, int blocksize, uint16_t flags,
 			      int timeout, const char *identifier) {
 	struct nl_sock *socket;
 	struct nlattr *sock_attr;
@@ -247,7 +247,7 @@ nla_put_failure:
 }
 #else
 static void netlink_configure(int index, int *sockfds, int num_connects,
-			      u64 size64, int blocksize, uint16_t flags,
+			      uint64_t size64, int blocksize, uint16_t flags,
 			      int timeout, const char *identifier)
 {
 }
@@ -557,7 +557,7 @@ void send_opt_exportname(int sock, uint16_t *flags, char* name, uint16_t global_
 }
 
 void negotiate(int *sockp, uint16_t *flags, uint32_t needed_flags, uint32_t client_flags, uint32_t do_opts) {
-	u64 magic;
+	uint64_t magic;
 	uint16_t tmp;
 	uint16_t global_flags;
 	char buf[256] = "\0\0\0\0\0\0\0\0\0";
@@ -791,7 +791,7 @@ out:
 	return retval;
 }
 
-void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
+void setsizes(int nbd, uint64_t size64, int blocksize, uint32_t flags) {
 	unsigned long size;
 	int read_only = (flags & NBD_FLAG_READ_ONLY) ? 1 : 0;
 
@@ -799,14 +799,14 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 		err("Device too large.\n");
 	else {
 		int tmp_blocksize = 4096;
-		if (size64 / (u64)blocksize <= (uint64_t)~0UL)
+		if (size64 / (uint64_t)blocksize <= (uint64_t)~0UL)
 			tmp_blocksize = blocksize;
 		if (ioctl(nbd, NBD_SET_BLKSIZE, tmp_blocksize) < 0) {
 			fprintf(stderr, "Failed to set blocksize %d\n",
 				tmp_blocksize);
 			err("Ioctl/1.1a failed: %m\n");
 		}
-		size = (unsigned long)(size64 / (u64)tmp_blocksize);
+		size = (unsigned long)(size64 / (uint64_t)tmp_blocksize);
 		if (ioctl(nbd, NBD_SET_SIZE_BLOCKS, size) < 0)
 			err("Ioctl/1.1b failed: %m\n");
 		if (tmp_blocksize != blocksize) {
@@ -816,7 +816,7 @@ void setsizes(int nbd, u64 size64, int blocksize, u32 flags) {
 				err("Ioctl/1.1c failed: %m\n");
 			}
 		}
-		fprintf(stderr, "bs=%d, sz=%" PRIu64 " bytes\n", blocksize, (u64)tmp_blocksize * size);
+		fprintf(stderr, "bs=%d, sz=%" PRIu64 " bytes\n", blocksize, (uint64_t)tmp_blocksize * size);
 	}
 
 	ioctl(nbd, NBD_CLEAR_SOCK);
