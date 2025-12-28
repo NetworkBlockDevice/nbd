@@ -46,7 +46,7 @@ static int callback(struct nl_msg *msg, void *arg)
 
 	nla_for_each_nested(attr, msg_attr[NBD_ATTR_DEVICE_LIST], rem) {
 		struct nlattr *device[NBD_DEVICE_ATTR_MAX + 1];
-		u32 index;
+		uint32_t index;
 		uint8_t connected;
 
 		if (nla_type(attr) != NBD_DEVICE_ITEM)
