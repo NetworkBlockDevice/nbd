@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: install dependencies
-        run: sudo apt-get update && sudo apt-get -y install docbook-utils libglib2.0-dev libgnutls28-dev libnl-genl-3-dev autoconf-archive
+        run: sudo apt-get update && sudo apt-get -y install docbook-utils libglib2.0-dev libgnutls28-dev libnl-genl-3-dev autoconf-archive gcovr
       - name: Check out repository
         uses: actions/checkout@v4
       - run: ./autogen.sh
@@ -17,6 +17,11 @@ jobs:
       - name: Generate coverage reports
         run: |
           gcovr -r . --exclude-directories tests --print-summary --xml-pretty -o coverage.xml --html=coverage.html --html-details
+      - name: Submit coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage.xml
+          format: cobertura
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
