@@ -5,6 +5,17 @@ Welcome to the NBD userland support files!
 
 This package contains nbd-server and nbd-client.
 
+The Network Block Device (NBD) is a protocol, originally implemented for
+Linux but that now has [a number of
+implementations](#alternate-implementations) that lets a computer access
+a remote storage device (like a hard drive or partition) as if it were a
+local, physical disk, using a simple client-server model over a TCP/IP
+network. This allows remote booting, swapping, or filesystem access
+without complex network file systems like NFS. It works by exporting a
+block device from a server and presenting it as a local block device on
+a client machine, allowing standard block-level operations (read/write)
+over the network.
+
 To install the package, download the source and do the normal
 `configure`/`make`/`make install` dance. You'll need to install it on both the
 client and the server.
