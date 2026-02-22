@@ -67,6 +67,15 @@ struct tlssession
 #define BUF_SIZE 65536
 #define BUF_HWM ((BUF_SIZE*3)/4)
 
+/* Custom push/pull functions for GnuTLS to handle socket wrapper better */
+static inline ssize_t custom_gnutls_push(gnutls_transport_ptr_t ptr, const void *data, size_t len) {
+    return write((int)(intptr_t)ptr, data, len);
+}
+
+static inline ssize_t custom_gnutls_pull(gnutls_transport_ptr_t ptr, void *data, size_t len) {
+    return read((int)(intptr_t)ptr, data, len);
+}
+
 static int
 falsequit (void *opaque)
 {
@@ -374,9 +383,11 @@ tlssession_mainloop (int cryptfd, int plainfd, tlssession_t * s)
       goto error;
     }
 
-  /* set it up to work with our FD */
+  /* set it up to work with our FD using custom push/pull functions */
   gnutls_transport_set_ptr (s->session,
 			    (gnutls_transport_ptr_t) (intptr_t) cryptfd);
+  gnutls_transport_set_push_function (s->session, custom_gnutls_push);
+  gnutls_transport_set_pull_function (s->session, custom_gnutls_pull);
 
 
   /* Now do the handshake */
