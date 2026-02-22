@@ -255,7 +255,144 @@ static void netlink_disconnect(char *nbddev)
 }
 #endif /* HAVE_NETLINK */
 
-int check_conn(char* devname, int do_print) {
+#if HAVE_NETLINK
+static struct nla_policy nbd_device_policy[NBD_DEVICE_ATTR_MAX + 1] = {
+	[NBD_DEVICE_INDEX]		=	{ .type = NLA_U32 },
+	[NBD_DEVICE_CONNECTED]		=	{ .type = NLA_U8 },
+};
+
+static int status_callback(struct nl_msg *msg, void *arg) {
+	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+	struct nlattr *msg_attr[NBD_ATTR_MAX + 1];
+	struct nlattr *attr;
+	int ret, rem;
+	int *connected = (int *)arg;
+
+	ret = nla_parse(msg_attr, NBD_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
+			genlmsg_attrlen(gnlh, 0), NULL);
+	if (ret)
+		return NL_OK;
+
+	if (!msg_attr[NBD_ATTR_DEVICE_LIST])
+		return NL_OK;
+
+	nla_for_each_nested(attr, msg_attr[NBD_ATTR_DEVICE_LIST], rem) {
+		struct nlattr *device[NBD_DEVICE_ATTR_MAX + 1];
+		uint32_t index;
+		uint8_t connected_status;
+
+		if (nla_type(attr) != NBD_DEVICE_ITEM)
+			continue;
+		
+		ret = nla_parse_nested(device, NBD_DEVICE_ATTR_MAX, attr,
+				       nbd_device_policy);
+		if (ret)
+			continue;
+
+		if (!device[NBD_DEVICE_INDEX] || !device[NBD_DEVICE_CONNECTED])
+			continue;
+
+		index = nla_get_u32(device[NBD_DEVICE_INDEX]);
+		connected_status = nla_get_u8(device[NBD_DEVICE_CONNECTED]);
+		
+		*connected = connected_status ? 0 : 1; /* 0 = connected, 1 = disconnected */
+		break; /* We only care about the first device for check_conn */
+	}
+	
+	return NL_OK;
+}
+
+static int netlink_check_conn(char* devname, int do_print) {
+	struct nl_sock *socket;
+	struct nl_msg *msg;
+	int driver_id, ret;
+	int index = -1;
+	int connected = -1; /* -1 = unknown, 0 = connected, 1 = disconnected */
+
+	/* Parse device index from name */
+	if (sscanf(devname, "/dev/nbd%d", &index) != 1) {
+		if (sscanf(devname, "nbd%d", &index) != 1) {
+			return 2; /* Invalid device name */
+		}
+	}
+
+	/* Setup netlink socket */
+	socket = nl_socket_alloc();
+	if (!socket)
+		return 2;
+
+	if (genl_connect(socket)) {
+		nl_socket_free(socket);
+		return 2;
+	}
+
+	driver_id = genl_ctrl_resolve(socket, "nbd");
+	if (driver_id < 0) {
+		nl_socket_free(socket);
+		return 2;
+	}
+
+	/* Set up callback to handle response */
+	nl_socket_modify_cb(socket, NL_CB_VALID, NL_CB_CUSTOM, status_callback, &connected);
+
+	/* Create status request message */
+	msg = nlmsg_alloc();
+	if (!msg) {
+		nl_socket_free(socket);
+		return 2;
+	}
+
+	genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, driver_id, 0, 0,
+		    NBD_CMD_STATUS, 0);
+	NLA_PUT_U32(msg, NBD_ATTR_INDEX, index);
+
+	/* Send message and get response */
+	ret = nl_send_sync(socket, msg);
+	if (ret < 0) {
+		nl_socket_free(socket);
+		return 2;
+	}
+
+	/* Receive the response */
+	ret = nl_recvmsgs_default(socket);
+	if (ret < 0) {
+		nl_socket_free(socket);
+		return 2;
+	}
+
+	nl_socket_free(socket);
+
+	if (connected == -1) {
+		/* Device not found or error */
+		return 1;
+	}
+
+	if (do_print) {
+		if (connected == 0) {
+			printf("connected\n");
+		} else {
+			printf("disconnected\n");
+		}
+	}
+
+	return connected; /* 0 = connected, 1 = disconnected */
+
+nla_put_failure:
+	nlmsg_free(msg);
+	nl_socket_free(socket);
+	return 2;
+}
+#endif /* HAVE_NETLINK */
+
+int check_conn(char* devname, int do_print, int use_netlink) {
+#if HAVE_NETLINK
+	if (use_netlink) {
+		/* Use netlink method when enabled */
+		return netlink_check_conn(devname, do_print);
+	}
+	/* Fall through to old method when netlink disabled */
+#endif
+	/* Old method (fallback or when netlink not compiled in) */
 	char buf[256];
 	char* p;
 	int fd;
@@ -938,6 +1075,8 @@ int main(int argc, char *argv[]) {
 	char *identifier = NULL;
 	int netlink = HAVE_NETLINK;
 	int need_disconnect = 0;
+	int do_check_conn = 0;
+	char *check_device = NULL;
 	int *sockfds;
 	struct option long_options[] = {
 		{ "cacertfile", required_argument, NULL, 'A' },
@@ -1043,7 +1182,9 @@ int main(int argc, char *argv[]) {
 			}
 			break;
 		case 'c':
-			return check_conn(optarg, 1);
+			do_check_conn = 1;
+			check_device = optarg;
+			break;
 		case 'C':
 			cur_client->nconn = (int)strtol(optarg, NULL, 0);
 			break;
@@ -1135,6 +1276,11 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "E: option eaten by 42 mice\n");
 			exit(EXIT_FAILURE);
 		}
+	}
+
+	/* Handle check_conn request after all options are processed */
+	if (do_check_conn) {
+		return check_conn(check_device, 1, netlink);
 	}
 
 	if (need_disconnect) {
@@ -1300,7 +1446,7 @@ int main(int argc, char *argv[]) {
 				.tv_sec = 0,
 				.tv_nsec = 100000000,
 			};
-			while(check_conn(cur_client->dev, 0)) {
+			while(check_conn(cur_client->dev, 0, 0)) {
 				if (main_pid != getppid()) {
 					/* check_conn() will not return 0 when nbd disconnected
 					 * and parent exited during this loop. So the child has to

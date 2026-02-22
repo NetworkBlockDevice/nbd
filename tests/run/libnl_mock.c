@@ -28,12 +28,20 @@ static void (*real_nlmsg_free)(struct nl_msg *msg) = NULL;
 static void *(*real_genlmsg_put)(struct nl_msg *msg, uint32_t port, uint32_t seq, int family, int hdrlen, int flags, uint8_t cmd, uint8_t version) = NULL;
 static struct nlmsghdr *(*real_nlmsg_hdr)(struct nl_msg *msg) = NULL;
 static int (*real_nl_send_auto)(struct nl_sock *sock, struct nl_msg *msg) = NULL;
+static int (*real_nl_send_sync)(struct nl_sock *sock, struct nl_msg *msg) = NULL;
 static int (*real_nl_wait_for_ack)(struct nl_sock *sock) = NULL;
+static int (*real_nl_recvmsgs_default)(struct nl_sock *sock) = NULL;
 
 /* Mock state */
 static int mock_family_id = 42;
 static int mock_connected = 0;
 static struct nl_msg *last_sent_msg = NULL;
+static int mock_device_status = 0; /* 0 = disconnected, 1 = connected */
+static uint32_t mock_device_index = 0;
+
+/* Callback function to simulate status response */
+static nl_recvmsg_msg_cb_t status_callback_func = NULL;
+static void *status_callback_arg = NULL;
 
 /* Initialize real function pointers */
 static void init_real_functions(void) {
@@ -48,7 +56,9 @@ static void init_real_functions(void) {
 		real_genlmsg_put = dlsym(RTLD_NEXT, "genlmsg_put");
 		real_nlmsg_hdr = dlsym(RTLD_NEXT, "nlmsg_hdr");
 		real_nl_send_auto = dlsym(RTLD_NEXT, "nl_send_auto");
+		real_nl_send_sync = dlsym(RTLD_NEXT, "nl_send_sync");
 		real_nl_wait_for_ack = dlsym(RTLD_NEXT, "nl_wait_for_ack");
+		real_nl_recvmsgs_default = dlsym(RTLD_NEXT, "nl_recvmsgs_default");
 	}
 }
 
@@ -157,6 +167,8 @@ static int validate_disconnect_message(struct nl_msg *msg) {
 static int validate_status_message(struct nl_msg *msg) {
 	struct nlmsghdr *nlh;
 	struct genlmsghdr *gnlh;
+	struct nlattr *attrs[NBD_ATTR_MAX + 1];
+	int ret;
 	
 	nlh = real_nlmsg_hdr(msg);
 	if (!nlh) return -1;
@@ -169,7 +181,20 @@ static int validate_status_message(struct nl_msg *msg) {
 		return -1;
 	}
 	
-	printf("MOCK: ✓ Status message validation passed\n");
+	ret = genlmsg_parse(nlh, 0, attrs, NBD_ATTR_MAX, NULL);
+	if (ret != 0) {
+		fprintf(stderr, "MOCK: Failed to parse status attributes: %d\n", ret);
+		return -1;
+	}
+	
+	/* Extract device index if provided */
+	if (attrs[NBD_ATTR_INDEX]) {
+		mock_device_index = nla_get_u32(attrs[NBD_ATTR_INDEX]);
+		printf("MOCK: ✓ Status message validation passed\n");
+		printf("MOCK:   Querying device index: %u\n", mock_device_index);
+	} else {
+		printf("MOCK: ✓ Status message validation passed (querying all devices)\n");
+	}
 	
 	return 0;
 }
@@ -206,7 +231,16 @@ int genl_ctrl_resolve(struct nl_sock *sock, const char *name) {
 
 int nl_socket_modify_cb(struct nl_sock *sock, enum nl_cb_type type, enum nl_cb_kind kind, nl_recvmsg_msg_cb_t func, void *arg) {
 	init_real_functions();
-	printf("MOCK: nl_socket_modify_cb() - callback registered\n");
+	
+	/* Store the callback for status queries */
+	if (type == NL_CB_VALID && kind == NL_CB_CUSTOM) {
+		status_callback_func = func;
+		status_callback_arg = arg;
+		printf("MOCK: nl_socket_modify_cb() - callback registered for status queries\n");
+	} else {
+		printf("MOCK: nl_socket_modify_cb() - callback registered\n");
+	}
+	
 	return real_nl_socket_modify_cb(sock, type, kind, func, arg);
 }
 
@@ -285,4 +319,61 @@ int nl_wait_for_ack(struct nl_sock *sock) {
 	init_real_functions();
 	printf("MOCK: nl_wait_for_ack() - success (mock)\n");
 	return 0; /* Always succeed in mock */
+}
+
+int nl_send_sync(struct nl_sock *sock, struct nl_msg *msg) {
+	/* For now, just call nl_send_auto since they're similar */
+	return nl_send_auto(sock, msg);
+}
+
+int nl_recvmsgs_default(struct nl_sock *sock) {
+	init_real_functions();
+	
+	printf("MOCK: nl_recvmsgs_default() - simulating response\n");
+	
+	/* If we have a registered callback, simulate a status response */
+	if (status_callback_func && status_callback_arg) {
+		/* Create a mock response message */
+		struct nl_msg *response = real_nlmsg_alloc();
+		if (response) {
+			/* Build a mock status response */
+			void *msg_data = genlmsg_put(response, NL_AUTO_PORT, NL_AUTO_SEQ, mock_family_id, 0, 0, NBD_CMD_STATUS, 0);
+			
+			if (msg_data) {
+				/* Add device list attribute */
+				struct nlattr *device_list = nla_nest_start(response, NBD_ATTR_DEVICE_LIST);
+				if (device_list) {
+					/* Add device item */
+					struct nlattr *device_item = nla_nest_start(response, NBD_DEVICE_ITEM);
+					if (device_item) {
+						/* Add device index */
+						nla_put_u32(response, NBD_DEVICE_INDEX, mock_device_index);
+						/* Add connection status */
+						nla_put_u8(response, NBD_DEVICE_CONNECTED, mock_device_status);
+						nla_nest_end(response, device_item);
+					}
+					nla_nest_end(response, device_list);
+				}
+				
+				/* Call the callback with the mock response */
+				printf("MOCK: Calling status callback with mock response (status=%d)\n", mock_device_status);
+				status_callback_func(response, status_callback_arg);
+			}
+			
+			real_nlmsg_free(response);
+		}
+	}
+	
+	return 0; /* Always succeed in mock */
+}
+
+/* Public API for tests to control mock behavior */
+void mock_set_device_status(int status) {
+	mock_device_status = status ? 1 : 0;
+	printf("MOCK: Setting device status to %s\n", status ? "connected" : "disconnected");
+}
+
+void mock_set_device_index(uint32_t index) {
+	mock_device_index = index;
+	printf("MOCK: Setting device index to %u\n", index);
 }
