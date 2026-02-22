@@ -162,9 +162,8 @@ static struct nl_sock *get_nbd_socket(int *driver_id) {
 	return socket;
 }
 
-static void netlink_configure(int index, int *sockfds, int num_connects,
-			      uint64_t size64, int blocksize, uint16_t flags,
-			      int timeout, const char *identifier) {
+static void netlink_configure(int index, int *sockfds, uint16_t flags,
+			      const char *identifier) {
 	struct nl_sock *socket;
 	struct nlattr *sock_attr;
 	struct nl_msg *msg;
@@ -181,18 +180,18 @@ static void netlink_configure(int index, int *sockfds, int num_connects,
 		    NBD_CMD_CONNECT, 0);
 	if (index >= 0)
 		NLA_PUT_U32(msg, NBD_ATTR_INDEX, index);
-	NLA_PUT_U64(msg, NBD_ATTR_SIZE_BYTES, size64);
-	NLA_PUT_U64(msg, NBD_ATTR_BLOCK_SIZE_BYTES, blocksize);
+	NLA_PUT_U64(msg, NBD_ATTR_SIZE_BYTES, cur_client->size64);
+	NLA_PUT_U64(msg, NBD_ATTR_BLOCK_SIZE_BYTES, cur_client->bs);
 	NLA_PUT_U64(msg, NBD_ATTR_SERVER_FLAGS, flags);
-	if (timeout)
-		NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, timeout);
+	if (cur_client->timeout)
+		NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, cur_client->timeout);
 	if (identifier)
 		NLA_PUT_STRING(msg, NBD_ATTR_BACKEND_IDENTIFIER, identifier);
 
 	sock_attr = nla_nest_start(msg, NBD_ATTR_SOCKETS);
 	if (!sock_attr)
 		err("Couldn't nest the sockets for our connection\n");
-	for (i = 0; i < num_connects; i++) {
+	for (i = 0; i < cur_client->nconn; i++) {
 		struct nlattr *sock_opt;
 		sock_opt = nla_nest_start(msg, NBD_SOCK_ITEM);
 		if (!sock_opt)
@@ -246,9 +245,8 @@ nla_put_failure:
 	err("Failed to create netlink message\n");
 }
 #else
-static void netlink_configure(int index, int *sockfds, int num_connects,
-			      uint64_t size64, int blocksize, uint16_t flags,
-			      int timeout, const char *identifier)
+static void netlink_configure(int index, int *sockfds, uint16_t flags,
+			      const char *identifier)
 {
 }
 
@@ -1260,9 +1258,7 @@ int main(int argc, char *argv[]) {
 			if (sscanf(cur_client->dev, "/dev/nbd%d", &index) != 1)
 				err("Invalid nbd device target\n");
 		}
-		netlink_configure(index, sockfds, cur_client->nconn,
-				  cur_client->size64, cur_client->bs, flags, cur_client->timeout,
-				  identifier);
+		netlink_configure(index, sockfds, flags, identifier);
 		return 0;
 	}
 	/* Go daemon */
