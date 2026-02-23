@@ -1,5 +1,8 @@
 # The NBD Netlink Control Protocol
 
+NOTE: this documentation is AI-generated and still needs review. Use with
+caution.
+
 ## Introduction
 
 The NBD kernel driver provides a netlink-based control interface that allows userspace
