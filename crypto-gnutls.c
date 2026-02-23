@@ -386,8 +386,12 @@ tlssession_mainloop (int cryptfd, int plainfd, tlssession_t * s)
   /* set it up to work with our FD using custom push/pull functions */
   gnutls_transport_set_ptr (s->session,
 			    (gnutls_transport_ptr_t) (intptr_t) cryptfd);
-  gnutls_transport_set_push_function (s->session, custom_gnutls_push);
-  gnutls_transport_set_pull_function (s->session, custom_gnutls_pull);
+  /* Only use custom push/pull functions when running under cwrap */
+  char *socket_wrapper_dir = getenv("SOCKET_WRAPPER_DIR");
+  if (socket_wrapper_dir && socket_wrapper_dir[0] != '\0') {
+    gnutls_transport_set_push_function (s->session, custom_gnutls_push);
+    gnutls_transport_set_pull_function (s->session, custom_gnutls_pull);
+  }
 
 
   /* Now do the handshake */
