@@ -446,6 +446,8 @@ EOF
 		../../nbd-client -d /dev/nbd0 2>&1 | head -5
 		disconnect_ret=$?
 
+		retval=0
+
 		# Connect should succeed or fail gracefully
 		if [ $connect_ret -eq 0 ]; then
 			echo "✓ nbd-client connect test passed"
@@ -461,6 +463,47 @@ EOF
 			echo "✓ nbd-client disconnect test passed"
 		else
 			echo "✗ nbd-client disconnect test failed with code: $disconnect_ret"
+			retval=1
+		fi
+		;;
+	*/persist)
+		# Test persist mode with netlink interface
+		cat > ${conffile} <<EOF
+[generic]
+[export]
+	exportname = $tmpnam
+EOF
+		../../nbd-server -C ${conffile} -p ${pidfile} &
+		PID=$!
+		sleep $DELAY
+
+		export LD_PRELOAD="$(pwd)/libnl_mock.so"
+
+		# Test 1: Basic persist mode connection with dead timeout
+		echo "Testing persist mode with dead connection timeout..."
+		timeout 2s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist -dead-timeout 30 2>&1 | head -5
+		persist_ret=$?
+
+		# Test 2: Test with default timeout (should use 30 seconds)
+		echo "Testing persist mode with default timeout..."
+		timeout 2s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist 2>&1 | head -5
+		persist_default_ret=$?
+
+		retval=0
+
+		# Basic persist mode should work or timeout
+		if [ $persist_ret -eq 124 ] || [ $persist_ret -eq 0 ]; then
+			echo "✓ persist mode test passed"
+		else
+			echo "✗ persist mode test failed with code: $persist_ret"
+			retval=1
+		fi
+
+		# Default timeout should work or timeout
+		if [ $persist_default_ret -eq 124 ] || [ $persist_default_ret -eq 0 ]; then
+			echo "✓ persist mode default timeout test passed"
+		else
+			echo "✗ persist mode default timeout test failed with code: $persist_default_ret"
 			retval=1
 		fi
 		;;

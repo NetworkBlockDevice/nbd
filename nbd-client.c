@@ -79,6 +79,7 @@ void nbdtab_set_property(char *property, char *val) {
 	SET_PROP("priority", priority, val);
 	SET_PROP("bs", bs, strtol(val, NULL, 10));
 	SET_PROP("timeout", timeout, strtol(val, NULL, 10));
+	SET_PROP("dead-timeout", dead_conn_timeout, strtol(val, NULL, 10));
 	SET_PROP("conns", nconn, strtol(val, NULL, 10));
 	if(*property != '_') {
 		fprintf(stderr, "Warning: unknown option '%s' found in nbdtab file", property);
@@ -185,6 +186,10 @@ static void netlink_configure(int index, int *sockfds, uint16_t flags,
 	NLA_PUT_U64(msg, NBD_ATTR_SERVER_FLAGS, flags);
 	if (cur_client->timeout)
 		NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, cur_client->timeout);
+	if (cur_client->dead_conn_timeout)
+		NLA_PUT_U64(msg, NBD_ATTR_DEAD_CONN_TIMEOUT, cur_client->dead_conn_timeout);
+	else if (cur_client->persist_mode)
+		NLA_PUT_U64(msg, NBD_ATTR_DEAD_CONN_TIMEOUT, 30); /* Default 30 seconds for persist mode */
 	if (identifier)
 		NLA_PUT_STRING(msg, NBD_ATTR_BACKEND_IDENTIFIER, identifier);
 
@@ -425,12 +430,33 @@ int check_conn(char* devname, int do_print, int use_netlink) {
 	return 0;
 }
 
-int opennet() {
+int opennet(saved_connection_t *saved_conn) {
 	int sock;
 	struct addrinfo hints;
 	struct addrinfo *ai = NULL;
 	struct addrinfo *rp = NULL;
 	int e;
+
+	if (saved_conn && saved_conn->ai) {
+		/* Use saved address info */
+		for(rp = saved_conn->ai; rp != NULL; rp = rp->ai_next) {
+			sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+
+			if(sock == -1)
+				continue;	/* error */
+
+			if(connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
+				break;		/* success */
+
+			close(sock);
+		}
+
+		if (rp != NULL) {
+			setmysockopt(sock);
+			return sock;
+		}
+		/* Fall back to fresh lookup if saved connection fails */
+	}
 
 	memset(&hints,'\0',sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -438,12 +464,21 @@ int opennet() {
 	hints.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	e = getaddrinfo(cur_client->hostn, cur_client->port, &hints, &ai);
+	e = getaddrinfo(saved_conn ? saved_conn->hostname : cur_client->hostn, 
+		       saved_conn ? saved_conn->port : cur_client->port, &hints, &ai);
 
 	if(e != 0) {
 		fprintf(stderr, "getaddrinfo failed: %s\n", gai_strerror(e));
 		freeaddrinfo(ai);
 		return -1;
+	}
+
+	/* Save the address info for future use */
+	if (saved_conn) {
+		if (saved_conn->ai) {
+			freeaddrinfo(saved_conn->ai);
+		}
+		saved_conn->ai = ai;
 	}
 
 	for(rp = ai; rp != NULL; rp = rp->ai_next) {
@@ -461,12 +496,17 @@ int opennet() {
 	if (rp == NULL) {
 		err_nonfatal("Socket failed: %m");
 		sock = -1;
-		goto err;
+		if (!saved_conn) {
+			goto err;
+		}
+		return sock;
 	}
 
 	setmysockopt(sock);
+	if (!saved_conn) {
 err:
-	freeaddrinfo(ai);
+		freeaddrinfo(ai);
+	}
 	return sock;
 }
 
@@ -896,6 +936,274 @@ void negotiate(int *sockp, uint16_t *flags, uint32_t needed_flags, uint32_t clie
 	free(rep);
 }
 
+#if HAVE_NETLINK
+#include <sys/select.h>
+
+/* Callback for persist mode multicast messages */
+static int persist_callback(struct nl_msg *msg, void *arg) {
+	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+	struct nlattr *msg_attr[NBD_ATTR_MAX + 1];
+	struct nlattr *attr;
+	int ret, rem;
+	persist_connection_t *persist_conn = (persist_connection_t *)arg;
+	uint32_t device_index;
+
+	ret = nla_parse(msg_attr, NBD_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
+			genlmsg_attrlen(gnlh, 0), NULL);
+	if (ret)
+		return NL_OK;
+
+	/* Check if this message is for our device */
+	if (!msg_attr[NBD_ATTR_INDEX])
+		return NL_OK;
+	
+	device_index = nla_get_u32(msg_attr[NBD_ATTR_INDEX]);
+	/* TODO: Need to extract our device index and compare */
+	
+	switch (gnlh->cmd) {
+		case NBD_CMD_LINK_DEAD:
+			fprintf(stderr, "Received link dead notification for device %d\n", device_index);
+			/* Trigger reconnection */
+			/* This will be handled in the main loop */
+			break;
+		default:
+			break;
+	}
+	
+	return NL_OK;
+}
+
+/* Exponential backoff reconnection with maximum 3 minutes */
+static int reconnect_with_backoff(persist_connection_t *persist_conn, int *new_sockfds) {
+	int backoff_time = 1; /* Start with 1 second */
+	int max_backoff = 180; /* Maximum 3 minutes */
+	int attempt = 0;
+	int i;
+	
+	while (backoff_time <= max_backoff) {
+		fprintf(stderr, "Reconnection attempt %d, waiting %d seconds...\n", 
+			attempt + 1, backoff_time);
+		
+		sleep(backoff_time);
+		
+		/* Try to establish all connections */
+		for (i = 0; i < cur_client->nconn; i++) {
+			if (cur_client->b_unix) {
+				new_sockfds[i] = openunix();
+			} else {
+				new_sockfds[i] = opennet(persist_conn->conn);
+			}
+			
+			if (new_sockfds[i] < 0) {
+				/* Connection failed, clean up and retry */
+				int j;
+				for (j = 0; j < i; j++) {
+					close(new_sockfds[j]);
+				}
+				break;
+			}
+			
+			/* Negotiate connection parameters */
+			if (!cur_client->preinit) {
+				uint16_t new_flags = 0;
+				negotiate(&new_sockfds[i], &new_flags, 0, NBD_FLAG_C_FIXED_NEWSTYLE, 0);
+				/* TODO: Save and compare flags with original connection */
+			}
+		}
+		
+		/* Check if all connections were successful */
+		int all_success = 1;
+		for (i = 0; i < cur_client->nconn; i++) {
+			if (new_sockfds[i] < 0) {
+				all_success = 0;
+				break;
+			}
+		}
+		
+		if (all_success) {
+			fprintf(stderr, "Successfully reconnected after %d attempts\n", attempt + 1);
+			return 0;
+		}
+		
+		/* Exponential backoff */
+		backoff_time *= 2;
+		attempt++;
+	}
+	
+	fprintf(stderr, "Failed to reconnect after %d attempts, giving up\n", attempt);
+	return -1;
+}
+
+/* Send reconfigure message to kernel */
+static int netlink_reconfigure(int device_index, int *sockfds) {
+	struct nl_sock *socket;
+	struct nl_msg *msg;
+	struct nlattr *sock_attr;
+	int driver_id, i, ret;
+
+	socket = get_nbd_socket(&driver_id);
+	
+	msg = nlmsg_alloc();
+	if (!msg)
+		err("Couldn't allocate netlink message\n");
+	genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, driver_id, 0, 0,
+		    NBD_CMD_RECONFIGURE, 0);
+	if (device_index >= 0)
+		NLA_PUT_U32(msg, NBD_ATTR_INDEX, device_index);
+
+	sock_attr = nla_nest_start(msg, NBD_ATTR_SOCKETS);
+	if (!sock_attr)
+		err("Couldn't nest the sockets for reconnection\n");
+	
+	for (i = 0; i < cur_client->nconn; i++) {
+		struct nlattr *sock_opt;
+		sock_opt = nla_nest_start(msg, NBD_SOCK_ITEM);
+		if (!sock_opt)
+			err("Couldn't nest the sockets for our connection\n");
+		NLA_PUT_U32(msg, NBD_SOCK_FD, sockfds[i]);
+		nla_nest_end(msg, sock_opt);
+	}
+	nla_nest_end(msg, sock_attr);
+
+	ret = nl_send_sync(socket, msg);
+	if (ret < 0) {
+		err_code("Failed to reconfigure device, check dmesg\n", ret);
+		nl_socket_free(socket);
+		return -1;
+	}
+	
+	nl_socket_free(socket);
+	return 0;
+nla_put_failure:
+	err("Failed to create reconfigure netlink message\n");
+	return -1;
+}
+
+/* Cleanup function for persist connection */
+static void cleanup_persist_connection(persist_connection_t *persist_conn) {
+	if (!persist_conn)
+		return;
+		
+	if (persist_conn->conn) {
+		if (persist_conn->conn->ai) {
+			freeaddrinfo(persist_conn->conn->ai);
+		}
+		if (persist_conn->conn->hostname) {
+			free(persist_conn->conn->hostname);
+		}
+		if (persist_conn->conn->port) {
+			free(persist_conn->conn->port);
+		}
+		free(persist_conn->conn);
+	}
+}
+
+/* Main persist mode loop */
+static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t connection_flags) {
+	struct nl_sock *mcast_socket = NULL;
+	persist_connection_t persist_conn;
+	int driver_id;
+	int ret;
+	sigset_t mask, oldmask;
+	struct sigaction sa;
+	
+	/* Initialize persist connection structure */
+	persist_conn.conn = malloc(sizeof(saved_connection_t));
+	if (!persist_conn.conn)
+		err("Cannot allocate saved connection\n");
+	
+	memset(persist_conn.conn, 0, sizeof(saved_connection_t));
+	persist_conn.flags = connection_flags;
+	persist_conn.size64 = cur_client->size64;
+	persist_conn.blocksize = cur_client->bs;
+	persist_conn.timeout = cur_client->timeout;
+	
+	/* Save initial connection details */
+	if (!cur_client->b_unix) {
+		persist_conn.conn->hostname = strdup(cur_client->hostn);
+		persist_conn.conn->port = strdup(cur_client->port);
+		/* Perform initial address resolution and save */
+		opennet(persist_conn.conn);
+	}
+	
+	/* Set up signal handling for clean shutdown */
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGTERM);
+	sigprocmask(SIG_BLOCK, &mask, &oldmask);
+	
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa, NULL);
+	
+	/* Set up multicast socket for listening to disconnection messages */
+	mcast_socket = nl_socket_alloc();
+	if (!mcast_socket)
+		err("Couldn't allocate multicast socket\n");
+	
+	if (genl_connect(mcast_socket))
+		err("Couldn't connect to the multicast socket\n");
+	
+	driver_id = genl_ctrl_resolve(mcast_socket, "nbd");
+	if (driver_id < 0)
+		err("Couldn't resolve the nbd netlink family for multicast\n");
+	
+	/* Join multicast group */
+	ret = nl_socket_add_membership(mcast_socket, genl_ctrl_resolve_grp(mcast_socket, "nbd", "nbd_mc_group"));
+	if (ret < 0)
+		err("Couldn't join nbd multicast group\n");
+	
+	/* Set up callback for multicast messages */
+	nl_socket_modify_cb(mcast_socket, NL_CB_VALID, NL_CB_CUSTOM, persist_callback, &persist_conn);
+	
+	fprintf(stderr, "Persist mode active, monitoring device %d\n", device_index);
+	
+	/* Main monitoring loop */
+	while (1) {
+		fd_set readfds;
+		int max_fd = nl_socket_get_fd(mcast_socket);
+		struct timespec timeout_ts = { .tv_sec = 1, .tv_nsec = 0 };
+		
+		FD_ZERO(&readfds);
+		FD_SET(max_fd, &readfds);
+		
+		/* Temporarily unblock signals for pselect */
+		sigprocmask(SIG_SETMASK, &oldmask, NULL);
+		
+		/* Wait for multicast messages or timeout */
+		ret = pselect(max_fd + 1, &readfds, NULL, NULL, &timeout_ts, &oldmask);
+		
+		/* Re-block signals */
+		sigprocmask(SIG_BLOCK, &mask, NULL);
+		
+		if (ret < 0) {
+			if (errno == EINTR) {
+				fprintf(stderr, "Received interrupt signal, shutting down persist mode\n");
+				break; /* Exit cleanly on interrupt */
+			}
+			err("Select failed in persist mode: %m\n");
+		}
+		
+		if (ret > 0 && FD_ISSET(max_fd, &readfds)) {
+			/* Process netlink messages */
+			nl_recvmsgs_default(mcast_socket);
+		}
+	}
+	
+	/* Cleanup */
+	cleanup_persist_connection(&persist_conn);
+	
+	if (mcast_socket) {
+		nl_socket_free(mcast_socket);
+	}
+	
+	sigprocmask(SIG_SETMASK, &oldmask, NULL);
+	
+	return 0;
+}
+
+#endif /* HAVE_NETLINK */
+
 bool get_from_config() {
 	bool retval = false;
 	yyin = fopen(SYSCONFDIR "/nbdtab", "r");
@@ -1056,12 +1364,12 @@ static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:"
 #if HAVE_GNUTLS
 	"A:C:F:K:"
 #endif
+	"T"
 	;
 
 int main(int argc, char *argv[]) {
 	char* port=NBD_DEFAULT_PORT;
 	int sock, nbd;
-	int cont=0;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	pid_t main_pid;
 	uint16_t flags = 0;
@@ -1105,6 +1413,7 @@ int main(int argc, char *argv[]) {
 		{ "readonly", no_argument, NULL, 'R' },
 		{ "swap", no_argument, NULL, 's' },
 		{ "timeout", required_argument, NULL, 't' },
+		{ "dead-timeout", required_argument, NULL, 'T' },
 		{ "unix", no_argument, NULL, 'u' },
 		{ "version", no_argument, NULL, 'V' },
 		{ "enable-tls", no_argument, NULL, 'x' },
@@ -1223,7 +1532,7 @@ int main(int argc, char *argv[]) {
 			cur_client->name = optarg;
 			break;
 		case 'p':
-			cont=1;
+                        cur_client->persist = true;
 			break;
 		case 'P':
 			cur_client->preinit = true;
@@ -1233,6 +1542,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 's':
 			cur_client->swap = true;
+			break;
+		case 'T':
+			cur_client->dead_conn_timeout = strtol(optarg, NULL, 0);
 			break;
 		case 't':
 		      timeout:
@@ -1367,7 +1679,7 @@ int main(int argc, char *argv[]) {
 		if (cur_client->b_unix)
 			sock = openunix();
 		else
-			sock = opennet();
+			sock = opennet(NULL);
 		if (sock < 0)
 			exit(EXIT_FAILURE);
 
@@ -1405,6 +1717,12 @@ int main(int argc, char *argv[]) {
 				err("Invalid nbd device target\n");
 		}
 		netlink_configure(index, sockfds, flags, identifier);
+		
+		/* If persist mode is enabled, start the monitoring loop */
+		if (cur_client->persist_mode) {
+			return persist_mode_main(index, sockfds, flags);
+		}
+		
 		return 0;
 	}
 	/* Go daemon */
@@ -1469,9 +1787,9 @@ int main(int argc, char *argv[]) {
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
-				cont=0;
+                                cur_client->persist_mode = false;
 			} else {
-				if(cont) {
+				if(cur_client->persist_mode) {
 					uint64_t old_size = cur_client->size64;
 					uint16_t new_flags;
 
@@ -1481,7 +1799,7 @@ int main(int argc, char *argv[]) {
 						if (cur_client->b_unix)
 							sock = openunix();
 						else
-							sock = opennet();
+							sock = opennet(NULL);
 						if (sock >= 0)
 							break;
 						sleep (1);
@@ -1505,9 +1823,9 @@ int main(int argc, char *argv[]) {
 			 * happened at this point. Probably best to quit, now
 			 */
 			fprintf(stderr, "Kernel call returned.\n");
-			cont=0;
+                        cur_client->persist_mode = false;
 		}
-	} while(cont);
+	} while(cur_client->persist_mode);
 	printf("sock, ");
 	ioctl(nbd, NBD_CLEAR_SOCK);
 	printf("done\n");

@@ -10,7 +10,7 @@ TESTS_ENVIRONMENT=$(srcdir)/simple_test
 endif
 TESTS = cfg1 cfgmulti cfgnew cfgsize write flush integrity dirconfig list inetd \
 	rowrite tree rotree unix integrityhuge handshake tls tlswrongcert tlshuge \
-	connstatus nlconnect
+	connstatus nlconnect persist
 XFAIL_TESTS=@RUN_XFAIL@
 check_PROGRAMS = nbd-tester-client
 nbd_tester_client_SOURCES = nbd-tester-client.c
@@ -47,6 +47,7 @@ tlshuge:
 tlswrongcert:
 nlconnect: libnl_mock.so
 connstatus: libnl_mock.so
+persist: libnl_mock.so
 
 libnl_mock.so: libnl_mock.c
 	$(CC) -fPIC -shared -o $@ $< -ldl @LIBNL3_CFLAGS@ @LIBNL3_LIBS@

@@ -20,9 +20,12 @@
 /* Real function pointers */
 static int (*real_genl_connect)(struct nl_sock *sock) = NULL;
 static int (*real_genl_ctrl_resolve)(struct nl_sock *sock, const char *name) = NULL;
+static int (*real_genl_ctrl_resolve_grp)(struct nl_sock *sock, const char *family_name, const char *grp_name) = NULL;
 static struct nl_sock *(*real_nl_socket_alloc)(void) = NULL;
 static void (*real_nl_socket_free)(struct nl_sock *sock) = NULL;
 static int (*real_nl_socket_modify_cb)(struct nl_sock *sock, enum nl_cb_type type, enum nl_cb_kind kind, nl_recvmsg_msg_cb_t func, void *arg) = NULL;
+static int (*real_nl_socket_add_membership)(struct nl_sock *sock, int group) = NULL;
+static int (*real_nl_socket_get_fd)(const struct nl_sock *sock) = NULL;
 static struct nl_msg *(*real_nlmsg_alloc)(void) = NULL;
 static void (*real_nlmsg_free)(struct nl_msg *msg) = NULL;
 static void *(*real_genlmsg_put)(struct nl_msg *msg, uint32_t port, uint32_t seq, int family, int hdrlen, int flags, uint8_t cmd, uint8_t version) = NULL;
@@ -34,6 +37,7 @@ static int (*real_nl_recvmsgs_default)(struct nl_sock *sock) = NULL;
 
 /* Mock state */
 static int mock_family_id = 42;
+static int mock_group_id = 43;
 static int mock_connected = 0;
 static struct nl_msg *last_sent_msg = NULL;
 static int mock_device_status = 0; /* 0 = disconnected, 1 = connected */
@@ -43,6 +47,10 @@ static uint32_t mock_device_index = 0;
 static nl_recvmsg_msg_cb_t status_callback_func = NULL;
 static void *status_callback_arg = NULL;
 
+/* Callback function to simulate persist mode responses */
+static nl_recvmsg_msg_cb_t persist_callback_func = NULL;
+static void *persist_callback_arg = NULL;
+
 /* Initialize real function pointers */
 static void init_real_functions(void) {
 	if (!real_nl_socket_alloc) {
@@ -50,7 +58,10 @@ static void init_real_functions(void) {
 		real_nl_socket_free = dlsym(RTLD_NEXT, "nl_socket_free");
 		real_genl_connect = dlsym(RTLD_NEXT, "genl_connect");
 		real_genl_ctrl_resolve = dlsym(RTLD_NEXT, "genl_ctrl_resolve");
+		real_genl_ctrl_resolve_grp = dlsym(RTLD_NEXT, "genl_ctrl_resolve_grp");
 		real_nl_socket_modify_cb = dlsym(RTLD_NEXT, "nl_socket_modify_cb");
+		real_nl_socket_add_membership = dlsym(RTLD_NEXT, "nl_socket_add_membership");
+		real_nl_socket_get_fd = dlsym(RTLD_NEXT, "nl_socket_get_fd");
 		real_nlmsg_alloc = dlsym(RTLD_NEXT, "nlmsg_alloc");
 		real_nlmsg_free = dlsym(RTLD_NEXT, "nlmsg_free");
 		real_genlmsg_put = dlsym(RTLD_NEXT, "genlmsg_put");
@@ -130,6 +141,15 @@ static int validate_connect_message(struct nl_msg *msg) {
 	printf("MOCK:   Size: %lu, Block size: %lu, Flags: %lu\n", 
 	       size, block_size, nla_get_u64(attrs[NBD_ATTR_SERVER_FLAGS]));
 	
+	/* Check for optional dead connection timeout */
+	if (attrs[NBD_ATTR_DEAD_CONN_TIMEOUT]) {
+		uint64_t timeout = nla_get_u64(attrs[NBD_ATTR_DEAD_CONN_TIMEOUT]);
+		printf("MOCK:   Dead connection timeout: %lu seconds\n", timeout);
+		if (timeout == 0) {
+			fprintf(stderr, "MOCK: Warning: dead connection timeout is 0, should be non-zero for persist mode\n");
+		}
+	}
+	
 	return 0;
 }
 
@@ -159,6 +179,42 @@ static int validate_disconnect_message(struct nl_msg *msg) {
 	}
 	
 	printf("MOCK: ✓ Disconnect message validation passed\n");
+	printf("MOCK:   Device index: %u\n", nla_get_u32(attrs[NBD_ATTR_INDEX]));
+	
+	return 0;
+}
+
+static int validate_reconfigure_message(struct nl_msg *msg) {
+	struct nlmsghdr *nlh;
+	struct genlmsghdr *gnlh;
+	struct nlattr *attrs[NBD_ATTR_MAX + 1];
+	int ret;
+	
+	nlh = real_nlmsg_hdr(msg);
+	if (!nlh) return -1;
+	
+	gnlh = nlmsg_data(nlh);
+	if (!gnlh) return -1;
+	
+	if (gnlh->cmd != NBD_CMD_RECONFIGURE) {
+		fprintf(stderr, "MOCK: Expected NBD_CMD_RECONFIGURE, got %d\n", gnlh->cmd);
+		return -1;
+	}
+	
+	ret = genlmsg_parse(nlh, 0, attrs, NBD_ATTR_MAX, NULL);
+	if (ret != 0) return -1;
+	
+	if (!attrs[NBD_ATTR_INDEX]) {
+		fprintf(stderr, "MOCK: Missing required NBD_ATTR_INDEX for reconfigure\n");
+		return -1;
+	}
+	
+	if (!attrs[NBD_ATTR_SOCKETS]) {
+		fprintf(stderr, "MOCK: Missing required NBD_ATTR_SOCKETS for reconfigure\n");
+		return -1;
+	}
+	
+	printf("MOCK: ✓ Reconfigure message validation passed\n");
 	printf("MOCK:   Device index: %u\n", nla_get_u32(attrs[NBD_ATTR_INDEX]));
 	
 	return 0;
@@ -229,19 +285,59 @@ int genl_ctrl_resolve(struct nl_sock *sock, const char *name) {
 	return -ENOENT;
 }
 
+int genl_ctrl_resolve_grp(struct nl_sock *sock, const char *family_name, const char *grp_name) {
+	init_real_functions();
+	
+	if (strcmp(family_name, "nbd") == 0 && strcmp(grp_name, "nbd_mc_group") == 0) {
+		printf("MOCK: genl_ctrl_resolve_grp(nbd, nbd_mc_group) - returning mock group ID %d\n", mock_group_id);
+		return mock_group_id;
+	}
+	
+	printf("MOCK: genl_ctrl_resolve_grp(%s, %s) - not found\n", family_name, grp_name);
+	return -ENOENT;
+}
+
 int nl_socket_modify_cb(struct nl_sock *sock, enum nl_cb_type type, enum nl_cb_kind kind, nl_recvmsg_msg_cb_t func, void *arg) {
 	init_real_functions();
 	
-	/* Store the callback for status queries */
+	/* Store the callback for status queries and persist mode */
 	if (type == NL_CB_VALID && kind == NL_CB_CUSTOM) {
-		status_callback_func = func;
-		status_callback_arg = arg;
-		printf("MOCK: nl_socket_modify_cb() - callback registered for status queries\n");
+		/* Use a simple heuristic - if func is not NULL, store it as persist callback */
+		/* In practice, the persist mode callback is the last one registered */
+		if (func && !status_callback_func) {
+			status_callback_func = func;
+			status_callback_arg = arg;
+			printf("MOCK: nl_socket_modify_cb() - callback registered for status queries\n");
+		} else if (func) {
+			persist_callback_func = func;
+			persist_callback_arg = arg;
+			printf("MOCK: nl_socket_modify_cb() - callback registered for persist mode\n");
+		} else {
+			printf("MOCK: nl_socket_modify_cb() - callback registered\n");
+		}
 	} else {
 		printf("MOCK: nl_socket_modify_cb() - callback registered\n");
 	}
 	
 	return real_nl_socket_modify_cb(sock, type, kind, func, arg);
+}
+
+int nl_socket_add_membership(struct nl_sock *sock, int group) {
+	init_real_functions();
+	
+	if (group == mock_group_id) {
+		printf("MOCK: nl_socket_add_membership() - joined nbd_mc_group (group %d)\n", group);
+		return 0;
+	}
+	
+	printf("MOCK: nl_socket_add_membership() - unknown group %d\n", group);
+	return -EINVAL;
+}
+
+int nl_socket_get_fd(const struct nl_sock *sock) {
+	init_real_functions();
+	printf("MOCK: nl_socket_get_fd() - returning mock fd 42\n");
+	return 42; /* Return a fake file descriptor */
 }
 
 struct nl_msg *nlmsg_alloc(void) {
@@ -293,6 +389,9 @@ int nl_send_auto(struct nl_sock *sock, struct nl_msg *msg) {
 				break;
 			case NBD_CMD_DISCONNECT:
 				validation_result = validate_disconnect_message(msg);
+				break;
+			case NBD_CMD_RECONFIGURE:
+				validation_result = validate_reconfigure_message(msg);
 				break;
 			case NBD_CMD_STATUS:
 				validation_result = validate_status_message(msg);
@@ -376,4 +475,33 @@ void mock_set_device_status(int status) {
 void mock_set_device_index(uint32_t index) {
 	mock_device_index = index;
 	printf("MOCK: Setting device index to %u\n", index);
+}
+
+void mock_send_link_dead_notification(void) {
+	init_real_functions();
+	
+	printf("MOCK: Sending link dead notification\n");
+	
+	/* If we have a registered persist callback, simulate a link dead message */
+	if (persist_callback_func && persist_callback_arg) {
+		/* Create a mock link dead message */
+		struct nl_msg *msg = real_nlmsg_alloc();
+		if (msg) {
+			/* Build a mock link dead notification */
+			void *msg_data = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, mock_family_id, 0, 0, NBD_CMD_LINK_DEAD, 0);
+			
+			if (msg_data) {
+				/* Add device index */
+				nla_put_u32(msg, NBD_ATTR_INDEX, mock_device_index);
+				
+				/* Call the persist callback with the mock notification */
+				printf("MOCK: Calling persist callback with link dead notification (device %u)\n", mock_device_index);
+				persist_callback_func(msg, persist_callback_arg);
+			}
+			
+			real_nlmsg_free(msg);
+		}
+	} else {
+		printf("MOCK: No persist callback registered, cannot send link dead notification\n");
+	}
 }
