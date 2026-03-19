@@ -307,8 +307,10 @@ static int writeit_tls(gnutls_session_t s, const void *buf, size_t len) {
 	while(len > 0) {
 		DEBUG("+");
 		if ((res = gnutls_record_send(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
-			m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
-			err_nonfatal(m);
+			if(res != GNUTLS_E_AGAIN) {
+				m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
+				err_nonfatal(m);
+			}
 		} else if(res < 0) {
 			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
