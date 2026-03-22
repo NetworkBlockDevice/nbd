@@ -1710,6 +1710,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+#if HAVE_NETLINK
 	if (netlink) {
 		int index = -1;
 		if (cur_client->dev) {
@@ -1725,6 +1726,8 @@ int main(int argc, char *argv[]) {
 		
 		return 0;
 	}
+#endif
+
 	/* Go daemon */
 
 #ifndef NOFORK
