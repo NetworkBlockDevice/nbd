@@ -3816,12 +3816,6 @@ void daemonize() {
         if(dup2(2, newfd) < 0) {
                 err("dup2 stderr");
         }
-        child=fork();
-        if(child < 0) {
-                err("fork");
-        } else if(child > 0) {
-                exit(EXIT_SUCCESS);
-        }
 	FILE*pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
