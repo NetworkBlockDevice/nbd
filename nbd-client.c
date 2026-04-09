@@ -62,6 +62,7 @@
 
 #include "nbdclt.h"
 #include "nbdtab_parser.tab.h"
+#include "args.h"
 
 CLIENT* cur_client;
 extern FILE *yyin, *yyout;
@@ -1357,24 +1358,12 @@ void disconnect(char* device) {
 	close(nbd);
 }
 
-static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:"
-#if HAVE_NETLINK
-	"i:L"
-#endif
-#if HAVE_GNUTLS
-	"A:C:F:K:"
-#endif
-	"T"
-	;
-
 int main(int argc, char *argv[]) {
 	char* port=NBD_DEFAULT_PORT;
 	int sock, nbd;
 	int G_GNUC_UNUSED nofork=0; // if -dNOFORK
 	pid_t main_pid;
 	uint16_t flags = 0;
-	int c;
-	int nonspecial=0;
 	uint16_t needed_flags=0;
 	uint32_t cflags=NBD_FLAG_C_FIXED_NEWSTYLE;
 	uint32_t opts=0;
@@ -1382,44 +1371,7 @@ int main(int argc, char *argv[]) {
 	struct sigaction sa;
 	char *identifier = NULL;
 	int netlink = HAVE_NETLINK;
-	int need_disconnect = 0;
-	int do_check_conn = 0;
-	char *check_device = NULL;
 	int *sockfds;
-	struct option long_options[] = {
-		{ "cacertfile", required_argument, NULL, 'A' },
-		{ "block-size", required_argument, NULL, 'b' },
-		{ "size", required_argument, NULL, 'B' },
-		{ "check", required_argument, NULL, 'c' },
-		{ "connections", required_argument, NULL, 'C'},
-		{ "disconnect", required_argument, NULL, 'd' },
-		{ "certfile", required_argument, NULL, 'F' },
-		{ "no-optgo", no_argument, NULL, 'g' },
-		{ "help", no_argument, NULL, 'h' },
-		{ "tlshostname", required_argument, NULL, 'H' },
-#if HAVE_NETLINK
-		{ "identifier", required_argument, NULL, 'i' },
-#endif
-		{ "keyfile", required_argument, NULL, 'K' },
-		{ "list", no_argument, NULL, 'l' },
-#if HAVE_NETLINK
-		{ "nonetlink", no_argument, NULL, 'L' },
-#endif
-		{ "systemd-mark", no_argument, NULL, 'm' },
-		{ "nofork", no_argument, NULL, 'n' },
-		{ "name", required_argument, NULL, 'N' },
-		{ "persist", no_argument, NULL, 'p' },
-		{ "preinit", no_argument, NULL, 'P' },
-		{ "readonly", no_argument, NULL, 'R' },
-		{ "swap", no_argument, NULL, 's' },
-		{ "timeout", required_argument, NULL, 't' },
-		{ "dead-timeout", required_argument, NULL, 'T' },
-		{ "unix", no_argument, NULL, 'u' },
-		{ "version", no_argument, NULL, 'V' },
-		{ "enable-tls", no_argument, NULL, 'x' },
-		{ "priority", required_argument, NULL, 'y' },
-		{ 0, 0, 0, 0 },
-	};
 	int i;
 
 	logging(MY_NAME);
@@ -1428,182 +1380,56 @@ int main(int argc, char *argv[]) {
         tlssession_init();
 #endif
         cur_client = calloc(sizeof(CLIENT), 1);
-        cur_client->bs = 512;
-        cur_client->nconn = 1;
-        cur_client->port = NBD_DEFAULT_PORT;
+        init_client(cur_client);
 
-	while((c=getopt_long_only(argc, argv, short_opts, long_options, NULL))>=0) {
-		switch(c) {
-		case 1:
-			// non-option argument
-			if(strchr(optarg, '=')) {
-				// old-style 'bs=' or 'timeout='
-				// argument
-				fprintf(stderr, "WARNING: old-style command-line argument encountered. This is deprecated.\n");
-				if(!strncmp(optarg, "bs=", 3)) {
-					optarg+=3;
-					goto blocksize;
-				}
-				if(!strncmp(optarg, "timeout=", 8)) {
-					optarg+=8;
-					goto timeout;
-				}
-				usage("unknown option %s encountered", optarg);
-				exit(EXIT_FAILURE);
-			}
-			switch(nonspecial++) {
-				case 0:
-					// host
-					cur_client->hostn=optarg;
-					break;
-				case 1:
-					// port
-					if(!strtol(optarg, NULL, 0)) {
-						// not parseable as a number, assume it's the device
-						cur_client->dev = optarg;
-						nonspecial++;
-					} else {
-						port = optarg;
-					}
-					break;
-				case 2:
-					// device
-					cur_client->dev = optarg;
-					break;
-				default:
-					usage("too many non-option arguments specified");
-					exit(EXIT_FAILURE);
-			}
-			break;
-		case 'b':
-		      blocksize:
-			cur_client->bs=(int)strtol(optarg, NULL, 0);
-			if(cur_client->bs == 0 || (cur_client->bs % 512) != 0) {
-				fprintf(stderr, "E: blocksize is not a multiple of 512! This is not allowed\n");
-				exit(EXIT_FAILURE);
-			}
-			break;
-		case 'B':
-			cur_client->force_size64=(uint64_t)strtoull(optarg, NULL, 0);
-			if(cur_client->force_size64 == 0) {
-				fprintf(stderr, "E: Invalid size\n");
-				exit(EXIT_FAILURE);
-			}
-			break;
-		case 'c':
-			do_check_conn = 1;
-			check_device = optarg;
-			break;
-		case 'C':
-			cur_client->nconn = (int)strtol(optarg, NULL, 0);
-			break;
-		case 'd':
-			need_disconnect = 1;
-			cur_client->dev = strdup(optarg);
-			break;
-		case 'g':
-			cur_client->no_optgo = true;
-			break;
-		case 'h':
-			usage(NULL);
-			exit(EXIT_SUCCESS);
+	// Use refactored argument parsing
+	parse_result_t parse_result = parse_nbd_client_args(argc, argv, cur_client);
+	
+	// Update identifier and netlink from parsing results
 #if HAVE_NETLINK
-		case 'i':
-			identifier = optarg;
-			break;
+	if (parse_result.identifier) {
+		identifier = parse_result.identifier;
+	}
+	if (parse_result.nonetlink) {
+		netlink = 0;
+	}
 #endif
-		case 'l':
-			needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
-			opts |= NBDC_DO_LIST;
-			cur_client->dev="";
-			break;
-#if HAVE_NETLINK
-		case 'L':
-			netlink = 0;
-			break;
-#endif
-		case 'm':
-			argv[0][0] = '@';
-			break;
-		case 'n':
-			nofork=1;
-			break;
-		case 'N':
-			cur_client->name = optarg;
-			break;
-		case 'p':
-                        cur_client->persist = true;
-			break;
-		case 'P':
-			cur_client->preinit = true;
-			break;
-		case 'R':
-			cur_client->force_ro = true;
-			break;
-		case 's':
-			cur_client->swap = true;
-			break;
-		case 'T':
-			cur_client->dead_conn_timeout = strtol(optarg, NULL, 0);
-			break;
-		case 't':
-		      timeout:
-			cur_client->timeout = strtol(optarg, NULL, 0);
-			break;
-		case 'u':
-			cur_client->b_unix = 1;
-			break;
-		case 'V':
+	
+	// Handle immediate exit cases from argument parsing
+	if (parse_result.should_exit) {
+		if (parse_result.show_version) {
 			printf("This is %s, from %s\n", PROG_NAME, PACKAGE_STRING);
 			return 0;
-#if HAVE_GNUTLS && !defined(NOTLS)
-		case 'x':
-			cur_client->tls = true;
-			break;
-                case 'F':
-                        cur_client->cert=strdup(optarg);
-                        break;
-                case 'K':
-                        cur_client->key=strdup(optarg);
-                        break;
-                case 'A':
-                        cur_client->cacert=strdup(optarg);
-                        break;
-                case 'H':
-                        cur_client->tlshostn=strdup(optarg);
-                        break;
-                case 'y':
-                        cur_client->priority=strdup(optarg);
-                        break;
-#else
-                case 'F':
-                case 'K':
-                case 'H':
-                case 'A':
-		        case 'y':
-			fprintf(stderr, "E: TLS support not compiled in\n");
-                        exit(EXIT_FAILURE);
-#endif
-		default:
-			fprintf(stderr, "E: option eaten by 42 mice\n");
-			exit(EXIT_FAILURE);
 		}
+		if (parse_result.error_msg[0] != '\0') {
+			usage(parse_result.error_msg);
+		} else {
+			usage(NULL);
+		}
+		exit(parse_result.exit_code);
 	}
 
-	/* Handle check_conn request after all options are processed */
-	if (do_check_conn) {
-		return check_conn(check_device, 1, netlink);
+	// Handle check_conn request after all options are processed
+	if (parse_result.check_conn) {
+		return check_conn(parse_result.check_device, 1, netlink);
 	}
 
-	if (need_disconnect) {
+	if (parse_result.need_disconnect) {
 		if (netlink)
 			netlink_disconnect(cur_client->dev);
 		else
 			disconnect(cur_client->dev);
 		exit(EXIT_SUCCESS);
 	}
+
+	// Handle list exports
+	if (parse_result.list_exports) {
+		needed_flags |= NBD_FLAG_FIXED_NEWSTYLE;
+		opts |= NBDC_DO_LIST;
+	}
+
 #ifdef __ANDROID__
-  if (swap)
+  if (cur_client->swap)
     err("swap option unsupported on Android because mlockall is unsupported.");
 #endif
 	if(cur_client->hostn) {
