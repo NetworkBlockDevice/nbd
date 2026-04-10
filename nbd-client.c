@@ -1545,9 +1545,11 @@ int main(int argc, char *argv[]) {
 		netlink_configure(index, sockfds, flags, identifier);
 		
 		/* If persist mode is enabled, start the monitoring loop */
+#if HAVE_NETLINK
 		if (cur_client->persist_mode) {
 			return persist_mode_main(index, sockfds, flags);
 		}
+#endif
 		
 		return 0;
 	}
