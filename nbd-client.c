@@ -225,10 +225,14 @@ static void netlink_disconnect(char *nbddev) {
 	struct nl_msg *msg;
 	int driver_id;
 	int ret;
+	char *local_dev = nbddev;
 
 	int index = -1;
 	if (nbddev) {
-		if (sscanf(nbddev, "nbd%d", &index) != 1)
+		if (!strncmp(local_dev, "/dev/", 5)) {
+			local_dev += 5;
+		}
+		if (sscanf(local_dev, "nbd%d", &index) != 1)
 			err("Invalid nbd device target\n");
 	}
 	if (index < 0)
@@ -313,13 +317,15 @@ static int netlink_check_conn(char* devname, int do_print) {
 	struct nl_msg *msg;
 	int driver_id, ret;
 	int index = -1;
+	char *local_dev = devname;
 	int connected = -1; /* -1 = unknown, 0 = connected, 1 = disconnected */
 
 	/* Parse device index from name */
-	if (sscanf(devname, "/dev/nbd%d", &index) != 1) {
-		if (sscanf(devname, "nbd%d", &index) != 1) {
-			return 2; /* Invalid device name */
-		}
+	if (!strncmp(local_dev, "/dev/", 5)) {
+		local_dev += 5;
+	}
+	if (sscanf(local_dev, "nbd%d", &index) != 1) {
+		return 2; /* Invalid device name */
 	}
 
 	/* Setup netlink socket */
@@ -1539,7 +1545,11 @@ int main(int argc, char *argv[]) {
 	if (netlink) {
 		int index = -1;
 		if (cur_client->dev) {
-			if (sscanf(cur_client->dev, "nbd%d", &index) != 1)
+			char *local_dev = cur_client->dev;
+			if(!strncmp(local_dev, "/dev/", 5)) {
+				local_dev += 5;
+			}
+			if (sscanf(local_dev, "nbd%d", &index) != 1)
 				err("Invalid nbd device target\n");
 		}
 		netlink_configure(index, sockfds, flags, identifier);
