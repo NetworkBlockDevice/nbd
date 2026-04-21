@@ -228,8 +228,11 @@ static void netlink_disconnect(char *nbddev) {
 
 	int index = -1;
 	if (nbddev) {
-		if (sscanf(nbddev, "nbd%d", &index) != 1)
-			err("Invalid nbd device target\n");
+		if (sscanf(nbddev, "/dev/nbd%d", &index) != 1) {
+			if (sscanf(nbddev, "nbd%d", &index) != 1) {
+				err("Invalid nbd device target\n");
+			}
+		}
 	}
 	if (index < 0)
 		err("Invalid nbd device target\n");
@@ -1539,8 +1542,11 @@ int main(int argc, char *argv[]) {
 	if (netlink) {
 		int index = -1;
 		if (cur_client->dev) {
-			if (sscanf(cur_client->dev, "nbd%d", &index) != 1)
-				err("Invalid nbd device target\n");
+			if (sscanf(cur_client->dev, "/dev/nbd%d", &index) != 1) {
+				if (sscanf(cur_client->dev, "nbd%d", &index) != 1) {
+					err("Invalid nbd device target\n");
+				}
+			}
 		}
 		netlink_configure(index, sockfds, flags, identifier);
 		
