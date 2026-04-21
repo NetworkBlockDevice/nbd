@@ -318,10 +318,9 @@ static int netlink_check_conn(char* devname, int do_print) {
 	int connected = -1; /* -1 = unknown, 0 = connected, 1 = disconnected */
 
 	/* Parse device index from name */
-	if (sscanf(devname, "/dev/nbd%d", &index) != 1) {
-		if (sscanf(devname, "nbd%d", &index) != 1) {
-			return 2; /* Invalid device name */
-		}
+	if (sscanf(devname, "/dev/nbd%d", &index) != 1 &&
+	    sscanf(devname, "nbd%d", &index) != 1) {
+		return 2; /* Invalid device name */
 	}
 
 	/* Setup netlink socket */
