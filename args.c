@@ -156,7 +156,7 @@ blocksize:
             client->no_optgo = true;
             break;
         case 'h':
-            usage_error(&result, NULL); // Will show help
+            usage_error(&result, ""); // Will show help
             return result;
 #if HAVE_NETLINK
         case 'i':
