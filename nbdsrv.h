@@ -1,11 +1,12 @@
 #ifndef NBDSRV_H
 #define NBDSRV_H
 
-#include "lfs.h"
+// #include "lfs.h"
 
 #include <glib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #include <sys/socket.h>
 #include <sys/types.h>

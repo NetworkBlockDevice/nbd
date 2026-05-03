@@ -27,6 +27,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/types.h>
 
 #include "buffer.h"
+#include <stdlib.h>
+
 
 struct buffer
 {
