@@ -1,6 +1,9 @@
 #ifndef NBDCLT_H
 #define NBDCLT_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 typedef struct {
 	char *name;
 	char *dev;
@@ -23,7 +26,7 @@ typedef struct {
 	bool preinit;
 	bool force_ro;
 	bool tls;
-        bool persist_mode;
+    bool persist_mode;
 	char *priority;
 	int dead_conn_timeout;
 } CLIENT;

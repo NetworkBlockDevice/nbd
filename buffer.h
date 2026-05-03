@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 #ifndef __TLSPROXY_BUFFERS_H
 #define __TLSPROXY_BUFFERS_H
 
-#include <stdlib.h>
+//#include <stdlib.h>
 #include <sys/types.h>
 
 typedef struct buffer buffer_t;
