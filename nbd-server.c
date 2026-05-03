@@ -78,11 +78,11 @@
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
 #endif
-#include <sys/param.h>
+// #include <sys/param.h>
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
-#include <netinet/tcp.h>
+// #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <syslog.h>
@@ -98,8 +98,8 @@
 #if HAVE_BLKDISCARD
 #include <linux/fs.h>
 #endif
-#include <arpa/inet.h>
-#include <strings.h>
+// #include <arpa/inet.h>
+// #include <strings.h>
 #include <dirent.h>
 #ifdef HAVE_SYS_DIR_H
 #include <sys/dir.h>
@@ -111,7 +111,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <dirent.h>
-#include <ctype.h>
+// #include <ctype.h>
 #include <inttypes.h>
 
 #include <glib.h>
@@ -120,7 +120,7 @@
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
 #include "nbd-debug.h"
-#include "netdb-compat.h"
+// #include "netdb-compat.h"
 #include "backend.h"
 #include "treefiles.h"
 #include "nbd-helper.h"
@@ -379,9 +379,8 @@ static void socket_read(CLIENT* client, void *buf, size_t len) {
  * @param bufsiz the size of the buffer
  **/
 static inline void consume(CLIENT* c, size_t len, void * buf, size_t bufsiz) {
-	size_t curlen;
 	while (len>0) {
-		curlen = (len>bufsiz)?bufsiz:len;
+        const size_t curlen = (len>bufsiz)?bufsiz:len;
 		socket_read(c, buf, curlen);
 		len -= curlen;
 	}
@@ -555,7 +554,7 @@ SERVER* cmdline(int argc, char *argv[], struct generic_conf *genconf) {
 	int i=0;
 	int nonspecial=0;
 	int c;
-	struct option long_options[] = {
+    const struct option long_options[] = {
 		{"read-only", no_argument, NULL, 'r'},
 		{"multi-file", no_argument, NULL, 'm'},
 		{"copy-on-write", no_argument, NULL, 'c'},
