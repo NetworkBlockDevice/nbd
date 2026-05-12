@@ -1,3 +1,13 @@
+#!/bin/sh
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+sysconfdir=@sysconfdir@
+sbindir=@sbindir@
+bindir=@sbindir@
+runstatedir=@runstatedir@
+
+cat <<EOF
 [Unit]
 Description=NBD client connection for %i
 Documentation=man:nbd-client
@@ -14,6 +24,8 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=@sbindir@/nbd-client %i
 ExecStop=@sbindir@/nbd-client -d /dev/%i
+NoNewPrivileges=true
+ProtectSystem=full
 [Install]
 RequiredBy=dev-%i.device
 RequiredBy=dev-%ip1.device
@@ -31,3 +43,4 @@ RequiredBy=dev-%ip12.device
 RequiredBy=dev-%ip13.device
 RequiredBy=dev-%ip14.device
 RequiredBy=dev-%ip15.device
+EOF

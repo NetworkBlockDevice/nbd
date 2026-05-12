@@ -10,7 +10,7 @@ EXTRA_DIST=nbd@.service.tmpl nbd-server.service.tmpl
 nbd@.service: nbd@.service.sh
 	sh nbd@.service.sh > nbd@.service
 
-nbd@.service.sh.in: nbd@.service.tmpl sh.tmpl
+nbd@.service.sh.in: nbd@.service.tmpl ../man/sh.tmpl
 	cat sh.tmpl nbd@.service.tmpl > nbd@.service.sh.in
 	echo EOF >> nbd@.service.sh.in
 

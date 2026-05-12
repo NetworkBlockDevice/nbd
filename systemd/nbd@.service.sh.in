@@ -3,6 +3,19 @@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 sysconfdir=@sysconfdir@
+sbindir=@sbindir@
+bindir=@sbindir@
+runstatedir=@runstatedir@
+
+cat <<EOF
+#!/bin/sh
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+sysconfdir=@sysconfdir@
+sbindir=@sbindir@
+bindir=@sbindir@
+runstatedir=@runstatedir@
 
 cat <<EOF
 [Unit]
@@ -11,8 +24,9 @@ Documentation=man:nbd-client
 PartOf=nbd.service
 Before=dev-%i.device
 Before=remote-fs-pre.target
+Requires=modprobe@nbd.service
 After=network-online.target
-Before=shutdown.target
+After=modprobe@nbd.service
 Conflicts=shutdown.target
 DefaultDependencies=no
 [Service]
