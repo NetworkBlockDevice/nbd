@@ -260,7 +260,29 @@ manpage.1: manpage.sgml
 	  <emphasis>require</emphasis> the use of netlink, but it has
 	  not yet been decided when that will be the case.</para>
         </listitem>
-      </varlistentry
+      </varlistentry>
+      <varlistentry>
+        <term><option>-identifier <replaceable>ident</replaceable></option></term>
+        <term><option>-i</option></term>
+        <listitem>
+	  <para>Added in 3.27, this tells &dhpackage; to set the
+	  netlink identifier (requires kernel 5.14 or newer), which
+	  can later be viewed
+	  at <command>/sys/block/nbdN/backend</command>. This prevents
+	  any process from using netlink to silently reconfigure the
+	  device to a different backend, making it easier to write
+	  idempotent code that is safe in the presence of
+	  configuration races.
+	  </para>
+	  <para>This option is only available if &dhpackage; was
+	  compiled against libnl-genl. If that is not the case,
+	  nbd-client will only be able to use the ioctl interface (and
+	  the option will not be available).</para>
+	  <para>Note that a future version of &dhpackage; will
+	  <emphasis>require</emphasis> the use of netlink, but it has
+	  not yet been decided when that will be the case.</para>
+        </listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>-persist</option></term>
 	<term><option>-p</option></term>

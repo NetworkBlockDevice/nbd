@@ -363,7 +363,7 @@ int setup_connection_common(int sock, char *name, CONNECTION_TYPE ctype,
 			    int *serverflags, int testflags)
 {
 	char buf[256];
-	u64 tmp64;
+	uint64_t tmp64;
 	uint64_t mymagic = (name ? opts_magic : cliserv_magic);
 	uint32_t tmp32 = 0;
 	uint16_t handshakeflags = 0;
@@ -675,7 +675,7 @@ int setup_inetd_connection(gchar **argv)
 int close_connection(int sock, CLOSE_TYPE type)
 {
 	struct nbd_request req;
-	u64 counter = 0;
+	uint64_t counter = 0;
 
 	switch (type) {
 	case CONNECTION_CLOSE_PROPERLY:
@@ -831,7 +831,7 @@ int handshake_test(char *name, int sock, char close_sock, int testflags)
 {
 	int retval = -1;
 	int serverflags = 0;
-	u64 tmp64;
+	uint64_t tmp64;
 	uint32_t tmp32 = 0;
 
 	/* This should work */

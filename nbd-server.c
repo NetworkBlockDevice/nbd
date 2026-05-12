@@ -301,18 +301,22 @@ struct generic_conf {
 };
 
 #if HAVE_GNUTLS
-static int writeit_tls(gnutls_session_t s, void *buf, size_t len) {
+static int writeit_tls(gnutls_session_t s, const void *buf, size_t len) {
 	_cleanup_g_free_ char *m = NULL;
 	ssize_t res;
 	while(len > 0) {
 		DEBUG("+");
 		if ((res = gnutls_record_send(s, buf, len)) < 0 && !gnutls_error_is_fatal(res)) {
-			m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
-			err_nonfatal(m);
+			if(res != GNUTLS_E_AGAIN) {
+				m = g_strdup_printf("issue while sending data: %s", gnutls_strerror(res));
+				err_nonfatal(m);
+			}
 		} else if(res < 0) {
 			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
 			return -1;
+		} else if(res == 0) {
+			nbd_err_code("Aborting write: TLS connection closed gracefully.", 0);
 		} else {
 			len -= res;
 			buf += res;
@@ -333,6 +337,8 @@ static int readit_tls(gnutls_session_t s, void *buf, size_t len) {
 			m = g_strdup_printf("could not receive data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
 			return -1;
+		} else if(res == 0) {
+			nbd_err_code("TLS connection closed gracefully.", 0);
 		} else {
 			len -= res;
 			buf += res;
@@ -345,7 +351,7 @@ static int socket_read_tls(CLIENT* client, void *buf, size_t len) {
 	return readit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
 
-static int socket_write_tls(CLIENT* client, void *buf, size_t len) {
+static int socket_write_tls(CLIENT* client, const void *buf, size_t len) {
 	return writeit_tls(*((gnutls_session_t*)client->tls_session), buf, len);
 }
 #endif // HAVE_GNUTLS
@@ -354,7 +360,7 @@ static int socket_read_notls(CLIENT* client, void *buf, size_t len) {
 	return readit(client->net, buf, len);
 }
 
-static int socket_write_notls(CLIENT* client, void *buf, size_t len) {
+static int socket_write_notls(CLIENT* client, const void *buf, size_t len) {
 	return writeit(client->net, buf, len);
 }
 
@@ -397,7 +403,7 @@ static inline void consume_len(CLIENT* c) {
 	consume(c, len, buf, sizeof(buf));
 }
 
-static void socket_write(CLIENT* client, void *buf, size_t len) {
+static void socket_write(CLIENT* client, const void *buf, size_t len) {
 	g_assert(client->socket_write != NULL);
 	if(client->socket_write(client, buf, len)<0) {
 		g_assert(client->socket_closed != NULL);
@@ -863,7 +869,7 @@ GArray* parse_cfile(gchar* f, struct generic_conf *const genconf, bool expect_ge
 
         memset(&genconftmp, 0, sizeof(struct generic_conf));
 
-	genconftmp.tlsprio = "NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2:%SERVER_PRECEDENCE";
+	genconftmp.tlsprio = "NORMAL:+VERS-TLS-ALL:-VERS-TLS1.0:+VERS-TLS1.1:%SERVER_PRECEDENCE";
 
         if (genconf) {
                 /* Use the passed configuration values as defaults. The
@@ -1565,13 +1571,14 @@ int expread(READ_CTX *ctx, CLIENT *client) {
 			len : (size_t)DIFFPAGESIZE-offset;
 		if (!(client->server->flags & F_COPYONWRITE))
 			pthread_rwlock_rdlock(&client->export_lock);
-		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
+		if (client->difmap[mapcnt]!=(uint32_t)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt]));
 			char *buf = find_read_buf(ctx);
 			if (pread(client->difffile, buf, rdlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != rdlen) {
 				goto fail;
 			}
+			ctx->current_offset += rdlen;
 			confirm_read(client, ctx, rdlen);
 		} else { /* the block is not there */
 			if ((client->server->flags & F_WAIT) && (client->export == NULL)){
@@ -1634,7 +1641,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 
 		if (!(client->server->flags & F_COPYONWRITE))
 			pthread_rwlock_rdlock(&client->export_lock);
-		if (client->difmap[mapcnt]!=(u32)(-1)) { /* the block is already there */
+		if (client->difmap[mapcnt]!=(uint32_t)(-1)) { /* the block is already there */
 			DEBUG("Page %llu is at %lu\n", (unsigned long long)mapcnt,
 			       (unsigned long)(client->difmap[mapcnt])) ;
 			if (pwrite(client->difffile, buf, wrlen, client->difmap[mapcnt]*DIFFPAGESIZE+offset) != wrlen) goto fail;
@@ -1659,7 +1666,7 @@ int expwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
 				if(ret < 0 ) goto fail;
 			}
 			memcpy(pagebuf+offset,buf,wrlen) ;
-			if (write(client->difffile, pagebuf, DIFFPAGESIZE) != DIFFPAGESIZE)
+			if (pwrite(client->difffile, pagebuf, DIFFPAGESIZE, client->difmap[mapcnt]*DIFFPAGESIZE) != DIFFPAGESIZE)
 				goto fail;
 		}
 		if (!(client->server->flags & F_COPYONWRITE))
@@ -1782,7 +1789,7 @@ void punch_hole(int fd, off_t off, off_t len) {
 	}
 }
 
-static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, void* data) {
+static void send_reply(CLIENT* client, uint32_t opt, uint32_t reply_type, ssize_t datasize, const void* data) {
 	struct {
 		uint64_t magic;
 		uint32_t opt;
@@ -1934,7 +1941,7 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 		offset = DIFFPAGESIZE*i;
 		if (lock)
 			pthread_rwlock_wrlock(&client->export_lock);
-		if (client->difmap[i] != (u32)-1){
+		if (client->difmap[i] != (uint32_t)-1){
 			dirtycount += 1;
 			DEBUG("flushing dirty page %d, offset %ld\n", i, offset);
 			if (pread(client->difffile, buf, DIFFPAGESIZE, client->difmap[i]*DIFFPAGESIZE) != DIFFPAGESIZE) {
@@ -1951,7 +1958,7 @@ int commit_diff(CLIENT* client, bool lock, int fhandle){
 				}
 				break;
 			}
-			client->difmap[i] = (u32)-1;
+			client->difmap[i] = (uint32_t)-1;
 		}
 		if (lock)
 			pthread_rwlock_unlock(&client->export_lock);
@@ -2147,17 +2154,17 @@ bool copyonwrite_prepare(CLIENT* client) {
 		err("Could not create diff file (%m)");
 		return false;
 	}
-	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(u32)))==NULL) {
+	if ((client->difmap=calloc(client->exportsize/DIFFPAGESIZE,sizeof(uint32_t)))==NULL) {
 		err("Could not allocate memory");
 		return false;
 	}
-	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(u32)-1;
+	for (i=0;i<client->exportsize/DIFFPAGESIZE;i++) client->difmap[i]=(uint32_t)-1;
 
 	return true;
 }
 
 void send_export_info(CLIENT* client, SERVER* server, bool maybe_zeroes) {
-	uint64_t size_host = htonll((u64)(client->exportsize));
+	uint64_t size_host = htonll((uint64_t)(client->exportsize));
 	uint16_t flags = NBD_FLAG_HAS_FLAGS | NBD_FLAG_SEND_WRITE_ZEROES;
 
 	socket_write(client, &size_host, 8);
@@ -2873,7 +2880,7 @@ static void handle_normal_read(CLIENT *client, struct nbd_request *req)
 	} else {
 		ctx->is_structured = 0;
 	}
-	if(req->type & NBD_CMD_FLAG_DF != 0) {
+	if((req->type & NBD_CMD_FLAG_DF) != 0) {
 		ctx->df = 1;
 	}
 	if(ctx->is_structured && ctx->df && req->len > (1 << 20)) {
@@ -3303,7 +3310,7 @@ static int handle_childname(GArray* servers, int socket)
 				break;
 		}
 	}
-	if (len >= ULONG_MAX - 1) {
+	if (len >= UINT32_MAX - 1) {
 		err_nonfatal("Value out of range");
 		return -1;
 	}
@@ -3771,22 +3778,45 @@ void setup_servers(GArray *const servers, const gchar *const modernaddr,
 
 /**
  * Go daemon (unless we specified at compile time that we didn't want this)
- * @param serve the first server of our configuration. If its port is zero,
- * 	then do not daemonize, because we're doing inetd then. This parameter
- * 	is only used to create a PID file of the form
- * 	/var/run/nbd-server.&lt;port&gt;.pid; it's not modified in any way.
  **/
 #if !defined(NODAEMON)
 void daemonize() {
-	FILE*pidf;
-
-	if(daemon(0,0)<0) {
-		err("daemon");
-	}
+        pid_t child=fork();
+        if(child < 0) {
+		err("fork");
+	} else if(child > 0) {
+                exit(EXIT_SUCCESS);
+	} else {
+                if(setsid() < 0) {
+                        err("setsid");
+                }
+        }
+        if(chdir("/")<0) {
+                err("chdir");
+        }
 	if(!*pidfname) {
 		strncpy(pidfname, "/var/run/nbd-server.pid", 255);
 	}
-	pidf=fopen(pidfname, "w");
+        int newfd;
+        if((newfd = open("/dev/null", O_RDWR)) < 0) {
+                err("open");
+        }
+        if(dup2(0, newfd) < 0) {
+                err("dup2 stdin");
+        }
+        if(dup2(1, newfd) < 0) {
+                err("dup2 stdout");
+        }
+        if(dup2(2, newfd) < 0) {
+                err("dup2 stderr");
+        }
+        child=fork();
+        if(child < 0) {
+                err("fork");
+        } else if(child > 0) {
+                exit(EXIT_SUCCESS);
+        }
+	FILE*pidf=fopen(pidfname, "w");
 	if(pidf) {
 		fprintf(pidf,"%d\n", (int)getpid());
 		fclose(pidf);
@@ -3796,7 +3826,7 @@ void daemonize() {
 	}
 }
 #else
-#define daemonize(serve)
+#define daemonize()
 #endif /* !defined(NODAEMON) */
 
 /*

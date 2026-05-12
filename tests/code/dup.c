@@ -45,7 +45,7 @@ int main(void) {
 	count_assert(srvs.virtstyle == srvd->virtstyle);
 	count_assert(srvs.cidrlen == srvd->cidrlen);
 	count_assert(stringcmp(srvs.prerun, srvd->prerun) == 0);
-	count_assert(stringcmp(srvs.postrun, srvs.postrun) == 0);
+	count_assert(stringcmp(srvs.postrun, srvd->postrun) == 0);
 	count_assert(stringcmp(srvs.servename, srvd->servename) == 0);
 	count_assert(srvs.max_connections == srvd->max_connections);
 	count_assert(stringcmp(srvs.transactionlog, srvd->transactionlog) == 0);
