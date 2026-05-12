@@ -315,6 +315,8 @@ static int writeit_tls(gnutls_session_t s, const void *buf, size_t len) {
 			m = g_strdup_printf("could not send data: %s", gnutls_strerror(res));
 			err_nonfatal(m);
 			return -1;
+		} else if(res == 0) {
+			nbd_err_code("Aborting write: TLS connection closed gracefully.", 0);
 		} else {
 			len -= res;
 			buf += res;
@@ -336,7 +338,7 @@ static int readit_tls(gnutls_session_t s, void *buf, size_t len) {
 			err_nonfatal(m);
 			return -1;
 		} else if(res == 0) {
-			nbd_err("TLS End of data: Remote connection closed.");
+			nbd_err_code("TLS connection closed gracefully.", 0);
 		} else {
 			len -= res;
 			buf += res;
