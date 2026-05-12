@@ -68,3 +68,5 @@ nbdtab_parser.tab.h
 tests/parse/parser
 .pc
 debian/patches
+/systemd/nbd-server.service
+/systemd/nbd-server.service.sh

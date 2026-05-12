@@ -391,6 +391,7 @@ AC_CONFIG_FILES([Makefile
 		 $MAN_CONFIG_FILES
 		 systemd/Makefile
 		 systemd/nbd@.service.sh
+		 systemd/nbd-server.service.sh
 		])
 AC_OUTPUT
 

@@ -1,0 +1,23 @@
+#!/bin/sh
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+sysconfdir=@sysconfdir@
+sbindir=@sbindir@
+bindir=@sbindir@
+runstatedir=@runstatedir@
+
+cat <<EOF
+[Unit]
+Description=Network Block Device Server
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=$runstatedir/nbd-server.pid
+ExecStart=$bindir/nbd-server
+ExecReload=$bindir/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+EOF
