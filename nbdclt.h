@@ -23,12 +23,28 @@ typedef struct {
 	bool preinit;
 	bool force_ro;
 	bool tls;
+        bool persist_mode;
 	char *priority;
+	int dead_conn_timeout;
 } CLIENT;
 
 extern void nbdtab_set_property(char *property, char *val);
 extern void nbdtab_set_flag(char *property);
 extern void nbdtab_commit_line(char *devn, char *hostn, char *exportname);
 extern void yyerror(char *msg);
+
+typedef struct {
+	struct addrinfo *ai;
+	char *hostname;
+	char *port;
+} saved_connection_t;
+
+typedef struct {
+	saved_connection_t *conn;
+	uint16_t flags;
+	uint64_t size64;
+	int blocksize;
+	int timeout;
+} persist_connection_t;
 
 #endif

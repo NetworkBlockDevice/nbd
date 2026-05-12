@@ -9,9 +9,9 @@
 #include <cliserv.h>
 #include <nbd-debug.h>
 
-const u64 cliserv_magic = 0x00420281861253LL;
-const u64 opts_magic = 0x49484156454F5054LL;
-const u64 rep_magic = 0x3e889045565a9LL;
+const uint64_t cliserv_magic = 0x00420281861253LL;
+const uint64_t opts_magic = 0x49484156454F5054LL;
+const uint64_t rep_magic = 0x3e889045565a9LL;
 
 /**
  * Set a socket to blocking or non-blocking
@@ -72,10 +72,16 @@ void err_nonfatal(const char *s) {
 	fprintf(stderr, "Error: %s\n", s1);
 }
 
-void err(const char *s) {
+void nbd_err(const char *s) {
 	err_nonfatal(s);
 	fprintf(stderr, "Exiting.\n");
 	exit(EXIT_FAILURE);
+}
+
+void nbd_err_code(const char *s, int code) {
+	err_nonfatal(s);
+	fprintf(stderr, "Exiting.\n");
+	exit(abs(code));
 }
 
 void logging(const char* name) {
@@ -93,8 +99,8 @@ uint64_t ntohll(uint64_t a) {
 }
 #else
 uint64_t ntohll(uint64_t a) {
-	u32 lo = a & 0xffffffff;
-	u32 hi = a >> 32U;
+	uint32_t lo = a & 0xffffffff;
+	uint32_t hi = a >> 32U;
 	lo = ntohl(lo);
 	hi = ntohl(hi);
 	return ((uint64_t) lo) << 32U | hi;
@@ -139,7 +145,7 @@ int readit(int f, void *buf, size_t len) {
  * @param len the number of bytes to be written
  * @return 0 on success, or -1 if the socket was closed
  **/
-int writeit(int f, void *buf, size_t len) {
+int writeit(int f, const void *buf, size_t len) {
 	ssize_t res;
 	while (len > 0) {
 		DEBUG("+");

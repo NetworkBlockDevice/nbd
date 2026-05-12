@@ -84,19 +84,6 @@ else
   AC_MSG_RESULT([no])
 fi
 
-AC_ARG_ENABLE(
-  [gznbd],
-  [AS_HELP_STRING([--enable-gznbd],[Build gznbd too (nbd server with on-the-fly decompression of images. NOTE: no support for newstyle protocol.)])],
-  [
-    AS_IF(
-      [test "x$enableval" = "xyes"],
-      [ENABLE_GZNBD=yes],
-      [ENABLE_GZNBD=no]
-    )
-  ],
-  [ENABLE_GZNBD=no]
-)
-
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -277,9 +264,9 @@ AC_CHECK_HEADERS([sys/mount.h],,,
 ]])
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h sys/ioctl.h sys/socket.h syslog.h linux/types.h sys/dirent.h sys/uio.h])
 PKG_CHECK_MODULES(GLIB, [glib-2.0 >= 2.32.0 gthread-2.0 >= 2.32.0], [HAVE_GLIB=yes], AC_MSG_ERROR([Missing glib]))
-#PKG_CHECK_MODULES(SW, [socket_wrapper], [HAVE_SW=yes], [HAVE_SW=no])
-#PKG_CHECK_MODULES(NW, [nss_wrapper], [HAVE_NW=yes], [HAVE_NW=no])
-#AM_CONDITIONAL(CWRAP, test "$HAVE_SW" = "yes" -a "$HAVE_NW" = "yes")
+PKG_CHECK_MODULES(SW, [socket_wrapper], [HAVE_SW=yes], [HAVE_SW=no])
+PKG_CHECK_MODULES(NW, [nss_wrapper], [HAVE_NW=yes], [HAVE_NW=no])
+AM_CONDITIONAL(CWRAP, test "$HAVE_SW" = "yes" -a "$HAVE_NW" = "yes")
 
 my_save_cflags="$CFLAGS"
 my_save_libs="$LIBS"
@@ -323,6 +310,8 @@ else
 	HAVE_NETLINK=0
 	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
 fi
+
+AM_CONDITIONAL(NETLINK, [test "$HAVE_NETLINK" = "1"])
 
 AC_MSG_CHECKING([whether man pages are requested])
 AC_ARG_ENABLE([manpages],
@@ -383,7 +372,6 @@ AC_CONFIG_FILES([Makefile
 		 doc/Doxyfile
 		 doc/Makefile
 		 man/Makefile
-		 gznbd/Makefile
 		 tests/Makefile
 		 tests/code/Makefile
 		 tests/run/Makefile

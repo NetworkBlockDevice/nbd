@@ -963,7 +963,7 @@ Namespaces MUST be consist of one of the following:
 Third-party implementations can register additional namespaces by
 simple request to the mailing-list. The following additional
 third-party namespaces are currently registered:
-* `qemu`, maintained by [qemu.org](https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/nbd.txt)
+* `qemu`, maintained by [qemu.org](https://www.qemu.org/docs/master/interop/nbd.html)
 
 Save in respect of the `base:` namespace described below, this specification
 requires no specific semantics of metadata contexts, except that all the
@@ -2267,8 +2267,10 @@ The following request types exist:
     places for an exception), in part to avoid an amplification effect
     where a series of smaller descriptors can cause the server's reply
     to occupy more bytes than the *length* of the client's request.
-    The server MUST use descriptor lengths that are an integer
-    multiple of any advertised minimum block size. The status flags
+    The server SHOULD use descriptor lengths that are an integer
+    multiple of any advertised minimum block size, with an obvious
+    exception at the end of the image if the image size itself is
+    unaligned. The status flags
     are intentionally defined so that a server MAY always safely
     report a status of 0 for any block, although the server SHOULD
     return additional status values when they can be easily detected.
