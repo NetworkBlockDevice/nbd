@@ -12,6 +12,8 @@
 #include "treefiles.h"
 #include "nbd-debug.h"
 
+#include <string.h>
+
 /**
  * Tree structure helper functions
  */
@@ -32,13 +34,13 @@ void construct_path(char* name, int lenmax, off_t size, off_t pos, off_t* ppos) 
 	}
 }
 
-void delete_treefile(char* name, off_t size, off_t pos) {
+void delete_treefile(const char* base_nme, off_t export_size, off_t pos) {
 	char filename[PATH_MAX];
 	off_t ppos;
 
-	strncpy(filename,name,PATH_MAX-1);
+    strncpy(filename,base_nme,PATH_MAX-1);
 	filename[PATH_MAX-1] = '\0';
-	construct_path(filename+strlen(name),PATH_MAX-strlen(name)-1,size,pos,&ppos);
+    construct_path(filename+strlen(base_nme), PATH_MAX-strlen(base_nme)-1, export_size, pos, &ppos);
 
 	DEBUG("Deleting treefile: %s",filename);
 

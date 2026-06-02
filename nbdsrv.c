@@ -1,12 +1,13 @@
 #include "config.h"
 #include "nbd-debug.h"
 
-#include <nbdsrv.h>
+#include "nbdsrv.h"
 
 #include <assert.h>
 #include <ctype.h>
 #include <netdb.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <syslog.h>
@@ -18,16 +19,17 @@
 #include <sys/socket.h>
 #include <treefiles.h>
 #include "backend.h"
+
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
+
 #ifdef HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
 
-#define LINELEN 256	  /**< Size of static buffer used to read the
-			       authorization file (yuck) */
-#include <cliserv.h>
+#define LINELEN 256	  /**< Size of static buffer used to read the authorization file (yuck) */
+#include "cliserv.h"
 
 bool address_matches(const char* mask, const struct sockaddr* addr, GError** err) {
 	struct addrinfo *res, *aitmp, hints;
@@ -227,14 +229,12 @@ SERVER* dup_serve(const SERVER *const s) {
 }
 
 uint64_t size_autodetect(int fhandle) {
-	off_t es;
-	uint64_t bytes __attribute__((unused));
 	struct stat stat_buf;
-	int error;
 
 #ifdef HAVE_SYS_MOUNT_H
 #ifdef HAVE_SYS_IOCTL_H
 #ifdef BLKGETSIZE64
+    uint64_t bytes=0;
 	DEBUG("looking for export size with ioctl BLKGETSIZE64\n");
 	if (!ioctl(fhandle, BLKGETSIZE64, &bytes) && bytes) {
 		return bytes;
@@ -245,7 +245,7 @@ uint64_t size_autodetect(int fhandle) {
 
 	DEBUG("looking for fhandle size with fstat\n");
 	stat_buf.st_size = 0;
-	error = fstat(fhandle, &stat_buf);
+    const int error = fstat(fhandle, &stat_buf);
 	if (!error) {
 		/* always believe stat if a regular file as it might really
 		 * be zero length */
@@ -256,9 +256,9 @@ uint64_t size_autodetect(int fhandle) {
         }
 
 	DEBUG("looking for fhandle size with lseek SEEK_END\n");
-	es = lseek(fhandle, (off_t)0, SEEK_END);
-	if (es > ((off_t)0)) {
-		return (uint64_t)es;
+    const off_t es = lseek(fhandle, (off_t)0, SEEK_END);
+    if (es > 0) {
+        return es;
         } else {
                 DEBUG("lseek failed: %d", errno==EBADF?1:(errno==ESPIPE?2:(errno==EINVAL?3:4)));
         }
@@ -271,19 +271,19 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	/* Caller did range checking */
 	assert(!(client->server->flags & F_READONLY));
 	assert(req->from + req->len <= client->exportsize);
-	/* For copy-on-write, we should trim on the diff file. Not yet
-	 * implemented. */
+
+    /* For copy-on-write, we should trim on the diff file. Not yet implemented. */
 	if(client->server->flags & F_COPYONWRITE) {
 		DEBUG("TRIM not supported yet on copy-on-write exports");
 		return 0;
 	}
 	if (client->server->flags & F_TREEFILES) {
 		/* start address of first block to be trimmed */
-		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
+        off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
 		/* start address of first block NOT to be trimmed */
-		off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
+        const off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
 		while (min<max) {
-			delete_treefile(client->exportname,client->exportsize,min);
+            delete_treefile(client->exportname, client->exportsize, min);
 			min+=TREEPAGESIZE;
 		}
 		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
