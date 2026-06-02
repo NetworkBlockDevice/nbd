@@ -226,30 +226,25 @@ struct work_package {
 	void* data; /**< for write requests */
 };
 
-static volatile sig_atomic_t is_sigchld_caught; /**< Flag set by
-						     SIGCHLD handler
-						     to mark a child
-						     exit */
+/// Flag set by SIGCHLD handler to mark a child exit
+static volatile sig_atomic_t is_sigchld_caught;
 
-static volatile sig_atomic_t is_sigterm_caught; /**< Flag set by
-						     SIGTERM handler
-						     to mark a exit
-						     request */
+/// Flag set by SIGTERM handler to mark an exit request
+static volatile sig_atomic_t is_sigterm_caught;
 
-static volatile sig_atomic_t is_sighup_caught; /**< Flag set by SIGHUP
-                                                    handler to mark a
-                                                    reconfiguration
-                                                    request */
+/// Flag set by SIGHUP handler to mark a reconfiguration request
+static volatile sig_atomic_t is_sighup_caught;
 
-GArray* modernsocks;	  /**< Sockets for the modern handler. Not used
-			       if a client was only specified on the
-			       command line; only port used if
-			       oldstyle is set to false (and then the
-			       command-line client isn't used, gna gna).
-			       This may be more than one socket on
-			       systems that don't support serving IPv4
-			       and IPv6 from the same socket (like,
-			       e.g., FreeBSD) */
+/**
+ *  Sockets for the modern handler.
+ *  Not used if a client was only specified on the command line;
+ *  only port used if oldstyle is set to false (and then the command-line
+ *  client isn't used, gna gna).
+ *  This may be more than one socket on systems that don't support serving
+ *  IPv4 and IPv6 from the same socket (like, e.g., FreeBSD)
+ */
+GArray* modernsocks;
+
 GArray* childsocks;	/**< parent-side sockets for communication with children */
 int commsocket;		/**< child-side socket for communication with parent */
 static sem_t file_wait_sem;
@@ -262,7 +257,7 @@ bool logged_oversized=false;  /**< whether we logged oversized requests already 
 typedef enum {
 	PARAM_INT,		/**< This parameter is an integer */
 	PARAM_INT64,		/**< This parameter is an integer */
-	PARAM_STRING,		/**< This parameter is a string */
+    PARAM_STRING,	/**< This parameter is a string */
 	PARAM_BOOL,		/**< This parameter is a boolean */
 } PARAM_TYPE;
 
@@ -270,33 +265,30 @@ typedef enum {
  * Configuration file values
  **/
 typedef struct {
-	gchar *paramname;	/**< Name of the parameter, as it appears in
-				  the config file */
-	gboolean required;	/**< Whether this is a required (as opposed to
-				  optional) parameter */
+    gchar *paramname;   /**< Name of the parameter, as it appears in the config file */
+    gboolean required;	/**< Whether this is a required (as opposed to optional) parameter */
 	PARAM_TYPE ptype;	/**< Type of the parameter. */
 	gpointer target;	/**< Pointer to where the data of this
 				  parameter should be written. If ptype is
 				  PARAM_BOOL, the data is or'ed rather than
 				  overwritten. */
-	gint flagval;		/**< Flag mask for this parameter in case ptype
-				  is PARAM_BOOL. */
+    gint flagval;		/**< Flag mask for this parameter in case ptype is PARAM_BOOL. */
 } PARAM;
 
 /**
  * Configuration file values of the "generic" section
  **/
 struct generic_conf {
-        gchar *user;            /**< user we run the server as    */
-        gchar *group;           /**< group we run running as      */
-        gchar *modernaddr;      /**< address of the modern socket */
-        gchar *modernport;      /**< port of the modern socket    */
-        gchar *unixsock;	/**< file name of the unix domain socket */
+        gchar *user;        /**< user we run the server as    */
+        gchar *group;       /**< group we run running as      */
+        gchar *modernaddr;  /**< address of the modern socket */
+        gchar *modernport;  /**< port of the modern socket    */
+        gchar *unixsock;	   /**< file name of the unix domain socket */
 	gchar *certfile;        /**< certificate file             */
 	gchar *keyfile;         /**< key file                     */
 	gchar *cacertfile;      /**< CA certificate file          */
-	gchar *tlsprio;		/**< TLS priority string	  */
-        gint flags;             /**< global flags                 */
+    gchar *tlsprio;         /**< TLS priority string	  */
+        gint flags;         /**< global flags                 */
 	gint threads;		/**< maximum number of parallel threads we want to run */
 };
 

@@ -5,7 +5,7 @@
 #ifdef DODBG
 #define DEBUG(...) printf(__VA_ARGS__)
 #else
-#define DEBUG(...)
+#define DEBUG(...) do{}while(0)
 #endif
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION ""
