@@ -34,18 +34,18 @@ void construct_path(char* name, int lenmax, off_t size, off_t pos, off_t* ppos) 
 	}
 }
 
-void delete_treefile(const char* base_nme, off_t export_size, off_t pos) {
+void delete_treefile(const char* export_name, off_t export_size, off_t pos) {
 	char filename[PATH_MAX];
 	off_t ppos;
 
-    strncpy(filename,base_nme,PATH_MAX-1);
+    strncpy(filename, export_name, PATH_MAX-1);
 	filename[PATH_MAX-1] = '\0';
-    construct_path(filename+strlen(base_nme), PATH_MAX-strlen(base_nme)-1, export_size, pos, &ppos);
+    construct_path(filename+strlen(export_name), PATH_MAX-strlen(export_name)-1, export_size, pos, &ppos);
 
-	DEBUG("Deleting treefile: %s",filename);
+	DEBUG("Deleting treefile: %s", filename);
 
 	if (unlink(filename)==-1)
-		DEBUG("Deleting failed : %s",strerror(errno));
+		DEBUG("Deleting failed : %s", strerror(errno));
 }
 
 void mkdir_path(char* path) {
@@ -61,13 +61,13 @@ void mkdir_path(char* path) {
 	}
 }
 
-int open_treefile(char* name, mode_t mode, off_t size, off_t pos, pthread_mutex_t* mutex) {
+int open_treefile(const char* export_name, mode_t mode, off_t export_size, off_t pos, pthread_mutex_t* mutex) {
 	char filename[PATH_MAX];
 	off_t ppos;
 
-	strncpy(filename,name,PATH_MAX-1);
+	strncpy(filename, export_name, PATH_MAX-1);
 	filename[PATH_MAX - 1] = '\0';
-	construct_path(filename+strlen(name),PATH_MAX-strlen(name)-1,size,pos,&ppos);
+	construct_path(filename+strlen(export_name), PATH_MAX-strlen(export_name)-1, export_size, pos, &ppos);
 
 	DEBUG("Accessing treefile %s (offset %llu of %llu)",filename,(unsigned long long)pos,(unsigned long long)size);
 

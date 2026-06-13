@@ -272,18 +272,18 @@ int exptrim(struct nbd_request* req, CLIENT* client) {
 	assert(!(client->server->flags & F_READONLY));
 	assert(req->from + req->len <= client->exportsize);
 
-    /* For copy-on-write, we should trim on the diff file. Not yet implemented. */
+	/* For copy-on-write, we should trim on the diff file. Not yet implemented. */
 	if(client->server->flags & F_COPYONWRITE) {
 		DEBUG("TRIM not supported yet on copy-on-write exports");
 		return 0;
 	}
 	if (client->server->flags & F_TREEFILES) {
 		/* start address of first block to be trimmed */
-        off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
+		off_t min = ( ( req->from + TREEPAGESIZE - 1 ) / TREEPAGESIZE) * TREEPAGESIZE;
 		/* start address of first block NOT to be trimmed */
-        const off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
+		const off_t max = ( ( req->from + req->len ) / TREEPAGESIZE) * TREEPAGESIZE;
 		while (min<max) {
-            delete_treefile(client->exportname, client->exportsize, min);
+			delete_treefile(client->exportname, client->exportsize, min);
 			min+=TREEPAGESIZE;
 		}
 		DEBUG("Performed TRIM request on TREE structure from %llu to %llu", (unsigned long long) req->from, (unsigned long long) req->len);
