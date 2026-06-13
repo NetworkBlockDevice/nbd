@@ -279,17 +279,17 @@ typedef struct {
  * Configuration file values of the "generic" section
  **/
 struct generic_conf {
-        gchar *user;        /**< user we run the server as    */
-        gchar *group;       /**< group we run running as      */
-        gchar *modernaddr;  /**< address of the modern socket */
-        gchar *modernport;  /**< port of the modern socket    */
-        gchar *unixsock;	   /**< file name of the unix domain socket */
-	gchar *certfile;        /**< certificate file             */
-	gchar *keyfile;         /**< key file                     */
-	gchar *cacertfile;      /**< CA certificate file          */
-    gchar *tlsprio;         /**< TLS priority string	  */
-        gint flags;         /**< global flags                 */
-	gint threads;		/**< maximum number of parallel threads we want to run */
+	gchar *user;        /**< user we run the server as    */
+	gchar *group;       /**< group we run running as      */
+	gchar *modernaddr;  /**< address of the modern socket */
+	gchar *modernport;  /**< port of the modern socket    */
+	gchar *unixsock;    /**< file name of the unix domain socket */
+	gchar *certfile;    /**< certificate file             */
+	gchar *keyfile;     /**< key file                     */
+	gchar *cacertfile;  /**< CA certificate file          */
+	gchar *tlsprio;     /**< TLS priority string          */
+	gint flags;         /**< global flags                 */
+	gint threads;       /**< maximum number of parallel threads we want to run */
 };
 
 #if HAVE_GNUTLS
@@ -1190,7 +1190,7 @@ int get_filepos(CLIENT *client, off_t a, int* fhandle, off_t* foffset, size_t* m
  * @param fua Flag to indicate 'Force Unit Access'
  * @return The number of bytes actually written, or -1 in case of an error
  **/
-ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
+ssize_t rawexpwrite(off_t a, const char *buf, size_t len, CLIENT *client, int fua) {
 	int fhandle;
 	off_t foffset;
 	size_t maxbytes;
@@ -1263,7 +1263,7 @@ ssize_t rawexpwrite(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
  * @param fua Flag to indicate 'Force Unit Access'
  * @return 0 on success, nonzero on failure
  **/
-int rawexpwrite_fully(off_t a, char *buf, size_t len, CLIENT *client, int fua) {
+int rawexpwrite_fully(off_t a, const char *buf, size_t len, CLIENT *client, int fua) {
 	ssize_t ret=0;
 
 	while(len > 0 && (ret=rawexpwrite(a, buf, len, client, fua)) > 0 ) {

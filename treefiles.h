@@ -13,6 +13,6 @@ void delete_treefile(const char *base_name, off_t export_size, off_t pos);
 
 void mkdir_path(char *path);
 
-int open_treefile(char *name, mode_t mode, off_t size, off_t pos, pthread_mutex_t *mutex);
+int open_treefile(const char *export_name, mode_t mode, off_t size, off_t pos, pthread_mutex_t *mutex);
 
 #endif
