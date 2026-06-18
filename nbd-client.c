@@ -209,12 +209,12 @@ static void netlink_configure(int index, int *sockfds, uint16_t flags,
 
 	ret = nl_send_sync(socket, msg);
 	if (ret < 0) {
-                if(geteuid() != 0) {
-                        err_code("Failed to setup device. Are you root?\n", ret);
-                } else {
-		        err_code("Failed to setup device, check dmesg\n", ret);
-                }
-        }
+		if(geteuid() != 0) {
+			err_code("Failed to setup device. Are you root?\n", ret);
+		} else {
+			err_code("Failed to setup device, check dmesg\n", ret);
+		}
+	}
 	return;
 nla_put_failure:
 	err("Failed to create netlink message\n");
@@ -519,7 +519,7 @@ err:
 
 int openunix() {
 	int sock;
-        char *path = cur_client->hostn;
+	char *path = cur_client->hostn;
 	struct sockaddr_un un_addr;
 	memset(&un_addr, 0, sizeof(un_addr));
 
@@ -776,8 +776,8 @@ void negotiate(int *sockp, uint16_t *flags, uint32_t needed_flags, uint32_t clie
 		err("Failed/2.1: %m");
 
 #if HAVE_GNUTLS && !defined(NOTLS)
-        /* TLS */
-        if (cur_client->tls) {
+	/* TLS */
+	if (cur_client->tls) {
 		int plainfd[2]; // [0] is used by the proxy, [1] is used by NBD
 		tlssession_t *s = NULL;
 		int ret;
@@ -1230,7 +1230,7 @@ bool get_from_config() {
 		goto out;
 	}
 
-        retval = true;
+	retval = true;
 out:
 	if(yyin != NULL) {
 		fclose(yyin);
@@ -1383,10 +1383,10 @@ int main(int argc, char *argv[]) {
 	logging(MY_NAME);
 
 #if HAVE_GNUTLS && !defined(NOTLS)
-        tlssession_init();
+	tlssession_init();
 #endif
-        cur_client = calloc(sizeof(CLIENT), 1);
-        init_client(cur_client);
+	cur_client = calloc(sizeof(CLIENT), 1);
+	init_client(cur_client);
 
 	// Use refactored argument parsing
 	parse_result_t parse_result = parse_nbd_client_args(argc, argv, cur_client);
@@ -1441,7 +1441,7 @@ int main(int argc, char *argv[]) {
 	if(cur_client->hostn) {
 		if((!cur_client->name || !cur_client->dev) && !(opts & NBDC_DO_LIST)) {
 			if(!strncmp(cur_client->hostn, "nbd", 3) || !strncmp(cur_client->hostn, "/dev/nbd", 8)) {
-                                cur_client->dev = cur_client->hostn;
+				cur_client->dev = cur_client->hostn;
 				if(!get_from_config()) {
 					usage("no valid configuration for specified device found", cur_client->hostn);
 					exit(EXIT_FAILURE);
@@ -1456,7 +1456,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-        if (cur_client->key && !cur_client->cert)
+	if (cur_client->key && !cur_client->cert)
 		cur_client->cert = strdup(cur_client->key);
 
 	if (cur_client->cert != NULL || cur_client->key != NULL || cur_client->cacert != NULL || cur_client->tlshostn != NULL) {
@@ -1474,8 +1474,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-        if (!cur_client->tlshostn && cur_client->hostn && !cur_client->b_unix)
-                cur_client->tlshostn = strdup(cur_client->hostn);
+	if (!cur_client->tlshostn && cur_client->hostn && !cur_client->b_unix)
+		cur_client->tlshostn = strdup(cur_client->hostn);
 
 	if (netlink)
 		nofork = 1;
@@ -1623,7 +1623,7 @@ int main(int argc, char *argv[]) {
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
-                                cur_client->persist_mode = false;
+				cur_client->persist_mode = false;
 			} else {
 				if(cur_client->persist_mode) {
 					uint64_t old_size = cur_client->size64;
@@ -1659,7 +1659,7 @@ int main(int argc, char *argv[]) {
 			 * happened at this point. Probably best to quit, now
 			 */
 			fprintf(stderr, "Kernel call returned.\n");
-                        cur_client->persist_mode = false;
+			cur_client->persist_mode = false;
 		}
 	} while(cur_client->persist_mode);
 	printf("sock, ");
