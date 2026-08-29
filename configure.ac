@@ -287,29 +287,13 @@ AC_PREPROC_IFELSE(
 	[AC_MSG_RESULT([yes]); NEED_BSD_SOURCE=1])
 AC_DEFINE([NEED_BSD_SOURCE], $NEED_BSD_SOURCE, [Define to 1 if _BSD_SOURCE needs to be defined before certain inclusions])
 
-AC_ARG_WITH([libnl],
-	[AS_HELP_STRING([--without-libnl],
-		[do not use libnl])],
-	[],
-	[with_libnl=check]
+PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1,
+	[HAVE_NETLINK=1
+	AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
+	CFLAGS="$CFLAGS $LIBNL3_CFLAGS"
+	LIBS="$LIBS $LIBNL3_LIBS"],
+	AC_MSG_ERROR([required dependency libnl-genl not found or too old])
 )
-if test "x$with_libnl" != "xno"; then
-	PKG_CHECK_MODULES(LIBNL3, libnl-genl-3.0 >= 3.1,
-		[HAVE_NETLINK=1
-		AC_DEFINE(HAVE_NETLINK, 1, [Define to 1 if we have netlink support])
-		CFLAGS="$CFLAGS $LIBNL3_CFLAGS"
-		LIBS="$LIBS $LIBNL3_LIBS"],
-		[if test "x$with_libnl" = "xyes"; then
-			AC_MSG_ERROR([--with-libnl given but cannot find libnl])
-		else
-			HAVE_NETLINK=0
-			AC_DEFINE(HAVE_NETLINK, 0)
-		fi]
-	)
-else
-	HAVE_NETLINK=0
-	AC_DEFINE(HAVE_NETLINK, 0, [Define to 1 if we have netlink support])
-fi
 
 AM_CONDITIONAL(NETLINK, [test "$HAVE_NETLINK" = "1"])
 
