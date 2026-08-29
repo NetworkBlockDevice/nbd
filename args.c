@@ -247,7 +247,7 @@ timeout:
     }
 
     // Copy final port value
-    if(port != NBD_DEFAULT_PORT) {
+    if(strcmp(port, NBD_DEFAULT_PORT)) {
         client->port = port;
     }
 
