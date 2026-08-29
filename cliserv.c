@@ -47,7 +47,8 @@ void setmysockopt(int sock) {
 }
 
 void err_nonfatal(const char *s) {
-	char s1[150], *s2;
+	char s1[150];
+	const char *s2;
 
 	strncpy(s1, s, sizeof(s1));
 	if ((s2 = strstr(s, "%m"))) {
