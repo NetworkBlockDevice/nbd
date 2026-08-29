@@ -4,7 +4,12 @@
 #include "macro.h"
 
 int main(void) {
-	char filename[] = "/tmp/nbd.XXXXXX";
+	char* tmp = getenv("TMPDIR");
+	if(!tmp) {
+		tmp="/tmp";
+	}
+	char filename[strlen(tmp)+12];
+	sprintf(filename, "%s/nbd.XXXXXX", tmp);
 	int fd = mkstemp(filename);
 	unlink(filename);
 

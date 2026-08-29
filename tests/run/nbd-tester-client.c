@@ -1114,7 +1114,7 @@ static inline void makebuf(char *buf, uint64_t seq, uint64_t blknum)
 	uint64_t *p = (uint64_t *) buf;
 	int i;
 	if (!seq) {
-		bzero(buf, 512);
+		memset(buf, '\0', 512);
 		return;
 	}
 	for (i = 0; i < 512 / sizeof(uint64_t); i++) {
