@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <stdint.h>
+#include <sys/select.h>
 
 /* Mock libnl structures and functions */
 #include <netlink/netlink.h>
@@ -255,6 +256,32 @@ static int validate_status_message(struct nl_msg *msg) {
 	return 0;
 }
 
+/* pselect mock to drive the persist loop; only signals once if asked */
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask) {
+	static int call_count = 0;
+	const char *trigger = getenv("MOCK_PERSIST_TRIGGER");
+
+	(void)nfds;
+	(void)readfds;
+	(void)writefds;
+	(void)exceptfds;
+	(void)timeout;
+	(void)sigmask;
+
+	call_count++;
+
+	if (trigger && call_count == 1) {
+		printf("MOCK: pselect() - returning ready for first persist poll\n");
+		return 1;
+	}
+
+	/* After the first trigger (or if no trigger was requested), block until
+	 * we are interrupted. The timeout test harness will kill us. */
+	pause();
+	errno = EINTR;
+	return -1;
+}
+
 /* Mock implementations */
 struct nl_sock *nl_socket_alloc(void) {
 	init_real_functions();
@@ -425,11 +452,30 @@ int nl_send_sync(struct nl_sock *sock, struct nl_msg *msg) {
 	return nl_send_auto(sock, msg);
 }
 
+/* Forward declarations for test helpers */
+void mock_set_device_index(uint32_t index);
+void mock_send_link_dead_notification(void);
+
 int nl_recvmsgs_default(struct nl_sock *sock) {
 	init_real_functions();
 	
 	printf("MOCK: nl_recvmsgs_default() - simulating response\n");
 	
+	/* If asked, send a link-dead multicast for persist mode tests. */
+	if (getenv("MOCK_PERSIST_TRIGGER") && persist_callback_func && persist_callback_arg) {
+		const char *index_env = getenv("MOCK_PERSIST_INDEX");
+		static int link_dead_sent = 0;
+
+		if (!link_dead_sent) {
+			link_dead_sent = 1;
+			if (index_env)
+				mock_set_device_index(strtoul(index_env, NULL, 10));
+			mock_send_link_dead_notification();
+		}
+
+		return 0; /* Always succeed in mock */
+	}
+
 	/* If we have a registered callback, simulate a status response */
 	if (status_callback_func && status_callback_arg) {
 		/* Create a mock response message */

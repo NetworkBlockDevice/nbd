@@ -473,39 +473,71 @@ EOF
 [export]
 	exportname = $tmpnam
 EOF
+		# nbd-server runs with cwrap only; libnl_mock must not be preloaded
+		# into it because that would mock pselect() for the server.
 		../../nbd-server -C ${conffile} -p ${pidfile} &
 		PID=$!
 		sleep $DELAY
 
-		export LD_PRELOAD="$(pwd)/libnl_mock.so"
-
-		# Test 1: Basic persist mode connection with dead timeout
-		echo "Testing persist mode with dead connection timeout..."
-		timeout 2s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist -dead-timeout 30 2>&1 | head -5
-		persist_ret=$?
-
-		# Test 2: Test with default timeout (should use 30 seconds)
-		echo "Testing persist mode with default timeout..."
-		timeout 2s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist 2>&1 | head -5
-		persist_default_ret=$?
+		# nbd-client needs cwrap for the socket connection plus the libnl mock
+		# for netlink. Combine the inherited preloads with the mock library.
+		MOCK_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD }$(pwd)/libnl_mock.so"
+		export LD_PRELOAD="$MOCK_PRELOAD"
 
 		retval=0
+		set +e
 
-		# Basic persist mode should work or timeout
-		if [ $persist_ret -eq 124 ] || [ $persist_ret -eq 0 ]; then
-			echo "✓ persist mode test passed"
+		# Test 1: With -persist, the client listens to the multicast group
+		echo "Testing persist mode multicast group membership..."
+		timeout 2s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist -dead-timeout 30 >${tmpdir}/persist_join.out 2>&1
+		if grep -q "joined nbd_mc_group" ${tmpdir}/persist_join.out; then
+			echo "✓ persist mode listens to multicast"
 		else
-			echo "✗ persist mode test failed with code: $persist_ret"
+			echo "✗ persist mode did not join the multicast group"
+			cat ${tmpdir}/persist_join.out
 			retval=1
 		fi
 
-		# Default timeout should work or timeout
-		if [ $persist_default_ret -eq 124 ] || [ $persist_default_ret -eq 0 ]; then
-			echo "✓ persist mode default timeout test passed"
+		# Test 2: Without -persist, the client does not join the multicast group
+		echo "Testing without persist mode..."
+		timeout 2s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 >${tmpdir}/persist_nojoin.out 2>&1
+		if grep -q "joined nbd_mc_group" ${tmpdir}/persist_nojoin.out; then
+			echo "✗ non-persist mode unexpectedly joined the multicast group"
+			cat ${tmpdir}/persist_nojoin.out
+			retval=1
 		else
-			echo "✗ persist mode default timeout test failed with code: $persist_default_ret"
+			echo "✓ non-persist mode does not listen to multicast"
+		fi
+
+		# Test 3: With -persist, a matching link-dead notification triggers reconnection
+		echo "Testing persist mode reconnection on matching link dead..."
+		MOCK_PERSIST_TRIGGER=1 MOCK_PERSIST_INDEX=0 \
+		timeout 8s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist -dead-timeout 30 >${tmpdir}/persist_match.out 2>&1
+		if grep -q "Reconfigure message validation passed" ${tmpdir}/persist_match.out; then
+			echo "✓ persist mode reconnected on link dead"
+		else
+			echo "✗ persist mode did not reconnect on link dead"
+			cat ${tmpdir}/persist_match.out
 			retval=1
 		fi
+
+		# Test 4: With -persist, a non-matching link-dead notification is ignored
+		echo "Testing persist mode ignores link dead for other devices..."
+		MOCK_PERSIST_TRIGGER=1 MOCK_PERSIST_INDEX=99 \
+		timeout 3s ../../nbd-client -N export 127.0.0.1 /dev/nbd0 -persist -dead-timeout 30 >${tmpdir}/persist_mismatch.out 2>&1
+		if grep -q "Reconfigure message validation passed" ${tmpdir}/persist_mismatch.out; then
+			echo "✗ persist mode unexpectedly reconnected for another device"
+			cat ${tmpdir}/persist_mismatch.out
+			retval=1
+		elif grep -q "Received link dead notification for device 99" ${tmpdir}/persist_mismatch.out; then
+			echo "✓ persist mode ignored link dead for another device"
+		else
+			echo "✗ persist mode did not receive/ignore link dead for another device"
+			cat ${tmpdir}/persist_mismatch.out
+			retval=1
+		fi
+
+		set -e
 		;;
 	*)
 		echo "E: unknown test $1"
