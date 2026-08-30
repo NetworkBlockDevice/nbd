@@ -80,68 +80,68 @@ static int validate_connect_message(struct nl_msg *msg) {
 	struct genlmsghdr *gnlh;
 	struct nlattr *attrs[NBD_ATTR_MAX + 1];
 	int ret;
-	
+
 	nlh = real_nlmsg_hdr(msg);
 	if (!nlh) {
 		fprintf(stderr, "MOCK: Failed to get netlink header\n");
 		return -1;
 	}
-	
+
 	gnlh = nlmsg_data(nlh);
 	if (!gnlh) {
 		fprintf(stderr, "MOCK: Failed to get genl header\n");
 		return -1;
 	}
-	
+
 	if (gnlh->cmd != NBD_CMD_CONNECT) {
 		fprintf(stderr, "MOCK: Expected NBD_CMD_CONNECT, got %d\n", gnlh->cmd);
 		return -1;
 	}
-	
+
 	ret = genlmsg_parse(nlh, 0, attrs, NBD_ATTR_MAX, NULL);
 	if (ret != 0) {
 		fprintf(stderr, "MOCK: Failed to parse attributes: %d\n", ret);
 		return -1;
 	}
-	
+
 	/* Validate required attributes */
 	if (!attrs[NBD_ATTR_SIZE_BYTES]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_SIZE_BYTES\n");
 		return -1;
 	}
-	
+
 	if (!attrs[NBD_ATTR_BLOCK_SIZE_BYTES]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_BLOCK_SIZE_BYTES\n");
 		return -1;
 	}
-	
+
 	if (!attrs[NBD_ATTR_SERVER_FLAGS]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_SERVER_FLAGS\n");
 		return -1;
 	}
-	
+
 	if (!attrs[NBD_ATTR_SOCKETS]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_SOCKETS\n");
 		return -1;
 	}
-	
+
 	/* Validate attribute values */
 	uint64_t size = nla_get_u64(attrs[NBD_ATTR_SIZE_BYTES]);
 	if (size == 0) {
 		fprintf(stderr, "MOCK: Invalid size_bytes: %lu\n", size);
 		return -1;
 	}
-	
+
 	uint64_t block_size = nla_get_u64(attrs[NBD_ATTR_BLOCK_SIZE_BYTES]);
 	if (block_size == 0 || (block_size & (block_size - 1)) != 0) {
 		fprintf(stderr, "MOCK: Invalid block_size_bytes: %lu (must be power of 2)\n", block_size);
 		return -1;
 	}
-	
+
 	printf("MOCK: ✓ Connect message validation passed\n");
 	printf("MOCK:   Size: %lu, Block size: %lu, Flags: %lu\n", 
 	       size, block_size, nla_get_u64(attrs[NBD_ATTR_SERVER_FLAGS]));
-	
+
 	/* Check for optional dead connection timeout */
 	if (attrs[NBD_ATTR_DEAD_CONN_TIMEOUT]) {
 		uint64_t timeout = nla_get_u64(attrs[NBD_ATTR_DEAD_CONN_TIMEOUT]);
@@ -150,7 +150,7 @@ static int validate_connect_message(struct nl_msg *msg) {
 			fprintf(stderr, "MOCK: Warning: dead connection timeout is 0, should be non-zero for persist mode\n");
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -159,29 +159,29 @@ static int validate_disconnect_message(struct nl_msg *msg) {
 	struct genlmsghdr *gnlh;
 	struct nlattr *attrs[NBD_ATTR_MAX + 1];
 	int ret;
-	
+
 	nlh = real_nlmsg_hdr(msg);
 	if (!nlh) return -1;
-	
+
 	gnlh = nlmsg_data(nlh);
 	if (!gnlh) return -1;
-	
+
 	if (gnlh->cmd != NBD_CMD_DISCONNECT) {
 		fprintf(stderr, "MOCK: Expected NBD_CMD_DISCONNECT, got %d\n", gnlh->cmd);
 		return -1;
 	}
-	
+
 	ret = genlmsg_parse(nlh, 0, attrs, NBD_ATTR_MAX, NULL);
 	if (ret != 0) return -1;
-	
+
 	if (!attrs[NBD_ATTR_INDEX]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_INDEX for disconnect\n");
 		return -1;
 	}
-	
+
 	printf("MOCK: ✓ Disconnect message validation passed\n");
 	printf("MOCK:   Device index: %u\n", nla_get_u32(attrs[NBD_ATTR_INDEX]));
-	
+
 	return 0;
 }
 
@@ -190,34 +190,34 @@ static int validate_reconfigure_message(struct nl_msg *msg) {
 	struct genlmsghdr *gnlh;
 	struct nlattr *attrs[NBD_ATTR_MAX + 1];
 	int ret;
-	
+
 	nlh = real_nlmsg_hdr(msg);
 	if (!nlh) return -1;
-	
+
 	gnlh = nlmsg_data(nlh);
 	if (!gnlh) return -1;
-	
+
 	if (gnlh->cmd != NBD_CMD_RECONFIGURE) {
 		fprintf(stderr, "MOCK: Expected NBD_CMD_RECONFIGURE, got %d\n", gnlh->cmd);
 		return -1;
 	}
-	
+
 	ret = genlmsg_parse(nlh, 0, attrs, NBD_ATTR_MAX, NULL);
 	if (ret != 0) return -1;
-	
+
 	if (!attrs[NBD_ATTR_INDEX]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_INDEX for reconfigure\n");
 		return -1;
 	}
-	
+
 	if (!attrs[NBD_ATTR_SOCKETS]) {
 		fprintf(stderr, "MOCK: Missing required NBD_ATTR_SOCKETS for reconfigure\n");
 		return -1;
 	}
-	
+
 	printf("MOCK: ✓ Reconfigure message validation passed\n");
 	printf("MOCK:   Device index: %u\n", nla_get_u32(attrs[NBD_ATTR_INDEX]));
-	
+
 	return 0;
 }
 
@@ -226,24 +226,24 @@ static int validate_status_message(struct nl_msg *msg) {
 	struct genlmsghdr *gnlh;
 	struct nlattr *attrs[NBD_ATTR_MAX + 1];
 	int ret;
-	
+
 	nlh = real_nlmsg_hdr(msg);
 	if (!nlh) return -1;
-	
+
 	gnlh = nlmsg_data(nlh);
 	if (!gnlh) return -1;
-	
+
 	if (gnlh->cmd != NBD_CMD_STATUS) {
 		fprintf(stderr, "MOCK: Expected NBD_CMD_STATUS, got %d\n", gnlh->cmd);
 		return -1;
 	}
-	
+
 	ret = genlmsg_parse(nlh, 0, attrs, NBD_ATTR_MAX, NULL);
 	if (ret != 0) {
 		fprintf(stderr, "MOCK: Failed to parse status attributes: %d\n", ret);
 		return -1;
 	}
-	
+
 	/* Extract device index if provided */
 	if (attrs[NBD_ATTR_INDEX]) {
 		mock_device_index = nla_get_u32(attrs[NBD_ATTR_INDEX]);
@@ -252,7 +252,7 @@ static int validate_status_message(struct nl_msg *msg) {
 	} else {
 		printf("MOCK: ✓ Status message validation passed (querying all devices)\n");
 	}
-	
+
 	return 0;
 }
 
@@ -302,31 +302,31 @@ int genl_connect(struct nl_sock *sock) {
 
 int genl_ctrl_resolve(struct nl_sock *sock, const char *name) {
 	init_real_functions();
-	
+
 	if (strcmp(name, "nbd") == 0) {
 		printf("MOCK: genl_ctrl_resolve(nbd) - returning mock family ID %d\n", mock_family_id);
 		return mock_family_id;
 	}
-	
+
 	printf("MOCK: genl_ctrl_resolve(%s) - not found\n", name);
 	return -ENOENT;
 }
 
 int genl_ctrl_resolve_grp(struct nl_sock *sock, const char *family_name, const char *grp_name) {
 	init_real_functions();
-	
+
 	if (strcmp(family_name, "nbd") == 0 && strcmp(grp_name, "nbd_mc_group") == 0) {
 		printf("MOCK: genl_ctrl_resolve_grp(nbd, nbd_mc_group) - returning mock group ID %d\n", mock_group_id);
 		return mock_group_id;
 	}
-	
+
 	printf("MOCK: genl_ctrl_resolve_grp(%s, %s) - not found\n", family_name, grp_name);
 	return -ENOENT;
 }
 
 int nl_socket_modify_cb(struct nl_sock *sock, enum nl_cb_type type, enum nl_cb_kind kind, nl_recvmsg_msg_cb_t func, void *arg) {
 	init_real_functions();
-	
+
 	/* Store the callback for status queries and persist mode */
 	if (type == NL_CB_VALID && kind == NL_CB_CUSTOM) {
 		/* Use a simple heuristic - if func is not NULL, store it as persist callback */
@@ -345,18 +345,18 @@ int nl_socket_modify_cb(struct nl_sock *sock, enum nl_cb_type type, enum nl_cb_k
 	} else {
 		printf("MOCK: nl_socket_modify_cb() - callback registered\n");
 	}
-	
+
 	return real_nl_socket_modify_cb(sock, type, kind, func, arg);
 }
 
 int nl_socket_add_membership(struct nl_sock *sock, int group) {
 	init_real_functions();
-	
+
 	if (group == mock_group_id) {
 		printf("MOCK: nl_socket_add_membership() - joined nbd_mc_group (group %d)\n", group);
 		return 0;
 	}
-	
+
 	printf("MOCK: nl_socket_add_membership() - unknown group %d\n", group);
 	return -EINVAL;
 }
@@ -394,17 +394,17 @@ int nl_send_auto(struct nl_sock *sock, struct nl_msg *msg) {
 	struct nlmsghdr *nlh;
 	struct genlmsghdr *gnlh;
 	int validation_result = -1;
-	
+
 	init_real_functions();
-	
+
 	printf("MOCK: nl_send_auto() - intercepting message\n");
-	
+
 	/* Store the message for validation */
 	if (last_sent_msg) {
 		real_nlmsg_free(last_sent_msg);
 	}
 	last_sent_msg = msg;
-	
+
 	/* Validate the message */
 	nlh = real_nlmsg_hdr(msg);
 	if (nlh) {
@@ -430,12 +430,12 @@ int nl_send_auto(struct nl_sock *sock, struct nl_msg *msg) {
 			}
 		}
 	}
-	
+
 	if (validation_result != 0) {
 		fprintf(stderr, "MOCK: Message validation failed!\n");
 		return -EINVAL;
 	}
-	
+
 	/* Don't actually send, just pretend it worked */
 	printf("MOCK: nl_send_auto() - success (message not actually sent)\n");
 	return 0;
@@ -458,9 +458,9 @@ void mock_send_link_dead_notification(void);
 
 int nl_recvmsgs_default(struct nl_sock *sock) {
 	init_real_functions();
-	
+
 	printf("MOCK: nl_recvmsgs_default() - simulating response\n");
-	
+
 	/* If asked, send a link-dead multicast for persist mode tests. */
 	if (getenv("MOCK_PERSIST_TRIGGER") && persist_callback_func && persist_callback_arg) {
 		const char *index_env = getenv("MOCK_PERSIST_INDEX");
@@ -483,7 +483,7 @@ int nl_recvmsgs_default(struct nl_sock *sock) {
 		if (response) {
 			/* Build a mock status response */
 			void *msg_data = genlmsg_put(response, NL_AUTO_PORT, NL_AUTO_SEQ, mock_family_id, 0, 0, NBD_CMD_STATUS, 0);
-			
+
 			if (msg_data) {
 				/* Add device list attribute */
 				struct nlattr *device_list = nla_nest_start(response, NBD_ATTR_DEVICE_LIST);
@@ -499,16 +499,16 @@ int nl_recvmsgs_default(struct nl_sock *sock) {
 					}
 					nla_nest_end(response, device_list);
 				}
-				
+
 				/* Call the callback with the mock response */
 				printf("MOCK: Calling status callback with mock response (status=%d)\n", mock_device_status);
 				status_callback_func(response, status_callback_arg);
 			}
-			
+
 			real_nlmsg_free(response);
 		}
 	}
-	
+
 	return 0; /* Always succeed in mock */
 }
 
@@ -525,9 +525,9 @@ void mock_set_device_index(uint32_t index) {
 
 void mock_send_link_dead_notification(void) {
 	init_real_functions();
-	
+
 	printf("MOCK: Sending link dead notification\n");
-	
+
 	/* If we have a registered persist callback, simulate a link dead message */
 	if (persist_callback_func && persist_callback_arg) {
 		/* Create a mock link dead message */
@@ -535,16 +535,16 @@ void mock_send_link_dead_notification(void) {
 		if (msg) {
 			/* Build a mock link dead notification */
 			void *msg_data = genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, mock_family_id, 0, 0, NBD_CMD_LINK_DEAD, 0);
-			
+
 			if (msg_data) {
 				/* Add device index */
 				nla_put_u32(msg, NBD_ATTR_INDEX, mock_device_index);
-				
+
 				/* Call the persist callback with the mock notification */
 				printf("MOCK: Calling persist callback with link dead notification (device %u)\n", mock_device_index);
 				persist_callback_func(msg, persist_callback_arg);
 			}
-			
+
 			real_nlmsg_free(msg);
 		}
 	} else {
