@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include "config.h"
 #include "lfs.h"
+#include "nbd.h"
 #include <netinet/in.h>
 #include <glib.h>
 
