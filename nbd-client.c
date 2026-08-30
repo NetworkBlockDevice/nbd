@@ -1108,18 +1108,18 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 	int ret;
 	sigset_t mask, oldmask;
 	struct sigaction sa;
-	
+
 	/* Initialize persist connection structure */
 	persist_conn.conn = malloc(sizeof(saved_connection_t));
 	if (!persist_conn.conn)
 		err("Cannot allocate saved connection\n");
-	
+
 	memset(persist_conn.conn, 0, sizeof(saved_connection_t));
 	persist_conn.flags = connection_flags;
 	persist_conn.size64 = cur_client->size64;
 	persist_conn.blocksize = cur_client->bs;
 	persist_conn.timeout = cur_client->timeout;
-	
+
 	/* Save initial connection details */
 	if (!cur_client->b_unix) {
 		persist_conn.conn->hostname = strdup(cur_client->hostn);
@@ -1127,17 +1127,17 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 		/* Perform initial address resolution and save */
 		opennet(persist_conn.conn);
 	}
-	
+
 	/* Set up signal handling for clean shutdown */
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGINT);
 	sigaddset(&mask, SIGTERM);
 	sigprocmask(SIG_BLOCK, &mask, &oldmask);
-	
+
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, NULL);
-	
+
 	/* Set up multicast socket for listening to disconnection messages */
 	mcast_socket = nl_socket_alloc();
 	if (!mcast_socket)
@@ -1145,37 +1145,37 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 	
 	if (genl_connect(mcast_socket))
 		err("Couldn't connect to the multicast socket\n");
-	
+
 	driver_id = genl_ctrl_resolve(mcast_socket, "nbd");
 	if (driver_id < 0)
 		err("Couldn't resolve the nbd netlink family for multicast\n");
-	
+
 	/* Join multicast group */
 	ret = nl_socket_add_membership(mcast_socket, genl_ctrl_resolve_grp(mcast_socket, "nbd", "nbd_mc_group"));
 	if (ret < 0)
 		err("Couldn't join nbd multicast group\n");
-	
+
 	/* Set up callback for multicast messages */
 	nl_socket_modify_cb(mcast_socket, NL_CB_VALID, NL_CB_CUSTOM, persist_callback, &persist_conn);
-	
+
 	fprintf(stderr, "Persist mode active, monitoring device %d\n", device_index);
-	
+
 	/* Main monitoring loop */
 	while (1) {
 		fd_set readfds;
 		int max_fd = nl_socket_get_fd(mcast_socket);
-		
+
 		FD_ZERO(&readfds);
 		FD_SET(max_fd, &readfds);
-		
+
 		/* Temporarily unblock signals for pselect */
 		sigprocmask(SIG_SETMASK, &oldmask, NULL);
-		
+
 		ret = pselect(max_fd + 1, &readfds, NULL, NULL, NULL, &oldmask);
-		
+
 		/* Re-block signals */
 		sigprocmask(SIG_BLOCK, &mask, NULL);
-		
+
 		if (ret < 0) {
 			if (errno == EINTR) {
 				fprintf(stderr, "Received interrupt signal, shutting down persist mode\n");
@@ -1183,22 +1183,22 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 			}
 			err("Select failed in persist mode: %m\n");
 		}
-		
+
 		if (ret > 0 && FD_ISSET(max_fd, &readfds)) {
 			/* Process netlink messages */
 			nl_recvmsgs_default(mcast_socket);
 		}
 	}
-	
+
 	/* Cleanup */
 	cleanup_persist_connection(&persist_conn);
-	
+
 	if (mcast_socket) {
 		nl_socket_free(mcast_socket);
 	}
-	
+
 	sigprocmask(SIG_SETMASK, &oldmask, NULL);
-	
+
 	return 0;
 }
 
