@@ -9,14 +9,11 @@
    Send 128 bytes of zeros (reserved for future use)
  */
 
-// #include <errno.h>
 #include <string.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <stdlib.h>
-
-//#include "nbd.h"
 
 #ifndef HAVE_FDATASYNC
 #define fdatasync(arg) fsync(arg)

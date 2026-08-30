@@ -1,8 +1,6 @@
 #ifndef NBDSRV_H
 #define NBDSRV_H
 
-// #include "lfs.h"
-
 #include <glib.h>
 #include <stdbool.h>
 #include <stdint.h>

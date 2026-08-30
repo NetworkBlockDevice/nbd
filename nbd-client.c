@@ -19,7 +19,6 @@
  */
 
 #include "config.h"
-// #include "lfs.h"
 #include "nbd.h"
 
 #include <sys/ioctl.h>
@@ -27,10 +26,8 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <unistd.h>
-// #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
-// #include "netdb-compat.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -40,12 +37,9 @@
 #include <sys/mman.h>
 #include <signal.h>
 #include <errno.h>
-// #include <getopt.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
-
-// #include <linux/ioctl.h>
 
 #if HAVE_NETLINK
 #include "nbd-netlink.h"

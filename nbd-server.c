@@ -78,11 +78,9 @@
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
 #endif
-// #include <sys/param.h>
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
-// #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <syslog.h>
@@ -98,8 +96,6 @@
 #if HAVE_BLKDISCARD
 #include <linux/fs.h>
 #endif
-// #include <arpa/inet.h>
-// #include <strings.h>
 #include <dirent.h>
 #ifdef HAVE_SYS_DIR_H
 #include <sys/dir.h>
@@ -111,7 +107,6 @@
 #include <pwd.h>
 #include <grp.h>
 #include <dirent.h>
-// #include <ctype.h>
 #include <inttypes.h>
 
 #include <glib.h>
@@ -120,7 +115,6 @@
 #define MY_NAME "nbd_server"
 #include "cliserv.h"
 #include "nbd-debug.h"
-// #include "netdb-compat.h"
 #include "backend.h"
 #include "treefiles.h"
 #include "nbd-helper.h"
