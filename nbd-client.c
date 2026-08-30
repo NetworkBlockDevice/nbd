@@ -190,7 +190,7 @@ static void netlink_configure(int index, int *sockfds, uint16_t flags,
 		NLA_PUT_U64(msg, NBD_ATTR_TIMEOUT, cur_client->timeout);
 	if (cur_client->dead_conn_timeout)
 		NLA_PUT_U64(msg, NBD_ATTR_DEAD_CONN_TIMEOUT, cur_client->dead_conn_timeout);
-	else if (cur_client->persist_mode)
+	else if (cur_client->persist)
 		NLA_PUT_U64(msg, NBD_ATTR_DEAD_CONN_TIMEOUT, 30); /* Default 30 seconds for persist mode */
 	if (identifier)
 		NLA_PUT_STRING(msg, NBD_ATTR_BACKEND_IDENTIFIER, identifier);
@@ -1556,7 +1556,7 @@ int main(int argc, char *argv[]) {
 		netlink_configure(index, sockfds, flags, identifier);
 		
 		/* If persist mode is enabled, start the monitoring loop */
-		if (cur_client->persist_mode) {
+		if (cur_client->persist) {
 			return persist_mode_main(index, sockfds, flags);
 		}
 		
@@ -1624,9 +1624,9 @@ int main(int argc, char *argv[]) {
 			if(error==EBADR) {
 				/* The user probably did 'nbd-client -d' on us.
 				 * quit */
-				cur_client->persist_mode = false;
+				cur_client->persist = false;
 			} else {
-				if(cur_client->persist_mode) {
+				if(cur_client->persist) {
 					uint64_t old_size = cur_client->size64;
 					uint16_t new_flags;
 
@@ -1660,9 +1660,9 @@ int main(int argc, char *argv[]) {
 			 * happened at this point. Probably best to quit, now
 			 */
 			fprintf(stderr, "Kernel call returned.\n");
-			cur_client->persist_mode = false;
+			cur_client->persist = false;
 		}
-	} while(cur_client->persist_mode);
+	} while(cur_client->persist);
 	printf("sock, ");
 	ioctl(nbd, NBD_CLEAR_SOCK);
 	printf("done\n");

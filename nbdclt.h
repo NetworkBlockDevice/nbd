@@ -26,7 +26,6 @@ typedef struct {
 	bool preinit;
 	bool force_ro;
 	bool tls;
-    bool persist_mode;
 	char *priority;
 	int dead_conn_timeout;
 } CLIENT;
