@@ -1151,7 +1151,7 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 		err("Couldn't resolve the nbd netlink family for multicast\n");
 
 	/* Join multicast group */
-	ret = nl_socket_add_membership(mcast_socket, genl_ctrl_resolve_grp(mcast_socket, "nbd", "nbd_mc_group"));
+	ret = nl_socket_add_membership(mcast_socket, genl_ctrl_resolve_grp(mcast_socket, "nbd", NBD_GENL_MCAST_GROUP_NAME));
 	if (ret < 0)
 		err("Couldn't join nbd multicast group\n");
 
