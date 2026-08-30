@@ -964,9 +964,12 @@ static int persist_callback(struct nl_msg *msg, void *arg) {
 	
 	switch (gnlh->cmd) {
 		case NBD_CMD_LINK_DEAD:
+			device_index = nla_get_u32(msg_attr[NBD_ATTR_INDEX]);
 			fprintf(stderr, "Received link dead notification for device %d\n", device_index);
-			/* Trigger reconnection */
-			/* This will be handled in the main loop */
+			if(device_index == persist_conn->device_index) {
+				fprintf(stderr, "Our device, triggering reconnect...");
+				persist_conn->link_dead = true;
+			}
 			break;
 		default:
 			break;
@@ -1119,6 +1122,8 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 	persist_conn.size64 = cur_client->size64;
 	persist_conn.blocksize = cur_client->bs;
 	persist_conn.timeout = cur_client->timeout;
+	persist_conn.device_index = device_index;
+	persist_conn.link_dead = false;
 
 	/* Save initial connection details */
 	if (!cur_client->b_unix) {
@@ -1145,6 +1150,8 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 	
 	if (genl_connect(mcast_socket))
 		err("Couldn't connect to the multicast socket\n");
+
+	nl_socket_disable_seq_check(mcast_socket);
 
 	driver_id = genl_ctrl_resolve(mcast_socket, "nbd");
 	if (driver_id < 0)
@@ -1187,6 +1194,18 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 		if (ret > 0 && FD_ISSET(max_fd, &readfds)) {
 			/* Process netlink messages */
 			nl_recvmsgs_default(mcast_socket);
+			if(persist_conn.link_dead) {
+				int *new_sockfds = malloc(sizeof(int) * cur_client->nconn);
+				if(!new_sockfds) {
+					err("Cannot allocate socket fd array");
+				}
+
+				if(reconnect_with_backoff(&persist_conn, new_sockfds) == 0
+						&& netlink_reconfigure(device_index, new_sockfds) == 0) {
+					persist_conn.link_dead = 0;
+				}
+				free(new_sockfds);
+			}
 		}
 	}
 

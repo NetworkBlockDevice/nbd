@@ -47,6 +47,8 @@ typedef struct {
 	uint64_t size64;
 	int blocksize;
 	int timeout;
+	int device_index;
+	bool link_dead;
 } persist_connection_t;
 
 #endif
