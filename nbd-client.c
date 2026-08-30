@@ -1164,7 +1164,6 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 	while (1) {
 		fd_set readfds;
 		int max_fd = nl_socket_get_fd(mcast_socket);
-		struct timespec timeout_ts = { .tv_sec = 1, .tv_nsec = 0 };
 		
 		FD_ZERO(&readfds);
 		FD_SET(max_fd, &readfds);
@@ -1172,8 +1171,7 @@ static int persist_mode_main(int device_index, int *initial_sockfds, uint16_t co
 		/* Temporarily unblock signals for pselect */
 		sigprocmask(SIG_SETMASK, &oldmask, NULL);
 		
-		/* Wait for multicast messages or timeout */
-		ret = pselect(max_fd + 1, &readfds, NULL, NULL, &timeout_ts, &oldmask);
+		ret = pselect(max_fd + 1, &readfds, NULL, NULL, NULL, &oldmask);
 		
 		/* Re-block signals */
 		sigprocmask(SIG_BLOCK, &mask, NULL);
