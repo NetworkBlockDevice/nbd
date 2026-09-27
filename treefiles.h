@@ -4,6 +4,10 @@
 #include <pthread.h>
 #include <sys/types.h>
 
+// On 32-bit systems, lfs.h changes the size of off_t, so it *must* be included
+// before mentioning off_t, otherwise things go horribly wrong
+#include "lfs.h"
+
 #define TREEDIRSIZE  1024 /**< number of files per subdirectory (or subdirs per subdirectory) */
 #define TREEPAGESIZE 4096 /**< tree (block) files uses those chunks */
 

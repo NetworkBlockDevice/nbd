@@ -10,6 +10,9 @@
 #include <sys/types.h>
 #include <semaphore.h>
 #include "nbd.h"
+// On 32-bit systems, lfs.h changes the size of off_t, so it *must* be included
+// before mentioning off_t, otherwise things go horribly wrong
+#include "lfs.h"
 
 /* Structures */
 
