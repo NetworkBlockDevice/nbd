@@ -1,3 +1,4 @@
+#include "treefiles.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h> // for PATH_MAX
@@ -8,7 +9,6 @@
 
 #include "config.h"
 #include "cliserv.h"
-#include "treefiles.h"
 #include "nbd-debug.h"
 
 #include <string.h>

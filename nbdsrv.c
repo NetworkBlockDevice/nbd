@@ -1,4 +1,7 @@
 #include "config.h"
+// On 32-bit systems, lfs.h changes the size of off_t, so it *must* be included
+// before mentioning off_t, otherwise things go horribly wrong
+#include "lfs.h"
 #include "nbd-debug.h"
 
 #include "nbdsrv.h"
