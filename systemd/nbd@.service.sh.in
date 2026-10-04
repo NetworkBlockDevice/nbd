@@ -14,9 +14,8 @@ After=network-online.target
 Conflicts=shutdown.target
 DefaultDependencies=no
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=@sbindir@/nbd-client %i
+Type=simple
+ExecStart=@sbindir@/nbd-client -nofork %i
 ExecStop=@sbindir@/nbd-client -d %i
 [Install]
 RequiredBy=dev-%i.device
