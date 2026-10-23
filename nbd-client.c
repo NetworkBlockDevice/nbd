@@ -1339,9 +1339,9 @@ void usage(char* errmsg, ...) {
 		fprintf(stderr, "%s version %s\n", PROG_NAME, PACKAGE_VERSION);
 	}
 #if HAVE_NETLINK
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-i ident|-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m] [-i ident|-nonetlink|-L]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P] [-connections|-C num]\n");
 #else
-	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P]\n");
+	fprintf(stderr, "Usage: nbd-client -name|-N name host [port] nbd_device\n\t[-block-size|-b block size] [-timeout|-t timeout] [-swap|-s]\n\t[-persist|-p] [-nofork|-n] [-systemd-mark|-m]\n\t[-readonly|-R] [-size|-B bytes] [-preinit|-P] [-connections|-C num]\n");
 #endif
 	fprintf(stderr, "Or   : nbd-client -u (with same arguments as above)\n");
 	fprintf(stderr, "Or   : nbd-client nbdX\n");
