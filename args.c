@@ -40,7 +40,7 @@ parse_result_t parse_nbd_client_args(int argc, char *argv[], CLIENT *client) {
     int nonspecial = 0;
     char *port = NBD_DEFAULT_PORT;
     
-    static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:T:C"
+    static const char *short_opts = "-B:b:c:d:gH:hlnN:PpRSst:uVxy:T:C:"
 #if HAVE_NETLINK
 	"i:L"
 #endif
